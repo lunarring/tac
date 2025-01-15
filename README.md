@@ -95,7 +95,3 @@ agents:
     type: aider
     max_retries: 3
 ```
-
-## License
-
-MIT License
