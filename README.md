@@ -87,7 +87,7 @@ Additional options:
 
 ## Configuration
 
-The framework uses a configuration file (`src/test_chain/core/config.yaml`) to control various aspects:
+The framework uses a configuration file (`config.yaml`) to control various aspects:
 
 ```yaml
 agents:

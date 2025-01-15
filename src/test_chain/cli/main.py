@@ -14,7 +14,7 @@ from test_chain.core.executor import BlockExecutor
 from test_chain.core.logging import logger
 
 def load_config():
-    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'core', 'config.yaml')
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
