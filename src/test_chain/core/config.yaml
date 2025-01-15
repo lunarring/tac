@@ -4,3 +4,10 @@ agents:
     max_retries: 5
   testing:
     type: "aider" 
+
+logging:
+  test_chain:
+    color: "green"
+    level: "INFO"
+  other_packages:
+    level: "INFO" 

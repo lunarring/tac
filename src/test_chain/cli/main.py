@@ -11,6 +11,7 @@ if src_dir not in sys.path:
 from test_chain.core.block import Block
 from test_chain.agents.aider_agent import AiderAgent
 from test_chain.core.executor import BlockExecutor
+from test_chain.core.logging import logger
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'core', 'config.yaml')
@@ -79,18 +80,18 @@ def main():
     try:
         block, project_dir = load_block_from_yaml(args.yaml_path)
     except FileNotFoundError:
-        print(f"Error: YAML file not found: {args.yaml_path}")
+        logger.error(f"YAML file not found: {args.yaml_path}")
         sys.exit(1)
     except yaml.YAMLError as e:
-        print(f"Error: Invalid YAML file: {e}")
+        logger.error(f"Invalid YAML file: {e}")
         sys.exit(1)
     except KeyError as e:
-        print(f"Error: Missing required field in YAML file: {e}")
+        logger.error(f"Missing required field in YAML file: {e}")
         sys.exit(1)
 
     if args.dry_run:
-        print(f"Successfully loaded block '{block.function_name}' from {args.yaml_path}")
-        print(f"Project directory: {project_dir}")
+        logger.info(f"Successfully loaded block '{block.function_name}' from {args.yaml_path}")
+        logger.info(f"Project directory: {project_dir}")
         sys.exit(0)
 
     # Ensure the project directory exists
@@ -107,7 +108,7 @@ def main():
         with open(os.path.join(project_dir, 'tests', '__init__.py'), 'w', encoding='utf-8') as f:
             pass
         
-        print("Project initialized with placeholder code.")
+        logger.info("Project initialized with placeholder code.")
 
     try:
         # Load configuration
@@ -123,21 +124,21 @@ def main():
             # Only run tests
             success = executor.run_tests()
             if success:
-                print("All tests passed successfully.")
+                logger.info("All tests passed successfully.")
             else:
-                print("Tests failed.")
+                logger.error("Tests failed.")
                 sys.exit(1)
         else:
             # Execute the block
             success = executor.execute_block()
 
             if success:
-                print("Block executed and changes applied successfully.")
+                logger.info("Block executed and changes applied successfully.")
             else:
-                print("Block execution failed. Changes have been discarded.")
+                logger.error("Block execution failed. Changes have been discarded.")
                 sys.exit(1)
     except Exception as e:
-        print(f"Error during execution: {e}")
+        logger.error(f"Error during execution: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
