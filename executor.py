@@ -26,14 +26,21 @@ class BlockExecutor:
         """
         try:
             print("Generating tests first...")
-            self.agent.generate_tests(self.block.test_specification, self.block.test_data_generation)
+            self.agent.generate_tests(
+                self.block.test_specification, 
+                self.block.test_data_generation,
+                self.block.function_name
+            )
 
             max_retries = self.config['agents']['programming']['max_retries']
             for attempt in range(max_retries):
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution...")
                 
                 print("Executing task...")
-                self.agent.execute_task(self.block.task_description)
+                self.agent.execute_task(
+                    self.block.task_description,
+                    self.block.function_name
+                )
 
                 print("Running tests...")
                 if self.run_tests():

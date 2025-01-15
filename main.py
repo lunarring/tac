@@ -13,8 +13,9 @@ if __name__ == "__main__":
     # Define the path to the original project directory
     original_project_dir = '/Users/jjj/git/tmp/block_test'
 
-    # Create the block directly
+    # Create the block directly with function_name parameter
     block = Block(
+        function_name="caesar_cipher",
         task_description="""
         CHANGE: Implement a Python function caesar_cipher(text, shift) that returns a new string where each alphabetic character in 'text' is shifted by 'shift' positions in the alphabet. Wrap around from 'z' to 'a', preserve the original case for letters, and leave all non-alphabetic characters unchanged.
         """,
@@ -33,31 +34,13 @@ if __name__ == "__main__":
         """
     )
 
-    # # Create the block directly
-    # block = Block(
-    #     task_description=(
-    #         "CHANGE: Implement a Python function factorial(n) that returns the factorial of a non-negative integer n "
-    #         "or raises a ValueError if n is negative. For n=0, it should return 1; for n>0, it should multiply "
-    #         "all integers from 1 to n."
-    #     ),
-    #     test_specification="""
-    #     We will create two test functions:
-    #     1) test_factorial_positive_cases(): checks n=0 and n=5 return 1 and 120 respectively.
-    #     2) test_factorial_negative_cases(): checks n=-1 raises ValueError.
-    #     """,
-    #     test_data_generation="""
-    #     Positive data: n=0, n=5
-    #     Negative data: n=-1
-    #     """
-    # )
-
     # Ensure the original project directory exists
     if not os.path.exists(original_project_dir):
         os.makedirs(original_project_dir)
         os.makedirs(os.path.join(original_project_dir, 'tests'), exist_ok=True)
         
         with open(os.path.join(original_project_dir, 'main.py'), 'w', encoding='utf-8') as f:
-            f.write("def factorial(n):\n    return None  # Placeholder implementation\n")
+            f.write(f"def {block.function_name}(text, shift):\n    return None  # Placeholder implementation\n")
         
         # Create __init__.py files
         with open(os.path.join(original_project_dir, '__init__.py'), 'w', encoding='utf-8') as f:
@@ -81,6 +64,7 @@ if __name__ == "__main__":
 
     # Execute the block
     success = executor.execute_block()
+    # success = executor.run_tests()
 
     if success:
         print("Block executed and changes applied successfully.")
