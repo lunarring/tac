@@ -54,10 +54,17 @@ if __name__ == "__main__":
     # Ensure the original project directory exists
     if not os.path.exists(original_project_dir):
         os.makedirs(original_project_dir)
+        os.makedirs(os.path.join(original_project_dir, 'tests'), exist_ok=True)
+        
         with open(os.path.join(original_project_dir, 'main.py'), 'w', encoding='utf-8') as f:
             f.write("def factorial(n):\n    return None  # Placeholder implementation\n")
+        
+        # Create __init__.py files
         with open(os.path.join(original_project_dir, '__init__.py'), 'w', encoding='utf-8') as f:
-            pass  # Create an empty __init__.py
+            pass
+        with open(os.path.join(original_project_dir, 'tests', '__init__.py'), 'w', encoding='utf-8') as f:
+            pass
+        
         print("Original project initialized with placeholder code.")
 
     # Load configuration
