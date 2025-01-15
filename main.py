@@ -13,9 +13,10 @@ if __name__ == "__main__":
     # Define the path to the original project directory
     original_project_dir = '/Users/jjj/git/tmp/block_test'
 
-    # Create the block directly with function_name parameter
+    # Create the block with file_path parameter
     block = Block(
         function_name="caesar_cipher",
+        file_path="main.py",  # Specify which file should contain the function
         task_description="""
         CHANGE: Implement a Python function caesar_cipher(text, shift) that returns a new string where each alphabetic character in 'text' is shifted by 'shift' positions in the alphabet. Wrap around from 'z' to 'a', preserve the original case for letters, and leave all non-alphabetic characters unchanged.
         """,
@@ -53,14 +54,12 @@ if __name__ == "__main__":
     # Load configuration
     config = load_config()
     
-    # Initialize the agent based on config
-    if config['agents']['programming']['type'] == 'aider':
-        agent = AiderAgent(project_dir=original_project_dir)
-    else:
+    # Remove the agent initialization since it's now handled by the Block class
+    if config['agents']['programming']['type'] != 'aider':
         raise ValueError(f"Unknown agent type: {config['agents']['programming']['type']}")
 
-    # Initialize the executor
-    executor = BlockExecutor(block=block, agent=agent, project_dir=original_project_dir)
+    # Initialize the executor with just block and project_dir
+    executor = BlockExecutor(block=block, project_dir=original_project_dir)
 
     # Execute the block
     success = executor.execute_block()

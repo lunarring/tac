@@ -5,11 +5,10 @@ from block import Block
 from agent import Agent
 
 class BlockExecutor:
-    def __init__(self, block: Block, agent: Agent, project_dir: str):
+    def __init__(self, block: Block, project_dir: str):
         self.block = block
-        self.agent = agent
         self.project_dir = project_dir
-        self.agent.project_dir = project_dir
+        self.agent = block.create_agent(project_dir)
         self.test_results = ""
         self.config = self._load_config()
 
