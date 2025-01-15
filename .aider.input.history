@@ -1,6 +1,0 @@
-
-# 2025-01-15 15:20:17.310911
-+CHANGE: Implement a Python function factorial(n) that returns the factorial of a non-negative integer n or raises a ValueError if n is negative. For n=0, it should return 1; for n>0, it should multiply all integers from 1 to n.
-
-# 2025-01-15 15:20:17.311008
-+CHANGE: Implement a Python function factorial(n) that returns the factorial of a non-negative integer n or raises a ValueError if n is negative. For n=0, it should return 1; for n>0, it should multiply all integers from 1 to n.
