@@ -2,12 +2,18 @@ import os
 import sys
 import yaml
 import argparse
-from block import Block
-from agent import AiderAgent
-from executor import BlockExecutor
+
+# Add the src directory to Python path for local development
+src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
+from test_chain.core.block import Block
+from test_chain.agents.aider_agent import AiderAgent
+from test_chain.core.executor import BlockExecutor
 
 def load_config():
-    config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'core', 'config.yaml')
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
@@ -67,7 +73,7 @@ Example usage:
     
     return args
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
     
     try:
@@ -133,4 +139,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error during execution: {e}")
         sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 

@@ -1,8 +1,8 @@
 import os
 import subprocess
 import yaml
-from block import Block
-from agent import Agent
+from test_chain.core.block import Block
+from test_chain.agents.base import Agent
 
 class BlockExecutor:
     def __init__(self, block: Block, project_dir: str):

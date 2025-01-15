@@ -1,74 +1,101 @@
-# Test Chain Approach
+# Test Chain
 
-![Test Chain Logo](test_chain.png)
+An Automated, Test-Driven AI Coding Framework
 
-> An Automated, Test-Driven AI Coding Framework
+## Overview
 
-## High Level Summary
+Test Chain is a framework that automates the test-driven development process using AI. It takes a test-first approach where tests are generated before implementing the solution, ensuring robust and well-tested code.
 
-The Test Chain Approach is a structured, automated framework designed to enhance AI-driven software development through a sequence of interconnected, test-driven tasks. At its core, this methodology ensures that every modification or implementation within the codebase is meticulously validated against predefined tests before advancing to subsequent steps. This process is orchestrated by a high-level manager that oversees the entire chain, ensuring the workflow remains intact and efficient.
+## Installation
 
-Each step in the Test Chain consists of a distinct block that encompasses three tightly correlated elements. First, there is a clear and precise command or instruction that specifies the exact change or implementation required in the existing codebase. This instruction serves as the directive for the coding agent, guiding the necessary modifications. Second, the block includes a detailed description of how to generate the corresponding tests. These tests are designed to validate the specified change, encompassing both positive cases that should pass and negative cases that should fail. Third, the block outlines the generation or sourcing of test data, ensuring that there is appropriate data to effectively evaluate the tests. This includes defining scenarios that should lead to both successful and failed outcomes, thereby providing comprehensive coverage for the changes being made.
-
-The Worker Agent, which can be any modular AI coding framework such as Aider, is responsible for executing these tasks. The agent generates the required tests based on the provided specifications and implements the necessary code changes as per the instructions. By maintaining modularity, the framework allows for easy integration or swapping of different AI agents without disrupting the overall workflow. This ensures flexibility and scalability, enabling the system to adapt to various project requirements and evolving development environments.
-
-A crucial aspect of the Test Chain Approach is the enforcement that progression through the chain is contingent upon the successful fulfillment of each test. This means that the framework will only move to the next block once the current tests have been run and passed, ensuring that each step builds upon a solid and verified foundation. If a test fails, the system can incorporate mechanisms for retrying the task, refining the instructions, or escalating the issue to supervisory layers for further analysis and resolution.
-
-## Getting Started
-
-### Prerequisites
-- Python 3.8+
-- pip
-
-### Installation
 ```bash
-pip install -r requirements.txt
-```
-
-## Usage
-```bash
-python main.py
+pip install -e .
 ```
 
 ## Project Structure
+
 ```
-.
-├── main.py          # Entry point for the application
-├── agent.py         # Worker agent implementation (includes AiderAgent)
-├── block.py         # Block class definition for task encapsulation
-├── executor.py      # Test chain executor with test running capabilities
-├── config.yaml      # Configuration settings for the framework
-└── tests/           # Test suite directory
+test_chain/
+├── src/
+│   └── test_chain/
+│       ├── __init__.py
+│       ├── core/
+│       │   ├── __init__.py
+│       │   ├── block.py
+│       │   ├── executor.py
+│       │   └── config.yaml
+│       ├── agents/
+│       │   ├── __init__.py
+│       │   ├── base.py
+│       │   └── aider_agent.py
+│       └── cli/
+│           ├── __init__.py
+│           └── main.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_block.py
+│   ├── test_executor.py
+│   └── test_agents.py
+├── examples/
+│   └── caesar_cipher.yaml
+├── pyproject.toml
+├── setup.cfg
+├── README.md
+└── requirements.txt
 ```
 
-## Core Components
+## Usage
 
-### Block
-The `Block` class is the fundamental unit of work in the Test Chain. Each block contains:
-- Function name to be implemented/modified
-- File path where changes will be made
-- Task description
-- Test specification
-- Test data generation instructions
+1. Create a YAML file describing your coding task:
 
-### BlockExecutor
-The executor manages the execution of individual blocks:
-- Handles test running and validation
-- Creates and manages worker agents
-- Loads configuration settings
-- Provides test results and execution status
+```yaml
+project:
+  project_dir: "./my_project"
 
-### Agent
-The framework supports modular agent implementation:
-- Currently uses Aider as the default agent
-- Can be extended to support other AI coding frameworks
-- Handles code modifications and test implementation
+block:
+  function_name: "caesar_cipher"
+  file_path: "cipher.py"
+  task_description: "Implement a Caesar cipher encryption function that takes a text string and shift value as input."
+  test_specification: "Test the caesar_cipher function with various inputs including empty string, single character, multiple words, and different shift values."
+  test_data_generation: |
+    test_cases = [
+      ("hello", 3, "khoor"),
+      ("xyz", 1, "yza"),
+      ("", 5, ""),
+      ("Hello, World!", 1, "Ifmmp, Xpsme!")
+    ]
+```
+
+2. Run the test chain:
+
+```bash
+test-chain examples/caesar_cipher.yaml
+```
+
+Additional options:
+- `--dry-run`: Validate the YAML file without executing
+- `--skip-tests`: Skip running tests after implementation
+- `--test-only`: Only run the tests without implementing
+
+## How it Works
+
+1. The framework reads a block definition from a YAML file
+2. It generates tests based on the test specification
+3. An AI agent (currently using Aider) implements the solution
+4. Tests are run to verify the implementation
+5. If tests fail, the process retries with a new implementation
 
 ## Configuration
-The framework uses `config.yaml` for customizable settings:
-- Test execution parameters
-- Agent configurations
-- Framework behavior settings
 
-## Contributing
-Contributions are welcome! Please feel free to submit a Pull Request.
+The framework uses a configuration file (`src/test_chain/core/config.yaml`) to control various aspects:
+
+```yaml
+agents:
+  programming:
+    type: aider
+    max_retries: 3
+```
+
+## License
+
+MIT License
