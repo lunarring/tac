@@ -14,8 +14,6 @@ The Worker Agent, which can be any modular AI coding framework such as Aider, is
 
 A crucial aspect of the Test Chain Approach is the enforcement that progression through the chain is contingent upon the successful fulfillment of each test. This means that the framework will only move to the next block once the current tests have been run and passed, ensuring that each step builds upon a solid and verified foundation. If a test fails, the system can incorporate mechanisms for retrying the task, refining the instructions, or escalating the issue to supervisory layers for further analysis and resolution.
 
-In summary, the Test Chain Approach embodies a systematic, test-driven methodology for AI-assisted software development. By intertwining precise instructions, automated test generation, and AI-driven code modifications within a modular framework, it ensures that every code change is both intentional and verified. This approach not only enhances code quality and reliability but also fosters an efficient and scalable development process adaptable to evolving project demands. Establishing this framework sets the stage for innovative advancements in AI-driven coding practices, paving the way for more autonomous, reliable, and high-quality software development workflows.
-
 ## Getting Started
 
 ### Prerequisites
@@ -35,12 +33,42 @@ python main.py
 ## Project Structure
 ```
 .
-├── main.py          # Entry point
-├── agent.py         # Worker agent implementation
-├── executor.py      # Test chain executor
-├── config.yaml      # Configuration settings
-└── tests/           # Test suite
+├── main.py          # Entry point for the application
+├── agent.py         # Worker agent implementation (includes AiderAgent)
+├── block.py         # Block class definition for task encapsulation
+├── executor.py      # Test chain executor with test running capabilities
+├── config.yaml      # Configuration settings for the framework
+└── tests/           # Test suite directory
 ```
+
+## Core Components
+
+### Block
+The `Block` class is the fundamental unit of work in the Test Chain. Each block contains:
+- Function name to be implemented/modified
+- File path where changes will be made
+- Task description
+- Test specification
+- Test data generation instructions
+
+### BlockExecutor
+The executor manages the execution of individual blocks:
+- Handles test running and validation
+- Creates and manages worker agents
+- Loads configuration settings
+- Provides test results and execution status
+
+### Agent
+The framework supports modular agent implementation:
+- Currently uses Aider as the default agent
+- Can be extended to support other AI coding frameworks
+- Handles code modifications and test implementation
+
+## Configuration
+The framework uses `config.yaml` for customizable settings:
+- Test execution parameters
+- Agent configurations
+- Framework behavior settings
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
