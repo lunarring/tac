@@ -1,0 +1,6 @@
+agents:
+  programming:
+    type: "aider"
+    max_retries: 5
+  testing:
+    type: "aider" 
