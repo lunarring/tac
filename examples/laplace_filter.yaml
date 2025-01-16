@@ -1,0 +1,129 @@
+project:
+  name: laplace_filter
+  project_dir: /Users/jjj/git/tmp/laplace_test
+
+block:
+  function_name: laplace_filter
+  file_path: main.py
+  task_description: |
+    Implement a function laplace_filter(image: np.ndarray) -> np.ndarray that:
+    1. Uses a 2D Laplacian kernel, for example:
+         [[ 0,  1,  0],
+          [ 1, -4,  1],
+          [ 0,  1,  0]]
+    2. Convolves the input 'image' with this kernel (assuming zero-padding for boundaries).
+    3. Returns the filtered image as a new numpy array.
+
+  test_specification: |
+    We will create multiple unit tests to ensure the Laplacian filter is correct:
+
+    1) test_laplace_filter_constant_image():
+       - Input: 3x3 array filled with a constant value (e.g., 100).
+       - Expected Output: 3x3 array of zeros (no edges in a constant region).
+
+    2) test_laplace_filter_single_pixel():
+       - Input: 3x3 array of zeros with a single central pixel = 255.
+       - Expected Output: The center should be -4*255=-1020, and each direct neighbor (up/down/left/right) should be +255, with corners = 0.
+
+    3) test_laplace_filter_horizontal_gradient():
+       - Input: 4x4 array where each row has a constant intensity, and values increase from top row to bottom row 
+         (row 0=0, row 1=50, row 2=100, row 3=150). 
+       - Expected Output: Emphasized horizontal edges between rows. See detailed matrix below.
+
+    4) test_laplace_filter_vertical_gradient():
+       - Input: 4x4 array where each column has a constant intensity, and values increase from left to right 
+         ([0,50,100,150] in each row). 
+       - Expected Output: Emphasized vertical edges between columns. See detailed matrix below.
+
+    5) test_laplace_filter_large_uniform_area_with_edge():
+       - Input: 5x5 array where the left half is 0 and the right half is 200.
+       - Expected Output: Clear vertical edge responses around the boundary column. See detailed matrix below.
+
+  test_data_generation: |
+    ### 1) Constant image
+    input:
+      image: 
+        [
+          [100, 100, 100],
+          [100, 100, 100],
+          [100, 100, 100]
+        ]
+    expected_output:
+      image:
+        [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0]
+        ]
+
+    ### 2) Single pixel
+    input:
+      image:
+        [
+          [  0,   0,   0],
+          [  0, 255,   0],
+          [  0,   0,   0]
+        ]
+    expected_output:
+      image:
+        [
+          [   0,  255,    0],
+          [ 255, -1020, 255],
+          [   0,  255,    0]
+        ]
+
+    ### 3) Horizontal gradient (rows: 0, 50, 100, 150)
+    input:
+      image:
+        [
+          [  0,   0,   0,   0],
+          [ 50,  50,  50,  50],
+          [100, 100, 100, 100],
+          [150, 150, 150, 150]
+        ]
+    expected_output:
+      image:
+        [
+          [   50,    50,    50,    50],
+          [  -50,     0,     0,   -50],
+          [ -100,     0,     0,  -100],
+          [ -350,  -200,  -200,  -350]
+        ]
+
+    ### 4) Vertical gradient (columns: 0, 50, 100, 150)
+    input:
+      image:
+        [
+          [  0,  50, 100, 150],
+          [  0,  50, 100, 150],
+          [  0,  50, 100, 150],
+          [  0,  50, 100, 150]
+        ]
+    expected_output:
+      image:
+        [
+          [   50,   -50,  -100,  -350],
+          [   50,     0,     0,  -200],
+          [   50,     0,     0,  -200],
+          [   50,   -50,  -100,  -350]
+        ]
+
+    ### 5) Large uniform area with edge (5x5: left=0, right=200)
+    input:
+      image:
+        [
+          [  0,   0, 200, 200, 200],
+          [  0,   0, 200, 200, 200],
+          [  0,   0, 200, 200, 200],
+          [  0,   0, 200, 200, 200],
+          [  0,   0, 200, 200, 200]
+        ]
+    expected_output:
+      image:
+        [
+          [   0,  200, -400, -200, -400],
+          [   0,  200, -200,    0, -200],
+          [   0,  200, -200,    0, -200],
+          [   0,  200, -200,    0, -200],
+          [   0,  200, -400, -200, -400]
+        ]
