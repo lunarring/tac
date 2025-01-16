@@ -14,48 +14,36 @@ The framework provides two main commands: `block` and `gather`.
 
 The block command helps create and test new code implementations based on a YAML specification.
 
-1. Create a YAML file describing your coding task (e.g., `examples/laplace_filter.yaml`):
+1. Create a YAML file describing your coding task (e.g., `examples/caesar_cipher.yaml`):
 
 ```yaml
 project:
-  project_dir: "./laplace_test"
+  project_dir: "./block_test"
 
 block:
-  function_name: "laplace_filter"
+  function_name: "caesar_cipher"
   file_path: "main.py"
-  task_description: "Implement a Laplacian filter function that takes a numpy array image as input and returns the filtered image."
-  test_specification: "Test the laplace_filter function with various inputs including zero arrays, simple patterns, and edge cases."
-  test_data_generation: |
-    import numpy as np
-    test_cases = [
-      (np.zeros((3, 3)), np.zeros((3, 3))),
-      (np.eye(3), np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]])),
-      (np.ones((4, 4)), np.zeros((4, 4)))
-    ]
+  task_description: "Implement a Python function caesar_cipher(text, shift) that returns a new string where each alphabetic character in 'text' is shifted by 'shift' positions in the alphabet."
+  test_specification: |
+    Test cases include:
+    1) Simple shift: 'abc' with shift=1 => 'bcd'
+    2) Wraparound: 'xyz' with shift=2 => 'zab'
+    3) Mixed case: 'AbZ' with shift=1 => 'BcA'
+    4) Non-alpha: 'Hello, World!' with shift=5 => 'Mjqqt, Btwqi!'
 ```
 
 2. Run the test chain:
 
 ```bash
-python -m test_chain.cli.main block examples/laplace_filter.yaml
+python src/test_chain/cli/main.py block examples/caesar_cipher.yaml
 ```
 
 ### Gather Command
 
-The gather command helps collect and document Python files in a directory:
+The gather command helps collect and document Python files in a directory. This is particularly useful for copying the entire file structure to a powerful O(1)-like model:
 
 ```bash
-python -m test_chain.cli.main gather ./src/test_chain
-```
-
-Example output from gather:
-```
-## File: src/test_chain/core/block.py
-Contains core Block class implementation...
-
----
-## File: src/test_chain/agents/base.py
-Base agent interface definition...
+python src/test_chain/cli/main.py gather ./src/test_chain
 ```
 
 ### Command Options
