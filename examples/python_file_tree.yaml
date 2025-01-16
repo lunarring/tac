@@ -6,48 +6,61 @@ block:
   function_name: gather_python_files
   file_path: main.py
   task_description: |
-    Implement a Python function gather_python_files(directory, formatting_options=None) that does the following:
-    1) Recursively crawl through the specified 'directory' and all subdirectories.
-    2) Collect the paths of all .py files found.
-    3) Produce a visual tree representation of the directory structure that highlights each .py file.
-    4) For every .py file discovered, read and gather its entire content.
-    5) Format the final output into a single text representation which includes:
-       - A file tree at the top.
-       - The contents of each .py file below, optionally separated or prefixed by formatting elements passed in 'formatting_options'.
-    The end goal is to feed this consolidated text (including the tree structure and file contents) into LLMs or other processing tools.
+    Implement a Python function gather_python_files(directory, formatting_options=None) that:
+      1) Recursively crawls through the specified 'directory' (and subdirectories) to find .py files.
+      2) Produces a visual tree representation of the directory structure, highlighting each .py file.
+      3) Collects and concatenates the full content of each discovered .py file.
+      4) Applies enhanced formatting to the output, including but not limited to:
+         - Converting literal '\n' into actual newlines and using consistent indentation.
+         - Inserting readable separators or headings (e.g., "## File: <filename>").
+         - Using code fences (```python ... ```) around each file's contents for clarity.
+         - Optionally excluding certain directories (like .git, __pycache__) if requested.
+         - Indicating empty files or adding metadata (file size, last modified date).
+         - Chunking or summarizing particularly large files to prevent overly long text blocks.
+      5) Returns a single string or text file that combines:
+         - The directory tree on top.
+         - The contents of each .py file below, formatted according to 'formatting_options'.
+    The end goal is to provide an organized, comprehensive view of all Python source files in a directory for further LLM ingestion or manual review.
+
   test_specification: |
     We will create multiple test functions to ensure thorough coverage:
-    1) test_single_level_directory(): 
-       - Create a directory with a few .py files in a single level.
-       - Ensure the tree representation is correct and contents are properly concatenated.
-    2) test_multi_level_directory():
-       - Create nested subdirectories, each containing .py files.
-       - Validate that the output includes the correct hierarchical tree and all file contents.
-    3) test_no_python_files():
-       - Use a directory with no .py files.
-       - Confirm that the function returns just an empty tree or the correct indication that no .py files were found.
-    4) test_formatting_options():
-       - Provide custom separators, prefixes, or headings in 'formatting_options'.
-       - Verify that the final text output respects these custom formatting rules.
+      1) test_single_level_directory():
+         - A directory with a few .py files at one level.
+         - Verify the correct tree structure and concatenated file contents with headers/separators.
+      2) test_multi_level_directory():
+         - Nested subdirectories with various .py files.
+         - Check that the tree hierarchy is correctly represented and all contents are captured.
+      3) test_no_python_files():
+         - A directory containing no .py files.
+         - Confirm the function handles this gracefully (e.g., returns an empty tree or a note).
+      4) test_formatting_options():
+         - Provide custom formatting options (e.g., file headers, code fences, separators).
+         - Validate that these rules are applied in the final output.
+      5) test_directory_exclusions():
+         - Ensure that optional exclusions (like .git, __pycache__) are respected if specified.
+
   test_data_generation: |
     Data for test_single_level_directory:
       - Directory structure: /tmp/single_level -> file1.py, file2.py
-      - Each file has simple content (e.g. print("Hello from file1"), print("Hello from file2")).
-    
+      - Each file includes a simple "print" statement for easy content verification.
+
     Data for test_multi_level_directory:
-      - Directory structure:
-          /tmp/multi_level
-            ├── fileA.py
-            └── subdir
-                ├── fileB.py
-                └── deeper_subdir
-                    └── fileC.py
-      - Each file has unique content that can be identified in the final output.
+      - /tmp/multi_level
+        ├── fileA.py
+        └── subdir
+            ├── fileB.py
+            └── deeper_subdir
+                └── fileC.py
+      - Each file has distinct lines for identification in the output.
 
     Data for test_no_python_files:
-      - Directory: /tmp/empty_directory
-      - Contains no .py files, only empty subfolders or non-Python files.
+      - /tmp/empty_directory
+      - Only empty subfolders or non-python files to ensure no .py files are found.
 
     Data for test_formatting_options:
-      - Provide an options dictionary like {"header": "## File: ", "separator": "\n---\n"} 
-      - Check that each file's content is prefixed by "## File: {filename}" and separated by "\n---\n".
+      - formatting_options could be {"header": "## File: ", "separator": "\n---\n", "use_code_fences": true}.
+      - Check that each file is preceded by the "## File: <filename>" header, separated by "\n---\n", and wrapped in code fences.
+
+    Data for test_directory_exclusions:
+      - Provide a directory with .py files inside a .git/ subdirectory and a main folder.
+      - Ensure that if exclusions=[".git"], those .py files inside .git/ do not appear in the final output.

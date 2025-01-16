@@ -6,10 +6,20 @@ class AiderAgent(Agent):
         """
         Executes the Aider command to implement the task.
         """
-        prompt = f"Implement the function '{function_name}' according to this specification:\n{task_description}"
+        # Read the generated tests
+        test_file_path = 'tests/test_new_block.py'
+        try:
+            with open(test_file_path, 'r') as f:
+                generated_tests = f.read()
+        except FileNotFoundError:
+            generated_tests = "No tests found yet."
+
+        prompt = f"Implement the function '{function_name}' according to this specification:\n{task_description}\n\n"
+        prompt += f"The implementation must pass these tests:\n{generated_tests}\n"
         if previous_error:
-            prompt += f"\n\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
+            prompt += f"\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
         prompt += ". Don't make any __init__.py files."
+        
         command = [
             'aider',
             '--yes-always',
