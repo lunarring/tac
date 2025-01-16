@@ -1,3 +1,4 @@
+import os
 import subprocess
 from test_chain.agents.base import Agent
 from test_chain.core.logging import logger
@@ -8,11 +9,12 @@ class AiderAgent(Agent):
         Executes the Aider command to implement the task.
         """
         # Read the generated tests
-        test_file_path = 'tests/test_new_block.py'
+        test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
         try:
             with open(test_file_path, 'r') as f:
                 generated_tests = f.read()
         except FileNotFoundError:
+            logger.warning(f"Test file not found at {test_file_path}")
             generated_tests = "No tests found yet."
 
         prompt = f"Implement the function '{function_name}' according to this specification:\n{task_description}\n\n"
@@ -47,11 +49,12 @@ class AiderAgent(Agent):
         
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
         
+        test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
         command = [
             'aider',
             '--yes-always',
             '--no-git',
-            '--file', 'tests/test_new_block.py',
+            '--file', test_file_path,
             '--message', prompt
         ]
         
