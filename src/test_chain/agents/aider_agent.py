@@ -1,5 +1,6 @@
 import subprocess
 from test_chain.agents.base import Agent
+from test_chain.core.logging import logger
 
 class AiderAgent(Agent):
     def execute_task(self, task_description: str, function_name: str, previous_error: str = None) -> None:
@@ -19,6 +20,8 @@ class AiderAgent(Agent):
         if previous_error:
             prompt += f"\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
         prompt += ". Don't make any __init__.py files."
+        
+        logger.debug("Execution prompt for Aider:\n%s", prompt)
         
         command = [
             'aider',
@@ -41,6 +44,8 @@ class AiderAgent(Agent):
         Generates test cases in tests/test_new_block.py using Aider based on specifications and data.
         """
         prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}"
+        
+        logger.debug("Test generation prompt for Aider:\n%s", prompt)
         
         command = [
             'aider',

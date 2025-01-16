@@ -1,4 +1,24 @@
-def execute_block(self) -> bool:
+import os
+import subprocess
+import yaml
+from block import Block
+from agent import Agent
+
+class BlockExecutor:
+    def __init__(self, block: Block, project_dir: str):
+        self.block = block
+        self.project_dir = project_dir
+        self.agent = block.create_agent(project_dir)
+        self.test_results = ""
+        self.config = self._load_config()
+
+    def _load_config(self) -> dict:
+        """Load configuration from config.yaml"""
+        config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+
+    def execute_block(self) -> bool:
         """
         Executes the block with test-first approach and retry logic.
         Always generates tests first, then implements solution with retries.
@@ -46,7 +66,7 @@ def execute_block(self) -> bool:
         """
         try:
             result = subprocess.run(
-                ['pytest', 'tests/test_new_block.py', '-v', '--disable-warnings'],
+                ['pytest', 'tests/test_new_block.py', '-v', '--no-skip', '--no-maxfail'],
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir

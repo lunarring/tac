@@ -8,6 +8,6 @@ agents:
 logging:
   test_chain:
     color: "green"
-    level: "INFO"
+    level: "DEBUG"
   other_packages:
     level: "INFO"
