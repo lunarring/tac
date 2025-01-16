@@ -2,10 +2,6 @@
 
 Test-driven AI Chains combines the methodical approach of test-driven development with blockchain-style verification mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
 
-## Overview
-
-Test Chain is a framework that automates the test-driven development process using AI. It takes a test-first approach where tests are generated before implementing the solution, ensuring robust and well-tested code.
-
 ## Usage
 
 The framework provides two main commands: `block` and `gather`.
