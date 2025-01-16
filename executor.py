@@ -66,7 +66,7 @@ class BlockExecutor:
         """
         try:
             result = subprocess.run(
-                ['pytest', 'tests/test_new_block.py', '-v', '--no-skip', '--no-maxfail'],
+                ['pytest', 'tests/test_new_block.py', '-v'],
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir
