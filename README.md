@@ -46,6 +46,10 @@ test_chain/
 
 ## Usage
 
+The CLI provides two main commands: `block` and `gather`.
+
+### Block Command
+
 1. Create a YAML file describing your coding task:
 
 ```yaml
@@ -69,13 +73,27 @@ block:
 2. Run the test chain:
 
 ```bash
-test-chain examples/caesar_cipher.yaml
+test-chain block examples/caesar_cipher.yaml
 ```
 
-Additional options:
+Block command options:
 - `--dry-run`: Validate the YAML file without executing
 - `--skip-tests`: Skip running tests after implementation
 - `--test-only`: Only run the tests without implementing
+
+### Gather Command
+
+The gather command helps collect information about Python files in a directory:
+
+```bash
+test-chain gather /path/to/directory
+```
+
+Gather command options:
+- `--header`: Header format for each file (default: "## File: ")
+- `--separator`: Separator between sections (default: "\n---\n")
+- `--code-fences`: Use code fences in output
+- `--exclusions`: Comma-separated directories to exclude (default: .git,__pycache__)
 
 ## How it Works
 
