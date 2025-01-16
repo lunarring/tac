@@ -1,7 +1,7 @@
 agents:
   programming:
     type: "aider"
-    max_retries: 5
+    max_retries: 8
   testing:
     type: "aider"
 
