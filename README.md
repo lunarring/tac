@@ -1,6 +1,6 @@
 # Test-driven Agentic Chains
 
-Test-driven AI Chains combines the methodical approach of test-driven development with blockchain-style verification mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
+Test-driven Agentic Chains combines the methodical approach of test-driven development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
 
 ## Usage
 
