@@ -6,11 +6,70 @@ An Automated, Test-Driven AI Coding Framework
 
 Test Chain is a framework that automates the test-driven development process using AI. It takes a test-first approach where tests are generated before implementing the solution, ensuring robust and well-tested code.
 
-## Installation
+## Usage
+
+The framework provides two main commands: `block` and `gather`.
+
+### Block Command
+
+The block command helps create and test new code implementations based on a YAML specification.
+
+1. Create a YAML file describing your coding task (e.g., `examples/laplace_filter.yaml`):
+
+```yaml
+project:
+  project_dir: "./laplace_test"
+
+block:
+  function_name: "laplace_filter"
+  file_path: "main.py"
+  task_description: "Implement a Laplacian filter function that takes a numpy array image as input and returns the filtered image."
+  test_specification: "Test the laplace_filter function with various inputs including zero arrays, simple patterns, and edge cases."
+  test_data_generation: |
+    import numpy as np
+    test_cases = [
+      (np.zeros((3, 3)), np.zeros((3, 3))),
+      (np.eye(3), np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]])),
+      (np.ones((4, 4)), np.zeros((4, 4)))
+    ]
+```
+
+2. Run the test chain:
 
 ```bash
-pip install -e .
+python -m test_chain.cli.main block examples/laplace_filter.yaml
 ```
+
+### Gather Command
+
+The gather command helps collect and document Python files in a directory:
+
+```bash
+python -m test_chain.cli.main gather ./src/test_chain
+```
+
+Example output from gather:
+```
+## File: src/test_chain/core/block.py
+Contains core Block class implementation...
+
+---
+## File: src/test_chain/agents/base.py
+Base agent interface definition...
+```
+
+### Command Options
+
+Block command options:
+- `--dry-run`: Validate the YAML file without executing
+- `--skip-tests`: Skip running tests after implementation
+- `--test-only`: Only run the tests without implementing
+
+Gather command options:
+- `--header`: Header format for each file (default: "## File: ")
+- `--separator`: Separator between sections (default: "\n---\n")
+- `--code-fences`: Use code fences in output
+- `--exclusions`: Comma-separated directories to exclude (default: .git,__pycache__)
 
 ## Project Structure
 
@@ -43,65 +102,6 @@ test_chain/
 ├── README.md
 └── requirements.txt
 ```
-
-## Usage
-
-The CLI provides two main commands: `block` and `gather`.
-
-### Block Command
-
-1. Create a YAML file describing your coding task:
-
-```yaml
-project:
-  project_dir: "./my_project"
-
-block:
-  function_name: "caesar_cipher"
-  file_path: "cipher.py"
-  task_description: "Implement a Caesar cipher encryption function that takes a text string and shift value as input."
-  test_specification: "Test the caesar_cipher function with various inputs including empty string, single character, multiple words, and different shift values."
-  test_data_generation: |
-    test_cases = [
-      ("hello", 3, "khoor"),
-      ("xyz", 1, "yza"),
-      ("", 5, ""),
-      ("Hello, World!", 1, "Ifmmp, Xpsme!")
-    ]
-```
-
-2. Run the test chain:
-
-```bash
-test-chain block examples/caesar_cipher.yaml
-```
-
-Block command options:
-- `--dry-run`: Validate the YAML file without executing
-- `--skip-tests`: Skip running tests after implementation
-- `--test-only`: Only run the tests without implementing
-
-### Gather Command
-
-The gather command helps collect information about Python files in a directory:
-
-```bash
-test-chain gather /path/to/directory
-```
-
-Gather command options:
-- `--header`: Header format for each file (default: "## File: ")
-- `--separator`: Separator between sections (default: "\n---\n")
-- `--code-fences`: Use code fences in output
-- `--exclusions`: Comma-separated directories to exclude (default: .git,__pycache__)
-
-## How it Works
-
-1. The framework reads a block definition from a YAML file
-2. It generates tests based on the test specification
-3. An AI agent (currently using Aider) implements the solution
-4. Tests are run to verify the implementation
-5. If tests fail, the process retries with a new implementation
 
 ## Configuration
 

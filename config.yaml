@@ -2,12 +2,19 @@ agents:
   programming:
     type: "aider"
     max_retries: 8
+    model: "o1-mini"
+    model_settings:
+      edit_format: "diff"
+      verify_ssl: true
+      timeout: 120
+      max_chat_history_tokens: 100000
   testing:
     type: "aider"
+    model: "o1-mini"
 
 logging:
   test_chain:
     color: "green"
-    level: "DEBUG"
+    level: "INFO"
   other_packages:
     level: "INFO"
