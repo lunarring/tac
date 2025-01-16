@@ -1,0 +1,53 @@
+project:
+  name: python_file_tree
+  project_dir: /Users/jjj/git/tmp/file_tree
+
+block:
+  function_name: gather_python_files
+  file_path: main.py
+  task_description: |
+    Implement a Python function gather_python_files(directory, formatting_options=None) that does the following:
+    1) Recursively crawl through the specified 'directory' and all subdirectories.
+    2) Collect the paths of all .py files found.
+    3) Produce a visual tree representation of the directory structure that highlights each .py file.
+    4) For every .py file discovered, read and gather its entire content.
+    5) Format the final output into a single text representation which includes:
+       - A file tree at the top.
+       - The contents of each .py file below, optionally separated or prefixed by formatting elements passed in 'formatting_options'.
+    The end goal is to feed this consolidated text (including the tree structure and file contents) into LLMs or other processing tools.
+  test_specification: |
+    We will create multiple test functions to ensure thorough coverage:
+    1) test_single_level_directory(): 
+       - Create a directory with a few .py files in a single level.
+       - Ensure the tree representation is correct and contents are properly concatenated.
+    2) test_multi_level_directory():
+       - Create nested subdirectories, each containing .py files.
+       - Validate that the output includes the correct hierarchical tree and all file contents.
+    3) test_no_python_files():
+       - Use a directory with no .py files.
+       - Confirm that the function returns just an empty tree or the correct indication that no .py files were found.
+    4) test_formatting_options():
+       - Provide custom separators, prefixes, or headings in 'formatting_options'.
+       - Verify that the final text output respects these custom formatting rules.
+  test_data_generation: |
+    Data for test_single_level_directory:
+      - Directory structure: /tmp/single_level -> file1.py, file2.py
+      - Each file has simple content (e.g. print("Hello from file1"), print("Hello from file2")).
+    
+    Data for test_multi_level_directory:
+      - Directory structure:
+          /tmp/multi_level
+            ├── fileA.py
+            └── subdir
+                ├── fileB.py
+                └── deeper_subdir
+                    └── fileC.py
+      - Each file has unique content that can be identified in the final output.
+
+    Data for test_no_python_files:
+      - Directory: /tmp/empty_directory
+      - Contains no .py files, only empty subfolders or non-Python files.
+
+    Data for test_formatting_options:
+      - Provide an options dictionary like {"header": "## File: ", "separator": "\n---\n"} 
+      - Check that each file's content is prefixed by "## File: {filename}" and separated by "\n---\n".

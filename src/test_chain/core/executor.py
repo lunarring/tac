@@ -11,6 +11,7 @@ class BlockExecutor:
         self.agent = block.create_agent(project_dir)
         self.test_results = ""
         self.config = self._load_config()
+        self.previous_error = None  # Track previous error
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -38,7 +39,8 @@ class BlockExecutor:
                 print("Executing task...")
                 self.agent.execute_task(
                     self.block.task_description,
-                    self.block.function_name
+                    self.block.function_name,
+                    previous_error=self.previous_error  # Pass previous error to agent
                 )
 
                 print("Running tests...")
@@ -49,6 +51,7 @@ class BlockExecutor:
                     print("Tests failed.")
                     print("Test Results:")
                     print(self.get_test_results())
+                    self.previous_error = self.test_results  # Store current error for next attempt
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
                     else:

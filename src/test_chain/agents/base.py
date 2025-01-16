@@ -13,7 +13,7 @@ class Agent(ABC):
             open(init_path, 'w').close()
 
     @abstractmethod
-    def execute_task(self, task_description: str, function_name: str) -> None:
+    def execute_task(self, task_description: str, function_name: str, previous_error: str = None) -> None:
         pass
 
     @abstractmethod

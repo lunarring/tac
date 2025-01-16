@@ -2,11 +2,14 @@ import subprocess
 from test_chain.agents.base import Agent
 
 class AiderAgent(Agent):
-    def execute_task(self, task_description: str, function_name: str) -> None:
+    def execute_task(self, task_description: str, function_name: str, previous_error: str = None) -> None:
         """
         Executes the Aider command to implement the task.
         """
         prompt = f"Implement the function '{function_name}' according to this specification:\n{task_description}"
+        if previous_error:
+            prompt += f"\n\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
+        prompt += ". Don't make any __init__.py files."
         command = [
             'aider',
             '--yes-always',
