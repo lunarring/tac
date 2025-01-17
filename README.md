@@ -14,8 +14,8 @@ Test-driven Agentic Chains (TDAC) extends the principles of continuous testing a
 1. **Clone this repository** (or download it) to your local machine:
 
    ```bash
-   git clone git@github.com:lunarring/TDAC.git
-   cd TDAC
+   git clone git@github.com:lunarring/tdac.git
+   cd tdac
    ```
 
 2. Activate your environment (e.g., mine is called 'good'):
@@ -30,7 +30,7 @@ Test-driven Agentic Chains (TDAC) extends the principles of continuous testing a
    pip install -e .
    ```
 
-After this, you can run the tdac command from anywhere in your terminal (as long as your environment is activated).
+After this, you can run the  command from anywhere in your terminal (as long as your environment is activated).
 
 ## ⚙️ Usage
 
