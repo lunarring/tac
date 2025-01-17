@@ -31,7 +31,7 @@ block:
 2. Run the test chain:
 
 ```bash
-python src/test_chain/cli/main.py yaml examples/caesar_cipher.yaml
+python src/tdac/cli/main.py yaml examples/caesar_cipher.yaml
 ```
 
 ### Gather Command
@@ -39,7 +39,7 @@ python src/test_chain/cli/main.py yaml examples/caesar_cipher.yaml
 The gather command helps collect and document Python files in a directory. This is particularly useful for copying the entire file structure to a powerful O(1)-like model:
 
 ```bash
-python src/test_chain/cli/main.py gather ./src/test_chain
+python src/tdac/cli/main.py gather ./src/tdac
 ```
 
 ### Command Options
@@ -58,9 +58,9 @@ Gather command options:
 ## Project Structure
 
 ```
-test_chain/
+tdac/
 ├── src/
-│   └── test_chain/
+│   └── tdac/
 │       ├── __init__.py
 │       ├── core/
 │       │   ├── __init__.py

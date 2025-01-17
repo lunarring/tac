@@ -11,7 +11,7 @@ def setup_logging():
         config = yaml.safe_load(f)
 
     # Create logger
-    logger = logging.getLogger('test_chain')
+    logger = logging.getLogger('tdac')
     
     # Remove any existing handlers
     logger.handlers = []
@@ -25,7 +25,7 @@ def setup_logging():
     # Create formatter
     log_colors = {
         'DEBUG': 'cyan',
-        'INFO': config['logging']['test_chain']['color'],
+        'INFO': config['logging']['tdac']['color'],
         'WARNING': 'yellow',
         'ERROR': 'red',
         'CRITICAL': 'red,bg_white',
@@ -44,7 +44,7 @@ def setup_logging():
     logger.addHandler(console_handler)
     
     # Set level from config
-    logger.setLevel(config['logging']['test_chain']['level'])
+    logger.setLevel(config['logging']['tdac']['level'])
     
     return logger
 

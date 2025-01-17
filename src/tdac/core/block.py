@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Any
-from test_chain.agents.base import Agent
-from test_chain.agents.aider_agent import AiderAgent
+from tdac.agents.base import Agent
+from tdac.agents.aider_agent import AiderAgent
 
 @dataclass
 class Block:

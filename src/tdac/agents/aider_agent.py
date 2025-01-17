@@ -1,7 +1,7 @@
 import os
 import subprocess
-from test_chain.agents.base import Agent
-from test_chain.core.logging import logger
+from tdac.agents.base import Agent
+from tdac.core.logging import logger
 
 class AiderAgent(Agent):
     def execute_task(self, task_description: str, function_name: str, previous_error: str = None) -> None:

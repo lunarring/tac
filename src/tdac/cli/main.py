@@ -8,11 +8,11 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from test_chain.core.block import Block
-from test_chain.agents.aider_agent import AiderAgent
-from test_chain.core.executor import BlockExecutor
-from test_chain.core.logging import logger
-from test_chain.utils.file_gatherer import gather_python_files
+from tdac.core.block import Block
+from tdac.agents.aider_agent import AiderAgent
+from tdac.core.executor import BlockExecutor
+from tdac.core.logging import logger
+from tdac.utils.file_gatherer import gather_python_files
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
