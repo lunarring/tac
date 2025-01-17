@@ -58,16 +58,16 @@ class AiderAgent(Agent):
         """
         Generates test cases in tests/test_new_block.py using Aider based on specifications and data.
         """
-        prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}. Have a close look on this file, maybe it is a class that needs to be instantiated or maybe just a function that needs to be called."
+        test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
+        prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}. Have a close look on this file, maybe it is a class that needs to be instantiated or maybe just a function that needs to be called. Be sure that you are ONLY writing tests in the file tests/test_new_block.py!"
         
         # Append source code if enabled in config
         if self.agent_config.get('include_source_code', False):
             source_code = gather_python_files(self.project_dir)
-            prompt += f"\n\nHere is the full source code of the project:\n{source_code}"
+            prompt += f"\n\nHere is the full source code of the project, possibly including tests that you should try to be consistent with in your formulation of the new tests. Here is the code: \n{source_code}"
         
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
         
-        test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
         command = [
             'aider',
             '--yes-always',
@@ -79,10 +79,10 @@ class AiderAgent(Agent):
         ]
 
         # Add target file if it exists
-        target_file_path = os.path.join(self.project_dir, self.target_file)
-        if os.path.exists(target_file_path):
-            logger.info(f"Including existing target file in Aider command: {self.target_file}")
-            command.extend(['--read', self.target_file])
+        # target_file_path = os.path.join(self.project_dir, self.target_file)
+        # if os.path.exists(target_file_path):
+        #     logger.info(f"Including existing target file in Aider command: {self.target_file}")
+        #     command.extend(['--read', self.target_file])
 
         command.extend(['--message', prompt])
         
