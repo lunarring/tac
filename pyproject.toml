@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "test_chain"
-version = "0.1.0"
-description = "An Automated, Test-Driven AI Coding Framework"
+name = "TDAC"
+version = "0.1.1"
+description = "Test-driven Agentic Chains combines the methodical approach of test-driven development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance."
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = "BSD-3-Clause"
 dependencies = [
     "pytest>=8.0.0",
     "aider-chat>=0.18.0",
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-test-chain = "test_chain.cli.main:main"
+tdac = "tdac.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/test_chain"]
+packages = ["src/tdac"]
