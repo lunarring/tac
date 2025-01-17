@@ -13,6 +13,7 @@ dependencies = [
     "pytest>=8.0.0",
     "aider-chat>=0.18.0",
     "PyYAML>=6.0.1",
+    "colorama>=0.4.6",
 ]
 
 [project.scripts]

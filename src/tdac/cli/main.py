@@ -3,6 +3,7 @@ import os
 import sys
 import yaml
 import argparse
+import ast
 
 # Add the src directory to Python path for local development
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -49,6 +50,81 @@ def gather_files_command(args):
     
     result = gather_python_files(args.directory, formatting_options, exclusions)
     print(result)
+
+def run_tests_command(args):
+    """Handle the test run command"""
+    test_dir = args.directory
+    if not os.path.exists(test_dir):
+        logger.error(f"Test directory not found: {test_dir}")
+        sys.exit(1)
+    
+    # Create a minimal Block instance just for running tests
+    block = Block(
+        function_name="dummy",  # Not used for test running
+        file_path="dummy.py",   # Not used for test running
+        task_description="",    # Not used for test running
+        test_specification="",  # Not used for test running
+        test_data_generation="" # Not used for test running
+    )
+    
+    # Create executor with current directory as project dir
+    executor = BlockExecutor(block=block, project_dir=os.getcwd())
+    
+    # Run tests and print results
+    success = executor.run_tests(test_path=test_dir)
+    
+    if not success:
+        sys.exit(1)
+
+def list_tests_command(args):
+    """Handle the test list command"""
+    test_dir = args.directory
+    if not os.path.exists(test_dir):
+        logger.error(f"Test directory not found: {test_dir}")
+        sys.exit(1)
+    
+    def get_test_functions(file_path):
+        """Extract test function names from a Python file using ast"""
+        with open(file_path, 'r', encoding='utf-8') as f:
+            try:
+                tree = ast.parse(f.read(), filename=file_path)
+            except:
+                return []  # Skip files that can't be parsed
+        
+        return [node.name for node in ast.walk(tree) 
+                if isinstance(node, ast.FunctionDef) 
+                and (node.name.startswith('test_') or node.name.endswith('_test'))]
+    
+    test_count = 0
+    tests_by_file = {}
+    
+    # Walk through the test directory
+    for root, _, files in os.walk(test_dir):
+        for file in files:
+            if file.startswith('test_') and file.endswith('.py'):
+                file_path = os.path.join(root, file)
+                test_functions = get_test_functions(file_path)
+                if test_functions:
+                    rel_path = os.path.relpath(file_path)
+                    tests_by_file[rel_path] = test_functions
+                    test_count += len(test_functions)
+    
+    if not tests_by_file:
+        print("\nNo tests found.")
+        sys.exit(0)
+    
+    print("\nAvailable tests:")
+    for file_path, tests in sorted(tests_by_file.items()):
+        print(f"\n{file_path}:")
+        for test in sorted(tests):
+            print(f"  - {test}")
+    
+    print(f"\nTotal tests found: {test_count}")
+
+def generate_tests_command(args):
+    """Handle the test generate command"""
+    print("\nTest generation feature is coming soon!")
+    print("This will help you automatically generate test cases for your functions.")
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
@@ -118,6 +194,37 @@ Example usage:
         help='Comma-separated directories to exclude (default: .git,__pycache__)'
     )
     
+    # Test command
+    test_parser = subparsers.add_parser('test',
+        help='Test-related commands'
+    )
+    test_subparsers = test_parser.add_subparsers(dest='test_command', help='Test commands')
+    
+    # Run tests command
+    run_parser = test_subparsers.add_parser('run',
+        help='Run tests found in tests/ subfolder'
+    )
+    run_parser.add_argument(
+        '--directory',
+        default='tests',
+        help='Directory containing tests (default: tests)'
+    )
+    
+    # List tests command
+    list_parser = test_subparsers.add_parser('list',
+        help='List available tests'
+    )
+    list_parser.add_argument(
+        '--directory',
+        default='tests',
+        help='Directory containing tests (default: tests)'
+    )
+    
+    # Generate tests command
+    generate_parser = test_subparsers.add_parser('generate',
+        help='Generate tests (placeholder)'
+    )
+    
     args = parser.parse_args()
     
     if args.command == 'yaml' and args.skip_tests and args.test_only:
@@ -130,6 +237,17 @@ def main():
     
     if args.command == 'gather':
         gather_files_command(args)
+        return
+    
+    if args.command == 'test':
+        if args.test_command == 'run':
+            run_tests_command(args)
+        elif args.test_command == 'list':
+            list_tests_command(args)
+        elif args.test_command == 'generate':
+            generate_tests_command(args)
+        else:
+            parser.error("Please specify a test command (run, list, or generate)")
         return
     
     if args.command == 'yaml':
@@ -149,6 +267,17 @@ def main():
             logger.info(f"Successfully loaded block '{block.function_name}' from {args.yaml_path}")
             logger.info(f"Project directory: {project_dir}")
             sys.exit(0)
+
+        if args.test_only:
+            # Only run tests
+            executor = BlockExecutor(block=block, project_dir=project_dir)
+            success = executor.run_tests()
+            if success:
+                logger.info("All tests passed successfully.")
+            else:
+                logger.error("Tests failed.")
+                sys.exit(1)
+            return
 
         # Ensure the project directory exists
         if not os.path.exists(project_dir):
