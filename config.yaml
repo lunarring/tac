@@ -8,13 +8,15 @@ agents:
       verify_ssl: true
       timeout: 120
       max_chat_history_tokens: 100000
+    include_source_code: true
   testing:
     type: "aider"
     model: "o1-mini"
+    include_source_code: true
 
 logging:
   tdac:
-    level: INFO
+    level: DEBUG
     color: green
   other_packages:
     level: "INFO"

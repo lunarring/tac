@@ -311,7 +311,7 @@ def main():
                 raise ValueError(f"Unknown agent type: {config['agents']['programming']['type']}")
 
             # Initialize the executor with block and project_dir
-            executor = BlockExecutor(block=block, project_dir=project_dir)
+            executor = BlockExecutor(block=block, project_dir=project_dir, config=config)
 
             if args.test_only:
                 # Only run tests

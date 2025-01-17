@@ -2,8 +2,13 @@ import os
 import subprocess
 from tdac.agents.base import Agent
 from tdac.core.logging import logger
+from tdac.utils.file_gatherer import gather_python_files
 
 class AiderAgent(Agent):
+    def __init__(self, project_dir: str, target_file: str, config: dict):
+        super().__init__(project_dir, target_file)
+        self.agent_config = config.get('agents', {}).get('programming' if self.__class__.__name__ == 'AiderAgent' else 'testing', {})
+
     def execute_task(self, task_description: str, function_name: str, previous_error: str = None) -> None:
         """
         Executes the Aider command to implement the task.
@@ -22,6 +27,11 @@ class AiderAgent(Agent):
         if previous_error:
             prompt += f"\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
         prompt += ". Don't make any __init__.py files."
+        
+        # Append source code if enabled in config
+        if self.agent_config.get('include_source_code', False):
+            source_code = gather_python_files(self.project_dir)
+            prompt += f"\n\nHere is the full source code of the project:\n{source_code}"
         
         logger.debug("Execution prompt for Aider:\n%s", prompt)
         
@@ -48,6 +58,11 @@ class AiderAgent(Agent):
         Generates test cases in tests/test_new_block.py using Aider based on specifications and data.
         """
         prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}. Have a close look on this file, maybe it is a class that needs to be instantiated or maybe just a function that needs to be called."
+        
+        # Append source code if enabled in config
+        if self.agent_config.get('include_source_code', False):
+            source_code = gather_python_files(self.project_dir)
+            prompt += f"\n\nHere is the full source code of the project:\n{source_code}"
         
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
         

@@ -12,7 +12,7 @@ class Block:
         self.test_specification = test_specification
         self.test_data_generation = test_data_generation
 
-    def create_agent(self, project_dir: str) -> 'Agent':
+    def create_agent(self, project_dir: str, config: dict = None) -> 'Agent':
         """Factory method to create an appropriate agent for this block"""
         # For now we're hardcoding AiderAgent, but this could be made configurable
-        return AiderAgent(project_dir=project_dir, target_file=self.file_path)
+        return AiderAgent(project_dir=project_dir, target_file=self.file_path, config=config)

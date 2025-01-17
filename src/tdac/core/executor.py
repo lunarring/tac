@@ -5,12 +5,12 @@ from tdac.core.block import Block
 from tdac.agents.base import Agent
 
 class BlockExecutor:
-    def __init__(self, block: Block, project_dir: str):
+    def __init__(self, block: Block, project_dir: str, config: dict = None):
         self.block = block
         self.project_dir = project_dir
-        self.agent = block.create_agent(project_dir)
+        self.config = config if config else self._load_config()
+        self.agent = block.create_agent(project_dir, self.config)
         self.test_results = ""
-        self.config = self._load_config()
         self.previous_error = None  # Track previous error
 
     def _load_config(self) -> dict:
