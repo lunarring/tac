@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-def gather_python_files(directory, formatting_options=None, exclusions=None):
+def gather_python_files(directory, formatting_options=None, exclusions=None, exclude_dot_files=True):
     if formatting_options is None:
         formatting_options = {"header": "## File: ", "separator": "\n---\n", "use_code_fences": True}
     if exclusions is None:
@@ -13,8 +13,8 @@ def gather_python_files(directory, formatting_options=None, exclusions=None):
     directory = str(directory)  # Ensure directory is a string
 
     for root, dirs, files in os.walk(directory):
-        # Exclude specified directories
-        dirs[:] = [d for d in dirs if d not in exclusions]
+        # Exclude specified directories and optionally dot directories
+        dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
 
         # Build directory tree
         level = root.replace(directory, '').count(os.sep)
@@ -22,7 +22,9 @@ def gather_python_files(directory, formatting_options=None, exclusions=None):
         directory_tree.append(f"{indent}{os.path.basename(root)}/")
 
         for file in files:
-            if file.endswith('.py') and not file.startswith('.#'):
+            if (file.endswith('.py') and 
+                not file.startswith('.#') and 
+                not (exclude_dot_files and file.startswith('.'))):
                 file_path = os.path.join(root, file)
                 directory_tree.append(f"{indent}    {file}")
 
