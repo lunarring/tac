@@ -30,6 +30,8 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--file', self.target_file,
+            '--input-history-file', '/dev/null',
+            '--chat-history-file', '/dev/null',
             '--message', prompt
         ]
         try:
@@ -55,6 +57,8 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--file', test_file_path,
+            '--input-history-file', '/dev/null',
+            '--chat-history-file', '/dev/null',
         ]
 
         # Add target file if it exists
