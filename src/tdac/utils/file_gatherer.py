@@ -22,7 +22,7 @@ def gather_python_files(directory, formatting_options=None, exclusions=None):
         directory_tree.append(f"{indent}{os.path.basename(root)}/")
 
         for file in files:
-            if file.endswith('.py'):
+            if file.endswith('.py') and not file.startswith('.#'):
                 file_path = os.path.join(root, file)
                 directory_tree.append(f"{indent}    {file}")
 
