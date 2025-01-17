@@ -14,11 +14,11 @@ Test-driven Agentic Chains (TDAC) extends the principles of continuous testing a
 1. **Clone this repository** (or download it) to your local machine:
 
    ```bash
-   git clone https://github.com/your-username/tdac.git
-   cd tdac
+   git clone git@github.com:lunarring/TDAC.git
+   cd TDAC
    ```
 
-2. Activate your environment (e.g., a Conda environment named good):
+2. Activate your environment (e.g., mine is called 'good'):
    ```bash
    conda activate good
    ```
@@ -27,13 +27,7 @@ Test-driven Agentic Chains (TDAC) extends the principles of continuous testing a
 
    Editable (development) mode:
    ```bash
-   pip install --editable .
-   ```
-   This lets you modify the code in src/tdac/ and instantly see your changes without reinstalling.
-
-   Standard (production) install:
-   ```bash
-   pip install .
+   pip install -e .
    ```
 
 After this, you can run the tdac command from anywhere in your terminal (as long as your environment is activated).
@@ -42,7 +36,7 @@ After this, you can run the tdac command from anywhere in your terminal (as long
 
 The framework provides two main commands: `yaml` and `gather`.
 
-### YAML Command (Block Command)
+### YAML Command (this currently executes one block)
 
 The yaml command helps create and test new code implementations based on a YAML specification.
 
@@ -76,7 +70,7 @@ The yaml command helps create and test new code implementations based on a YAML 
 
 ### Gather Command
 
-The gather command helps collect and document Python files in a directory. This can be especially useful for auditing or for feeding code into a specialized model:
+The gather command helps collect and document Python files in a directory. This can be especially useful for auditing or for feeding code of a whole repository into a more powerful model.
 
 ```bash
 tdac gather ./src/tdac
