@@ -1,10 +1,6 @@
-# Test Chain
+# Test-driven Agentic Chains
 
-An Automated, Test-Driven AI Coding Framework
-
-## Overview
-
-Test Chain is a framework that automates the test-driven development process using AI. It takes a test-first approach where tests are generated before implementing the solution, ensuring robust and well-tested code.
+Test-driven Agentic Chains combines the methodical approach of test-driven development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
 
 ## Usage
 
