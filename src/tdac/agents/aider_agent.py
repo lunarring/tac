@@ -18,7 +18,7 @@ class AiderAgent(Agent):
             generated_tests = "No tests found yet."
 
         prompt = f"Implement the function '{function_name}' according to this specification:\n{task_description}\n\n"
-        prompt += f"The implementation must pass these tests:\n{generated_tests}\n"
+        prompt += f"The implementation must pass these tests:\n{generated_tests}\n. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
         if previous_error:
             prompt += f"\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
         prompt += ". Don't make any __init__.py files."
@@ -45,7 +45,7 @@ class AiderAgent(Agent):
         """
         Generates test cases in tests/test_new_block.py using Aider based on specifications and data.
         """
-        prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}"
+        prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}. Have a close look on this file, maybe it is a class that needs to be instantiated or maybe just a function that needs to be called."
         
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
         
@@ -55,8 +55,15 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--file', test_file_path,
-            '--message', prompt
         ]
+
+        # Add target file if it exists
+        target_file_path = os.path.join(self.project_dir, self.target_file)
+        if os.path.exists(target_file_path):
+            logger.info(f"Including existing target file in Aider command: {self.target_file}")
+            command.extend(['--read', self.target_file])
+
+        command.extend(['--message', prompt])
         
         try:
             result = subprocess.run(command, check=True, cwd=self.project_dir,
