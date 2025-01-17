@@ -19,18 +19,20 @@ class BlockExecutor:
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
 
-    def execute_block(self) -> bool:
+    def execute_block(self, skip_test_generation: bool = False) -> bool:
         """
         Executes the block with test-first approach and retry logic.
-        Always generates tests first, then implements solution with retries.
+        Args:
+            skip_test_generation: If True, skips test generation and only implements solution
         """
         try:
-            print("Generating tests first...")
-            self.agent.generate_tests(
-                self.block.test_specification, 
-                self.block.test_data_generation,
-                self.block.function_name
-            )
+            if not skip_test_generation:
+                print("Generating tests first...")
+                self.agent.generate_tests(
+                    self.block.test_specification, 
+                    self.block.test_data_generation,
+                    self.block.function_name
+                )
 
             max_retries = self.config['agents']['programming']['max_retries']
             for attempt in range(max_retries):

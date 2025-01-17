@@ -164,6 +164,11 @@ Example usage:
         action='store_true',
         help='Only run the tests without executing the block'
     )
+    yaml_parser.add_argument(
+        '--skip-test-generation',
+        action='store_true',
+        help='Skip test generation and only implement the solution'
+    )
     
     # File gathering command
     gather_parser = subparsers.add_parser('gather', 
@@ -229,6 +234,9 @@ Example usage:
     
     if args.command == 'yaml' and args.skip_tests and args.test_only:
         parser.error("Cannot use --skip-tests and --test-only together")
+    
+    if args.command == 'yaml' and args.skip_test_generation and args.test_only:
+        parser.error("Cannot use --skip-test-generation and --test-only together")
     
     return parser, args
 
@@ -315,7 +323,7 @@ def main():
                     sys.exit(1)
             else:
                 # Execute the block
-                success = executor.execute_block()
+                success = executor.execute_block(skip_test_generation=args.skip_test_generation)
 
                 if success:
                     logger.info("Block executed and changes applied successfully.")
