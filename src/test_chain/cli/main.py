@@ -58,7 +58,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Block execution command
-    block_parser = subparsers.add_parser('block', 
+    yaml_parser = subparsers.add_parser('yaml', 
         help='Execute a coding block defined in a YAML file',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -68,21 +68,21 @@ Example usage:
   %(prog)s --test-only examples/caesar_cipher.yaml
         """
     )
-    block_parser.add_argument(
+    yaml_parser.add_argument(
         'yaml_path',
         help='Path to the YAML file containing the block definition'
     )
-    block_parser.add_argument(
+    yaml_parser.add_argument(
         '--dry-run',
         action='store_true',
         help='Load and validate the YAML file without executing the block'
     )
-    block_parser.add_argument(
+    yaml_parser.add_argument(
         '--skip-tests',
         action='store_true',
         help='Skip running tests after implementing the solution'
     )
-    block_parser.add_argument(
+    yaml_parser.add_argument(
         '--test-only',
         action='store_true',
         help='Only run the tests without executing the block'
@@ -119,7 +119,7 @@ Example usage:
     
     args = parser.parse_args()
     
-    if args.command == 'block' and args.skip_tests and args.test_only:
+    if args.command == 'yaml' and args.skip_tests and args.test_only:
         parser.error("Cannot use --skip-tests and --test-only together")
     
     return parser, args
@@ -131,7 +131,7 @@ def main():
         gather_files_command(args)
         return
     
-    if args.command == 'block':
+    if args.command == 'yaml':
         try:
             block, project_dir = load_block_from_yaml(args.yaml_path)
         except FileNotFoundError:

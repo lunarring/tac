@@ -8,11 +8,11 @@ Test Chain is a framework that automates the test-driven development process usi
 
 ## Usage
 
-The framework provides two main commands: `block` and `gather`.
+The framework provides two main commands: `yaml` and `gather`.
 
 ### Block Command
 
-The block command helps create and test new code implementations based on a YAML specification.
+The yaml command helps create and test new code implementations based on a YAML specification.
 
 1. Create a YAML file describing your coding task (e.g., `examples/caesar_cipher.yaml`):
 
@@ -35,7 +35,7 @@ block:
 2. Run the test chain:
 
 ```bash
-python src/test_chain/cli/main.py block examples/caesar_cipher.yaml
+python src/test_chain/cli/main.py yaml examples/caesar_cipher.yaml
 ```
 
 ### Gather Command
