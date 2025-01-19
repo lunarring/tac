@@ -84,6 +84,13 @@ class AiderAgent(Agent):
         
         The new tests that you should write have the following specification: {test_specification}.
         Critically, you are closely adhering to using the following DATA for running the tests: {test_data_generation}.
+
+        Last remarks:
+        - be as minimal as possible, don't implement too many / unncessary tests
+        - strongly orient yourself with the existing tests, they are a good reference
+        - try to be minimally invasive in general
+        - do not ASSUME that some function in the code exists, always verify the code first
+        - don't forget to only ADD tests and NOT to modify any existing test functions code
         """
         
         # Append source code if enabled in config
