@@ -15,6 +15,7 @@ from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import BlockExecutor
 from tdac.core.logging import logger
 from tdac.utils.file_gatherer import gather_python_files
+from tdac.utils.protoblock_generator import generate_protoblock
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
@@ -126,6 +127,15 @@ def generate_tests_command(args):
     print("\nTest generation feature is coming soon!")
     print("This will help you automatically generate test cases for your functions.")
 
+def generate_protoblock_command(args):
+    """Handle the protoblock generation command"""
+    try:
+        protoblock = generate_protoblock(args.directory)
+        print(protoblock)
+    except Exception as e:
+        logger.error(f"Error generating protoblock: {e}")
+        sys.exit(1)
+
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
@@ -133,6 +143,15 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Protoblock command
+    protoblock_parser = subparsers.add_parser('protoblock',
+        help='Generate a protoblock YAML template from a directory'
+    )
+    protoblock_parser.add_argument(
+        'directory',
+        help='Directory to generate protoblock from'
+    )
     
     # Block execution command
     yaml_parser = subparsers.add_parser('yaml', 
@@ -251,6 +270,10 @@ def main():
             parser.error("Please specify a test command (run, list, or generate)")
         return
     
+    if args.command == 'protoblock':
+        generate_protoblock_command(args)
+        return
+
     if args.command == 'yaml':
         try:
             block, project_dir = load_block_from_yaml(args.yaml_path)
