@@ -13,17 +13,21 @@ class AiderAgent(Agent):
         """
         Executes the Aider command to implement the task.
         """
-        # Read the generated tests
-        test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
-        try:
-            with open(test_file_path, 'r') as f:
-                generated_tests = f.read()
-        except FileNotFoundError:
-            logger.warning(f"Test file not found at {test_file_path}")
-            generated_tests = "No tests found yet."
+        prompt = f"Implement changes in the code in {self.target_file} according to this specification:\n{task_description}\n\n"
 
-        prompt = f"Implement the function '{function_name}' according to this specification:\n{task_description}\n\n"
-        prompt += f"The implementation must pass these tests:\n{generated_tests}\n. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
+        # Read the generated tests
+        # test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
+        # try:
+        #     with open(test_file_path, 'r') as f:
+        #         generated_tests = f.read()
+        # except FileNotFoundError:
+        #     logger.warning(f"Test file not found at {test_file_path}")
+        #     generated_tests = "No tests found yet."
+
+        # prompt += f"The implementation must pass these tests:\n{generated_tests}\n. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"       
+        
+        prompt += f"The implementation must pass the tests specified in tests/test_new_block.py. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
+
         if previous_error:
             prompt += f"\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
         prompt += ". Don't make any __init__.py files."
@@ -39,6 +43,7 @@ class AiderAgent(Agent):
             'aider',
             '--yes-always',
             '--no-git',
+            '--read', 'tests/test_new_block.py',
             '--model', self.agent_config.get('model'),
             '--file', self.target_file,
             '--input-history-file', '/dev/null',

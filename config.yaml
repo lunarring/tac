@@ -2,17 +2,18 @@ agents:
   programming:
     type: "aider"
     max_retries: 8
-    model: "gpt-4o-mini"
+    # model: "gpt-4o-mini"
+    model: "o1-mini"
     model_settings:
       edit_format: "diff"
       verify_ssl: true
       timeout: 120
       max_chat_history_tokens: 100000
-    include_source_code: true
+    include_source_code: false
   testing:
     type: "aider"
     model: "gpt-4o-mini"
-    include_source_code: true
+    include_source_code: false
 
 logging:
   tdac:
