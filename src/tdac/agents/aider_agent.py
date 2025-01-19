@@ -16,24 +16,13 @@ class AiderAgent(Agent):
         task_description = self.config['task_description']
         function_name = self.config['function_name']
         
-        prompt = f"Implement changes in the code in {self.target_file} according to this specification:\n{task_description}\n\n"
-
-        # Read the generated tests
-        # test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
-        # try:
-        #     with open(test_file_path, 'r') as f:
-        #         generated_tests = f.read()
-        # except FileNotFoundError:
-        #     logger.warning(f"Test file not found at {test_file_path}")
-        #     generated_tests = "No tests found yet."
-
-        # prompt += f"The implementation must pass these tests:\n{generated_tests}\n. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"       
+        prompt = f"Implement changes in the code in {self.target_file} according to this specification:\n{task_description}\n\n"  
         
-        prompt += f"The implementation must pass the tests specified in tests/test_new_block.py. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
+        prompt += f"The implementation must pass the tests however. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
 
         if previous_error:
-            prompt += f"\nThe previous implementation failed with these errors, please fix them:\n{previous_error}"
-        prompt += ". Don't make any __init__.py files."
+            prompt += f"\nYou had an attempt of implementing this before, but it FAILED passing the tests! Here are the errors: please fix them:\n{previous_error}"
+        prompt += "Also please don't create any __init__.py files."
         
         # Append source code if enabled in config
         if self.agent_config.get('include_source_code', False):
@@ -42,17 +31,31 @@ class AiderAgent(Agent):
         
         logger.debug("Execution prompt for Aider:\n%s", prompt)
         
+        # Find all test files in the tests directory
+        tests_dir = os.path.join(self.project_dir, 'tests')
+        test_files = [f for f in os.listdir(tests_dir) 
+                     if f.startswith('test_') and f.endswith('.py')]
+        
         command = [
             'aider',
             '--yes-always',
             '--no-git',
-            '--read', 'tests/test_new_block.py',
             '--model', self.agent_config.get('model'),
             '--file', self.target_file,
             '--input-history-file', '/dev/null',
-            '--chat-history-file', '/dev/null',
-            '--message', prompt
+            '--chat-history-file', '/dev/null'
         ]
+
+        # Add all test files to be read
+        if test_files:
+            for test_file in test_files:
+                command.extend(['--read', os.path.join('tests', test_file)])
+        else:
+            # If no test files exist, use the default test_new_block.py
+            command.extend(['--read', os.path.join('tests', 'test_new_block.py')])
+
+        command.extend(['--message', prompt])
+        
         try:
             result = subprocess.run(command, check=True, cwd=self.project_dir,
                                     capture_output=True, text=True)

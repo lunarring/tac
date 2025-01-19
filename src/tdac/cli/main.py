@@ -296,10 +296,14 @@ def main():
                 executor.agent.generate_tests()
                 logger.info("Tests generated successfully.")
             elif args.gen_task:
-                # Only execute task without generating tests
+                # Execute task without generating tests, but with full retry logic
                 logger.info("Executing task...")
-                executor.agent.execute_task()
-                logger.info("Task executed successfully.")
+                success = executor.execute_block(skip_test_generation=True)
+                if success:
+                    logger.info("Task executed and verified successfully.")
+                else:
+                    logger.error("Task implementation failed.")
+                    sys.exit(1)
             elif args.run_tests:
                 # Only run tests
                 success = executor.run_tests()

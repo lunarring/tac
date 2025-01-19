@@ -67,11 +67,11 @@ class BlockExecutor:
         """
         Runs the tests using pytest framework.
         Args:
-            test_path: Optional path to test file or directory. If None, runs tests/test_new_block.py
+            test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
         """
         try:
-            # Make test_target relative to project_dir
-            test_target = test_path or 'tests/test_new_block.py'
+            # Default to running all test*.py files in tests directory
+            test_target = test_path or 'tests'
             full_path = os.path.join(self.project_dir, test_target)
             pytest_args = ['--disable-warnings', '-v']
 
@@ -82,7 +82,8 @@ class BlockExecutor:
             elif os.path.isdir(full_path):
                 # Directory case - discover and run all test files
                 print(f"\nDiscovering tests in directory: {test_target}")
-                result = self._run_pytest([test_target] + pytest_args)
+                # Add pattern to only run test*.py files
+                result = self._run_pytest([test_target, '-k', 'test_'] + pytest_args)
             else:
                 self.test_results = f"Error: Test path not found: {full_path}"
                 print(self.test_results)
