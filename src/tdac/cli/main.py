@@ -141,8 +141,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         epilog="""
 Example usage:
   %(prog)s examples/caesar_cipher.yaml
-  %(prog)s --dry-run examples/caesar_cipher.yaml
-  %(prog)s --test-only examples/caesar_cipher.yaml
+  %(prog)s --gen-tests examples/caesar_cipher.yaml
+  %(prog)s --gen-task examples/caesar_cipher.yaml
+  %(prog)s --run-tests examples/caesar_cipher.yaml
         """
     )
     yaml_parser.add_argument(
@@ -150,24 +151,19 @@ Example usage:
         help='Path to the YAML file containing the block definition'
     )
     yaml_parser.add_argument(
-        '--dry-run',
+        '--gen-tests',
         action='store_true',
-        help='Load and validate the YAML file without executing the block'
+        help='Only generate the tests without executing the task'
     )
     yaml_parser.add_argument(
-        '--skip-tests',
+        '--gen-task',
         action='store_true',
-        help='Skip running tests after implementing the solution'
+        help='Only execute the task without generating tests'
     )
     yaml_parser.add_argument(
-        '--test-only',
+        '--run-tests',
         action='store_true',
-        help='Only run the tests without executing the block'
-    )
-    yaml_parser.add_argument(
-        '--skip-test-generation',
-        action='store_true',
-        help='Skip test generation and only implement the solution'
+        help='Only run the tests without generating tests or executing task'
     )
     
     # File gathering command
@@ -232,11 +228,8 @@ Example usage:
     
     args = parser.parse_args()
     
-    if args.command == 'yaml' and args.skip_tests and args.test_only:
-        parser.error("Cannot use --skip-tests and --test-only together")
-    
-    if args.command == 'yaml' and args.skip_test_generation and args.test_only:
-        parser.error("Cannot use --skip-test-generation and --test-only together")
+    if args.command == 'yaml' and sum([args.gen_tests, args.gen_task, args.run_tests]) > 1:
+        parser.error("Cannot use multiple operation flags together (--gen-tests, --gen-task, --run-tests)")
     
     return parser, args
 
@@ -271,22 +264,6 @@ def main():
             logger.error(f"Missing required field in YAML file: {e}")
             sys.exit(1)
 
-        if args.dry_run:
-            logger.info(f"Successfully loaded block '{block.function_name}' from {args.yaml_path}")
-            logger.info(f"Project directory: {project_dir}")
-            sys.exit(0)
-
-        if args.test_only:
-            # Only run tests
-            executor = BlockExecutor(block=block, project_dir=project_dir)
-            success = executor.run_tests()
-            if success:
-                logger.info("All tests passed successfully.")
-            else:
-                logger.error("Tests failed.")
-                sys.exit(1)
-            return
-
         # Ensure the project directory exists
         if not os.path.exists(project_dir):
             os.makedirs(project_dir)
@@ -313,7 +290,17 @@ def main():
             # Initialize the executor with block and project_dir
             executor = BlockExecutor(block=block, project_dir=project_dir, config=config)
 
-            if args.test_only:
+            if args.gen_tests:
+                # Only generate tests
+                logger.info("Generating tests...")
+                executor.agent.generate_tests()
+                logger.info("Tests generated successfully.")
+            elif args.gen_task:
+                # Only execute task without generating tests
+                logger.info("Executing task...")
+                executor.agent.execute_task()
+                logger.info("Task executed successfully.")
+            elif args.run_tests:
                 # Only run tests
                 success = executor.run_tests()
                 if success:
@@ -322,9 +309,8 @@ def main():
                     logger.error("Tests failed.")
                     sys.exit(1)
             else:
-                # Execute the block
-                success = executor.execute_block(skip_test_generation=args.skip_test_generation)
-
+                # Execute the full block (default behavior)
+                success = executor.execute_block()
                 if success:
                     logger.info("Block executed and changes applied successfully.")
                 else:
