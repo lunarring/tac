@@ -6,13 +6,16 @@ from tdac.utils.file_gatherer import gather_python_files
 
 class AiderAgent(Agent):
     def __init__(self, project_dir: str, target_file: str, config: dict):
-        super().__init__(project_dir, target_file)
+        super().__init__(project_dir, target_file, config)
         self.agent_config = config.get('agents', {}).get('programming' if self.__class__.__name__ == 'AiderAgent' else 'testing', {})
 
-    def execute_task(self, task_description: str, function_name: str, previous_error: str = None) -> None:
+    def execute_task(self, previous_error: str = None) -> None:
         """
         Executes the Aider command to implement the task.
         """
+        task_description = self.config['task_description']
+        function_name = self.config['function_name']
+        
         prompt = f"Implement changes in the code in {self.target_file} according to this specification:\n{task_description}\n\n"
 
         # Read the generated tests
@@ -59,12 +62,26 @@ class AiderAgent(Agent):
             print(f"Error executing Aider: {e.stderr}")
             raise
 
-    def generate_tests(self, test_specification: str, test_data_generation: str, function_name: str) -> None:
+    def generate_tests(self) -> None:
         """
-        Generates test cases in tests/test_new_block.py using Aider based on specifications and data.
+        Generates the necessary test cases for the update in the new block.
         """
-        test_file_path = os.path.join(self.project_dir, 'tests', 'test_new_block.py')
-        prompt = f"Write tests for the function '{function_name}' using pytest with the following specification:\n{test_specification}\nUse the following test data:\n{test_data_generation}. For the import of {function_name}, you can assume it is in {self.target_file}. Have a close look on this file, maybe it is a class that needs to be instantiated or maybe just a function that needs to be called. Be sure that you are ONLY writing tests in the file tests/test_new_block.py!"
+        # Find all test files in the tests directory
+        tests_dir = os.path.join(self.project_dir, 'tests')
+        test_files = [f for f in os.listdir(tests_dir) 
+                     if f.startswith('test_') and f.endswith('.py')]
+        
+        test_specification = self.config['test_specification']
+        test_data_generation = self.config['test_data_generation']
+        task_description = self.config['task_description']
+        
+        prompt = f"""Your task is to extend our tests library with one or several new tests for new functionality that we want to build. CRITICALLY, you ADD new test functions BUT NEVER modify any existing test functions code.
+        
+        Here briefly a description of the new functionality for which we want to write tests: {task_description}.
+        
+        The new tests that you should write have the following specification: {test_specification}.
+        Critically, you are closely adhering to using the following DATA for running the tests: {test_data_generation}.
+        """
         
         # Append source code if enabled in config
         if self.agent_config.get('include_source_code', False):
@@ -78,16 +95,19 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
-            '--file', test_file_path,
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
+            '--read', self.target_file
         ]
-
-        # Add target file if it exists
-        # target_file_path = os.path.join(self.project_dir, self.target_file)
-        # if os.path.exists(target_file_path):
-        #     logger.info(f"Including existing target file in Aider command: {self.target_file}")
-        #     command.extend(['--read', self.target_file])
+                
+        if test_files:
+            # If there are existing test files, include all of them
+            for test_file in test_files:
+                command.extend(['--file', os.path.join('tests', test_file)])
+        else:
+            # If no test files exist, use the default test_new_block.py
+            test_file_path = os.path.join('tests', 'test_new_block.py')
+            command.extend(['--file', test_file_path])
 
         command.extend(['--message', prompt])
         

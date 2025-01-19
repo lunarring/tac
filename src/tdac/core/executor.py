@@ -9,6 +9,13 @@ class BlockExecutor:
         self.block = block
         self.project_dir = project_dir
         self.config = config if config else self._load_config()
+        # Update config with block-specific parameters
+        self.config.update({
+            'task_description': self.block.task_description,
+            'test_specification': self.block.test_specification,
+            'test_data_generation': self.block.test_data_generation,
+            'function_name': self.block.function_name
+        })
         self.agent = block.create_agent(project_dir, self.config)
         self.test_results = ""
         self.previous_error = None  # Track previous error
@@ -28,22 +35,14 @@ class BlockExecutor:
         try:
             if not skip_test_generation:
                 print("Generating tests first...")
-                self.agent.generate_tests(
-                    self.block.test_specification, 
-                    self.block.test_data_generation,
-                    self.block.function_name
-                )
+                self.agent.generate_tests()
 
             max_retries = self.config['agents']['programming']['max_retries']
             for attempt in range(max_retries):
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution...")
                 
                 print("Executing task...")
-                self.agent.execute_task(
-                    self.block.task_description,
-                    self.block.function_name,
-                    previous_error=self.previous_error  # Pass previous error to agent
-                )
+                self.agent.execute_task(previous_error=self.previous_error)
 
                 print("Running tests...")
                 if self.run_tests():
