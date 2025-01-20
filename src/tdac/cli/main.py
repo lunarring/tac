@@ -131,7 +131,8 @@ def generate_tests_command(args):
 def generate_protoblock_command(args):
     """Handle the protoblock generation command"""
     try:
-        protoblock = generate_protoblock(args.directory)
+        template_type = "refactor" if args.refactor else "default"
+        protoblock = generate_protoblock(args.directory, template_type=template_type)
         print(protoblock)
     except Exception as e:
         logger.error(f"Error generating protoblock: {e}")
@@ -152,6 +153,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     protoblock_parser.add_argument(
         'directory',
         help='Directory to generate protoblock from'
+    )
+    protoblock_parser.add_argument(
+        '--refactor',
+        action='store_true',
+        help='Generate a refactoring protoblock template'
     )
     
     # Block execution command

@@ -1,17 +1,44 @@
 from tdac.utils.file_gatherer import gather_python_files
 
-def generate_protoblock(directory: str) -> str:
+# Predefined templates for different protoblock types
+PROTOBLOCK_TEMPLATES = {
+    "refactor": {
+        "instructions": "We want to refactor the code because it is ugly and not very well done. Pick ONE single item for refactoring that seems most pressing.",
+        "description": "Generate a refactoring protoblock"
+    },
+    "default": {
+        "instructions": "",
+        "description": "Generate a standard protoblock"
+    }
+}
+
+def get_protoblock_template(template_type: str = "default") -> dict:
+    """Get a predefined protoblock template.
+    
+    Args:
+        template_type: The type of template to use (e.g., "refactor", "default")
+    
+    Returns:
+        A dictionary containing the template configuration
+    """
+    return PROTOBLOCK_TEMPLATES.get(template_type, PROTOBLOCK_TEMPLATES["default"])
+
+def generate_protoblock(directory: str, template_type: str = "default") -> str:
     """
     Generate a protoblock YAML template from a directory of Python files.
     
     Args:
         directory: Path to the directory containing Python files
+        template_type: The type of template to use (e.g., "refactor", "default")
     
     Returns:
         A string containing the protoblock YAML template
     """
     # Gather file contents using existing file gatherer
     file_content = gather_python_files(directory)
+    
+    # Get the template configuration
+    template_config = get_protoblock_template(template_type)
     
     # Generate the protoblock template
     template = f"""We have the following codebase: 
@@ -22,7 +49,7 @@ I want you to generate an instruction block (called protoblock) which is the inp
 --------------------
 
 seedblock:
-  instructions: instruction of the change in the code that was requested. this is just for reference, and it is an exact copy of the instructions that were received for creating this protoblock
+  instructions: {template_config["instructions"]}
 
 task:
   specification: given the entire codebase and the seedblock instruction, here we describe the task at hand very precisely. However we are not implementing the task here and we are not describing exactly HOW the code needs to be changed. You can come up with a proposal of how this could be achieved, but we do NOT need to implement it. Given your understanding of the seed block instructions and the codebase, you come up with a proposal for this!
@@ -37,5 +64,5 @@ context_files: list of files that need to be read for context in order to implem
 
 --------------------
 
-Now we have a following task, i.e. new functionality to implement. Answer in the yaml file directly and below it provide me a brief high level comment statement and your assertion how easy it is to implement that change! Here it is: """
+Please analyze the codebase and provide a protoblock YAML that addresses this task: {template_config["instructions"] if template_config["instructions"] else "Describe your task here"}"""
     return template 
