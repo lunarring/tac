@@ -1,13 +1,13 @@
 agents:
   programming:
     type: "aider"
-    max_retries: 4
+    max_retries: 10
     model: "deepseek/deepseek-chat"
     model_settings:
       edit_format: "diff"
       verify_ssl: true
       timeout: 120
-      max_chat_history_tokens: 100000
+      max_chat_history_tokens: 200000
   testing:
     type: "aider"
     model: "deepseek/deepseek-chat"
