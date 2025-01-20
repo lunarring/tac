@@ -17,6 +17,9 @@ class AiderAgent(Agent):
         write_files = self.config.get('write_files', [])  # Get write files from config
         context_files = [f for f in self.config.get('context_files', []) if f not in write_files]  # Filter out files already in write_files
         
+        logger.debug("Files to be written: %s", write_files)
+        logger.debug("Context files to be read: %s", context_files)
+        
         prompt = f"Implement changes in the code according to this specification:\n{task_description}\n\n"  
         
         prompt += f"The implementation must pass the tests however. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
@@ -32,14 +35,19 @@ class AiderAgent(Agent):
         test_files = [f for f in os.listdir('tests') 
                      if f.startswith('test_') and f.endswith('.py')]
         
+        logger.debug("Found test files: %s", test_files)
+        
         command = [
             'aider',
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
-            # '--input-history-file', '/dev/null',
-            # '--chat-history-file', '/dev/null'
+            '--input-history-file', '/dev/null',
+            '--chat-history-file', '/dev/null',
+            '--llm-history-file', '.aider.llm.history'
         ]
+
+        logger.debug("Using Aider model: %s", self.agent_config.get('model'))
 
         # Add all write files to be edited
         for write_file in write_files:
@@ -58,6 +66,8 @@ class AiderAgent(Agent):
             command.extend(['--read', os.path.join('tests', 'test_new_block.py')])
 
         command.extend(['--message', prompt])
+        
+        logger.debug("Final Aider command: %s", ' '.join(command))
         
         try:
             result = subprocess.run(command, check=True, text=True,

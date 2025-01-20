@@ -2,8 +2,7 @@ agents:
   programming:
     type: "aider"
     max_retries: 4
-    # model: "gpt-4o-mini"
-    model: "o1-mini"
+    model: "deepseek"
     model_settings:
       edit_format: "diff"
       verify_ssl: true
@@ -11,7 +10,7 @@ agents:
       max_chat_history_tokens: 100000
   testing:
     type: "aider"
-    model: "gpt-4o-mini"
+    model: "deepseek"
 
 logging:
   tdac:
