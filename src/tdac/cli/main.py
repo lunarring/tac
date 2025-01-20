@@ -16,7 +16,7 @@ from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import BlockExecutor
 from tdac.core.logging import logger
 from tdac.utils.file_gatherer import gather_python_files
-from tdac.utils.protoblock_generator import generate_protoblock
+from tdac.utils.seedblock_generator import generate_seedblock
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
@@ -128,14 +128,14 @@ def generate_tests_command(args):
     print("\nTest generation feature is coming soon!")
     print("This will help you automatically generate test cases for your functions.")
 
-def generate_protoblock_command(args):
-    """Handle the protoblock generation command"""
+def generate_seedblock_command(args):
+    """Handle the seedblock generation command"""
     try:
         template_type = "refactor" if args.refactor else "default"
-        protoblock = generate_protoblock(args.directory, template_type=template_type)
-        print(protoblock)
+        seedblock = generate_seedblock(args.directory, template_type=template_type)
+        print(seedblock)
     except Exception as e:
-        logger.error(f"Error generating protoblock: {e}")
+        logger.error(f"Error generating seedblock: {e}")
         sys.exit(1)
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
@@ -146,18 +146,18 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # Protoblock command
-    protoblock_parser = subparsers.add_parser('protoblock',
-        help='Generate a protoblock YAML template from a directory'
+    # Seedblock command
+    seedblock_parser = subparsers.add_parser('seedblock',
+        help='Generate a seedblock YAML template from a directory'
     )
-    protoblock_parser.add_argument(
+    seedblock_parser.add_argument(
         'directory',
-        help='Directory to generate protoblock from'
+        help='Directory to generate seedblock from'
     )
-    protoblock_parser.add_argument(
+    seedblock_parser.add_argument(
         '--refactor',
         action='store_true',
-        help='Generate a refactoring protoblock template'
+        help='Generate a refactoring seedblock template'
     )
     
     # Block execution command
@@ -283,8 +283,8 @@ def main():
             parser.error("Please specify a test command (run, list, or generate)")
         return
     
-    if args.command == 'protoblock':
-        generate_protoblock_command(args)
+    if args.command == 'seedblock':
+        generate_seedblock_command(args)
         return
 
     if args.command == 'yaml':
