@@ -67,7 +67,7 @@ test:
   data: describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible.
   replacements: list of existing tests that need to be adapapted because of the proposed chances. use relative file paths as given in the codebase. leave empty if no replacements are needed.
 
-write_files: list of files that may need to be written for the task. use relative file paths as given in the codebase. also add the replacements here!
+write_files: list of files that may need to be written for the task. use relative file paths as given in the codebase. It is SUPER IMPORTANT to add all files that need to be updated in here, so if we need to change a file, put it here! 
   
 context_files: list of files that need to be read for context in order to implement the task and as background information for the test. use relative file paths as given in the codebase.
 
