@@ -36,15 +36,33 @@ After this, you can run the  command from anywhere in your terminal (as long as 
 
 The framework provides several commands to help with AI-driven development:
 
-### Generate a Protoblock
+### Generate a Seedblock
 
-Generate a protoblock YAML template from an existing codebase:
+Generate a seedblock YAML template from an existing codebase:
 
 ```bash
-tdac protoblock ./your/code/directory
+tdac seedblock ./your/code/directory
 ```
 
-This will create a structured YAML template that you can use as input for the implementation command.
+The seedblock command supports several template types:
+- `--refactor`: Generate a template focused on code refactoring
+- `--test`: Generate a template for adding comprehensive tests
+- `--error`: Generate a template for error analysis and fixes
+
+Examples:
+```bash
+# Generate a refactoring template
+tdac seedblock ./src/tdac --refactor
+
+# Generate a testing template
+tdac seedblock ./src/tdac --test
+
+# Generate an error analysis template
+tdac seedblock ./src/tdac --error
+
+# Generate a default template
+tdac seedblock ./src/tdac
+```
 
 ### Execute Changes
 
