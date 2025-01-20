@@ -7,7 +7,7 @@ Test-driven Agentic Chains (TDAC) combines the methodical approach of test-drive
 
 ## What Is It?
 
-Test-driven Agentic Chains (TDAC) extends the principles of continuous testing and auditing into AI development. By structuring tasks as "blocks" validated by a series of automated tests and recorded changes, you can iteratively refine your AI's behavior while maintaining a transparent trail of its evolution.
+Test-driven Agentic Chains (TDAC) extends the principles of continuous testing and auditing into AI development. By structuring tasks as "blocks" validated by a series of automated tests and recorded changes, you can iteratively refine your AI's behavior while maintaining a transparent trail of its evolution. For a detailed technical overview of the system architecture and methodology, please refer to our [whitepaper](docs/whitepaper.md).
 
 ## 🚀 Installation
 
@@ -34,49 +34,74 @@ After this, you can run the  command from anywhere in your terminal (as long as 
 
 ## ⚙️ Usage
 
-The framework provides two main commands: `yaml` and `gather`.
+The framework provides several commands to help with AI-driven development:
 
-### YAML Command (this currently executes one block)
+### Generate a Protoblock
 
-The yaml command helps create and test new code implementations based on a YAML specification.
+Generate a protoblock YAML template from an existing codebase:
 
-1. Create a YAML file describing your coding task (e.g., `examples/caesar_cipher.yaml`):
-   ```yaml
-   project:
-     project_dir: "./block_test"
+```bash
+tdac protoblock ./your/code/directory
+```
 
-   block:
-     function_name: "caesar_cipher"
-     file_path: "main.py"
-     task_description: "Implement a Python function caesar_cipher(text, shift) that returns a new string where each alphabetic character in 'text' is shifted by 'shift' positions in the alphabet."
-     test_specification: |
-       Test cases include:
-       1) Simple shift: 'abc' with shift=1 => 'bcd'
-       2) Wraparound: 'xyz' with shift=2 => 'zab'
-       3) Mixed case: 'AbZ' with shift=1 => 'BcA'
-       4) Non-alpha: 'Hello, World!' with shift=5 => 'Mjqqt, Btwqi!'
-   ```
+This will create a structured YAML template that you can use as input for the implementation command.
 
-2. Run the test chain:
-   ```bash
-   tdac yaml examples/caesar_cipher.yaml
-   ```
+### Execute Changes
 
-#### Command Options (YAML / Block)
+Execute changes based on a YAML specification:
 
-- `--dry-run`: Validate the YAML file without executing
-- `--skip-tests`: Skip running tests after implementation
-- `--test-only`: Only run the tests without implementing
+```bash
+tdac yaml your_protoblock.yaml
+```
 
-### Gather Command
+The yaml command supports several flags:
+- `--gen-tests`: Only generate the tests without executing the task
+- `--gen-task`: Only execute the task without generating tests
+- `--run-tests`: Only run the tests without generating tests or executing task
 
-The gather command helps collect and document Python files in a directory. This can be especially useful for auditing or for feeding code of a whole repository into a more powerful model.
+Example protoblock YAML structure:
+```yaml
+seedblock:
+  instructions: "Add feature X to the system"
+
+task:
+  specification: "Detailed description of what needs to be implemented"
+  write_files: 
+    - "src/module/new_feature.py"
+
+test:
+  specification: "Description of how the new functionality should be tested"
+  data: "Test input data and expected outcomes"
+  replacements: []
+
+context_files:
+  - "src/module/existing.py"
+```
+
+### Test Management
+
+The framework provides several test-related commands:
+
+```bash
+# Run tests
+tdac test run [--directory tests]
+
+# List available tests
+tdac test list [--directory tests]
+
+# Generate tests (coming soon)
+tdac test generate
+```
+
+### Gather Code Documentation
+
+The gather command helps collect and document Python files in a directory:
 
 ```bash
 tdac gather ./src/tdac
 ```
 
-#### Command Options (Gather)
+#### Command Options
 
 - `--header`: Header format for each file (default: "## File: ")
 - `--separator`: Separator between sections (default: "\n---\n")
