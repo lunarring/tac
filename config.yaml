@@ -9,11 +9,9 @@ agents:
       verify_ssl: true
       timeout: 120
       max_chat_history_tokens: 100000
-    include_source_code: false
   testing:
     type: "aider"
     model: "gpt-4o-mini"
-    include_source_code: false
 
 logging:
   tdac:

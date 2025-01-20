@@ -5,18 +5,18 @@ from tdac.core.block import Block
 from tdac.agents.base import Agent
 
 class BlockExecutor:
-    def __init__(self, block: Block, project_dir: str, config: dict = None):
+    def __init__(self, block: Block, config: dict = None):
         self.block = block
-        self.project_dir = project_dir
         self.config = config if config else self._load_config()
         # Update config with block-specific parameters
         self.config.update({
             'task_description': self.block.task_description,
             'test_specification': self.block.test_specification,
             'test_data_generation': self.block.test_data_generation,
-            'function_name': self.block.function_name
+            'write_files': self.block.write_files,
+            'context_files': self.block.context_files
         })
-        self.agent = block.create_agent(project_dir, self.config)
+        self.agent = block.create_agent(self.config)
         self.test_results = ""
         self.previous_error = None  # Track previous error
 
@@ -72,7 +72,7 @@ class BlockExecutor:
         try:
             # Default to running all test*.py files in tests directory
             test_target = test_path or 'tests'
-            full_path = os.path.join(self.project_dir, test_target)
+            full_path = test_target
             pytest_args = ['--disable-warnings', '-v']
 
             if os.path.isfile(full_path):
@@ -104,8 +104,7 @@ class BlockExecutor:
         result = subprocess.run(
             ['pytest'] + args,
             capture_output=True,
-            text=True,
-            cwd=self.project_dir
+            text=True
         )
         self.test_results = result.stdout + "\n" + result.stderr
         return result.returncode == 0

@@ -22,23 +22,23 @@ def load_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-def load_block_from_yaml(yaml_path: str) -> tuple[Block, str]:
-    """Load block definition and project directory from a YAML file"""
+def load_block_from_yaml(yaml_path: str) -> Block:
+    """Load block definition from a YAML file"""
     with open(yaml_path, 'r') as f:
         data = yaml.safe_load(f)
     
-    project_dir = data['project']['project_dir']
-    block_data = data['block']
+    task_data = data['task']
+    test_data = data['test']
     
     block = Block(
-        function_name=block_data['function_name'],
-        file_path=block_data['file_path'],
-        task_description=block_data['task_description'],
-        test_specification=block_data['test_specification'],
-        test_data_generation=block_data['test_data_generation']
+        task_description=task_data['specification'],
+        test_specification=test_data['specification'],
+        test_data_generation=test_data['data'],
+        write_files=task_data['write_files'],
+        context_files=data.get('context_files', [])
     )
     
-    return block, project_dir
+    return block
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -276,7 +276,7 @@ def main():
 
     if args.command == 'yaml':
         try:
-            block, project_dir = load_block_from_yaml(args.yaml_path)
+            block = load_block_from_yaml(args.yaml_path)
         except FileNotFoundError:
             logger.error(f"YAML file not found: {args.yaml_path}")
             sys.exit(1)
@@ -287,21 +287,10 @@ def main():
             logger.error(f"Missing required field in YAML file: {e}")
             sys.exit(1)
 
-        # Ensure the project directory exists
-        if not os.path.exists(project_dir):
-            os.makedirs(project_dir)
-            os.makedirs(os.path.join(project_dir, 'tests'), exist_ok=True)
-            
-            with open(os.path.join(project_dir, block.file_path), 'w', encoding='utf-8') as f:
-                f.write(f"def {block.function_name}(text, shift):\n    return None  # Placeholder implementation\n")
-            
-            # Create __init__.py files
-            with open(os.path.join(project_dir, '__init__.py'), 'w', encoding='utf-8') as f:
-                pass
-            with open(os.path.join(project_dir, 'tests', '__init__.py'), 'w', encoding='utf-8') as f:
-                pass
-            
-            logger.info("Project initialized with placeholder code.")
+        # Ensure tests directory exists
+        os.makedirs('tests', exist_ok=True)
+        with open(os.path.join('tests', '__init__.py'), 'w', encoding='utf-8') as f:
+            pass
 
         try:
             # Load configuration
@@ -310,8 +299,8 @@ def main():
             if config['agents']['programming']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['agents']['programming']['type']}")
 
-            # Initialize the executor with block and project_dir
-            executor = BlockExecutor(block=block, project_dir=project_dir, config=config)
+            # Initialize the executor with block and config
+            executor = BlockExecutor(block=block, config=config)
 
             if args.gen_tests:
                 # Only generate tests

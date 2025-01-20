@@ -3,16 +3,25 @@ from typing import Dict, Any
 from tdac.agents.base import Agent
 from tdac.agents.aider_agent import AiderAgent
 
-@dataclass
 class Block:
-    def __init__(self, function_name: str, file_path: str, task_description: str, test_specification: str, test_data_generation: str):
-        self.function_name = function_name
-        self.file_path = file_path
+    def __init__(self, task_description: str, test_specification: str, test_data_generation: str, write_files: list, context_files: list):
         self.task_description = task_description
         self.test_specification = test_specification
         self.test_data_generation = test_data_generation
+        self.write_files = write_files
+        self.context_files = context_files
 
-    def create_agent(self, project_dir: str, config: dict = None) -> 'Agent':
-        """Factory method to create an appropriate agent for this block"""
-        # For now we're hardcoding AiderAgent, but this could be made configurable
-        return AiderAgent(project_dir=project_dir, target_file=self.file_path, config=config)
+    def create_agent(self, config: dict):
+        """Create an agent for this block based on the config"""
+        from tdac.agents.aider_agent import AiderAgent
+        
+        # Add block-specific parameters to config
+        config.update({
+            'task_description': self.task_description,
+            'test_specification': self.test_specification,
+            'test_data_generation': self.test_data_generation,
+            'write_files': self.write_files,
+            'context_files': self.context_files
+        })
+        
+        return AiderAgent(config)

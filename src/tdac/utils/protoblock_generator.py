@@ -17,52 +17,23 @@ def generate_protoblock(directory: str) -> str:
     template = f"""We have the following codebase: 
 {file_content}
     
-I want you to generate an instruction block for a programming agent. The block has a very specific format that I need you to adhere to, here is an example:
+I want you to generate an instruction block (called protoblock) which is the input for a coding agent. The block has a very specific format that I need you to adhere to precisely, here is the format:
 
-project:
-  name: real_time_stats_update
-  project_dir: /Users/jjj/git/piano_trainer
+seedblock:
+  instructions: <instruction of the change in the code that was requested. this is just for reference, and it is an exact copy of the instructions that were received for creating this protoblock>
 
-block:
-  function_name: update_statistics
-  file_path: src/piano_trainer.py
-  task_description: |
-    Enhance the system so that performance metrics are recalculated immediately 
-    after each individual tone is processed. Previously, these metrics were 
-    calculated either only at the conclusion of the entire process or once 
-    for the entire set of tones. Now, each time a tone is received and processed, 
-    the relevant logic should be triggered to generate and store updated metrics 
-    on the spot. Displaying or reporting these metrics is not required at this time.
+task:
+  specification: <given the entire codebase and the seedblock instruction, here we describe the task at hand very precisely. However we are not implementing the task here and we are not describing exactly HOW the code needs to be changed. Thus, don't exactly describe the functions or classes and how they need to be changed. However we do our best to formulate the task at hand very precisely with the knowledge of the codebase and the seedblock instruction.>
+  write_files: <list of files that may need to be written for the task. use relative file paths as given in the codebase. Don't list test files here.>
 
-  test_specification: |
-    Verification will ensure that for each tone received, the update process 
-    for performance metrics is executed immediately. Key points include:
-      1) Updates occur right after each tone—no deferrals until the full set is processed.
-      2) The process must accept structured information about each tone (e.g., 
-         properties like pitch or duration).
-      3) The continuous accumulation of metrics should be validated at each step.
+test: 
+  specification: <given the entire codebase and the seedblock instruction, here we describe the test specification for the task at hand. We are aiming to just write ONE single tests, which is able to infer whether the task update has been implemented correctly or not. Thus, the goal is is figure out if the task has been implemented correctly. Critically, the test needs to be fulfillable. We do NOT need to test anything else than the NEW functionality given the task specification. The rest of the code will be tested by other means anyways, so don't mention it. However, if you are forseeing that the new test will clash with an existing test, because maybe code will be replaced, then mention it in the field 'replacements'.>
+  data: <describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference>.
+  replacements: <list of tests that need to be replaced by the new test. use relative file paths as given in the codebase. leave empty if no replacements are needed.>
 
-  test_data_generation: |
-    Test data will consist of a series of tones, each defined by essential properties 
-    such as pitch and duration. For instance:
-      - pitch = 60, duration = 100
-      - pitch = 62, duration = 150
-      - pitch = 64, duration = 200
-
-    Each tone in the series is then processed, and the verification confirms that 
-    metrics are updated immediately and accurately for each tone. 
-    The timing and correctness of these updates are the main focus.
+context_files: <list of files that need to be read for context in order to implement the task and as background information for the test. use relative file paths as given in the codebase.>
 
 ———————————————
 
-Crucially, you need to take care of the following with the highest precision possible:
-- have the correct file_path for the files that need to be modified
-- this is the only place to mention python files 
-- don't exactly describe the functions or classes and how they need to be changed, just describe the task at hand very precisely, given the codebase below. the more precise you can describe the task, the better!
-- describe the tests very precisely. they need to be able to test whether the task update has been implemented correctly or not. try to make simple tests, keep it easy and modular.
-- we do NOT need to test anything else than the NEW functionality. the rest of the code will be tested by other means anyways, so don't mention it.
-
-———————————————
-
-Now we have the following task at hand, below it I will then provide you the codebase. Answer in the yaml file directly and below it provide me a brief high level comment statement and your assertion how easy it is to implement that change!"""
+Now we have a following task, i.e. new functionality to implement. Answer in the yaml file directly and below it provide me a brief high level comment statement and your assertion how easy it is to implement that change! Here it is: """
     return template 

@@ -5,8 +5,8 @@ from tdac.core.logging import logger
 from tdac.utils.file_gatherer import gather_python_files
 
 class AiderAgent(Agent):
-    def __init__(self, project_dir: str, target_file: str, config: dict):
-        super().__init__(project_dir, target_file, config)
+    def __init__(self, config: dict):
+        super().__init__(config)
         self.agent_config = config.get('agents', {}).get('programming' if self.__class__.__name__ == 'AiderAgent' else 'testing', {})
 
     def execute_task(self, previous_error: str = None) -> None:
@@ -14,26 +14,22 @@ class AiderAgent(Agent):
         Executes the Aider command to implement the task.
         """
         task_description = self.config['task_description']
-        function_name = self.config['function_name']
+        write_files = self.config.get('write_files', [])  # Get write files from config
+        context_files = self.config.get('context_files', [])  # Get context files
         
-        prompt = f"Implement changes in the code in {self.target_file} according to this specification:\n{task_description}\n\n"  
+        prompt = f"Implement changes in the code according to this specification:\n{task_description}\n\n"  
         
         prompt += f"The implementation must pass the tests however. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
 
         if previous_error:
             prompt += f"\nYou had an attempt of implementing this before, but it FAILED passing the tests! Here are the errors: please fix them:\n{previous_error}"
         prompt += "Also please don't create any __init__.py files."
-        
-        # Append source code if enabled in config
-        if self.agent_config.get('include_source_code', False):
-            source_code = gather_python_files(self.project_dir)
-            prompt += f"\n\nHere is the full source code of the project:\n{source_code}"
+    
         
         logger.debug("Execution prompt for Aider:\n%s", prompt)
         
         # Find all test files in the tests directory
-        tests_dir = os.path.join(self.project_dir, 'tests')
-        test_files = [f for f in os.listdir(tests_dir) 
+        test_files = [f for f in os.listdir('tests') 
                      if f.startswith('test_') and f.endswith('.py')]
         
         command = [
@@ -41,10 +37,17 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
-            '--file', self.target_file,
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null'
         ]
+
+        # Add all write files to be edited
+        for write_file in write_files:
+            command.extend(['--file', write_file])
+
+        # Add all context files to be read
+        for context_file in context_files:
+            command.extend(['--read', context_file])
 
         # Add all test files to be read
         if test_files:
@@ -57,8 +60,8 @@ class AiderAgent(Agent):
         command.extend(['--message', prompt])
         
         try:
-            result = subprocess.run(command, check=True, cwd=self.project_dir,
-                                    capture_output=True, text=True)
+            result = subprocess.run(command, check=True, text=True,
+                                  capture_output=True)
             print("Aider executed successfully.")
             print(result.stdout)
         except subprocess.CalledProcessError as e:
@@ -70,13 +73,14 @@ class AiderAgent(Agent):
         Generates the necessary test cases for the update in the new block.
         """
         # Find all test files in the tests directory
-        tests_dir = os.path.join(self.project_dir, 'tests')
-        test_files = [f for f in os.listdir(tests_dir) 
+        test_files = [f for f in os.listdir('tests') 
                      if f.startswith('test_') and f.endswith('.py')]
         
         test_specification = self.config['test_specification']
         test_data_generation = self.config['test_data_generation']
         task_description = self.config['task_description']
+        write_files = self.config.get('write_files', [])  # Get write files for reading
+        context_files = self.config.get('context_files', [])  # Get context files
         
         prompt = f"""Your task is to extend our tests library with one or several new tests for new functionality that we want to build. CRITICALLY, you ADD new test functions BUT NEVER modify any existing test functions code.
         
@@ -92,12 +96,7 @@ class AiderAgent(Agent):
         - do not ASSUME that some function in the code exists, always verify the code first
         - don't forget to only ADD tests and NOT to modify any existing test functions code
         """
-        
-        # Append source code if enabled in config
-        if self.agent_config.get('include_source_code', False):
-            source_code = gather_python_files(self.project_dir)
-            prompt += f"\n\nHere is the full source code of the project, possibly including tests that you should try to be consistent with in your formulation of the new tests. Here is the code: \n{source_code}"
-        
+    
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
         
         command = [
@@ -106,12 +105,15 @@ class AiderAgent(Agent):
             '--no-git',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
-            '--chat-history-file', '/dev/null',
-            '--read', self.target_file
+            '--chat-history-file', '/dev/null'
         ]
+
+        # Add all write files and context files to be read
+        for file in write_files + context_files:
+            command.extend(['--read', file])
                 
         if test_files:
-            # If there are existing test files, include all of them
+            # If there are existing test files, include all of them for writing
             for test_file in test_files:
                 command.extend(['--file', os.path.join('tests', test_file)])
         else:
@@ -122,8 +124,8 @@ class AiderAgent(Agent):
         command.extend(['--message', prompt])
         
         try:
-            result = subprocess.run(command, check=True, cwd=self.project_dir,
-                                  capture_output=True, text=True)
+            result = subprocess.run(command, check=True, text=True,
+                                  capture_output=True)
             print("Test generation with Aider executed successfully.")
             print(result.stdout)
         except subprocess.CalledProcessError as e:
