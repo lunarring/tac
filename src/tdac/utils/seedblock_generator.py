@@ -71,6 +71,8 @@ write_files: list of files that may need to be written for the task. use relativ
   
 context_files: list of files that need to be read for context in order to implement the task and as background information for the test. use relative file paths as given in the codebase.
 
+commit_message: a short, descriptive commit message that starts with TDAC! and summarizes what this block aims to achieve. Keep it concise and clear.
+
 --------------------
 
 Please analyze the codebase and provide a seedblock YAML that addresses this task: {template_config["instructions"] if template_config["instructions"] else "Describe your task here"}"""

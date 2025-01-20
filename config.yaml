@@ -12,6 +12,9 @@ agents:
     type: "aider"
     model: "deepseek/deepseek-chat"
 
+git:
+  auto_push: true
+
 logging:
   tdac:
     level: DEBUG

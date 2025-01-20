@@ -37,7 +37,8 @@ def load_block_from_yaml(yaml_path: str) -> Block:
         test_specification=test_data['specification'],
         test_data_generation=test_data['data'],
         write_files=data['write_files'],
-        context_files=data.get('context_files', [])
+        context_files=data.get('context_files', []),
+        commit_message=data.get('commit_message')
     )
     
     return block
@@ -157,6 +158,40 @@ def check_git_status() -> bool:
         return False
     except git.exc.GitCommandError as e:
         logger.error(f"Error checking git status: {e}")
+        return False
+
+def handle_git_operations(config: dict, block: Block = None) -> bool:
+    """Handle git operations after successful block execution"""
+    try:
+        if not config.get('git', {}).get('auto_push', False):
+            return True
+
+        repo = git.Repo('.')
+        
+        # Stage all changes
+        repo.git.add('.')
+        
+        # Generate commit message
+        if block and block.commit_message:
+            commit_message = block.commit_message
+        else:
+            # Fallback to auto-generated message
+            changed_files = repo.git.diff('--staged', '--name-only').split('\n')
+            files_summary = ', '.join(changed_files[:3])
+            if len(changed_files) > 3:
+                files_summary += f" and {len(changed_files) - 3} more files"
+            commit_message = f"TDAC! Successfully implemented changes in {files_summary}"
+        
+        # Commit changes
+        repo.git.commit('-m', commit_message)
+        
+        # Push changes
+        repo.git.push()
+        
+        logger.info("Successfully committed and pushed changes")
+        return True
+    except Exception as e:
+        logger.error(f"Error during git operations: {e}")
         return False
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
@@ -351,6 +386,9 @@ def main():
                 success = executor.execute_block(skip_test_generation=True)
                 if success:
                     logger.info("Task executed and verified successfully.")
+                    # Handle git operations after successful execution
+                    if not handle_git_operations(config, block):
+                        sys.exit(1)
                 else:
                     logger.error("Task implementation failed.")
                     sys.exit(1)
@@ -367,6 +405,9 @@ def main():
                 success = executor.execute_block()
                 if success:
                     logger.info("Block executed and changes applied successfully.")
+                    # Handle git operations after successful execution
+                    if not handle_git_operations(config, block):
+                        sys.exit(1)
                 else:
                     logger.error("Block execution failed. Changes have been discarded.")
                     sys.exit(1)

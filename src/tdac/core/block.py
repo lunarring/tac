@@ -4,12 +4,13 @@ from tdac.agents.base import Agent
 from tdac.agents.aider_agent import AiderAgent
 
 class Block:
-    def __init__(self, task_description: str, test_specification: str, test_data_generation: str, write_files: list, context_files: list):
+    def __init__(self, task_description: str, test_specification: str, test_data_generation: str, write_files: list, context_files: list, commit_message: str = None):
         self.task_description = task_description
         self.test_specification = test_specification
         self.test_data_generation = test_data_generation
         self.write_files = write_files
         self.context_files = context_files
+        self.commit_message = commit_message
 
     def create_agent(self, config: dict):
         """Create a unified agent for this block based on the config"""
