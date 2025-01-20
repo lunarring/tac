@@ -16,9 +16,11 @@ class AiderAgent(Agent):
         task_description = self.config['task_description']
         test_specification = self.config['test_specification']
         test_data_generation = self.config['test_data_generation']
-        write_files = self.config.get('write_files', [])
-        # Filter out any files that are already in write_files from context_files
-        context_files = [f for f in self.config.get('context_files', []) if f not in write_files]
+        
+        # Deduplicate write_files using a set
+        write_files = list(set(self.config.get('write_files', [])))
+        # Filter out any files that are already in write_files from context_files using sets
+        context_files = list(set(f for f in self.config.get('context_files', []) if f not in write_files))
         
         logger.debug("Files to be written: %s", write_files)
         logger.debug("Context files to be read: %s", context_files)
@@ -59,9 +61,9 @@ Important Guidelines:
 
         logger.debug("Execution prompt for Aider:\n%s", prompt)
         
-        # Find all test files in the tests directory
-        test_files = [f for f in os.listdir('tests') 
-                     if f.startswith('test_') and f.endswith('.py')]
+        # Find all test files in the tests directory and deduplicate
+        test_files = list(set(f for f in os.listdir('tests') 
+                     if f.startswith('test_') and f.endswith('.py')))
         
         logger.debug("Found test files: %s", test_files)
         
