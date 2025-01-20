@@ -22,6 +22,28 @@ class AiderAgent(Agent):
         # Filter out any files that are already in write_files from context_files using sets
         context_files = list(set(f for f in self.config.get('context_files', []) if f not in write_files))
         
+        # Validate and clean file paths
+        if isinstance(write_files, str):
+            print("WARNING: write_files is a string, converting to list")
+            write_files = [write_files]
+        if isinstance(context_files, str):
+            print("WARNING: context_files is a string, converting to list")
+            context_files = [context_files]
+            
+        print("\nDEBUG - File Path Analysis:")
+        print(f"write_files type: {type(write_files)}")
+        print(f"write_files content: {write_files}")
+        print(f"context_files type: {type(context_files)}")
+        print(f"context_files content: {context_files}")
+        
+        # Ensure we have valid file paths
+        write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
+        context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
+        
+        print("\nDEBUG - After cleaning:")
+        print(f"Cleaned write_files: {write_files}")
+        print(f"Cleaned context_files: {context_files}")
+        
         logger.debug("Files to be written: %s", write_files)
         logger.debug("Context files to be read: %s", context_files)
 
@@ -98,10 +120,49 @@ Important Guidelines:
         logger.debug("Final Aider command: %s", ' '.join(command))
         
         try:
-            result = subprocess.run(command, check=True, text=True,
-                                  capture_output=True)
+            print("Executing Aider command...")
+            print(f"Command details:")
+            print(f"- Write files: {write_files}")
+            print(f"- Context files: {context_files}")
+            print(f"- Test files: {test_files}")
+            print(f"- Full command: {' '.join(command)}")
+            
+            # Run with full output capture and stream everything
+            process = subprocess.Popen(
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
+            # Stream output in real-time
+            while True:
+                stdout_line = process.stdout.readline()
+                stderr_line = process.stderr.readline()
+                
+                if stdout_line:
+                    print(f"STDOUT: {stdout_line.strip()}")
+                if stderr_line:
+                    print(f"STDERR: {stderr_line.strip()}")
+                    
+                # Check if process has finished
+                if process.poll() is not None:
+                    # Get remaining lines
+                    remaining_stdout, remaining_stderr = process.communicate()
+                    if remaining_stdout:
+                        print(f"FINAL STDOUT: {remaining_stdout}")
+                    if remaining_stderr:
+                        print(f"FINAL STDERR: {remaining_stderr}")
+                    break
+            
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, command)
+                
             print("Aider executed successfully.")
-            print(result.stdout)
         except subprocess.CalledProcessError as e:
-            print(f"Error executing Aider: {e.stderr}")
+            print(f"Aider execution failed with return code: {e.returncode}")
+            print("Command that failed:")
+            print(' '.join(command))
             raise 
