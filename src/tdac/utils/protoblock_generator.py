@@ -10,6 +10,10 @@ PROTOBLOCK_TEMPLATES = {
         "instructions": "An error occurred while running the code. Analyze the error message, trace through the codebase, and determine the root cause of the issue. Focus on ONE specific error and propose a solution.",
         "description": "Generate an error analysis protoblock"
     },
+    "test": {
+        "instructions": "We want to add comprehensive tests to verify the existing functionality. Do NOT modify any production code - focus solely on creating robust, maintainable tests that document and verify the current behavior. Pick ONE specific component or function to test thoroughly.",
+        "description": "Generate a testing protoblock"
+    },
     "default": {
         "instructions": "",
         "description": "Generate a standard protoblock"
