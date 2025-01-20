@@ -37,8 +37,8 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
-            '--input-history-file', '/dev/null',
-            '--chat-history-file', '/dev/null'
+            # '--input-history-file', '/dev/null',
+            # '--chat-history-file', '/dev/null'
         ]
 
         # Add all write files to be edited
@@ -84,20 +84,20 @@ class AiderAgent(Agent):
         
         prompt = f"""Your task is to extend our tests library with one or several new tests for new functionality that we want to build. CRITICALLY, you ADD new test functions BUT NEVER modify any existing test functions code.
         
-        Here briefly a description of the new functionality for which we want to write tests: {task_description}.
+Here is the description of the new functionality that will be implemented and for which YOU now will write tests: {task_description}
         
-        The new tests that you should write have the following specification: {test_specification}.
-        Critically, you are closely adhering to using the following DATA for running the tests: {test_data_generation}.
+The new tests that you should write have the following specification: {test_specification}
 
-        Last remarks:
-        - be as minimal as possible, don't implement too many / unncessary tests
-        - strongly orient yourself with the existing tests, they are a good reference
-        - try to be minimally invasive in general
-        - do not ASSUME that some function in the code exists, always verify the code first
-        - don't forget to only ADD tests and NOT to modify any existing test functions code
-        - don't write tests that may time out or cause other problems!
-        - When dealing with longer-running processes (threads, loops, etc.), ensure your tests have a clear exit condition or mock external/time-dependent calls to avoid indefinite hangs
-        """
+Critically, you are closely adhering to using the following DATA for running the tests: {test_data_generation}
+
+Last remarks:
+- be as minimalistic as possible, don't implement too many / unncessary tests
+- strongly orient yourself with the existing tests, they are a good reference
+- try to be minimally invasive in general
+- do not ASSUME that some function in the code exists, always verify the code first
+- don't forget to only ADD tests and NOT to modify any existing test functions code
+- don't write tests that may time out or cause other problems!
+- When dealing with longer-running processes (threads, loops, etc.), ensure your tests have a clear exit condition or mock external/time-dependent calls to avoid indefinite hangs"""
     
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
         
@@ -106,8 +106,8 @@ class AiderAgent(Agent):
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
-            '--input-history-file', '/dev/null',
-            '--chat-history-file', '/dev/null'
+            # '--input-history-file', '/dev/null',
+            # '--chat-history-file', '/dev/null'
         ]
 
         # Add all write files to be read
