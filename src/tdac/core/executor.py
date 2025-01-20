@@ -1,8 +1,11 @@
 import os
 import subprocess
 import yaml
+import logging
 from tdac.core.block import Block
 from tdac.agents.base import Agent
+
+logger = logging.getLogger(__name__)
 
 class BlockExecutor:
     def __init__(self, block: Block, config: dict = None):
@@ -75,17 +78,28 @@ class BlockExecutor:
             full_path = test_target
             pytest_args = ['--disable-warnings', '-v']
 
+            logger.debug(f"Test target path: {full_path}")
+            logger.debug(f"Working directory: {os.getcwd()}")
+            
+            if os.path.exists(full_path):
+                logger.debug(f"Path exists. Is file: {os.path.isfile(full_path)}, Is dir: {os.path.isdir(full_path)}")
+            else:
+                logger.debug(f"Path does not exist: {full_path}")
+
             if os.path.isfile(full_path):
                 # Single test file case
-                print(f"\nRunning tests from file: {test_target}")
+                logger.debug(f"Running single test file: {test_target}")
                 result = self._run_pytest([test_target] + pytest_args)
             elif os.path.isdir(full_path):
                 # Directory case - discover and run all test files
-                print(f"\nDiscovering tests in directory: {test_target}")
+                logger.debug(f"Discovering tests in directory: {test_target}")
+                test_files = [f for f in os.listdir(full_path) if f.startswith('test_') and f.endswith('.py')]
+                logger.debug(f"Found test files: {test_files}")
                 # Add pattern to only run test*.py files
                 result = self._run_pytest([test_target, '-k', 'test_'] + pytest_args)
             else:
                 self.test_results = f"Error: Test path not found: {full_path}"
+                logger.error(self.test_results)
                 print(self.test_results)
                 return False
 
@@ -96,18 +110,40 @@ class BlockExecutor:
             
         except Exception as e:
             self.test_results = str(e)
+            logger.exception("Error running tests")
             print(f"Error running tests: {e}")
             return False
 
     def _run_pytest(self, args: list) -> bool:
         """Helper method to run pytest with given arguments"""
-        result = subprocess.run(
-            ['pytest'] + args,
-            capture_output=True,
-            text=True
-        )
-        self.test_results = result.stdout + "\n" + result.stderr
-        return result.returncode == 0
+        try:
+            command = ['pytest'] + args
+            logger.debug(f"Running pytest command: {' '.join(command)}")
+            
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=30  # Add 30 second timeout
+            )
+            logger.debug(f"Pytest return code: {result.returncode}")
+            logger.debug(f"Pytest stdout: {result.stdout}")
+            logger.debug(f"Pytest stderr: {result.stderr}")
+            
+            self.test_results = result.stdout + "\n" + result.stderr
+            return result.returncode == 0
+        except subprocess.TimeoutExpired:
+            error_msg = "Error: Test discovery/execution timed out after 30 seconds"
+            logger.error(error_msg)
+            self.test_results = error_msg
+            print(self.test_results)
+            return False
+        except subprocess.SubprocessError as e:
+            error_msg = f"Error running pytest: {str(e)}"
+            logger.error(error_msg)
+            self.test_results = error_msg
+            print(self.test_results)
+            return False
 
     def _print_test_summary(self):
         """Parse test results and print a colored summary"""

@@ -4,6 +4,7 @@ import sys
 import yaml
 import argparse
 import ast
+import logging
 
 # Add the src directory to Python path for local development
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -59,17 +60,17 @@ def run_tests_command(args):
         logger.error(f"Test directory not found: {test_dir}")
         sys.exit(1)
     
-    # Create a minimal Block instance just for running tests
+    # Create a minimal Block instance for running tests
     block = Block(
-        function_name="dummy",  # Not used for test running
-        file_path="dummy.py",   # Not used for test running
-        task_description="",    # Not used for test running
-        test_specification="",  # Not used for test running
-        test_data_generation="" # Not used for test running
+        task_description="",    # Not needed for test running
+        test_specification="",  # Not needed for test running
+        test_data_generation="", # Not needed for test running
+        write_files=[],         # Not needed for test running
+        context_files=[]        # Not needed for test running
     )
     
-    # Create executor with current directory as project dir
-    executor = BlockExecutor(block=block, project_dir=os.getcwd())
+    # Create executor and run tests
+    executor = BlockExecutor(block=block)
     
     # Run tests and print results
     success = executor.run_tests(test_path=test_dir)
@@ -253,6 +254,12 @@ Example usage:
     return parser, args
 
 def main():
+    # Configure logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
     parser, args = parse_args()
     
     if args.command == 'gather':

@@ -1,7 +1,7 @@
 agents:
   programming:
     type: "aider"
-    max_retries: 8
+    max_retries: 4
     # model: "gpt-4o-mini"
     model: "o1-mini"
     model_settings:

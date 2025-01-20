@@ -15,7 +15,7 @@ class AiderAgent(Agent):
         """
         task_description = self.config['task_description']
         write_files = self.config.get('write_files', [])  # Get write files from config
-        context_files = self.config.get('context_files', [])  # Get context files
+        context_files = [f for f in self.config.get('context_files', []) if f not in write_files]  # Filter out files already in write_files
         
         prompt = f"Implement changes in the code according to this specification:\n{task_description}\n\n"  
         
@@ -80,7 +80,7 @@ class AiderAgent(Agent):
         test_data_generation = self.config['test_data_generation']
         task_description = self.config['task_description']
         write_files = self.config.get('write_files', [])  # Get write files for reading
-        context_files = self.config.get('context_files', [])  # Get context files
+        context_files = [f for f in self.config.get('context_files', []) if f not in write_files]  # Filter out files already in write_files
         
         prompt = f"""Your task is to extend our tests library with one or several new tests for new functionality that we want to build. CRITICALLY, you ADD new test functions BUT NEVER modify any existing test functions code.
         
@@ -95,6 +95,8 @@ class AiderAgent(Agent):
         - try to be minimally invasive in general
         - do not ASSUME that some function in the code exists, always verify the code first
         - don't forget to only ADD tests and NOT to modify any existing test functions code
+        - don't write tests that may time out or cause other problems!
+        - When dealing with longer-running processes (threads, loops, etc.), ensure your tests have a clear exit condition or mock external/time-dependent calls to avoid indefinite hangs
         """
     
         logger.debug("Test generation prompt for Aider:\n%s", prompt)
@@ -108,8 +110,12 @@ class AiderAgent(Agent):
             '--chat-history-file', '/dev/null'
         ]
 
-        # Add all write files and context files to be read
-        for file in write_files + context_files:
+        # Add all write files to be read
+        for file in write_files:
+            command.extend(['--read', file])
+
+        # Add filtered context files to be read
+        for file in context_files:
             command.extend(['--read', file])
                 
         if test_files:
