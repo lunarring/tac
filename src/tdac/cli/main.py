@@ -5,6 +5,7 @@ import yaml
 import argparse
 import ast
 import logging
+import git
 
 # Add the src directory to Python path for local development
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -137,6 +138,26 @@ def generate_seedblock_command(args):
     except Exception as e:
         logger.error(f"Error generating seedblock: {e}")
         sys.exit(1)
+
+def check_git_status() -> bool:
+    """Check if git repo exists and working tree is clean"""
+    try:
+        # Try to get git repo instance
+        repo = git.Repo('.')
+        
+        if repo.is_dirty(untracked_files=True):
+            logger.error("Git working tree is not clean. Please commit or stash your changes before running TDAC!")
+            print("\nGit status:")
+            print(repo.git.status())
+            return False
+            
+        return True
+    except git.exc.InvalidGitRepositoryError:
+        logger.error("Not a git repository. Please initialize git first.")
+        return False
+    except git.exc.GitCommandError as e:
+        logger.error(f"Error checking git status: {e}")
+        return False
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
@@ -288,6 +309,10 @@ def main():
         return
 
     if args.command == 'yaml':
+        # Check git status before proceeding
+        if not check_git_status():
+            sys.exit(1)
+            
         try:
             block = load_block_from_yaml(args.yaml_path)
         except FileNotFoundError:
