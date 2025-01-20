@@ -19,13 +19,15 @@ class AiderAgent(Agent):
         
         logger.debug("Files to be written: %s", write_files)
         logger.debug("Context files to be read: %s", context_files)
-        
-        prompt = f"Implement changes in the code according to this specification:\n{task_description}\n\n"  
+        if previous_error:
+            prompt = f"\nYou had an attempt of implementing this before, but YOU FAILED passing the tests! Here are the errors when running the tests. Please think it through thoroughly why it failed and fix it! We wanted to achieve the following before {task_description}. \n{previous_error}"
+
+        else: 
+            prompt = f"Implement changes in the code according to this specification:\n{task_description}\n\n"  
         
         prompt += f"The implementation must pass the tests however. Take a very close look at the tests and implement the function or whatever changes accordingly. It MUST pass all the tests!"
 
-        if previous_error:
-            prompt += f"\nYou had an attempt of implementing this before, but it FAILED passing the tests! Here are the errors: please fix them:\n{previous_error}"
+
         prompt += "Also please don't create any __init__.py files."
     
         
@@ -44,7 +46,7 @@ class AiderAgent(Agent):
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
-            '--llm-history-file', '.aider.llm.history'
+            '--llm-history-file', '.aider.llm.history_task'
         ]
 
         logger.debug("Using Aider model: %s", self.agent_config.get('model'))
@@ -92,9 +94,9 @@ class AiderAgent(Agent):
         write_files = self.config.get('write_files', [])  # Get write files for reading
         context_files = [f for f in self.config.get('context_files', []) if f not in write_files]  # Filter out files already in write_files
         
-        prompt = f"""Your task is to extend our tests library with one or several new tests for new functionality that we want to build. CRITICALLY, you ADD new test functions BUT NEVER modify any existing test functions code.
+        prompt = f"""You shall extend the tests library with one or several new tests for new functionality that we want to build. You are ONLY writing tests!
         
-Here is the description of the new functionality that will be implemented and for which YOU now will write tests: {task_description}
+The context is that we want to add new functionality to the code: {task_description}
         
 The new tests that you should write have the following specification: {test_specification}
 
@@ -116,8 +118,9 @@ Last remarks:
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
-            # '--input-history-file', '/dev/null',
-            # '--chat-history-file', '/dev/null'
+            '--input-history-file', '/dev/null',
+            '--chat-history-file', '/dev/null',
+            '--llm-history-file', '.aider.llm.history_test'
         ]
 
         # Add all write files to be read

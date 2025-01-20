@@ -132,8 +132,15 @@ class BlockExecutor:
             
             self.test_results = result.stdout + "\n" + result.stderr
             return result.returncode == 0
-        except subprocess.TimeoutExpired:
-            error_msg = "Error: Test discovery/execution timed out after 30 seconds"
+        except subprocess.TimeoutExpired as timeout_err:
+            # Capture any partial output that was generated before timeout
+            partial_output = ""
+            if timeout_err.stdout:
+                partial_output += "\nPartial stdout before timeout:\n" + timeout_err.stdout.decode('utf-8')
+            if timeout_err.stderr:
+                partial_output += "\nPartial stderr before timeout:\n" + timeout_err.stderr.decode('utf-8')
+            
+            error_msg = f"Error: Test discovery/execution timed out after 30 seconds\n{partial_output}"
             logger.error(error_msg)
             self.test_results = error_msg
             print(self.test_results)
