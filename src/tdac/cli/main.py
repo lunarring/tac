@@ -35,7 +35,7 @@ def load_block_from_yaml(yaml_path: str) -> Block:
         task_description=task_data['specification'],
         test_specification=test_data['specification'],
         test_data_generation=test_data['data'],
-        write_files=task_data['write_files'],
+        write_files=data['write_files'],
         context_files=data.get('context_files', [])
     )
     
