@@ -2,7 +2,7 @@ agents:
   programming:
     type: "aider"
     max_retries: 4
-    model: "deepseek"
+    model: "deepseek/deepseek-chat"
     model_settings:
       edit_format: "diff"
       verify_ssl: true
@@ -10,7 +10,7 @@ agents:
       max_chat_history_tokens: 100000
   testing:
     type: "aider"
-    model: "deepseek"
+    model: "deepseek/deepseek-chat"
 
 logging:
   tdac:

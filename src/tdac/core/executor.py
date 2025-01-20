@@ -29,22 +29,18 @@ class BlockExecutor:
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
 
-    def execute_block(self, skip_test_generation: bool = False) -> bool:
+    def execute_block(self) -> bool:
         """
-        Executes the block with test-first approach and retry logic.
-        Args:
-            skip_test_generation: If True, skips test generation and only implements solution
+        Executes the block with a unified test-and-implement approach.
+        Returns:
+            bool: True if execution was successful, False otherwise
         """
         try:
-            if not skip_test_generation:
-                print("Generating tests first...")
-                self.agent.generate_tests()
-
             max_retries = self.config['agents']['programming']['max_retries']
             for attempt in range(max_retries):
-                print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution...")
+                print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
                 
-                print("Executing task...")
+                print("Executing task and generating tests simultaneously...")
                 self.agent.execute_task(previous_error=self.previous_error)
 
                 print("Running tests...")

@@ -13,8 +13,4 @@ class Agent(ABC):
 
     @abstractmethod
     def execute_task(self, previous_error: str = None) -> None:
-        pass
-
-    @abstractmethod
-    def generate_tests(self) -> None:
         pass 

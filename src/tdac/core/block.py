@@ -12,7 +12,7 @@ class Block:
         self.context_files = context_files
 
     def create_agent(self, config: dict):
-        """Create an agent for this block based on the config"""
+        """Create a unified agent for this block based on the config"""
         from tdac.agents.aider_agent import AiderAgent
         
         # Add block-specific parameters to config
