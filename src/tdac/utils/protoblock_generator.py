@@ -6,6 +6,10 @@ PROTOBLOCK_TEMPLATES = {
         "instructions": "We want to refactor the code because it is ugly and not very well done. Pick ONE single item for refactoring that seems most pressing.",
         "description": "Generate a refactoring protoblock"
     },
+    "error": {
+        "instructions": "An error occurred while running the code. Analyze the error message, trace through the codebase, and determine the root cause of the issue. Focus on ONE specific error and propose a solution.",
+        "description": "Generate an error analysis protoblock"
+    },
     "default": {
         "instructions": "",
         "description": "Generate a standard protoblock"
