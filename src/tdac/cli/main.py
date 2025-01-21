@@ -20,7 +20,7 @@ from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.seedblock_generator import generate_seedblock
 from tdac.core.llm import LLMClient, Message
-from tdac.utils.json_validator import validate_protoblock_json, save_protoblock
+from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
 
 logger = setup_logger(__name__)
