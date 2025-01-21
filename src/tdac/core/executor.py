@@ -14,15 +14,16 @@ class BlockExecutor:
     def __init__(self, block: Block, config: dict = None):
         self.block = block
         self.config = config if config else self._load_config()
-        # Update config with block-specific parameters
-        self.config.update({
+        # Create agent with combined config
+        agent_config = self.config.copy()
+        agent_config.update({
             'task_description': self.block.task_description,
             'test_specification': self.block.test_specification,
             'test_data_generation': self.block.test_data_generation,
             'write_files': self.block.write_files,
             'context_files': self.block.context_files
         })
-        self.agent = block.create_agent(self.config)
+        self.agent = block.create_agent(agent_config)
         self.test_results = ""
         self.previous_error = None  # Track previous error
         self.git_manager = GitManager()
@@ -62,11 +63,24 @@ class BlockExecutor:
 
         log_filename = f".tdac_log_{self.block_id}"
         
-        # Get git diff
+        # Get git diff using GitManager for complete diff
         try:
-            git_diff = subprocess.run(['git', 'diff'], capture_output=True, text=True).stdout
-        except subprocess.SubprocessError:
-            git_diff = "Failed to get git diff"
+            if self.git_manager.repo:
+                # Get staged and unstaged changes
+                staged_diff = self.git_manager.repo.git.diff('--staged')
+                unstaged_diff = self.git_manager.repo.git.diff()
+                # Combine both diffs with headers
+                git_diff = ""
+                if staged_diff:
+                    git_diff += "=== Staged Changes ===\n" + staged_diff + "\n"
+                if unstaged_diff:
+                    git_diff += "=== Unstaged Changes ===\n" + unstaged_diff
+                if not git_diff:
+                    git_diff = "No changes detected"
+            else:
+                git_diff = "Git repository not available"
+        except Exception as e:
+            git_diff = f"Failed to get git diff: {str(e)}"
 
         # Prepare execution data for this attempt
         execution_data = {
