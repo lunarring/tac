@@ -258,10 +258,8 @@ Previous Attempt Analysis:
             elif os.path.isdir(full_path):
                 # Directory case - discover and run all test files
                 logger.debug(f"Discovering tests in directory: {test_target}")
-                test_files = [f for f in os.listdir(full_path) if f.startswith('test_') and f.endswith('.py')]
-                logger.debug(f"Found test files: {test_files}")
-                # Add pattern to only run test*.py files
-                result = self._run_pytest([test_target, '-k', 'test_'] + pytest_args)
+                # Remove the restrictive pattern and let pytest discover all tests
+                result = self._run_pytest([test_target, '-v'] + pytest_args)
             else:
                 self.test_results = f"Error: Test path not found: {full_path}"
                 logger.error(self.test_results)
