@@ -185,8 +185,8 @@ def generate_seedblock_command(args):
                 print(json_content)
                 sys.exit(1)
                 
-            # Save JSON to file
-            json_file = save_seedblock(json_content, template_type)
+            # Save JSON to file and get block ID
+            json_file, block_id = save_seedblock(json_content, template_type)
             abs_json_path = os.path.abspath(json_file)
             
             # Verify file was saved
@@ -195,6 +195,7 @@ def generate_seedblock_command(args):
                 sys.exit(1)
                 
             logger.info(f"Saved seedblock to {abs_json_path}")
+            logger.info(f"Block ID: {block_id}")
             
             # Print JSON content for inspection
             logger.info("Generated JSON content:")
@@ -206,6 +207,7 @@ def generate_seedblock_command(args):
             # Load and execute the seedblock
             logger.info("Executing seedblock...")
             block = load_block_from_json(json_file)
+            block.block_id = block_id  # Set the block ID
             executor = BlockExecutor(block=block)
             success = executor.execute_block()
             

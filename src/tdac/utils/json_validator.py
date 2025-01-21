@@ -70,16 +70,16 @@ def validate_seedblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Validation error: {str(e)}"
 
-def save_seedblock(json_content: Union[str, Dict], template_type: str) -> str:
+def save_seedblock(json_content: Union[str, Dict], template_type: str) -> tuple[str, str]:
     """
-    Saves a validated seedblock JSON to a file with timestamp and unique hash.
+    Saves a validated seedblock JSON to a file with unique block ID.
     
     Args:
         json_content: The JSON content to save
         template_type: Type of template (e.g., 'refactor', 'test')
         
     Returns:
-        str: Absolute path to saved file
+        tuple[str, str]: (absolute path to saved file, block ID)
     """
     # Clean and validate JSON first
     if isinstance(json_content, str):
@@ -96,14 +96,12 @@ def save_seedblock(json_content: Union[str, Dict], template_type: str) -> str:
     if not is_valid:
         raise ValueError(f"Invalid seedblock JSON: {error}")
     
-    # Generate filename with timestamp and unique hash
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
-    # Generate a unique hash based on content and timestamp
+    # Generate a unique hash based on content and current time
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')  # Still use timestamp for hash uniqueness
     hash_input = f"{json_content}{timestamp}".encode('utf-8')
-    unique_hash = hashlib.md5(hash_input).hexdigest()[:7]  # Use first 7 chars of hash
+    block_id = hashlib.md5(hash_input).hexdigest()[:7]  # Use first 7 chars of hash as block ID
     
-    filename = f".tdac_seedblock_{template_type}_{timestamp}_{unique_hash}.json"
+    filename = f".tdac_seedblock_{template_type}_{block_id}.json"
     
     # Save to file
     file_path = os.path.abspath(filename)
@@ -113,4 +111,4 @@ def save_seedblock(json_content: Union[str, Dict], template_type: str) -> str:
         else:
             f.write(json_content)
             
-    return file_path 
+    return file_path, block_id 
