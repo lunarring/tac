@@ -135,10 +135,19 @@ Important Guidelines:
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
             READ_TIMEOUT = 1.0   # 1 second read timeout
             
+            # Stream output in real-time with timeout handling
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
+            
             start_time = time.time()
             last_output_time = start_time
             
-            # Stream output in real-time with timeout handling
             while True:
                 # Check if we've exceeded total timeout
                 if time.time() - start_time > TOTAL_TIMEOUT:

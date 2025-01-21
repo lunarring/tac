@@ -4,7 +4,7 @@ general:
   total_timeout: 600
 
 aider:
-  model: "deepseek/deepseek-reasoner"
+  model: "deepseek/deepseek-chat"
   model_settings:
     edit_format: "diff"
     verify_ssl: true

@@ -154,7 +154,24 @@ class BlockExecutor:
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
                 
                 print("Executing task and generating tests simultaneously...")
-                self.agent.execute_task(previous_error=self.previous_error)
+                try:
+                    self.agent.execute_task(previous_error=self.previous_error)
+                except Exception as e:
+                    print(f"Error during task execution: {e}")
+                    # Write failure log
+                    self._write_log_file(attempt + 1, False)
+                    if attempt < max_retries - 1:
+                        print("Retrying with a new implementation...")
+                        continue
+                    else:
+                        print("Maximum retry attempts reached.")
+                        if self.revert_on_failure:
+                            print("Reverting all changes...")
+                            if self.git_manager.revert_changes():
+                                print("Successfully reverted all changes.")
+                            else:
+                                print("Failed to revert changes. Please check repository state manually.")
+                        return False
 
                 print("Running tests...")
                 if self.run_tests():
