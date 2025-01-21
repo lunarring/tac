@@ -128,10 +128,12 @@ class LLMClient:
             "stream": stream,
         }
         
-        # Use settings from config if not overridden
-        if temperature is None:
-            temperature = self.config.settings.get('temperature', 0.7)
-        params["temperature"] = temperature
+        # o1-mini doesn't support temperature parameter
+        if self.config.model != "o1-mini":
+            # Use settings from config if not overridden
+            if temperature is None:
+                temperature = self.config.settings.get('temperature', 0.7)
+            params["temperature"] = temperature
         
         if max_tokens is None:
             max_tokens = self.config.settings.get('max_tokens')
