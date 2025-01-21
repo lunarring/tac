@@ -150,6 +150,10 @@ def generate_seedblock_command(args):
         seedblock = generate_seedblock(args.directory, template_type=template_type)
         
         if args.execute:
+            # Check git status before proceeding
+            if not check_git_status():
+                sys.exit(1)
+                
             # Initialize LLM client
             llm_client = LLMClient()
             
@@ -195,6 +199,9 @@ def generate_seedblock_command(args):
             logger.info("Generated JSON content:")
             print("\n" + json_content + "\n")
             
+            # Load configuration
+            config = load_config()
+            
             # Load and execute the seedblock
             logger.info("Executing seedblock...")
             block = load_block_from_json(json_file)
@@ -203,6 +210,9 @@ def generate_seedblock_command(args):
             
             if success:
                 logger.info("Seedblock executed successfully")
+                # Handle git operations after successful execution
+                if not handle_git_operations(config, block):
+                    sys.exit(1)
             else:
                 logger.error("Seedblock execution failed")
                 sys.exit(1)
