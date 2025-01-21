@@ -36,22 +36,22 @@ After this, you can run the command from anywhere in your terminal (as long as y
 
 The framework provides several commands to help with AI-driven development:
 
-### Run Tasks
+### Create Blocks
 
 Generate and execute new blocks for different purposes:
 
 ```bash
 # Generate and execute a test-focused block
-tdac run --test ./your/code/directory
+tdac block --test ./your/code/directory
 
 # Generate and execute a refactoring block
-tdac run --refactor ./your/code/directory
+tdac block --refactor ./your/code/directory
 
 # Generate and execute an error analysis block
-tdac run --error ./your/code/directory
+tdac block --error ./your/code/directory
 
 # Generate and execute a custom block with specific instructions
-tdac run --instructions "Add error handling to all functions" ./your/code/directory
+tdac block --instructions "Add error handling to all functions" ./your/code/directory
 ```
 
 Each block type focuses on a different aspect:
