@@ -20,6 +20,7 @@ llm:
     max_tokens: null
     verify_ssl: true
     timeout: 120
+    system_message_as_user: true
 
 git:
   auto_push: true

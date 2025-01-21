@@ -11,7 +11,7 @@ logger = setup_logger(__name__)
 class AiderAgent(Agent):
     def __init__(self, config: dict):
         super().__init__(config)
-        self.agent_config = config.get('agents', {}).get('programming', {})
+        self.agent_config = config.get('agents', {}).get('aider', {})
 
     def execute_task(self, previous_error: str = None) -> None:
         """
@@ -131,18 +131,8 @@ Important Guidelines:
             logger.debug(f"- Test files: {test_files}")
             logger.debug(f"- Full command: {' '.join(command)}")
             
-            # Run with full output capture and stream everything
-            process = subprocess.Popen(
-                command,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
             # Set timeout values
-            TOTAL_TIMEOUT = 600  # 10 minutes total timeout
+            TOTAL_TIMEOUT = self.agent_config.get('execution_timeout_seconds', 600)  # Default to 10 minutes if not specified
             READ_TIMEOUT = 1.0   # 1 second read timeout
             
             start_time = time.time()
