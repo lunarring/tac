@@ -19,7 +19,7 @@ from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.seedblock_generator import generate_seedblock
 from tdac.core.llm import LLMClient, Message
-from tdac.utils.json_validator import validate_seedblock_json, save_seedblock
+from tdac.utils.json_validator import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
 
 logger = setup_logger(__name__)
@@ -37,6 +37,14 @@ def load_block_from_json(json_path: str) -> Block:
     task_data = data['task']
     test_data = data['test']
     
+    # Extract block ID from filename
+    filename = os.path.basename(json_path)
+    if filename.startswith('.tdac_protoblock_'):
+        # Format is .tdac_protoblock_type_ID.json
+        block_id = filename.split('_')[-1].split('.')[0]
+    else:
+        block_id = None
+    
     block = Block(
         task_description=task_data['specification'],
         test_specification=test_data['specification'],
@@ -45,6 +53,10 @@ def load_block_from_json(json_path: str) -> Block:
         context_files=data.get('context_files', []),
         commit_message=data.get('commit_message')
     )
+    
+    # Set the block ID if we found one
+    if block_id:
+        block.block_id = block_id
     
     return block
 
@@ -160,11 +172,11 @@ def generate_seedblock_command(args):
             
             # Send seedblock to LLM
             messages = [
-                Message(role="system", content="You are a helpful assistant that generates JSON seedblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
+                Message(role="system", content="You are a helpful assistant that generates JSON protoblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
                 Message(role="user", content=seedblock)
             ]
             
-            logger.info("Generating seedblock through LLM...")
+            logger.info("Generating protoblock through LLM...")
             response = llm_client.chat_completion(messages)
             json_content = response.choices[0].message.content
             
@@ -178,7 +190,7 @@ def generate_seedblock_command(args):
                 json_content = "\n".join(lines[start_idx:end_idx]).strip()
             
             # Validate JSON
-            is_valid, error = validate_seedblock_json(json_content)
+            is_valid, error = validate_protoblock_json(json_content)
             if not is_valid:
                 logger.error(f"Generated JSON is invalid: {error}")
                 logger.error("JSON content:")
@@ -186,15 +198,15 @@ def generate_seedblock_command(args):
                 sys.exit(1)
                 
             # Save JSON to file and get block ID
-            json_file, block_id = save_seedblock(json_content, template_type)
+            json_file, block_id = save_protoblock(json_content, template_type)
             abs_json_path = os.path.abspath(json_file)
             
             # Verify file was saved
             if not os.path.exists(abs_json_path):
-                logger.error(f"Failed to save seedblock JSON to {abs_json_path}")
+                logger.error(f"Failed to save protoblock JSON to {abs_json_path}")
                 sys.exit(1)
                 
-            logger.info(f"Saved seedblock to {abs_json_path}")
+            logger.info(f"Saved protoblock to {abs_json_path}")
             logger.info(f"Block ID: {block_id}")
             
             # Print JSON content for inspection
@@ -204,26 +216,26 @@ def generate_seedblock_command(args):
             # Load configuration
             config = load_config()
             
-            # Load and execute the seedblock
-            logger.info("Executing seedblock...")
+            # Load and execute the protoblock
+            logger.info("Executing protoblock...")
             block = load_block_from_json(json_file)
             block.block_id = block_id  # Set the block ID
             executor = BlockExecutor(block=block)
             success = executor.execute_block()
             
             if success:
-                logger.info("Seedblock executed successfully")
+                logger.info("Protoblock executed successfully")
                 # Handle git operations after successful execution
                 if not git_manager.handle_post_execution(config, block.commit_message):
                     sys.exit(1)
             else:
-                logger.error("Seedblock execution failed")
+                logger.error("Protoblock execution failed")
                 sys.exit(1)
         else:
             print(seedblock)
             
     except Exception as e:
-        logger.error(f"Error generating seedblock: {e}")
+        logger.error(f"Error generating protoblock: {e}")
         sys.exit(1)
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:

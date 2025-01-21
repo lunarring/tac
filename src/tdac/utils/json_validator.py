@@ -4,9 +4,14 @@ from datetime import datetime
 import os
 import hashlib
 
-def validate_seedblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
+def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
     """
-    Validates a seedblock JSON content against the expected structure.
+    Validates a protoblock JSON content against the expected structure.
+    A protoblock serves as the detailed recipe/blueprint for implementing a change, containing:
+    - Task Specification: Outlines the new functionality or fixes
+    - Test Specification: Defines tests for the functionality
+    - Data Generation: Specifies test data needs
+    - Context Files: Lists which code files must be examined/updated
     
     Args:
         json_content: Either a JSON string or already parsed dict
@@ -70,9 +75,9 @@ def validate_seedblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
     except Exception as e:
         return False, f"Validation error: {str(e)}"
 
-def save_seedblock(json_content: Union[str, Dict], template_type: str) -> tuple[str, str]:
+def save_protoblock(json_content: Union[str, Dict], template_type: str) -> tuple[str, str]:
     """
-    Saves a validated seedblock JSON to a file with unique block ID.
+    Saves a validated protoblock JSON to a file with unique block ID.
     
     Args:
         json_content: The JSON content to save
@@ -92,16 +97,16 @@ def save_seedblock(json_content: Union[str, Dict], template_type: str) -> tuple[
             cleaned_content = "\n".join(lines[start_idx:end_idx]).strip()
         json_content = cleaned_content
     
-    is_valid, error = validate_seedblock_json(json_content)
+    is_valid, error = validate_protoblock_json(json_content)
     if not is_valid:
-        raise ValueError(f"Invalid seedblock JSON: {error}")
+        raise ValueError(f"Invalid protoblock JSON: {error}")
     
     # Generate a unique hash based on content and current time
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')  # Still use timestamp for hash uniqueness
     hash_input = f"{json_content}{timestamp}".encode('utf-8')
     block_id = hashlib.md5(hash_input).hexdigest()[:7]  # Use first 7 chars of hash as block ID
     
-    filename = f".tdac_seedblock_{template_type}_{block_id}.json"
+    filename = f".tdac_protoblock_{template_type}_{block_id}.json"
     
     # Save to file
     file_path = os.path.abspath(filename)

@@ -2,6 +2,8 @@ import os
 import subprocess
 import yaml
 import logging
+import json
+from datetime import datetime
 from tdac.core.block import Block
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
@@ -24,12 +26,65 @@ class BlockExecutor:
         self.test_results = ""
         self.previous_error = None  # Track previous error
         self.git_manager = GitManager()
+        self.block_id = None  # Will be set when executing a block
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
         config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
+
+    def _write_log_file(self, attempt: int, success: bool) -> None:
+        """
+        Write a log file containing the protoblock JSON, git diff, and test results.
+        
+        Args:
+            attempt: The current attempt number
+            success: Whether the attempt was successful
+        """
+        if not self.block_id:
+            logger.warning("No block ID available for logging")
+            return
+
+        log_filename = f".tdac_log_{self.block_id}"
+        
+        # Get git diff
+        try:
+            git_diff = subprocess.run(['git', 'diff'], capture_output=True, text=True).stdout
+        except subprocess.SubprocessError:
+            git_diff = "Failed to get git diff"
+
+        # Prepare log data for this attempt
+        attempt_data = {
+            'timestamp': datetime.now().isoformat(),
+            'attempt': attempt,
+            'success': success,
+            'git_diff': git_diff,
+            'test_results': self.test_results
+        }
+
+        try:
+            # Load existing log data if it exists
+            if os.path.exists(log_filename):
+                with open(log_filename, 'r', encoding='utf-8') as f:
+                    log_data = json.load(f)
+            else:
+                # Initialize new log data with protoblock and attempts
+                log_data = {
+                    'protoblock': self.config,
+                    'attempts': []
+                }
+            
+            # Append new attempt data
+            if 'attempts' not in log_data:
+                log_data['attempts'] = []
+            log_data['attempts'].append(attempt_data)
+
+            # Write updated log file
+            with open(log_filename, 'w', encoding='utf-8') as f:
+                json.dump(log_data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to write log file: {e}")
 
     def execute_block(self) -> bool:
         """
@@ -38,6 +93,14 @@ class BlockExecutor:
             bool: True if execution was successful, False otherwise
         """
         try:
+            # Extract block ID from the protoblock filename if available
+            if hasattr(self.block, 'block_id'):
+                self.block_id = self.block.block_id
+            else:
+                # Default to extracting from commit message
+                if self.block.commit_message and self.block.commit_message.startswith('TDAC:'):
+                    self.block_id = self.block.commit_message.split(':')[1].strip().split()[0]
+
             max_retries = self.config['agents']['programming']['max_retries']
             for attempt in range(max_retries):
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
@@ -48,12 +111,16 @@ class BlockExecutor:
                 print("Running tests...")
                 if self.run_tests():
                     print("Tests passed successfully.")
+                    # Write success log
+                    self._write_log_file(attempt + 1, True)
                     return True
                 else:
                     print("Tests failed.")
                     print("Test Results:")
                     print(self.get_test_results())
                     self.previous_error = self.test_results  # Store current error for next attempt
+                    # Write failure log
+                    self._write_log_file(attempt + 1, False)
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
                     else:
@@ -68,6 +135,9 @@ class BlockExecutor:
             print(f"An error occurred during block execution: {e}")
             # Try to revert changes on error
             self.git_manager.revert_changes()
+            # Write error log if we have a block ID
+            if self.block_id:
+                self._write_log_file(attempt + 1 if 'attempt' in locals() else 1, False)
             return False
 
     def run_tests(self, test_path: str = None) -> bool:
