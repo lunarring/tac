@@ -320,65 +320,23 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # Seed command
-    seed_parser = subparsers.add_parser('seed',
-        help='Generate a seed JSON template from a directory'
+    # Run command
+    run_parser = subparsers.add_parser('run',
+        help='Run a task with test generation or specific instructions'
     )
-    seed_parser.add_argument(
+    run_parser.add_argument(
         'directory',
-        help='Directory to generate seed from'
+        help='Directory to analyze'
     )
-    seed_parser.add_argument(
-        '--refactor',
-        action='store_true',
-        help='Generate a refactoring seed template'
-    )
-    seed_parser.add_argument(
+    run_parser.add_argument(
         '--test',
         action='store_true',
-        help='Generate a testing seed template'
+        help='Generate and run tests for the directory'
     )
-    seed_parser.add_argument(
-        '--error',
-        action='store_true',
-        help='Generate an error analysis seed template'
-    )
-    seed_parser.add_argument(
-        '--execute',
-        action='store_true',
-        help='Process through LLM, save as JSON, and execute the seed'
-    )
-    
-    # Block execution command
-    json_parser = subparsers.add_parser('json', 
-        help='Execute a coding block defined in a JSON file',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Example usage:
-  %(prog)s examples/caesar_cipher.json
-  %(prog)s --gen-tests examples/caesar_cipher.json
-  %(prog)s --gen-task examples/caesar_cipher.json
-  %(prog)s --run-tests examples/caesar_cipher.json
-        """
-    )
-    json_parser.add_argument(
-        'json_path',
-        help='Path to the JSON file containing the block definition'
-    )
-    json_parser.add_argument(
-        '--gen-tests',
-        action='store_true',
-        help='Only generate the tests without executing the task'
-    )
-    json_parser.add_argument(
-        '--gen-task',
-        action='store_true',
-        help='Only execute the task without generating tests'
-    )
-    json_parser.add_argument(
-        '--run-tests',
-        action='store_true',
-        help='Only run the tests without generating tests or executing task'
+    run_parser.add_argument(
+        '--instructions',
+        type=str,
+        help='Specific instructions for the task'
     )
     
     # File gathering command
@@ -417,10 +375,10 @@ Example usage:
     test_subparsers = test_parser.add_subparsers(dest='test_command', help='Test commands')
     
     # Run tests command
-    run_parser = test_subparsers.add_parser('run',
+    run_test_parser = test_subparsers.add_parser('run',
         help='Run tests found in tests/ subfolder'
     )
-    run_parser.add_argument(
+    run_test_parser.add_argument(
         '--directory',
         default='tests',
         help='Directory containing tests (default: tests)'
@@ -448,8 +406,11 @@ Example usage:
     
     args = parser.parse_args()
     
-    if args.command == 'json' and sum([args.gen_tests, args.gen_task, args.run_tests]) > 1:
-        parser.error("Cannot use multiple operation flags together (--gen-tests, --gen-task, --run-tests)")
+    if args.command == 'run' and not (args.test or args.instructions):
+        parser.error("Must specify either --test or --instructions")
+    
+    if args.command == 'run' and args.test and args.instructions:
+        parser.error("Cannot use both --test and --instructions together")
     
     return parser, args
 
@@ -476,10 +437,6 @@ def main():
         else:
             parser.error("Please specify a test command (run, list, or generate)")
         return
-    
-    if args.command == 'seed':
-        generate_seed_command(args)
-        return
         
     if args.command == 'log':
         from tdac.cli.log_viewer import LogViewer
@@ -490,90 +447,52 @@ def main():
             sys.exit(0)
         return
 
-    if args.command == 'json':
+    if args.command == 'run':
         # Initialize git manager and check status
         git_manager = GitManager()
         if not git_manager.check_status():
             sys.exit(1)
             
-        # Check if existing tests pass
-        if os.path.exists('tests'):
-            logger.info("Checking if existing tests pass...")
-            test_executor = BlockExecutor(block=Block(
-                task_description="",    # Not needed for test running
-                test_specification="",  # Not needed for test running
-                test_data_generation="", # Not needed for test running
-                write_files=[],         # Not needed for test running
-                context_files=[]        # Not needed for test running
-            ))
-            if not test_executor.run_tests():
-                logger.error("Existing tests are failing. Please fix them before proceeding.")
-                sys.exit(1)
-            logger.info("All existing tests pass.")
-            
-        try:
-            block = load_block_from_json(args.json_path)
-        except FileNotFoundError:
-            logger.error(f"JSON file not found: {args.json_path}")
-            sys.exit(1)
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON file: {e}")
-            sys.exit(1)
-        except KeyError as e:
-            logger.error(f"Missing required field in JSON file: {e}")
-            sys.exit(1)
-
-        # Ensure tests directory exists
-        os.makedirs('tests', exist_ok=True)
-        with open(os.path.join('tests', '__init__.py'), 'w', encoding='utf-8') as f:
-            pass
-
         try:
             # Load configuration
             config = load_config()
             
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
-
-            # Initialize the executor with block and config
+            
+            # Create block based on command type
+            if args.test:
+                # Generate seed for test generation
+                from tdac.utils.seed_generator import generate_seed
+                seed = generate_seed(args.directory, template_type="test")
+                seed_data = json.loads(seed)
+                task_desc = seed_data["description"]
+            else:
+                # Use provided instructions
+                task_desc = args.instructions
+            
+            # Create block
+            block = Block(
+                task_description=task_desc,
+                test_specification="",  # Will be generated by agent
+                test_data_generation="",  # Will be generated by agent
+                write_files=[],  # Will be determined by agent
+                context_files=[]  # Will be determined by agent
+            )
+            
+            # Create executor and run
             executor = BlockExecutor(block=block, config=config)
-
-            if args.gen_tests:
-                # Only generate tests
-                logger.info("Generating tests...")
-                executor.agent.generate_tests()
-                logger.info("Tests generated successfully.")
-            elif args.gen_task:
-                # Execute task without generating tests, but with full retry logic
-                logger.info("Executing task...")
-                success = executor.execute_block(skip_test_generation=True)
-                if success:
-                    logger.info("Task executed and verified successfully.")
-                    # Handle git operations after successful execution
-                    if not git_manager.handle_post_execution(config, block.commit_message):
-                        sys.exit(1)
-                else:
-                    logger.error("Task implementation failed.")
-                    sys.exit(1)
-            elif args.run_tests:
-                # Only run tests
-                success = executor.run_tests()
-                if success:
-                    logger.info("All tests passed successfully.")
-                else:
-                    logger.error("Tests failed.")
+            success = executor.execute_block()
+            
+            if success:
+                logger.info("Task completed successfully.")
+                # Handle git operations after successful execution
+                if not git_manager.handle_post_execution(config, block.commit_message):
                     sys.exit(1)
             else:
-                # Execute the full block (default behavior)
-                success = executor.execute_block()
-                if success:
-                    logger.info("Block executed and changes applied successfully.")
-                    # Handle git operations after successful execution
-                    if not git_manager.handle_post_execution(config, block.commit_message):
-                        sys.exit(1)
-                else:
-                    logger.error("Block execution failed. Changes have been discarded.")
-                    sys.exit(1)
+                logger.error("Task execution failed.")
+                sys.exit(1)
+                
         except Exception as e:
             logger.error(f"Error during execution: {e}")
             sys.exit(1)
