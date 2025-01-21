@@ -320,30 +320,30 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # Run command
-    run_parser = subparsers.add_parser('run',
+    # Block command
+    block_parser = subparsers.add_parser('block',
         help='Generate and execute a new block with automated tests or custom instructions'
     )
-    run_parser.add_argument(
+    block_parser.add_argument(
         'directory',
         help='Directory to analyze and create block from'
     )
-    run_parser.add_argument(
+    block_parser.add_argument(
         '--test',
         action='store_true',
         help='Generate a test-focused block for the directory'
     )
-    run_parser.add_argument(
+    block_parser.add_argument(
         '--refactor',
         action='store_true',
         help='Generate a refactoring-focused block'
     )
-    run_parser.add_argument(
+    block_parser.add_argument(
         '--error',
         action='store_true',
         help='Generate an error analysis block'
     )
-    run_parser.add_argument(
+    block_parser.add_argument(
         '--instructions',
         type=str,
         help='Generate a custom block with specific instructions'
@@ -416,7 +416,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     args = parser.parse_args()
     
-    if args.command == 'run':
+    if args.command == 'block':
         # Count how many template flags are used
         template_flags = sum([
             args.test,
@@ -465,7 +465,7 @@ def main():
             sys.exit(0)
         return
 
-    if args.command == 'run':
+    if args.command == 'block':
         # Initialize git manager and check status
         git_manager = GitManager()
         if not git_manager.check_status():
