@@ -6,6 +6,7 @@ import argparse
 import ast
 import logging
 import json
+from datetime import datetime
 
 # Add the src directory to Python path for local development
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -238,6 +239,78 @@ def generate_seedblock_command(args):
         logger.error(f"Error generating protoblock: {e}")
         sys.exit(1)
 
+def list_logs_command(args):
+    """Handle the log viewing command"""
+    # Get all .tdac_log files in current directory
+    log_files = sorted(
+        [f for f in os.listdir('.') if f.startswith('.tdac_log_')],
+        key=lambda x: os.path.getmtime(x),
+        reverse=True
+    )
+    
+    if not log_files:
+        print("No log files found in current directory.")
+        return
+        
+    # Display files with numbers
+    print("\nAvailable log files (ordered by most recent):")
+    for i, file in enumerate(log_files, 1):
+        mtime = datetime.fromtimestamp(os.path.getmtime(file))
+        block_id = file.replace('.tdac_log_', '')
+        print(f"{i}. Block {block_id} - Last modified: {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    # Get user selection
+    while True:
+        try:
+            choice = input("\nSelect a log file (1-{}) or 'q' to quit: ".format(len(log_files)))
+            if choice.lower() == 'q':
+                return
+                
+            idx = int(choice) - 1
+            if 0 <= idx < len(log_files):
+                selected_file = log_files[idx]
+                break
+            else:
+                print(f"Please enter a number between 1 and {len(log_files)}")
+        except ValueError:
+            print("Please enter a valid number")
+    
+    # Read and display the selected log
+    try:
+        with open(selected_file, 'r') as f:
+            log_data = json.load(f)
+            
+        # Display log information
+        print("\n" + "="*50)
+        print(f"Log for Block: {selected_file.replace('.tdac_log_', '')}")
+        print("="*50)
+        
+        # Display protoblock info
+        if 'protoblock' in log_data:
+            proto = log_data['protoblock']
+            print("\nProtoblock Information:")
+            print(f"Task Description: {proto.get('task_description', 'N/A')}")
+            print(f"Test Specification: {proto.get('test_specification', 'N/A')}")
+            
+        # Display attempts
+        if 'attempts' in log_data:
+            print(f"\nTotal Attempts: {len(log_data['attempts'])}")
+            for i, attempt in enumerate(log_data['attempts'], 1):
+                print(f"\nAttempt {i}:")
+                print(f"Timestamp: {attempt['timestamp']}")
+                print(f"Success: {'✓' if attempt['success'] else '✗'}")
+                
+                if attempt.get('git_diff'):
+                    print("\nGit Diff:")
+                    print(attempt['git_diff'])
+                    
+                if attempt.get('test_results'):
+                    print("\nTest Results:")
+                    print(attempt['test_results'])
+                print("-"*50)
+    except Exception as e:
+        print(f"Error reading log file: {e}")
+
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
@@ -367,6 +440,11 @@ Example usage:
         help='Generate tests (placeholder)'
     )
     
+    # Log command
+    log_parser = subparsers.add_parser('log',
+        help='View execution logs'
+    )
+    
     args = parser.parse_args()
     
     if args.command == 'json' and sum([args.gen_tests, args.gen_task, args.run_tests]) > 1:
@@ -400,6 +478,10 @@ def main():
     
     if args.command == 'seedblock':
         generate_seedblock_command(args)
+        return
+        
+    if args.command == 'log':
+        list_logs_command(args)
         return
 
     if args.command == 'json':
