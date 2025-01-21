@@ -51,17 +51,11 @@ The seedblock command supports several template types:
 
 Examples:
 ```bash
-# Generate a refactoring template
-tdac seedblock ./src/tdac --refactor
-
-# Generate a testing template
-tdac seedblock ./src/tdac --test
-
-# Generate an error analysis template
-tdac seedblock ./src/tdac --error
-
-# Generate a default template
-tdac seedblock ./src/tdac
+# Replace DIRECTORY with your target code directory
+tdac seedblock --refactor DIRECTORY
+tdac seedblock --test DIRECTORY
+tdac seedblock --error DIRECTORY
+tdac seedblock DIRECTORY  # default template
 ```
 
 ### Execute Changes

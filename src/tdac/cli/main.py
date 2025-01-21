@@ -215,6 +215,16 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         action='store_true',
         help='Generate a refactoring seedblock template'
     )
+    seedblock_parser.add_argument(
+        '--test',
+        action='store_true',
+        help='Generate a testing seedblock template'
+    )
+    seedblock_parser.add_argument(
+        '--error',
+        action='store_true',
+        help='Generate an error analysis seedblock template'
+    )
     
     # Block execution command
     yaml_parser = subparsers.add_parser('yaml', 
