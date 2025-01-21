@@ -99,10 +99,27 @@ class LLMClient:
             ChatCompletion response from the model
         """
         # Convert messages to the format expected by the API
-        formatted_messages = [
-            {"role": msg.role, "content": msg.content}
-            for msg in messages
-        ]
+        formatted_messages = []
+        
+        # Special handling for o1-mini model which doesn't support system messages
+        if self.config.model == "o1-mini":
+            for msg in messages:
+                if msg.role == "system":
+                    # Convert system message to user message
+                    formatted_messages.append({
+                        "role": "user",
+                        "content": msg.content
+                    })
+                else:
+                    formatted_messages.append({
+                        "role": msg.role,
+                        "content": msg.content
+                    })
+        else:
+            formatted_messages = [
+                {"role": msg.role, "content": msg.content}
+                for msg in messages
+            ]
         
         # Prepare completion parameters
         params = {
