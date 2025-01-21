@@ -6,6 +6,7 @@ import git
 class TestGitManager(unittest.TestCase):
     @patch('tdac.core.git_manager.git.Repo')
     def test_initialization_success(self, mock_repo):
+        """Test successful initialization of GitManager with a valid git repository."""
         # Mock successful repo initialization
         mock_repo.return_value = MagicMock()
         
@@ -13,9 +14,12 @@ class TestGitManager(unittest.TestCase):
         
         mock_repo.assert_called_with('.')
         self.assertIsNotNone(manager.repo)
+        self.assertTrue(hasattr(manager.repo, 'git'))
+        self.assertTrue(callable(getattr(manager.repo, 'git', None)))
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_initialization_invalid_repo(self, mock_repo):
+        """Test initialization of GitManager with an invalid git repository."""
         # Mock InvalidGitRepositoryError
         mock_repo.side_effect = git.exc.InvalidGitRepositoryError
         
@@ -26,6 +30,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_initialization_git_command_error(self, mock_repo):
+        """Test initialization of GitManager when a GitCommandError occurs."""
         # Mock GitCommandError during repo initialization
         mock_repo.side_effect = git.exc.GitCommandError(['init'], 1)
         
@@ -36,6 +41,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_check_status_clean(self, mock_repo):
+        """Test check_status method when the repository is clean."""
         # Mock a clean repository
         mock_repo_instance = MagicMock()
         mock_repo_instance.is_dirty.return_value = False
@@ -49,6 +55,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_check_status_dirty(self, mock_repo):
+        """Test check_status method when the repository has uncommitted changes."""
         # Mock a dirty repository
         mock_repo_instance = MagicMock()
         mock_repo_instance.is_dirty.return_value = True
@@ -66,6 +73,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_check_status_git_command_error(self, mock_repo):
+        """Test check_status method when a GitCommandError occurs during status check."""
         # Mock GitCommandError during status check
         mock_repo_instance = MagicMock()
         mock_repo_instance.is_dirty.side_effect = git.exc.GitCommandError(['status'], 1)
@@ -81,6 +89,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_no_repo(self, mock_repo):
+        """Test handle_post_execution method when there is no git repository."""
         # Mock no repository initialized
         mock_repo.return_value = None
         
@@ -92,6 +101,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_auto_push_false(self, mock_repo):
+        """Test handle_post_execution method when auto_push is set to False."""
         # Mock repository with auto_push=False
         mock_repo_instance = MagicMock()
         mock_repo.return_value = mock_repo_instance
@@ -106,6 +116,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_with_commit_message(self, mock_repo):
+        """Test handle_post_execution method with a provided commit message."""
         # Mock successful git operations with provided commit message
         mock_repo_instance = MagicMock()
         mock_repo.return_value = mock_repo_instance
@@ -120,6 +131,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_auto_push_true_no_commit_message(self, mock_repo):
+        """Test handle_post_execution method with auto_push=True and no commit message provided."""
         # Mock successful git operations with auto-generated commit message
         mock_repo_instance = MagicMock()
         mock_repo_instance.git.diff.return_value = "file1.py\nfile2.py\nfile3.py\nfile4.py"
@@ -136,6 +148,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_git_command_error(self, mock_repo):
+        """Test handle_post_execution method when a GitCommandError occurs during git operations."""
         # Mock GitCommandError during git operations
         mock_repo_instance = MagicMock()
         mock_repo_instance.git.add.side_effect = git.exc.GitCommandError(['add'], 1)
@@ -153,6 +166,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_revert_changes_success(self, mock_repo):
+        """Test successfully reverting changes in the repository."""
         # Mock successful revert of changes
         mock_repo_instance = MagicMock()
         mock_repo.return_value = mock_repo_instance
@@ -166,6 +180,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_revert_changes_no_repo(self, mock_repo):
+        """Test revert_changes method when there is no git repository."""
         # Mock no repository initialized
         mock_repo.return_value = None
         
@@ -177,6 +192,7 @@ class TestGitManager(unittest.TestCase):
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_revert_changes_git_command_error(self, mock_repo):
+        """Test revert_changes method when a GitCommandError occurs during reverting."""
         # Mock GitCommandError during revert
         mock_repo_instance = MagicMock()
         mock_repo_instance.git.restore.side_effect = git.exc.GitCommandError(['restore'], 1)
