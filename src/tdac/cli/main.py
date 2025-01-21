@@ -180,7 +180,7 @@ def handle_git_operations(config: dict, block: Block = None) -> bool:
             files_summary = ', '.join(changed_files[:3])
             if len(changed_files) > 3:
                 files_summary += f" and {len(changed_files) - 3} more files"
-            commit_message = f"TDAC! Successfully implemented changes in {files_summary}"
+            commit_message = f"TDAC: Successfully implemented changes in {files_summary}"
         
         # Commit changes
         repo.git.commit('-m', commit_message)
