@@ -74,10 +74,10 @@ I want you to generate an instruction block (called seedblock) which is the inpu
     "test": {{
         "specification": "Test specification",
         "data": "Test data and expected outcomes",
-        "replacements": ["list", "of", "files", "to", "replace"]
+        "replacements": ["file1.py", "file2.py"]
     }},
-    "write_files": ["list", "of", "files", "to", "write"],
-    "context_files": ["list", "of", "files", "for", "context"],
+    "write_files": ["file1.py", "file2.py"],
+    "context_files": ["context1.py", "context2.py"],
     "commit_message": "TDAC: Brief commit message"
 }}
 
