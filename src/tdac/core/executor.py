@@ -36,7 +36,21 @@ class BlockExecutor:
 
     def _write_log_file(self, attempt: int, success: bool) -> None:
         """
-        Write a log file containing the protoblock JSON, git diff, and test results.
+        Write a log file containing the config and executions data.
+        The log file structure is:
+        {
+            "config": {...},  # Global config
+            "executions": [   # List of execution attempts
+                {
+                    "protoblock": {...},
+                    "timestamp": "...",
+                    "attempt": N,
+                    "success": bool,
+                    "git_diff": "...",
+                    "test_results": "..."
+                }
+            ]
+        }
         
         Args:
             attempt: The current attempt number
@@ -54,8 +68,16 @@ class BlockExecutor:
         except subprocess.SubprocessError:
             git_diff = "Failed to get git diff"
 
-        # Prepare log data for this attempt
-        attempt_data = {
+        # Prepare execution data for this attempt
+        execution_data = {
+            'protoblock': {
+                'task_description': self.block.task_description,
+                'test_specification': self.block.test_specification,
+                'test_data_generation': self.block.test_data_generation,
+                'write_files': self.block.write_files,
+                'context_files': self.block.context_files,
+                'commit_message': self.block.commit_message
+            },
             'timestamp': datetime.now().isoformat(),
             'attempt': attempt,
             'success': success,
@@ -69,16 +91,16 @@ class BlockExecutor:
                 with open(log_filename, 'r', encoding='utf-8') as f:
                     log_data = json.load(f)
             else:
-                # Initialize new log data with protoblock and attempts
+                # Initialize new log data with config and executions
                 log_data = {
-                    'protoblock': self.config,
-                    'attempts': []
+                    'config': self.config,
+                    'executions': []
                 }
             
-            # Append new attempt data
-            if 'attempts' not in log_data:
-                log_data['attempts'] = []
-            log_data['attempts'].append(attempt_data)
+            # Append new execution data
+            if 'executions' not in log_data:
+                log_data['executions'] = []
+            log_data['executions'].append(execution_data)
 
             # Write updated log file
             with open(log_filename, 'w', encoding='utf-8') as f:
