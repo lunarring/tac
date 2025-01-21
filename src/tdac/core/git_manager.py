@@ -57,7 +57,7 @@ class GitManager:
             # Push changes
             self.repo.git.push()
             
-            logger.info("Successfully committed and pushed changes")
+            logger.info(f"Successfully committed and pushed changes. Commit message: {commit_message}")
             return True
         except Exception as e:
             logger.error(f"Error during git operations: {e}")

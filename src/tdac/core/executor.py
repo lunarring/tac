@@ -146,7 +146,7 @@ class BlockExecutor:
 
                 print("Running tests...")
                 if self.run_tests():
-                    print("Tests passed successfully.")
+                    print("Protoblock could successfully be turned into Mergeblock.")
                     # Write success log
                     self._write_log_file(attempt + 1, True)
                     return True
