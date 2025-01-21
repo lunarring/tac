@@ -1,6 +1,6 @@
 import os
 import pytest
-from main import gather_python_files
+from tdac.utils.file_gatherer import gather_python_files
 
 def create_file(path, content=""):
     with open(path, 'w') as f:
