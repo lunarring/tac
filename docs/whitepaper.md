@@ -3,7 +3,7 @@
 
 ## Overview
 
-**TDAC (Test-driven Agentic Chains)** is a structured, automated framework engineered to significantly enhance AI-driven software development by creating a sequence of validated blocks, each representing a discrete, tested, and confirmed improvement to the code. In much the same way that blockchain technology ensures the immutability of prior blocks, TDAC guarantees each new code change is thoroughly tested and validated before linking it to the existing chain.
+**TDAC (Test-driven Agentic Chains)** is a framework to fully automate AI-driven software creation. The core idea is to create *blocks* of code change, which are validated through empirical testing. In much the same way that blockchain technology ensures the immutability of prior blocks, TDAC guarantees each new code change is thoroughly tested and validated before linking it to the existing codebase. Thus, it addresses two critical limitations of AI coding agents: a lack of assurance that the implementation meets the requested functionality, and insufficient safeguards to prevent breaking the existing codebase. Consequently, they cannot be entirely automated—and this is where TDAC delivers its promise: a robust, structured framework that ensures every implementation is both functional and stable.
 
 A **high-level manager** orchestrates this chain of development tasks, preserving both the workflow’s integrity and efficiency. Just as every block in a blockchain references the hash of its predecessor, each stage of TDAC references a known snapshot of the codebase and confirms its correctness with automated tests, ensuring that merging new functionality can only occur when it does not break existing features.
 
