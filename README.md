@@ -36,65 +36,29 @@ After this, you can run the command from anywhere in your terminal (as long as y
 
 The framework provides several commands to help with AI-driven development:
 
-### Generate a Seed
+### Run Tasks
 
-Generate a seed JSON template from an existing codebase:
-
-```bash
-tdac seed ./your/code/directory
-```
-
-The seed command supports several template types:
-- `--refactor`: Generate a refactoring template
-- `--test`: Generate a testing template
-- `--error`: Generate an error analysis template
-- `--execute`: Process through LLM and execute the seed
-
-Examples:
-```bash
-tdac seed --refactor DIRECTORY
-tdac seed --test DIRECTORY
-tdac seed --error DIRECTORY
-tdac seed DIRECTORY  # default template
-tdac seed --refactor --execute DIRECTORY  # generate and execute
-```
-
-### Execute Changes
-
-Execute changes based on a JSON specification:
+Execute AI-driven tasks with either test generation or specific instructions:
 
 ```bash
-tdac json your_protoblock.json
+# Generate and run tests for a directory
+tdac run --test ./your/code/directory
+
+# Generate and run refactoring tasks
+tdac run --refactor ./your/code/directory
+
+# Generate and run error analysis tasks
+tdac run --error ./your/code/directory
+
+# Run with specific instructions
+tdac run --instructions "Add error handling to all functions" ./your/code/directory
 ```
 
-The json command supports several flags:
-- `--gen-tests`: Only generate the tests without executing the task
-- `--gen-task`: Only execute the task without generating tests
-- `--run-tests`: Only run the tests without generating tests or executing task
-
-Example protoblock JSON structure:
-```json
-{
-    "seed": {
-        "instructions": "Add feature X to the system"
-    },
-    "task": {
-        "specification": "Detailed description of what needs to be implemented"
-    },
-    "test": {
-        "specification": "Description of how the new functionality should be tested",
-        "data": "Test input data and expected outcomes",
-        "replacements": []
-    },
-    "write_files": [
-        "src/module/new_feature.py"
-    ],
-    "context_files": [
-        "src/module/existing.py"
-    ],
-    "commit_message": "TDAC: Add feature X implementation"
-}
-```
+Each template type focuses on a different aspect:
+- `--test`: Generates tests for the codebase
+- `--refactor`: Analyzes and improves code structure and quality
+- `--error`: Performs error analysis and adds error handling
+- `--instructions`: Executes custom task instructions
 
 ### Test Management
 
@@ -125,6 +89,14 @@ tdac gather ./src/tdac
 - `--separator`: Separator between sections (default: "\n---\n")
 - `--code-fences`: Use code fences in output
 - `--exclusions`: Comma-separated directories to exclude (default: .git,__pycache__)
+
+### View Logs
+
+View execution logs interactively:
+
+```bash
+tdac log
+```
 
 ## ⚙️ Configuration
 

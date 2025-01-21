@@ -334,6 +334,16 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Generate and run tests for the directory'
     )
     run_parser.add_argument(
+        '--refactor',
+        action='store_true',
+        help='Generate and run refactoring tasks'
+    )
+    run_parser.add_argument(
+        '--error',
+        action='store_true',
+        help='Generate and run error analysis tasks'
+    )
+    run_parser.add_argument(
         '--instructions',
         type=str,
         help='Specific instructions for the task'
@@ -406,11 +416,19 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     args = parser.parse_args()
     
-    if args.command == 'run' and not (args.test or args.instructions):
-        parser.error("Must specify either --test or --instructions")
-    
-    if args.command == 'run' and args.test and args.instructions:
-        parser.error("Cannot use both --test and --instructions together")
+    if args.command == 'run':
+        # Count how many template flags are used
+        template_flags = sum([
+            args.test,
+            args.refactor,
+            args.error,
+            bool(args.instructions)
+        ])
+        
+        if template_flags == 0:
+            parser.error("Must specify one of: --test, --refactor, --error, or --instructions")
+        elif template_flags > 1:
+            parser.error("Can only use one of: --test, --refactor, --error, or --instructions")
     
     return parser, args
 
@@ -465,6 +483,18 @@ def main():
                 # Generate seed for test generation
                 from tdac.utils.seed_generator import generate_seed
                 seed = generate_seed(args.directory, template_type="test")
+                seed_data = json.loads(seed)
+                task_desc = seed_data["description"]
+            elif args.refactor:
+                # Generate seed for refactoring
+                from tdac.utils.seed_generator import generate_seed
+                seed = generate_seed(args.directory, template_type="refactor")
+                seed_data = json.loads(seed)
+                task_desc = seed_data["description"]
+            elif args.error:
+                # Generate seed for error analysis
+                from tdac.utils.seed_generator import generate_seed
+                seed = generate_seed(args.directory, template_type="error")
                 seed_data = json.loads(seed)
                 task_desc = seed_data["description"]
             else:
