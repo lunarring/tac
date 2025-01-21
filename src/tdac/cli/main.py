@@ -133,7 +133,15 @@ def generate_tests_command(args):
 def generate_seedblock_command(args):
     """Handle the seedblock generation command"""
     try:
-        template_type = "refactor" if args.refactor else "default"
+        # Determine template type based on args
+        template_type = "default"
+        if args.refactor:
+            template_type = "refactor"
+        elif args.test:
+            template_type = "test"
+        elif args.error:
+            template_type = "error"
+            
         seedblock = generate_seedblock(args.directory, template_type=template_type)
         print(seedblock)
     except Exception as e:
