@@ -1,7 +1,7 @@
 agents:
   programming:
     type: "aider"
-    max_retries: 10
+    max_retries: 2
     model: "deepseek/deepseek-chat"
     model_settings:
       edit_format: "diff"

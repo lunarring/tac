@@ -4,6 +4,7 @@ import yaml
 import logging
 from tdac.core.block import Block
 from tdac.agents.base import Agent
+from tdac.core.git_manager import GitManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class BlockExecutor:
         self.agent = block.create_agent(self.config)
         self.test_results = ""
         self.previous_error = None  # Track previous error
+        self.git_manager = GitManager()
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -55,11 +57,17 @@ class BlockExecutor:
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
                     else:
-                        print("Maximum retry attempts reached. Giving up.")
+                        print("Maximum retry attempts reached. Reverting all changes...")
+                        if self.git_manager.revert_changes():
+                            print("Successfully reverted all changes.")
+                        else:
+                            print("Failed to revert changes. Please check repository state manually.")
                         return False
 
         except Exception as e:
             print(f"An error occurred during block execution: {e}")
+            # Try to revert changes on error
+            self.git_manager.revert_changes()
             return False
 
     def run_tests(self, test_path: str = None) -> bool:

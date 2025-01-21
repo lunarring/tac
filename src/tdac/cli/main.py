@@ -5,7 +5,6 @@ import yaml
 import argparse
 import ast
 import logging
-import git
 import json
 
 # Add the src directory to Python path for local development
@@ -21,6 +20,7 @@ from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.seedblock_generator import generate_seedblock
 from tdac.core.llm import LLMClient, Message
 from tdac.utils.json_validator import validate_seedblock_json, save_seedblock
+from tdac.core.git_manager import GitManager
 
 logger = setup_logger(__name__)
 
@@ -150,8 +150,9 @@ def generate_seedblock_command(args):
         seedblock = generate_seedblock(args.directory, template_type=template_type)
         
         if args.execute:
-            # Check git status before proceeding
-            if not check_git_status():
+            # Initialize git manager and check status
+            git_manager = GitManager()
+            if not git_manager.check_status():
                 sys.exit(1)
                 
             # Initialize LLM client
@@ -211,7 +212,7 @@ def generate_seedblock_command(args):
             if success:
                 logger.info("Seedblock executed successfully")
                 # Handle git operations after successful execution
-                if not handle_git_operations(config, block):
+                if not git_manager.handle_post_execution(config, block.commit_message):
                     sys.exit(1)
             else:
                 logger.error("Seedblock execution failed")
@@ -222,60 +223,6 @@ def generate_seedblock_command(args):
     except Exception as e:
         logger.error(f"Error generating seedblock: {e}")
         sys.exit(1)
-
-def check_git_status() -> bool:
-    """Check if git repo exists and working tree is clean"""
-    try:
-        # Try to get git repo instance
-        repo = git.Repo('.')
-        
-        if repo.is_dirty(untracked_files=True):
-            logger.error("Git working tree is not clean. Please commit or stash your changes before running TDAC!")
-            print("\nGit status:")
-            print(repo.git.status())
-            return False
-            
-        return True
-    except git.exc.InvalidGitRepositoryError:
-        logger.error("Not a git repository. Please initialize git first.")
-        return False
-    except git.exc.GitCommandError as e:
-        logger.error(f"Error checking git status: {e}")
-        return False
-
-def handle_git_operations(config: dict, block: Block = None) -> bool:
-    """Handle git operations after successful block execution"""
-    try:
-        if not config.get('git', {}).get('auto_push', False):
-            return True
-
-        repo = git.Repo('.')
-        
-        # Stage all changes
-        repo.git.add('.')
-        
-        # Generate commit message
-        if block and block.commit_message:
-            commit_message = block.commit_message
-        else:
-            # Fallback to auto-generated message
-            changed_files = repo.git.diff('--staged', '--name-only').split('\n')
-            files_summary = ', '.join(changed_files[:3])
-            if len(changed_files) > 3:
-                files_summary += f" and {len(changed_files) - 3} more files"
-            commit_message = f"TDAC: Successfully implemented changes in {files_summary}"
-        
-        # Commit changes
-        repo.git.commit('-m', commit_message)
-        
-        # Push changes
-        repo.git.push()
-        
-        logger.info("Successfully committed and pushed changes")
-        return True
-    except Exception as e:
-        logger.error(f"Error during git operations: {e}")
-        return False
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
@@ -442,8 +389,9 @@ def main():
         return
 
     if args.command == 'json':
-        # Check git status before proceeding
-        if not check_git_status():
+        # Initialize git manager and check status
+        git_manager = GitManager()
+        if not git_manager.check_status():
             sys.exit(1)
             
         # Check if existing tests pass
@@ -500,7 +448,7 @@ def main():
                 if success:
                     logger.info("Task executed and verified successfully.")
                     # Handle git operations after successful execution
-                    if not handle_git_operations(config, block):
+                    if not git_manager.handle_post_execution(config, block.commit_message):
                         sys.exit(1)
                 else:
                     logger.error("Task implementation failed.")
@@ -519,7 +467,7 @@ def main():
                 if success:
                     logger.info("Block executed and changes applied successfully.")
                     # Handle git operations after successful execution
-                    if not handle_git_operations(config, block):
+                    if not git_manager.handle_post_execution(config, block.commit_message):
                         sys.exit(1)
                 else:
                     logger.error("Block execution failed. Changes have been discarded.")
