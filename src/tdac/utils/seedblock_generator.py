@@ -7,7 +7,7 @@ import string
 # Predefined templates for different seedblock types
 SEEDBLOCK_TEMPLATES = {
     "refactor": {
-        "instructions": "We want to refactor the code because it is ugly and not very well done. Pick ONE single item for refactoring that seems most pressing.",
+        "instructions": "Analyze the entire codebase to identify areas of redundancy and complexity, focusing on improving maintainability. Remove or refactor duplicate code segments, ensuring that any repetitive logic is consolidated into reusable functions or modules. Improve naming conventions, code structure, and documentation to enhance readability and consistency across the project. Address code smells by applying relevant design patterns and best practices, including principles like DRY (Don't Repeat Yourself). Finally, verify all changes through comprehensive testing and update any related documentation to maintain clarity for future contributors.",
         "description": "Generate a refactoring seedblock"
     },
     "error": {
@@ -15,7 +15,7 @@ SEEDBLOCK_TEMPLATES = {
         "description": "Generate an error analysis seedblock"
     },
     "test": {
-        "instructions": "We want to add comprehensive tests to verify the existing functionality. Do NOT modify any production code - focus solely on creating robust, maintainable tests that document and verify the current behavior. Pick ONE specific component or function to test thoroughly.",
+        "instructions": "We want to add comprehensive tests to verify the existing functionality. Do NOT modify any code EXCEPT for the test files. We want to have maximum coverage of the codebase. Thereofore you think through which would be a good test to add! Focus solely on creating this one robust, maintainable tests that document and verify the current behavior.",
         "description": "Generate a testing seedblock"
     },
     "default": {
