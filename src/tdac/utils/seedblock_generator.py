@@ -52,7 +52,7 @@ def generate_seedblock(directory: str, template_type: str = "default") -> str:
     template = f"""We have the following codebase: 
 {file_content}
     
-I want you to generate an instruction block (called seedblock) which is the input for a coding agent. The block has a very specific format that I need you to adhere to precisely, here is the format. For the text of each of the points, don't use line breaks, just write it all in one line. Write in very concise language, and write in a tone of giving direct and precise orders. Keep the yaml structure as in the example below, where the elements seedblock, task, test, write_files, context_files and commit_message are all at the same level.
+I want you to generate an instruction block (called seedblock) which is the input for a coding agent. The block has a very specific format that I need you to adhere to precisely, here is the format. For the text of each of the points, don't use line breaks, just write it all in one line. Write in very concise language, and write in a tone of giving direct and precise orders. Keep the yaml structure as in the example below, where the elements seedblock, task, test, write_files, context_files and commit_message are all at the same level. It is VERY IMPORTANT to adhere to this format, and to not change it and to ONLY directly output the yaml structure and NO OTHER COMMENTS OR TEXT!
 
 --------------------
 
