@@ -40,11 +40,7 @@ TEST FAILURE OUTPUT:
 {test_results}
 
 Please provide a concise analysis covering:
-1. What approach was taken in the implementation
-2. Why the tests failed (root cause analysis)
-3. What could be improved in the next attempt
-4. Any potential issues in the test specifications themselves
-
+What could be done differently? Be very concrete and specific.
 Keep your response focused and actionable."""
 
         messages = [

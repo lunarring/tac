@@ -4,7 +4,7 @@ general:
   total_timeout: 600
 
 aider:
-  model: "openai/o1-mini"
+  model: "deepseek/deepseek-reasoner"
   model_settings:
     edit_format: "diff"
     verify_ssl: true
@@ -12,8 +12,8 @@ aider:
     max_chat_history_tokens: 200000
 
 llm:
-  provider: "openai"
-  model: "o1-mini"
+  provider: "deepseek"
+  model: "deepseek-reasoner"
   settings:
     temperature: 0.7
     max_tokens: null
