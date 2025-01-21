@@ -532,8 +532,8 @@ def main():
             # Load configuration
             config = load_config()
             
-            if config['agents']['programming']['type'] != 'aider':
-                raise ValueError(f"Unknown agent type: {config['agents']['programming']['type']}")
+            if config['general']['type'] != 'aider':
+                raise ValueError(f"Unknown agent type: {config['general']['type']}")
 
             # Initialize the executor with block and config
             executor = BlockExecutor(block=block, config=config)

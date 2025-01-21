@@ -11,7 +11,7 @@ logger = setup_logger(__name__)
 class AiderAgent(Agent):
     def __init__(self, config: dict):
         super().__init__(config)
-        self.agent_config = config.get('agents', {}).get('aider', {})
+        self.agent_config = config.get('aider', {})
 
     def execute_task(self, previous_error: str = None) -> None:
         """
@@ -132,7 +132,7 @@ Important Guidelines:
             logger.debug(f"- Full command: {' '.join(command)}")
             
             # Set timeout values
-            TOTAL_TIMEOUT = self.agent_config.get('execution_timeout_seconds', 600)  # Default to 10 minutes if not specified
+            TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
             READ_TIMEOUT = 1.0   # 1 second read timeout
             
             start_time = time.time()

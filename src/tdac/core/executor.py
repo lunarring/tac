@@ -148,7 +148,7 @@ class BlockExecutor:
                 if self.block.commit_message and self.block.commit_message.startswith('TDAC:'):
                     self.block_id = self.block.commit_message.split(':')[1].strip().split()[0]
 
-            max_retries = self.config['agents']['programming']['max_retries']
+            max_retries = self.config['general']['max_retries']
             for attempt in range(max_retries):
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
                 
