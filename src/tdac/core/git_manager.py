@@ -2,9 +2,6 @@ import git
 import logging
 import os
 from typing import Optional
-from colorama import init, Fore, Style
-
-init()  # Initialize colorama
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +75,7 @@ class GitManager:
             # Clean untracked files and directories
             self.repo.git.clean('-fd')
             
-            logger.info(f"{Fore.RED}Reverted all changes and cleaned untracked files{Style.RESET_ALL}")
+            logger.error("Reverted all changes and cleaned untracked files")
             return True
         except Exception as e:
             logger.error(f"Error reverting changes: {e}")
