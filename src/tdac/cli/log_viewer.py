@@ -146,7 +146,8 @@ class LogViewer:
                 "Basic info (timestamp, success, attempt)",
                 "Protoblock details",
                 "Git diff",
-                "Test results"
+                "Test results",
+                "Failure analysis"
             ]
             
             self.show_menu(options, f"Execution {execution_num} Components")
@@ -192,6 +193,13 @@ class LogViewer:
                         self.console.print(Panel(execution['test_results'], title="Test Results"))
                     else:
                         self.console.print("[yellow]No test results available[/yellow]")
+                        
+                elif choice == 5:
+                    # Show failure analysis
+                    if 'failure_analysis' in execution and execution['failure_analysis'].strip():
+                        self.console.print(Panel(execution['failure_analysis'], title="Failure Analysis", style="red"))
+                    else:
+                        self.console.print("[yellow]No failure analysis available (execution may have succeeded)[/yellow]")
                         
                 input("\nPress Enter to continue...")
             except IndexError:

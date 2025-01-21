@@ -96,6 +96,11 @@ class LogManager:
             test_preview = execution['test_results'][:100] + "..." if len(execution['test_results']) > 100 else execution['test_results']
             parent.add(f"🧪 Test Results: {test_preview}")
             
+        # Add failure analysis if present
+        if 'failure_analysis' in execution and execution['failure_analysis'].strip():
+            analysis_preview = execution['failure_analysis'][:100] + "..." if len(execution['failure_analysis']) > 100 else execution['failure_analysis']
+            parent.add(f"🔍 Failure Analysis: {analysis_preview}")
+        
     def display_execution_details(self, execution_index: int) -> None:
         """Display full details of a specific execution."""
         if not self.current_log:
@@ -134,6 +139,10 @@ class LogManager:
         # Show test results in a panel if not empty
         if execution['test_results'].strip():
             self.console.print(Panel(execution['test_results'], title="Test Results"))
+            
+        # Show failure analysis in a panel if present
+        if 'failure_analysis' in execution and execution['failure_analysis'].strip():
+            self.console.print(Panel(execution['failure_analysis'], title="Failure Analysis", style="red"))
             
     def display_config(self) -> None:
         """Display the full configuration."""

@@ -7,6 +7,7 @@ from datetime import datetime
 from tdac.core.block import Block
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
+from tdac.utils.protoblock_reflector import ProtoBlockReflector
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class BlockExecutor:
         self.previous_error = None  # Track previous error
         self.git_manager = GitManager()
         self.block_id = None  # Will be set when executing a block
+        self.reflector = ProtoBlockReflector()  # Initialize reflector
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -115,6 +117,15 @@ class BlockExecutor:
             if 'executions' not in log_data:
                 log_data['executions'] = []
             log_data['executions'].append(execution_data)
+
+            # If execution failed, get analysis from reflector
+            if not success:
+                analysis = self.reflector.analyze_failure(execution_data)
+                execution_data['failure_analysis'] = analysis
+                print("\nFailure Analysis:")
+                print("="*50)
+                print(analysis)
+                print("="*50)
 
             # Write updated log file
             with open(log_filename, 'w', encoding='utf-8') as f:
