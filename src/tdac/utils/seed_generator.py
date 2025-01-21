@@ -35,16 +35,16 @@ def get_seed_template(template_type: str = "default") -> dict:
     """
     return SEED_TEMPLATES.get(template_type, SEED_TEMPLATES["default"])
 
-def generate_seed(directory: str, template_type: str = "default") -> str:
+def generate_instructions(directory: str, template_type: str = "default") -> str:
     """
-    Generate a seed JSON template from a directory of Python files.
+    Generate instructions for the LLM to create a protoblock.
     
     Args:
         directory: Path to the directory containing Python files
         template_type: The type of template to use (e.g., "refactor", "default")
     
     Returns:
-        A string containing the seed JSON template
+        A string containing the instructions for the LLM
     """
     # Gather file contents using existing file gatherer
     file_content = gather_python_files(directory)
@@ -52,22 +52,13 @@ def generate_seed(directory: str, template_type: str = "default") -> str:
     # Get the template configuration
     template_config = get_seed_template(template_type)
     
-    # Generate simple 6-character unique identifier
-    unique_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
-    
-    # Generate the seed template
-    template = {
-        "id": unique_id,  # Add unique identifier
-        "type": template_type,  # Add template type
-        "description": f"""We have the following codebase:
+    # Generate the instructions
+    instructions = f"""We have the following codebase:
 {file_content}
 
-I want you to generate an instruction block (called seed) which is the input for a coding agent. The block has a very specific format that I need you to adhere to precisely. Write in very concise language, and write in a tone of giving direct and precise orders. The response should be a valid JSON object with the following structure:
+I want you to generate instructions which are the input for a coding agent. The instructions have a very specific format that I need you to adhere to precisely. Write in very concise language, and write in a tone of giving direct and precise orders. The response should be a valid JSON object with the following structure:
 
 {{
-    "seed": {{
-        "instructions": "Brief instructions for the task"
-    }},
     "task": {{
         "specification": "Detailed task specification"
     }},
@@ -80,8 +71,8 @@ I want you to generate an instruction block (called seed) which is the input for
     "context_files": ["context1.py", "context2.py"],
     "commit_message": "TDAC: Brief commit message"
 }}
-
-Please analyze the codebase and provide a seed that addresses this task: {template_config["instructions"] if template_config["instructions"] else "Describe your task here"}"""
-    }
+--------------------
+Now here are the instructions to make this json file:
+Please analyze the codebase and provide a protoblock that addresses this task: {template_config["instructions"] if template_config["instructions"] else "Describe your task here"}"""
     
-    return json.dumps(template, indent=2) 
+    return instructions 

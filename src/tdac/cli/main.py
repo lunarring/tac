@@ -18,10 +18,11 @@ from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import BlockExecutor
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
-from tdac.utils.seed_generator import generate_seed
+from tdac.utils.seed_generator import generate_instructions
 from tdac.core.llm import LLMClient, Message
 from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
+from tdac.utils.protoblock_factory import ProtoBlockFactory
 
 logger = setup_logger(__name__)
 
@@ -160,8 +161,9 @@ def generate_seed_command(args):
         elif args.error:
             template_type = "error"
             
-        seed = generate_seed(args.directory, template_type=template_type)
-        seed_data = json.loads(seed)  # Parse the seed to get the unique ID
+        # Create protoblock using factory
+        factory = ProtoBlockFactory()
+        protoblock = factory.create_from_directory(args.directory, template_type=template_type)
         
         if args.execute:
             # Initialize git manager and check status
@@ -169,38 +171,8 @@ def generate_seed_command(args):
             if not git_manager.check_status():
                 sys.exit(1)
                 
-            # Initialize LLM client
-            llm_client = LLMClient()
-            
-            # Send seed to LLM
-            messages = [
-                Message(role="system", content="You are a helpful assistant that generates JSON protoblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
-                Message(role="user", content=seed_data["description"])  # Use only the description part
-            ]
-            
-            logger.info("Generating protoblock through LLM...")
-            response = llm_client.chat_completion(messages)
-            json_content = response.choices[0].message.content
-            
-            # Strip markdown code fences if present
-            json_content = json_content.strip()
-            if json_content.startswith("```"):
-                # Find the first and last code fence
-                lines = json_content.split("\n")
-                start_idx = next((i for i, line in enumerate(lines) if line.startswith("```")), 0) + 1
-                end_idx = next((i for i, line in enumerate(lines[start_idx:], start_idx) if line.startswith("```")), len(lines))
-                json_content = "\n".join(lines[start_idx:end_idx]).strip()
-            
-            # Validate JSON
-            is_valid, error = validate_protoblock_json(json_content)
-            if not is_valid:
-                logger.error(f"Generated JSON is invalid: {error}")
-                logger.error("JSON content:")
-                print(json_content)
-                sys.exit(1)
-                
-            # Save JSON to file using the unique ID from seed
-            json_file, block_id = save_protoblock(json_content, template_type, seed_data["id"])
+            # Save protoblock to file
+            json_file = factory.save_protoblock(protoblock, template_type)
             abs_json_path = os.path.abspath(json_file)
             
             # Verify file was saved
@@ -209,11 +181,7 @@ def generate_seed_command(args):
                 sys.exit(1)
                 
             logger.info(f"Saved protoblock to {abs_json_path}")
-            logger.info(f"Block ID: {block_id}")
-            
-            # Print JSON content for inspection
-            logger.info("Generated JSON content:")
-            print("\n" + json_content + "\n")
+            logger.info(f"Block ID: {protoblock.block_id}")
             
             # Load configuration
             config = load_config()
@@ -221,7 +189,7 @@ def generate_seed_command(args):
             # Load and execute the protoblock
             logger.info("Executing protoblock...")
             block = load_block_from_json(json_file)
-            block.block_id = block_id  # Set the block ID
+            block.block_id = protoblock.block_id  # Set the block ID
             executor = BlockExecutor(block=block)
             success = executor.execute_block()
             
@@ -234,7 +202,13 @@ def generate_seed_command(args):
                 logger.error("Protoblock execution failed")
                 sys.exit(1)
         else:
-            print(seed)
+            # Just print the protoblock details
+            print(f"Generated ProtoBlock (ID: {protoblock.block_id}):")
+            print(f"Task: {protoblock.task_specification}")
+            print(f"Test Specification: {protoblock.test_specification}")
+            print(f"Files to Write: {', '.join(protoblock.write_files)}")
+            print(f"Context Files: {', '.join(protoblock.context_files)}")
+            print(f"Commit Message: {protoblock.commit_message}")
             
     except Exception as e:
         logger.error(f"Error generating protoblock: {e}")
@@ -479,41 +453,36 @@ def main():
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
             
             # Create block based on command type
-            block_id = None
+            template_type = "default"
             if args.test:
-                # Generate seed for test generation
-                from tdac.utils.seed_generator import generate_seed
-                seed = generate_seed(args.directory, template_type="test")
-                seed_data = json.loads(seed)
-                task_desc = seed_data["description"]
-                block_id = seed_data["id"]
+                template_type = "test"
             elif args.refactor:
-                # Generate seed for refactoring
-                from tdac.utils.seed_generator import generate_seed
-                seed = generate_seed(args.directory, template_type="refactor")
-                seed_data = json.loads(seed)
-                task_desc = seed_data["description"]
-                block_id = seed_data["id"]
+                template_type = "refactor"
             elif args.error:
-                # Generate seed for error analysis
-                from tdac.utils.seed_generator import generate_seed
-                seed = generate_seed(args.directory, template_type="error")
-                seed_data = json.loads(seed)
-                task_desc = seed_data["description"]
-                block_id = seed_data["id"]
-            else:
+                template_type = "error"
+            elif args.instructions:
                 # Use provided instructions
                 task_desc = args.instructions
+                block = Block(
+                    task_description=task_desc,
+                    test_specification="",  # Will be generated by agent
+                    test_data_generation="",  # Will be generated by agent
+                    write_files=[],  # Will be determined by agent
+                    context_files=[],  # Will be determined by agent
+                )
             
-            # Create block
-            block = Block(
-                task_description=task_desc,
-                test_specification="",  # Will be generated by agent
-                test_data_generation="",  # Will be generated by agent
-                write_files=[],  # Will be determined by agent
-                context_files=[],  # Will be determined by agent
-                block_id=block_id  # Pass block ID directly
-            )
+            if not args.instructions:
+                # Create protoblock using factory
+                factory = ProtoBlockFactory()
+                protoblock = factory.create_from_directory(args.directory, template_type=template_type)
+                
+                # Save protoblock to file
+                json_file = factory.save_protoblock(protoblock, template_type)
+                abs_json_path = os.path.abspath(json_file)
+                
+                # Load block from saved protoblock
+                block = load_block_from_json(json_file)
+                block.block_id = protoblock.block_id
             
             # Create executor and run
             executor = BlockExecutor(block=block, config=config)
