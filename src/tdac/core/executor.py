@@ -30,6 +30,7 @@ class BlockExecutor:
         self.git_manager = GitManager()
         self.block_id = None  # Will be set when executing a block
         self.reflector = ProtoBlockReflector()  # Initialize reflector
+        self.revert_on_failure = False  # Default to not reverting changes on failure
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -192,18 +193,22 @@ Previous Attempt Analysis:
                     self._write_log_file(attempt + 1, False)
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
+                        continue
                     else:
-                        print("Maximum retry attempts reached. Reverting all changes...")
-                        if self.git_manager.revert_changes():
-                            print("Successfully reverted all changes.")
-                        else:
-                            print("Failed to revert changes. Please check repository state manually.")
+                        print("Maximum retry attempts reached.")
+                        if self.revert_on_failure:
+                            print("Reverting all changes...")
+                            if self.git_manager.revert_changes():
+                                print("Successfully reverted all changes.")
+                            else:
+                                print("Failed to revert changes. Please check repository state manually.")
                         return False
 
         except Exception as e:
             print(f"An error occurred during block execution: {e}")
-            # Try to revert changes on error
-            self.git_manager.revert_changes()
+            # Try to revert changes on error only if configured to do so
+            if self.revert_on_failure:
+                self.git_manager.revert_changes()
             # Write error log if we have a block ID
             if self.block_id:
                 self._write_log_file(attempt + 1 if 'attempt' in locals() else 1, False)
