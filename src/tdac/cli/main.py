@@ -6,6 +6,7 @@ import argparse
 import ast
 import logging
 import git
+import json
 
 # Add the src directory to Python path for local development
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -18,6 +19,8 @@ from tdac.core.executor import BlockExecutor
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.seedblock_generator import generate_seedblock
+from tdac.core.llm import LLMClient, Message
+from tdac.utils.yaml_validator import validate_seedblock_json, save_seedblock
 
 logger = setup_logger(__name__)
 
@@ -26,10 +29,10 @@ def load_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-def load_block_from_yaml(yaml_path: str) -> Block:
-    """Load block definition from a YAML file"""
-    with open(yaml_path, 'r') as f:
-        data = yaml.safe_load(f)
+def load_block_from_json(json_path: str) -> Block:
+    """Load block definition from a JSON file"""
+    with open(json_path, 'r') as f:
+        data = json.load(f)
     
     task_data = data['task']
     test_data = data['test']
@@ -145,7 +148,67 @@ def generate_seedblock_command(args):
             template_type = "error"
             
         seedblock = generate_seedblock(args.directory, template_type=template_type)
-        print(seedblock)
+        
+        if args.execute:
+            # Initialize LLM client
+            llm_client = LLMClient()
+            
+            # Send seedblock to LLM
+            messages = [
+                Message(role="system", content="You are a helpful assistant that generates JSON seedblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
+                Message(role="user", content=seedblock)
+            ]
+            
+            logger.info("Generating seedblock through LLM...")
+            response = llm_client.chat_completion(messages)
+            json_content = response.choices[0].message.content
+            
+            # Strip markdown code fences if present
+            json_content = json_content.strip()
+            if json_content.startswith("```"):
+                # Find the first and last code fence
+                lines = json_content.split("\n")
+                start_idx = next((i for i, line in enumerate(lines) if line.startswith("```")), 0) + 1
+                end_idx = next((i for i, line in enumerate(lines[start_idx:], start_idx) if line.startswith("```")), len(lines))
+                json_content = "\n".join(lines[start_idx:end_idx]).strip()
+            
+            # Validate JSON
+            is_valid, error = validate_seedblock_json(json_content)
+            if not is_valid:
+                logger.error(f"Generated JSON is invalid: {error}")
+                logger.error("JSON content:")
+                print(json_content)
+                sys.exit(1)
+                
+            # Save JSON to file
+            json_file = save_seedblock(json_content, template_type)
+            abs_json_path = os.path.abspath(json_file)
+            
+            # Verify file was saved
+            if not os.path.exists(abs_json_path):
+                logger.error(f"Failed to save seedblock JSON to {abs_json_path}")
+                sys.exit(1)
+                
+            logger.info(f"Saved seedblock to {abs_json_path}")
+            
+            # Print JSON content for inspection
+            logger.info("Generated JSON content:")
+            print("\n" + json_content + "\n")
+            
+            # Load and execute the seedblock
+            logger.info("Executing seedblock...")
+            block = load_block_from_json(json_file)
+            executor = BlockExecutor(block=block)
+            success = executor.execute_block()
+            
+            if success:
+                logger.info("Seedblock executed successfully")
+            else:
+                logger.error("Seedblock execution failed")
+                sys.exit(1)
+        else:
+            print(seedblock)
+            
     except Exception as e:
         logger.error(f"Error generating seedblock: {e}")
         sys.exit(1)
@@ -214,7 +277,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     # Seedblock command
     seedblock_parser = subparsers.add_parser('seedblock',
-        help='Generate a seedblock YAML template from a directory'
+        help='Generate a seedblock JSON template from a directory'
     )
     seedblock_parser.add_argument(
         'directory',
@@ -235,34 +298,39 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         action='store_true',
         help='Generate an error analysis seedblock template'
     )
+    seedblock_parser.add_argument(
+        '--execute',
+        action='store_true',
+        help='Process through LLM, save as JSON, and execute the seedblock'
+    )
     
     # Block execution command
-    yaml_parser = subparsers.add_parser('yaml', 
-        help='Execute a coding block defined in a YAML file',
+    json_parser = subparsers.add_parser('json', 
+        help='Execute a coding block defined in a JSON file',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example usage:
-  %(prog)s examples/caesar_cipher.yaml
-  %(prog)s --gen-tests examples/caesar_cipher.yaml
-  %(prog)s --gen-task examples/caesar_cipher.yaml
-  %(prog)s --run-tests examples/caesar_cipher.yaml
+  %(prog)s examples/caesar_cipher.json
+  %(prog)s --gen-tests examples/caesar_cipher.json
+  %(prog)s --gen-task examples/caesar_cipher.json
+  %(prog)s --run-tests examples/caesar_cipher.json
         """
     )
-    yaml_parser.add_argument(
-        'yaml_path',
-        help='Path to the YAML file containing the block definition'
+    json_parser.add_argument(
+        'json_path',
+        help='Path to the JSON file containing the block definition'
     )
-    yaml_parser.add_argument(
+    json_parser.add_argument(
         '--gen-tests',
         action='store_true',
         help='Only generate the tests without executing the task'
     )
-    yaml_parser.add_argument(
+    json_parser.add_argument(
         '--gen-task',
         action='store_true',
         help='Only execute the task without generating tests'
     )
-    yaml_parser.add_argument(
+    json_parser.add_argument(
         '--run-tests',
         action='store_true',
         help='Only run the tests without generating tests or executing task'
@@ -330,7 +398,7 @@ Example usage:
     
     args = parser.parse_args()
     
-    if args.command == 'yaml' and sum([args.gen_tests, args.gen_task, args.run_tests]) > 1:
+    if args.command == 'json' and sum([args.gen_tests, args.gen_task, args.run_tests]) > 1:
         parser.error("Cannot use multiple operation flags together (--gen-tests, --gen-task, --run-tests)")
     
     return parser, args
@@ -363,7 +431,7 @@ def main():
         generate_seedblock_command(args)
         return
 
-    if args.command == 'yaml':
+    if args.command == 'json':
         # Check git status before proceeding
         if not check_git_status():
             sys.exit(1)
@@ -384,15 +452,15 @@ def main():
             logger.info("All existing tests pass.")
             
         try:
-            block = load_block_from_yaml(args.yaml_path)
+            block = load_block_from_json(args.json_path)
         except FileNotFoundError:
-            logger.error(f"YAML file not found: {args.yaml_path}")
+            logger.error(f"JSON file not found: {args.json_path}")
             sys.exit(1)
-        except yaml.YAMLError as e:
-            logger.error(f"Invalid YAML file: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON file: {e}")
             sys.exit(1)
         except KeyError as e:
-            logger.error(f"Missing required field in YAML file: {e}")
+            logger.error(f"Missing required field in JSON file: {e}")
             sys.exit(1)
 
         # Ensure tests directory exists

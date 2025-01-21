@@ -27,18 +27,11 @@ class LLMConfig:
     def from_config_file(config_path: Optional[str] = None) -> 'LLMConfig':
         """Create LLMConfig from config.yaml file."""
         if config_path is None:
-            # Try to find config in standard locations
-            possible_paths = [
-                "config.yaml",
-                "../config.yaml",
-                "../../config.yaml",
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    config_path = path
-                    break
-            if config_path is None:
-                raise FileNotFoundError("Could not find config.yaml")
+            # Use the same config path resolution as main CLI
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+            
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"Could not find config file at: {config_path}")
         
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
