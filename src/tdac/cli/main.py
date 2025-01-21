@@ -366,6 +366,21 @@ def main():
         if not check_git_status():
             sys.exit(1)
             
+        # Check if existing tests pass
+        if os.path.exists('tests'):
+            logger.info("Checking if existing tests pass...")
+            test_executor = BlockExecutor(block=Block(
+                task_description="",    # Not needed for test running
+                test_specification="",  # Not needed for test running
+                test_data_generation="", # Not needed for test running
+                write_files=[],         # Not needed for test running
+                context_files=[]        # Not needed for test running
+            ))
+            if not test_executor.run_tests():
+                logger.error("Existing tests are failing. Please fix them before proceeding.")
+                sys.exit(1)
+            logger.info("All existing tests pass.")
+            
         try:
             block = load_block_from_yaml(args.yaml_path)
         except FileNotFoundError:
