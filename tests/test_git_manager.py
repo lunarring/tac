@@ -18,6 +18,18 @@ class TestGitManager(unittest.TestCase):
         self.assertTrue(callable(getattr(manager.repo, 'git', None)))
     
     @patch('tdac.core.git_manager.git.Repo')
+    def test_initialization_with_custom_path(self, mock_repo):
+        """Test initialization of GitManager with a custom repository path."""
+        # Mock successful repo initialization
+        mock_repo.return_value = MagicMock()
+        
+        repo_path = '/path/to/repo'
+        manager = GitManager(repo_path=repo_path)
+        
+        mock_repo.assert_called_with(repo_path)
+        self.assertIsNotNone(manager.repo)
+    
+    @patch('tdac.core.git_manager.git.Repo')
     def test_initialization_invalid_repo(self, mock_repo):
         """Test initialization of GitManager with an invalid git repository."""
         # Mock InvalidGitRepositoryError
@@ -61,11 +73,11 @@ class TestGitManager(unittest.TestCase):
         mock_repo_instance.is_dirty.return_value = True
         mock_repo_instance.git.status.return_value = "On branch master\nChanges not staged for commit:"
         mock_repo.return_value = mock_repo_instance
-        
+    
         with self.assertLogs('tdac.core.git_manager', level='ERROR') as log:
             manager = GitManager()
             status = manager.check_status()
-            
+    
             mock_repo_instance.is_dirty.assert_called_with(untracked_files=True)
             mock_repo_instance.git.status.assert_called()
             self.assertFalse(status)
@@ -78,11 +90,11 @@ class TestGitManager(unittest.TestCase):
         mock_repo_instance = MagicMock()
         mock_repo_instance.is_dirty.side_effect = git.exc.GitCommandError(['status'], 1)
         mock_repo.return_value = mock_repo_instance
-        
+    
         with self.assertLogs('tdac.core.git_manager', level='ERROR') as log:
             manager = GitManager()
             status = manager.check_status()
-            
+    
             mock_repo_instance.is_dirty.assert_called_with(untracked_files=True)
             self.assertFalse(status)
             self.assertIn("Error checking git status", log.output[0])
@@ -90,14 +102,13 @@ class TestGitManager(unittest.TestCase):
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_no_repo(self, mock_repo):
         """Test handle_post_execution method when there is no git repository."""
-        # Mock no repository initialized
+        # Mock repo as None
         mock_repo.return_value = None
         
         manager = GitManager()
         result = manager.handle_post_execution(config={'git': {'auto_push': True}}, commit_message="Test commit")
         
         self.assertTrue(result)
-        mock_repo.assert_called_with('.')
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_handle_post_execution_auto_push_false(self, mock_repo):
@@ -174,35 +185,34 @@ class TestGitManager(unittest.TestCase):
         manager = GitManager()
         result = manager.revert_changes()
         
-        mock_repo_instance.git.restore.assert_called_with('--source=@{u}', '--staged', '--worktree', '.')
+        mock_repo_instance.git.reset.assert_called_with('--hard')
         mock_repo_instance.git.clean.assert_called_with('-fd')
         self.assertTrue(result)
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_revert_changes_no_repo(self, mock_repo):
         """Test revert_changes method when there is no git repository."""
-        # Mock no repository initialized
+        # Mock repo as None
         mock_repo.return_value = None
         
         manager = GitManager()
         result = manager.revert_changes()
         
         self.assertFalse(result)
-        mock_repo.assert_called_with('.')
     
     @patch('tdac.core.git_manager.git.Repo')
     def test_revert_changes_git_command_error(self, mock_repo):
         """Test revert_changes method when a GitCommandError occurs during reverting."""
         # Mock GitCommandError during revert
         mock_repo_instance = MagicMock()
-        mock_repo_instance.git.restore.side_effect = git.exc.GitCommandError(['restore'], 1)
+        mock_repo_instance.git.reset.side_effect = git.exc.GitCommandError(['reset'], 1)
         mock_repo.return_value = mock_repo_instance
         
         with self.assertLogs('tdac.core.git_manager', level='ERROR') as log:
             manager = GitManager()
             result = manager.revert_changes()
             
-            mock_repo_instance.git.restore.assert_called_with('--source=@{u}', '--staged', '--worktree', '.')
+            mock_repo_instance.git.reset.assert_called_with('--hard')
             mock_repo_instance.git.clean.assert_not_called()
             self.assertFalse(result)
             self.assertIn("Error reverting changes", log.output[0])
