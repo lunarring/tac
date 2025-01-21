@@ -1,5 +1,5 @@
 # Byte-compiled / optimized / DLL files
-seedblock*.json
+.tdac_*
 .aider*
 __pycache__/
 *.py[cod]

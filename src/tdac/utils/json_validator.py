@@ -2,6 +2,7 @@ from typing import Dict, List, Union
 import json
 from datetime import datetime
 import os
+import hashlib
 
 def validate_seedblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
     """
@@ -71,7 +72,7 @@ def validate_seedblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
 
 def save_seedblock(json_content: Union[str, Dict], template_type: str) -> str:
     """
-    Saves a validated seedblock JSON to a file with timestamp.
+    Saves a validated seedblock JSON to a file with timestamp and unique hash.
     
     Args:
         json_content: The JSON content to save
@@ -95,22 +96,21 @@ def save_seedblock(json_content: Union[str, Dict], template_type: str) -> str:
     if not is_valid:
         raise ValueError(f"Invalid seedblock JSON: {error}")
     
-    # Generate filename with timestamp
+    # Generate filename with timestamp and unique hash
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    filename = f"seedblock_{template_type}_{timestamp}.json"
     
-    # Use absolute path in current directory
-    abs_path = os.path.abspath(filename)
+    # Generate a unique hash based on content and timestamp
+    hash_input = f"{json_content}{timestamp}".encode('utf-8')
+    unique_hash = hashlib.md5(hash_input).hexdigest()[:7]  # Use first 7 chars of hash
     
-    # Convert to string if dict
-    if isinstance(json_content, dict):
-        json_content = json.dumps(json_content, indent=2)
+    filename = f".tdac_seedblock_{template_type}_{timestamp}_{unique_hash}.json"
     
     # Save to file
-    try:
-        with open(abs_path, 'w') as f:
+    file_path = os.path.abspath(filename)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        if isinstance(json_content, dict):
+            json.dump(json_content, f, indent=2)
+        else:
             f.write(json_content)
-    except Exception as e:
-        raise IOError(f"Failed to save seedblock to {abs_path}: {str(e)}")
-    
-    return abs_path 
+            
+    return file_path 
