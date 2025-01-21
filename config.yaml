@@ -1,16 +1,15 @@
-agents:
-  programming:
-    type: "aider"
-    max_retries: 2
-    model: "openai/o1-mini"
-    model_settings:
-      edit_format: "diff"
-      verify_ssl: true
-      timeout: 120
-      max_chat_history_tokens: 200000
-  testing:
-    type: "aider"
-    model: "openai/o1-mini"
+general:
+  type: "aider"
+  max_retries: 2
+  total_timeout: 600
+
+aider:
+  model: "openai/o1-mini"
+  model_settings:
+    edit_format: "diff"
+    verify_ssl: true
+    timeout: 120
+    max_chat_history_tokens: 200000
 
 llm:
   provider: "openai"
@@ -20,7 +19,6 @@ llm:
     max_tokens: null
     verify_ssl: true
     timeout: 120
-    system_message_as_user: true
 
 git:
   auto_push: true
