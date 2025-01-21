@@ -442,7 +442,7 @@ Example usage:
     
     # Log command
     log_parser = subparsers.add_parser('log',
-        help='View execution logs'
+        help='Interactive log viewer'
     )
     
     args = parser.parse_args()
@@ -481,7 +481,12 @@ def main():
         return
         
     if args.command == 'log':
-        list_logs_command(args)
+        from tdac.cli.log_viewer import LogViewer
+        try:
+            LogViewer().main_menu()
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            sys.exit(0)
         return
 
     if args.command == 'json':
