@@ -2,7 +2,7 @@ agents:
   programming:
     type: "aider"
     max_retries: 2
-    model: "deepseek/deepseek-chat"
+    model: "openai/o1-mini"
     model_settings:
       edit_format: "diff"
       verify_ssl: true
@@ -10,14 +10,14 @@ agents:
       max_chat_history_tokens: 200000
   testing:
     type: "aider"
-    model: "deepseek/deepseek-chat"
+    model: "openai/o1-mini"
 
 llm:
-  provider: "deepseek"  # or "openai"
-  model: "deepseek-chat"  # model name for the selected provider
+  provider: "openai"
+  model: "o1-mini"
   settings:
     temperature: 0.7
-    max_tokens: null  # null for no limit
+    max_tokens: null
     verify_ssl: true
     timeout: 120
 
