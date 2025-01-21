@@ -3,6 +3,8 @@ import subprocess
 from tdac.agents.base import Agent
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
+import select
+import time
 
 logger = setup_logger(__name__)
 
@@ -26,25 +28,25 @@ class AiderAgent(Agent):
         
         # Validate and clean file paths
         if isinstance(write_files, str):
-            print("WARNING: write_files is a string, converting to list")
+            logger.warning("write_files is a string, converting to list")
             write_files = [write_files]
         if isinstance(context_files, str):
-            print("WARNING: context_files is a string, converting to list")
+            logger.warning("context_files is a string, converting to list")
             context_files = [context_files]
             
-        print("\nDEBUG - File Path Analysis:")
-        print(f"write_files type: {type(write_files)}")
-        print(f"write_files content: {write_files}")
-        print(f"context_files type: {type(context_files)}")
-        print(f"context_files content: {context_files}")
+        logger.debug("DEBUG - File Path Analysis:")
+        logger.debug(f"write_files type: {type(write_files)}")
+        logger.debug(f"write_files content: {write_files}")
+        logger.debug(f"context_files type: {type(context_files)}")
+        logger.debug(f"context_files content: {context_files}")
         
         # Ensure we have valid file paths
         write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
         context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
         
-        print("\nDEBUG - After cleaning:")
-        print(f"Cleaned write_files: {write_files}")
-        print(f"Cleaned context_files: {context_files}")
+        logger.debug("DEBUG - After cleaning:")
+        logger.debug(f"Cleaned write_files: {write_files}")
+        logger.debug(f"Cleaned context_files: {context_files}")
         
         logger.debug("Files to be written: %s", write_files)
         logger.debug("Context files to be read: %s", context_files)
@@ -122,12 +124,12 @@ Important Guidelines:
         logger.debug("Final Aider command: %s", ' '.join(command))
         
         try:
-            print("Executing Aider command...")
-            print(f"Command details:")
-            print(f"- Write files: {write_files}")
-            print(f"- Context files: {context_files}")
-            print(f"- Test files: {test_files}")
-            print(f"- Full command: {' '.join(command)}")
+            logger.info("Executing Aider command...")
+            logger.debug("Command details:")
+            logger.debug(f"- Write files: {write_files}")
+            logger.debug(f"- Context files: {context_files}")
+            logger.debug(f"- Test files: {test_files}")
+            logger.debug(f"- Full command: {' '.join(command)}")
             
             # Run with full output capture and stream everything
             process = subprocess.Popen(
@@ -139,32 +141,54 @@ Important Guidelines:
                 universal_newlines=True
             )
             
-            # Stream output in real-time
+            # Set timeout values
+            TOTAL_TIMEOUT = 600  # 10 minutes total timeout
+            READ_TIMEOUT = 1.0   # 1 second read timeout
+            
+            start_time = time.time()
+            last_output_time = start_time
+            
+            # Stream output in real-time with timeout handling
             while True:
-                stdout_line = process.stdout.readline()
-                stderr_line = process.stderr.readline()
+                # Check if we've exceeded total timeout
+                if time.time() - start_time > TOTAL_TIMEOUT:
+                    process.kill()
+                    raise TimeoutError(f"Aider process exceeded {TOTAL_TIMEOUT} seconds timeout")
                 
-                if stdout_line:
-                    print(f"STDOUT: {stdout_line.strip()}")
-                if stderr_line:
-                    print(f"STDERR: {stderr_line.strip()}")
-                    
-                # Check if process has finished
+                # Check if we've had no output for too long (possible hang)
+                if time.time() - last_output_time > 30:  # 30 seconds without output
+                    process.kill()
+                    raise TimeoutError("Aider process appears to be hung - no output for 30 seconds")
+                
+                # Use select to wait for output with timeout
+                reads = [process.stdout, process.stderr]
+                ready_reads, _, _ = select.select(reads, [], [], READ_TIMEOUT)
+                
                 if process.poll() is not None:
-                    # Get remaining lines
+                    # Process finished, get any remaining output
                     remaining_stdout, remaining_stderr = process.communicate()
                     if remaining_stdout:
-                        print(f"FINAL STDOUT: {remaining_stdout}")
+                        logger.debug(f"FINAL STDOUT: {remaining_stdout}")
                     if remaining_stderr:
-                        print(f"FINAL STDERR: {remaining_stderr}")
+                        logger.debug(f"FINAL STDERR: {remaining_stderr}")
                     break
+                
+                # Read from any ready pipes
+                for pipe in ready_reads:
+                    line = pipe.readline()
+                    if line:
+                        last_output_time = time.time()
+                        if pipe == process.stdout:
+                            logger.debug(f"STDOUT: {line.strip()}")
+                        else:
+                            logger.debug(f"STDERR: {line.strip()}")
             
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, command)
                 
-            print("Aider executed successfully.")
+            logger.info("Aider executed successfully.")
         except subprocess.CalledProcessError as e:
-            print(f"Aider execution failed with return code: {e.returncode}")
-            print("Command that failed:")
-            print(' '.join(command))
+            logger.error(f"Aider execution failed with return code: {e.returncode}")
+            logger.error("Command that failed:")
+            logger.error(' '.join(command))
             raise 
