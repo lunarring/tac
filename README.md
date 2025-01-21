@@ -30,7 +30,7 @@ Test-driven Agentic Chains (TDAC) extends the principles of continuous testing a
    pip install -e .
    ```
 
-After this, you can run the  command from anywhere in your terminal (as long as your environment is activated).
+After this, you can run the command from anywhere in your terminal (as long as your environment is activated).
 
 ## ⚙️ Usage
 
@@ -38,7 +38,7 @@ The framework provides several commands to help with AI-driven development:
 
 ### Generate a Seedblock
 
-Generate a seedblock YAML template from an existing codebase:
+Generate a seedblock JSON template from an existing codebase:
 
 ```bash
 tdac seedblock ./your/code/directory
@@ -48,6 +48,7 @@ The seedblock command supports several template types:
 - `--refactor`: Generate a template focused on code refactoring
 - `--test`: Generate a template for adding comprehensive tests
 - `--error`: Generate a template for error analysis and fixes
+- `--execute`: Process through LLM and execute the seedblock
 
 Examples:
 ```bash
@@ -56,38 +57,44 @@ tdac seedblock --refactor DIRECTORY
 tdac seedblock --test DIRECTORY
 tdac seedblock --error DIRECTORY
 tdac seedblock DIRECTORY  # default template
+tdac seedblock --refactor --execute DIRECTORY  # generate and execute
 ```
 
 ### Execute Changes
 
-Execute changes based on a YAML specification:
+Execute changes based on a JSON specification:
 
 ```bash
-tdac yaml your_protoblock.yaml
+tdac json your_protoblock.json
 ```
 
-The yaml command supports several flags:
+The json command supports several flags:
 - `--gen-tests`: Only generate the tests without executing the task
 - `--gen-task`: Only execute the task without generating tests
 - `--run-tests`: Only run the tests without generating tests or executing task
 
-Example protoblock YAML structure:
-```yaml
-seedblock:
-  instructions: "Add feature X to the system"
-
-task:
-  specification: "Detailed description of what needs to be implemented"
-  write_files: 
-    - "src/module/new_feature.py"
-
-test:
-  specification: "Description of how the new functionality should be tested"
-  data: "Test input data and expected outcomes"
-  replacements: []
-
-context_files:
-  - "src/module/existing.py"
+Example protoblock JSON structure:
+```json
+{
+    "seedblock": {
+        "instructions": "Add feature X to the system"
+    },
+    "task": {
+        "specification": "Detailed description of what needs to be implemented"
+    },
+    "test": {
+        "specification": "Description of how the new functionality should be tested",
+        "data": "Test input data and expected outcomes",
+        "replacements": []
+    },
+    "write_files": [
+        "src/module/new_feature.py"
+    ],
+    "context_files": [
+        "src/module/existing.py"
+    ],
+    "commit_message": "TDAC: Add feature X implementation"
+}
 ```
 
 ### Test Management
