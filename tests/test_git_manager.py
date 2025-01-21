@@ -45,10 +45,11 @@ class TestGitManager(unittest.TestCase):
         """Test initialization of GitManager when a GitCommandError occurs."""
         # Mock GitCommandError during repo initialization
         mock_repo.side_effect = git.exc.GitCommandError(['init'], 1)
-        
+    
         with self.assertLogs('tdac.core.git_manager', level='ERROR') as log:
             manager = GitManager()
             self.assertIsNone(manager.repo)
+            # Updated assertion to match the actual log message
             self.assertIn("Error initializing git repository", log.output[0])
     
     @patch('tdac.core.git_manager.git.Repo')
