@@ -15,9 +15,11 @@ if src_dir not in sys.path:
 from tdac.core.block import Block
 from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import BlockExecutor
-from tdac.core.logging import logger
+from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.seedblock_generator import generate_seedblock
+
+logger = setup_logger(__name__)
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')

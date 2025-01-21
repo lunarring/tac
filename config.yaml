@@ -12,6 +12,15 @@ agents:
     type: "aider"
     model: "deepseek/deepseek-chat"
 
+llm:
+  provider: "deepseek"  # or "openai"
+  model: "deepseek-chat"  # model name for the selected provider
+  settings:
+    temperature: 0.7
+    max_tokens: null  # null for no limit
+    verify_ssl: true
+    timeout: 120
+
 git:
   auto_push: true
 

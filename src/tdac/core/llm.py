@@ -1,0 +1,150 @@
+"""Module for handling LLM (Language Model) interactions."""
+
+import os
+from enum import Enum
+from typing import List, Dict, Optional, Union
+from dataclasses import dataclass
+import yaml
+
+from openai import OpenAI
+from openai.types.chat import ChatCompletion
+
+class LLMProvider(Enum):
+    """Supported LLM providers."""
+    DEEPSEEK = "deepseek"
+    OPENAI = "openai"
+
+@dataclass
+class Message:
+    """Represents a chat message."""
+    role: str
+    content: str
+
+class LLMConfig:
+    """Configuration for LLM clients."""
+    
+    @staticmethod
+    def from_config_file(config_path: Optional[str] = None) -> 'LLMConfig':
+        """Create LLMConfig from config.yaml file."""
+        if config_path is None:
+            # Try to find config in standard locations
+            possible_paths = [
+                "config.yaml",
+                "../config.yaml",
+                "../../config.yaml",
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    config_path = path
+                    break
+            if config_path is None:
+                raise FileNotFoundError("Could not find config.yaml")
+        
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        llm_config = config.get('llm', {})
+        provider = llm_config.get('provider', 'deepseek')  # Default to deepseek
+        model = llm_config.get('model', 'deepseek-chat')
+        
+        return LLMConfig(provider=provider, model=model, settings=llm_config.get('settings', {}))
+    
+    def __init__(self, provider: Union[LLMProvider, str], model: str, settings: Optional[Dict] = None):
+        if isinstance(provider, str):
+            provider = LLMProvider(provider.lower())
+        self.provider = provider
+        self.model = model
+        self.settings = settings or {}
+        
+        # Load API keys from environment variables
+        if provider == LLMProvider.DEEPSEEK:
+            self.api_key = os.getenv("DEEPSEEK_API_KEY")
+            if not self.api_key:
+                raise ValueError("DEEPSEEK_API_KEY environment variable not set")
+            self.base_url = "https://api.deepseek.com"
+        else:  # OpenAI
+            self.api_key = os.getenv("OPENAI_API_KEY")
+            if not self.api_key:
+                raise ValueError("OPENAI_API_KEY environment variable not set")
+            self.base_url = None  # OpenAI uses default base URL
+
+class LLMClient:
+    """Client for interacting with Language Models."""
+    
+    def __init__(self, config: Optional[LLMConfig] = None):
+        """Initialize client with config from file or provided config."""
+        self.config = config or LLMConfig.from_config_file()
+        self.client = self._initialize_client()
+    
+    def _initialize_client(self) -> OpenAI:
+        """Initialize the OpenAI client with appropriate configuration."""
+        kwargs = {
+            "api_key": self.config.api_key,
+            "timeout": self.config.settings.get('timeout', 120),
+        }
+        if self.config.base_url:
+            kwargs["base_url"] = self.config.base_url
+        return OpenAI(**kwargs)
+    
+    def chat_completion(
+        self,
+        messages: List[Message],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False,
+    ) -> ChatCompletion:
+        """
+        Send a chat completion request to the LLM.
+        
+        Args:
+            messages: List of messages in the conversation
+            temperature: Controls randomness (0.0 to 1.0)
+            max_tokens: Maximum number of tokens to generate
+            stream: Whether to stream the response
+            
+        Returns:
+            ChatCompletion response from the model
+        """
+        # Convert messages to the format expected by the API
+        formatted_messages = [
+            {"role": msg.role, "content": msg.content}
+            for msg in messages
+        ]
+        
+        # Prepare completion parameters
+        params = {
+            "model": self.config.model,
+            "messages": formatted_messages,
+            "stream": stream,
+        }
+        
+        # Use settings from config if not overridden
+        if temperature is None:
+            temperature = self.config.settings.get('temperature', 0.7)
+        params["temperature"] = temperature
+        
+        if max_tokens is None:
+            max_tokens = self.config.settings.get('max_tokens')
+        if max_tokens:
+            params["max_tokens"] = max_tokens
+            
+        try:
+            return self.client.chat.completions.create(**params)
+        except Exception as e:
+            provider_name = self.config.provider.value.capitalize()
+            raise Exception(f"{provider_name} API call failed: {str(e)}")
+
+# Example usage:
+if __name__ == "__main__":
+    # Create client using config.yaml
+    client = LLMClient()
+    
+    # Example messages
+    messages = [
+        Message(role="system", content="You are a helpful assistant"),
+        Message(role="user", content="Hello!")
+    ]
+    
+    # Get completion
+    response = client.chat_completion(messages)
+    print(response.choices[0].message.content) 

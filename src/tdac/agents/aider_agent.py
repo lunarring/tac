@@ -1,8 +1,10 @@
 import os
 import subprocess
 from tdac.agents.base import Agent
-from tdac.core.logging import logger
+from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
+
+logger = setup_logger(__name__)
 
 class AiderAgent(Agent):
     def __init__(self, config: dict):
