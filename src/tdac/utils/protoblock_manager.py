@@ -76,14 +76,14 @@ def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]
     except Exception as e:
         return False, f"Validation error: {str(e)}"
 
-def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_id: str = None) -> tuple[str, str]:
+def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_id: str) -> tuple[str, str]:
     """
     Saves a validated protoblock JSON to a file with unique block ID.
     
     Args:
         json_content: The JSON content to save
         template_type: Type of template (e.g., 'refactor', 'test')
-        unique_id: Optional unique identifier for the block. If not provided, one will be generated.
+        unique_id: The unique identifier for the block (required)
         
     Returns:
         tuple[str, str]: (absolute path to saved file, block ID)
@@ -103,15 +103,12 @@ def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_i
     if not is_valid:
         raise ValueError(f"Invalid protoblock JSON: {error}")
     
-    # Generate block ID if not provided
-    block_id = unique_id if unique_id else f"{int(time.time())}_{template_type}"
-    
-    # Save to file
-    filename = f".tdac_protoblock_{template_type}_{block_id}.json"
+    # Use the provided unique ID only for filename
+    filename = f".tdac_protoblock_{unique_id}.json"
     with open(filename, 'w', encoding='utf-8') as f:
         if isinstance(json_content, str):
             f.write(json_content)
         else:
             json.dump(json_content, f, indent=2)
     
-    return filename, block_id 
+    return filename, unique_id 

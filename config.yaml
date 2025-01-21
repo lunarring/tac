@@ -26,7 +26,7 @@ git:
 
 logging:
   tdac:
-    level: DEBUG
+    level: INFO
     color: green
   other_packages:
     level: "INFO"

@@ -52,10 +52,8 @@ def generate_seedblock(directory: str, template_type: str = "default") -> str:
     # Get the template configuration
     template_config = get_seedblock_template(template_type)
     
-    # Generate unique identifier
-    timestamp = int(time.time())
-    random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
-    unique_id = f"{timestamp}_{random_id}"
+    # Generate simple 6-character unique identifier
+    unique_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
     
     # Generate the seedblock template
     template = {
