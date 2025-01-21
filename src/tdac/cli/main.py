@@ -18,7 +18,7 @@ from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import BlockExecutor
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
-from tdac.utils.seedblock_generator import generate_seedblock
+from tdac.utils.seed_generator import generate_seed
 from tdac.core.llm import LLMClient, Message
 from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
@@ -148,8 +148,8 @@ def generate_tests_command(args):
     print("\nTest generation feature is coming soon!")
     print("This will help you automatically generate test cases for your functions.")
 
-def generate_seedblock_command(args):
-    """Handle the seedblock generation command"""
+def generate_seed_command(args):
+    """Handle the seed generation command"""
     try:
         # Determine template type based on args
         template_type = "default"
@@ -160,8 +160,8 @@ def generate_seedblock_command(args):
         elif args.error:
             template_type = "error"
             
-        seedblock = generate_seedblock(args.directory, template_type=template_type)
-        seedblock_data = json.loads(seedblock)  # Parse the seedblock to get the unique ID
+        seed = generate_seed(args.directory, template_type=template_type)
+        seed_data = json.loads(seed)  # Parse the seed to get the unique ID
         
         if args.execute:
             # Initialize git manager and check status
@@ -172,10 +172,10 @@ def generate_seedblock_command(args):
             # Initialize LLM client
             llm_client = LLMClient()
             
-            # Send seedblock to LLM
+            # Send seed to LLM
             messages = [
                 Message(role="system", content="You are a helpful assistant that generates JSON protoblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
-                Message(role="user", content=seedblock_data["description"])  # Use only the description part
+                Message(role="user", content=seed_data["description"])  # Use only the description part
             ]
             
             logger.info("Generating protoblock through LLM...")
@@ -199,8 +199,8 @@ def generate_seedblock_command(args):
                 print(json_content)
                 sys.exit(1)
                 
-            # Save JSON to file using the unique ID from seedblock
-            json_file, block_id = save_protoblock(json_content, template_type, seedblock_data["id"])
+            # Save JSON to file using the unique ID from seed
+            json_file, block_id = save_protoblock(json_content, template_type, seed_data["id"])
             abs_json_path = os.path.abspath(json_file)
             
             # Verify file was saved
@@ -234,7 +234,7 @@ def generate_seedblock_command(args):
                 logger.error("Protoblock execution failed")
                 sys.exit(1)
         else:
-            print(seedblock)
+            print(seed)
             
     except Exception as e:
         logger.error(f"Error generating protoblock: {e}")
@@ -320,33 +320,33 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # Seedblock command
-    seedblock_parser = subparsers.add_parser('seedblock',
-        help='Generate a seedblock JSON template from a directory'
+    # Seed command
+    seed_parser = subparsers.add_parser('seed',
+        help='Generate a seed JSON template from a directory'
     )
-    seedblock_parser.add_argument(
+    seed_parser.add_argument(
         'directory',
-        help='Directory to generate seedblock from'
+        help='Directory to generate seed from'
     )
-    seedblock_parser.add_argument(
+    seed_parser.add_argument(
         '--refactor',
         action='store_true',
-        help='Generate a refactoring seedblock template'
+        help='Generate a refactoring seed template'
     )
-    seedblock_parser.add_argument(
+    seed_parser.add_argument(
         '--test',
         action='store_true',
-        help='Generate a testing seedblock template'
+        help='Generate a testing seed template'
     )
-    seedblock_parser.add_argument(
+    seed_parser.add_argument(
         '--error',
         action='store_true',
-        help='Generate an error analysis seedblock template'
+        help='Generate an error analysis seed template'
     )
-    seedblock_parser.add_argument(
+    seed_parser.add_argument(
         '--execute',
         action='store_true',
-        help='Process through LLM, save as JSON, and execute the seedblock'
+        help='Process through LLM, save as JSON, and execute the seed'
     )
     
     # Block execution command
@@ -477,8 +477,8 @@ def main():
             parser.error("Please specify a test command (run, list, or generate)")
         return
     
-    if args.command == 'seedblock':
-        generate_seedblock_command(args)
+    if args.command == 'seed':
+        generate_seed_command(args)
         return
         
     if args.command == 'log':

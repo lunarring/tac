@@ -38,14 +38,14 @@ def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]
             return False, "JSON content must be a dictionary"
             
         # Required top-level keys
-        required_keys = ['seedblock', 'task', 'test', 'write_files', 'context_files', 'commit_message']
+        required_keys = ['seed', 'task', 'test', 'write_files', 'context_files', 'commit_message']
         for key in required_keys:
             if key not in data:
                 return False, f"Missing required top-level key: {key}"
         
-        # Validate seedblock section
-        if not isinstance(data['seedblock'], dict) or 'instructions' not in data['seedblock']:
-            return False, "seedblock section must contain 'instructions'"
+        # Validate seed section
+        if not isinstance(data['seed'], dict) or 'instructions' not in data['seed']:
+            return False, "seed section must contain 'instructions'"
             
         # Validate task section
         if not isinstance(data['task'], dict) or 'specification' not in data['task']:

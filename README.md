@@ -36,28 +36,27 @@ After this, you can run the command from anywhere in your terminal (as long as y
 
 The framework provides several commands to help with AI-driven development:
 
-### Generate a Seedblock
+### Generate a Seed
 
-Generate a seedblock JSON template from an existing codebase:
+Generate a seed JSON template from an existing codebase:
 
 ```bash
-tdac seedblock ./your/code/directory
+tdac seed ./your/code/directory
 ```
 
-The seedblock command supports several template types:
-- `--refactor`: Generate a template focused on code refactoring
-- `--test`: Generate a template for adding comprehensive tests
-- `--error`: Generate a template for error analysis and fixes
-- `--execute`: Process through LLM and execute the seedblock
+The seed command supports several template types:
+- `--refactor`: Generate a refactoring template
+- `--test`: Generate a testing template
+- `--error`: Generate an error analysis template
+- `--execute`: Process through LLM and execute the seed
 
 Examples:
 ```bash
-# Replace DIRECTORY with your target code directory
-tdac seedblock --refactor DIRECTORY
-tdac seedblock --test DIRECTORY
-tdac seedblock --error DIRECTORY
-tdac seedblock DIRECTORY  # default template
-tdac seedblock --refactor --execute DIRECTORY  # generate and execute
+tdac seed --refactor DIRECTORY
+tdac seed --test DIRECTORY
+tdac seed --error DIRECTORY
+tdac seed DIRECTORY  # default template
+tdac seed --refactor --execute DIRECTORY  # generate and execute
 ```
 
 ### Execute Changes
@@ -76,7 +75,7 @@ The json command supports several flags:
 Example protoblock JSON structure:
 ```json
 {
-    "seedblock": {
+    "seed": {
         "instructions": "Add feature X to the system"
     },
     "task": {
