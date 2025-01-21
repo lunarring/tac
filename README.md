@@ -38,27 +38,27 @@ The framework provides several commands to help with AI-driven development:
 
 ### Run Tasks
 
-Execute AI-driven tasks with either test generation or specific instructions:
+Generate and execute new blocks for different purposes:
 
 ```bash
-# Generate and run tests for a directory
+# Generate and execute a test-focused block
 tdac run --test ./your/code/directory
 
-# Generate and run refactoring tasks
+# Generate and execute a refactoring block
 tdac run --refactor ./your/code/directory
 
-# Generate and run error analysis tasks
+# Generate and execute an error analysis block
 tdac run --error ./your/code/directory
 
-# Run with specific instructions
+# Generate and execute a custom block with specific instructions
 tdac run --instructions "Add error handling to all functions" ./your/code/directory
 ```
 
-Each template type focuses on a different aspect:
-- `--test`: Generates tests for the codebase
-- `--refactor`: Analyzes and improves code structure and quality
-- `--error`: Performs error analysis and adds error handling
-- `--instructions`: Executes custom task instructions
+Each block type focuses on a different aspect:
+- `--test`: Creates a block focused on generating tests for the codebase
+- `--refactor`: Creates a block for analyzing and improving code structure and quality
+- `--error`: Creates a block for error analysis and handling improvements
+- `--instructions`: Creates a block from custom task instructions
 
 ### Test Management
 

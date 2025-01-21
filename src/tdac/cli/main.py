@@ -322,31 +322,31 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     # Run command
     run_parser = subparsers.add_parser('run',
-        help='Run a task with test generation or specific instructions'
+        help='Generate and execute a new block with automated tests or custom instructions'
     )
     run_parser.add_argument(
         'directory',
-        help='Directory to analyze'
+        help='Directory to analyze and create block from'
     )
     run_parser.add_argument(
         '--test',
         action='store_true',
-        help='Generate and run tests for the directory'
+        help='Generate a test-focused block for the directory'
     )
     run_parser.add_argument(
         '--refactor',
         action='store_true',
-        help='Generate and run refactoring tasks'
+        help='Generate a refactoring-focused block'
     )
     run_parser.add_argument(
         '--error',
         action='store_true',
-        help='Generate and run error analysis tasks'
+        help='Generate an error analysis block'
     )
     run_parser.add_argument(
         '--instructions',
         type=str,
-        help='Specific instructions for the task'
+        help='Generate a custom block with specific instructions'
     )
     
     # File gathering command
