@@ -161,6 +161,7 @@ def generate_seedblock_command(args):
             template_type = "error"
             
         seedblock = generate_seedblock(args.directory, template_type=template_type)
+        seedblock_data = json.loads(seedblock)  # Parse the seedblock to get the unique ID
         
         if args.execute:
             # Initialize git manager and check status
@@ -174,7 +175,7 @@ def generate_seedblock_command(args):
             # Send seedblock to LLM
             messages = [
                 Message(role="system", content="You are a helpful assistant that generates JSON protoblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
-                Message(role="user", content=seedblock)
+                Message(role="user", content=seedblock_data["description"])  # Use only the description part
             ]
             
             logger.info("Generating protoblock through LLM...")
@@ -198,8 +199,8 @@ def generate_seedblock_command(args):
                 print(json_content)
                 sys.exit(1)
                 
-            # Save JSON to file and get block ID
-            json_file, block_id = save_protoblock(json_content, template_type)
+            # Save JSON to file using the unique ID from seedblock
+            json_file, block_id = save_protoblock(json_content, template_type, seedblock_data["id"])
             abs_json_path = os.path.abspath(json_file)
             
             # Verify file was saved

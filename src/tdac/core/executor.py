@@ -165,7 +165,29 @@ class BlockExecutor:
                     print("Tests failed.")
                     print("Test Results:")
                     print(self.get_test_results())
-                    self.previous_error = self.test_results  # Store current error for next attempt
+                    
+                    # Get failure analysis and combine with test results for next attempt
+                    execution_data = {
+                        'protoblock': {
+                            'task_description': self.block.task_description,
+                            'test_specification': self.block.test_specification,
+                            'test_data_generation': self.block.test_data_generation,
+                            'write_files': self.block.write_files,
+                            'context_files': self.block.context_files,
+                            'commit_message': self.block.commit_message
+                        },
+                        'git_diff': self.git_manager.repo.git.diff() if self.git_manager.repo else "",
+                        'test_results': self.test_results
+                    }
+                    analysis = self.reflector.analyze_failure(execution_data)
+                    
+                    # Combine test results and analysis for next attempt
+                    self.previous_error = f"""Test Results:
+{self.test_results}
+
+Previous Attempt Analysis:
+{analysis}"""
+                    
                     # Write failure log
                     self._write_log_file(attempt + 1, False)
                     if attempt < max_retries - 1:

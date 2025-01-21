@@ -1,5 +1,8 @@
 from tdac.utils.file_gatherer import gather_python_files
 import json
+import time
+import random
+import string
 
 # Predefined templates for different seedblock types
 SEEDBLOCK_TEMPLATES = {
@@ -49,8 +52,15 @@ def generate_seedblock(directory: str, template_type: str = "default") -> str:
     # Get the template configuration
     template_config = get_seedblock_template(template_type)
     
+    # Generate unique identifier
+    timestamp = int(time.time())
+    random_id = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    unique_id = f"{timestamp}_{random_id}"
+    
     # Generate the seedblock template
     template = {
+        "id": unique_id,  # Add unique identifier
+        "type": template_type,  # Add template type
         "description": f"""We have the following codebase:
 {file_content}
 

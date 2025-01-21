@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 import os
 import hashlib
+import time
 
 def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
     """
@@ -75,13 +76,14 @@ def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]
     except Exception as e:
         return False, f"Validation error: {str(e)}"
 
-def save_protoblock(json_content: Union[str, Dict], template_type: str) -> tuple[str, str]:
+def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_id: str = None) -> tuple[str, str]:
     """
     Saves a validated protoblock JSON to a file with unique block ID.
     
     Args:
         json_content: The JSON content to save
         template_type: Type of template (e.g., 'refactor', 'test')
+        unique_id: Optional unique identifier for the block. If not provided, one will be generated.
         
     Returns:
         tuple[str, str]: (absolute path to saved file, block ID)
@@ -101,19 +103,15 @@ def save_protoblock(json_content: Union[str, Dict], template_type: str) -> tuple
     if not is_valid:
         raise ValueError(f"Invalid protoblock JSON: {error}")
     
-    # Generate a unique hash based on content and current time
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')  # Still use timestamp for hash uniqueness
-    hash_input = f"{json_content}{timestamp}".encode('utf-8')
-    block_id = hashlib.md5(hash_input).hexdigest()[:7]  # Use first 7 chars of hash as block ID
-    
-    filename = f".tdac_protoblock_{template_type}_{block_id}.json"
+    # Generate block ID if not provided
+    block_id = unique_id if unique_id else f"{int(time.time())}_{template_type}"
     
     # Save to file
-    file_path = os.path.abspath(filename)
-    with open(file_path, 'w', encoding='utf-8') as f:
-        if isinstance(json_content, dict):
-            json.dump(json_content, f, indent=2)
-        else:
+    filename = f".tdac_protoblock_{template_type}_{block_id}.json"
+    with open(filename, 'w', encoding='utf-8') as f:
+        if isinstance(json_content, str):
             f.write(json_content)
-            
-    return file_path, block_id 
+        else:
+            json.dump(json_content, f, indent=2)
+    
+    return filename, block_id 
