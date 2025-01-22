@@ -298,7 +298,8 @@ class TDACViewer:
                 "Protoblock details",
                 "Git diff",
                 "Test results",
-                "Failure analysis"
+                "Failure analysis",
+                "View execution timeline"  # New option
             ]
             
             self.show_menu(options, f"Execution {execution_num} Components")
@@ -312,15 +313,28 @@ class TDACViewer:
             self.add_to_history(self.execution_details_menu, execution_num)
             
             try:
-                execution = self.log_manager.current_log['executions'][execution_num - 1]
+                # Get all entries for this attempt number
+                attempt_entries = [
+                    entry for entry in self.log_manager.current_log['executions']
+                    if entry['attempt'] == execution_num
+                ]
+                
+                if not attempt_entries:
+                    self.console.print("[red]No entries found for this attempt[/red]")
+                    input("\nPress Enter to continue...")
+                    continue
+                
+                # Use the last entry for most displays as it has the final state
+                execution = attempt_entries[-1]
                 
                 if choice == 1:
                     # Show basic info
                     table = Table(title=f"Execution {execution_num} Basic Info")
                     table.add_column("Field", style="cyan")
                     table.add_column("Value", style="green")
-                    table.add_row("Timestamp", execution['timestamp'])
-                    table.add_row("Success", "✅" if execution['success'] else "❌")
+                    table.add_row("First Timestamp", attempt_entries[0]['timestamp'])
+                    table.add_row("Last Timestamp", attempt_entries[-1]['timestamp'])
+                    table.add_row("Final Status", "✅" if execution['success'] else "❌")
                     table.add_row("Attempt", str(execution['attempt']))
                     self.console.print(table)
                     
@@ -352,6 +366,23 @@ class TDACViewer:
                         self.console.print(Panel(execution['failure_analysis'], title="Failure Analysis", style="red"))
                     else:
                         self.console.print("[yellow]No failure analysis available (execution may have succeeded)[/yellow]")
+                
+                elif choice == 6:
+                    # Show execution timeline
+                    table = Table(title=f"Execution {execution_num} Timeline")
+                    table.add_column("Time", style="cyan")
+                    table.add_column("Status", style="yellow")
+                    table.add_column("Message", style="green")
+                    
+                    for entry in attempt_entries:
+                        status = "✅" if entry['success'] else "❌" if entry['success'] is False else "🔄"
+                        table.add_row(
+                            entry['timestamp'],
+                            status,
+                            entry.get('message', 'No message')
+                        )
+                    
+                    self.console.print(table)
                         
                 input("\nPress Enter to continue...")
             except IndexError:

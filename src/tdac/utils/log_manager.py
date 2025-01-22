@@ -162,7 +162,9 @@ class LogManager:
         ))
         
     def get_execution_count(self) -> int:
-        """Get the number of executions in the current log."""
+        """Get the number of unique attempts in the current log."""
         if not self.current_log:
             return 0
-        return len(self.current_log['executions']) 
+        # Get unique attempt numbers
+        attempts = {execution['attempt'] for execution in self.current_log['executions']}
+        return len(attempts) 
