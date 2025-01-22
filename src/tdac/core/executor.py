@@ -151,7 +151,9 @@ class BlockExecutor:
             logger.info(f"Using max_retries={max_retries} from config")
             
             for attempt in range(max_retries):
-                print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
+                print("\n" + "="*60)
+                print(f"Starting attempt {attempt + 1} of {max_retries}")
+                print("="*60 + "\n")
                 
                 print("Executing task and generating tests simultaneously...")
                 try:
@@ -178,9 +180,14 @@ class BlockExecutor:
                         self.previous_error = analysis
                         
                     if attempt < max_retries - 1:
+                        remaining = max_retries - (attempt + 1)
+                        print("\n" + "="*60)
+                        print(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
                         print("Retrying with a new implementation...")
+                        print("="*60 + "\n")
                         continue
                     else:
+                        print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
                         if self.revert_on_failure:
                             print("Reverting all changes...")
@@ -188,6 +195,8 @@ class BlockExecutor:
                                 print("Successfully reverted all changes.")
                             else:
                                 print("Failed to revert changes. Please check repository state manually.")
+                        # Write final failure log
+                        self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
                         return False
 
                 print("Running tests...")
@@ -266,11 +275,16 @@ Previous Attempt Analysis:
 {analysis}"""
                     
                     if attempt < max_retries - 1:
+                        remaining = max_retries - (attempt + 1)
+                        print("\n" + "="*60)
+                        print(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
                         print("Retrying with a new implementation...")
+                        print("="*60 + "\n")
                         # Write log before retry
                         self._write_log_file(attempt + 1, None, "Preparing for retry")
                         continue
                     else:
+                        print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
                         if self.revert_on_failure:
                             print("Reverting all changes...")
