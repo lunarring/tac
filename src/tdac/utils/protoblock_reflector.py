@@ -51,7 +51,7 @@ Keep your response focused and actionable."""
         try:
             # Get analysis from LLM
             response = self.llm_client.chat_completion(messages, temperature=0.3)  # Lower temperature for more focused analysis
-            return response.choices[0].message.content
+            return response
         except Exception as e:
             logger.error(f"Failed to get LLM analysis: {e}")
             return f"Error analyzing failure: {str(e)}" 

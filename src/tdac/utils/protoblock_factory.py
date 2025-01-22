@@ -44,7 +44,7 @@ class ProtoBlockFactory:
         
         # Get response from LLM
         response = self.llm_client.chat_completion(messages)
-        json_content = response.choices[0].message.content.strip()
+        json_content = response.strip()
         
         # Strip markdown code fences if present
         if json_content.startswith("```"):

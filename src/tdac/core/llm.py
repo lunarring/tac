@@ -85,7 +85,7 @@ class LLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         stream: bool = False,
-    ) -> ChatCompletion:
+    ) -> str:
         """
         Send a chat completion request to the LLM.
         
@@ -96,7 +96,7 @@ class LLMClient:
             stream: Whether to stream the response
             
         Returns:
-            ChatCompletion response from the model
+            str: The content of the model's response message
         """
         # Convert messages to the format expected by the API
         formatted_messages = []
@@ -141,7 +141,8 @@ class LLMClient:
             params["max_tokens"] = max_tokens
             
         try:
-            return self.client.chat.completions.create(**params)
+            response = self.client.chat.completions.create(**params)
+            return response.choices[0].message.content
         except Exception as e:
             provider_name = self.config.provider.value.capitalize()
             raise Exception(f"{provider_name} API call failed: {str(e)}")
@@ -159,4 +160,4 @@ if __name__ == "__main__":
     
     # Get completion
     response = client.chat_completion(messages)
-    print(response.choices[0].message.content) 
+    print(response)  # Now directly prints the message content 
