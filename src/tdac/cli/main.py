@@ -401,9 +401,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Generate tests (placeholder)'
     )
     
-    # Log command
-    log_parser = subparsers.add_parser('log',
-        help='Interactive log viewer'
+    # View command
+    view_parser = subparsers.add_parser('view',
+        help='Interactive viewer for logs and protoblocks'
     )
     
     args = parser.parse_args()
@@ -448,10 +448,10 @@ def main():
             parser.error("Please specify a test command (run, list, or generate)")
         return
         
-    if args.command == 'log':
-        from tdac.cli.log_viewer import LogViewer
+    if args.command == 'view':
+        from tdac.cli.viewer import TDACViewer
         try:
-            LogViewer().main_menu()
+            TDACViewer().main_menu()
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)

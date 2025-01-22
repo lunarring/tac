@@ -123,6 +123,9 @@ class TDACViewer:
                 input("Press Enter to continue...")
                 return
                 
+            # Sort protoblocks by modification time (newest first)
+            protoblocks.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+                
             # Create options with human-friendly times and template type
             options = []
             for pb in protoblocks:
@@ -157,11 +160,22 @@ class TDACViewer:
             return
             
         while True:
-            version_count = len(data.get('versions', [1]))  # Default to 1 for legacy format
-            options = [
-                "Show basic info",
-                f"View versions (1-{version_count})",
-            ]
+            versions = data.get('versions', [data])  # Use data itself as single version for legacy format
+            options = []
+            
+            # Add version options
+            for i, version in enumerate(versions, 1):
+                timestamp = version.get('timestamp', 'N/A')
+                if timestamp != 'N/A':
+                    try:
+                        dt = datetime.fromisoformat(timestamp)
+                        timestamp = self.get_human_time_diff(dt.timestamp())
+                    except:
+                        pass
+                options.append(f"View version {i} ({timestamp})")
+                
+            # Add basic info as last option
+            options.append("Show basic info")
             
             self.show_menu(options, f"Protoblock File: {protoblock_file}")
             choice = self.get_choice(len(options))
@@ -172,92 +186,58 @@ class TDACViewer:
                 
             self.add_to_history(self.protoblock_menu, protoblock_file)
             
-            if choice == 1:
+            if choice == len(options):  # Last option is basic info
                 # Show basic info
                 table = Table(title=f"Protoblock Basic Info")
                 table.add_column("Field", style="cyan")
                 table.add_column("Value", style="green")
                 table.add_row("Block ID", data.get('block_id', 'N/A'))
                 table.add_row("Template Type", data.get('template_type', 'N/A'))
-                table.add_row("Version Count", str(version_count))
+                table.add_row("Version Count", str(len(versions)))
                 self.console.print(table)
                 input("\nPress Enter to continue...")
-            elif choice == 2:
-                self.protoblock_versions_menu(data)
-                
-    def protoblock_versions_menu(self, data: dict) -> None:
-        """Show menu for viewing protoblock versions."""
-        while True:
-            versions = data.get('versions', [data])  # Use data itself as single version for legacy format
-            options = []
-            for i, version in enumerate(versions, 1):
-                timestamp = version.get('timestamp', 'N/A')
-                if timestamp != 'N/A':
-                    try:
-                        dt = datetime.fromisoformat(timestamp)
-                        timestamp = self.get_human_time_diff(dt.timestamp())
-                    except:
-                        pass
-                options.append(f"Version {i} ({timestamp})")
-                
-            self.show_menu(options, "Available Versions")
-            choice = self.get_choice(len(options))
-            
-            if choice == 'b':
-                self.go_back()
-                return
-                
-            self.add_to_history(self.protoblock_versions_menu, data)
-            self.protoblock_version_details_menu(versions[choice - 1])
-            
-    def protoblock_version_details_menu(self, version: dict) -> None:
-        """Show menu for specific version components."""
-        while True:
-            options = [
-                "Task specification",
-                "Test specification",
-                "Test data",
-                "Files to write",
-                "Context files",
-                "Commit message"
-            ]
-            
-            self.show_menu(options, "Version Components")
-            choice = self.get_choice(len(options))
-            
-            if choice == 'b':
-                self.go_back()
-                return
-                
-            self.add_to_history(self.protoblock_version_details_menu, version)
-            
-            try:
-                if choice == 1:
-                    self.console.print(Panel(version['task']['specification'], title="Task Specification"))
-                elif choice == 2:
-                    self.console.print(Panel(version['test']['specification'], title="Test Specification"))
-                elif choice == 3:
-                    self.console.print(Panel(version['test']['data'], title="Test Data"))
-                elif choice == 4:
-                    files = version.get('write_files', [])
-                    if files:
-                        self.console.print(Panel("\n".join(files), title="Files to Write"))
-                    else:
-                        self.console.print("[yellow]No files to write specified[/yellow]")
-                elif choice == 5:
-                    files = version.get('context_files', [])
-                    if files:
-                        self.console.print(Panel("\n".join(files), title="Context Files"))
-                    else:
-                        self.console.print("[yellow]No context files specified[/yellow]")
-                elif choice == 6:
-                    msg = version.get('commit_message', 'N/A')
-                    self.console.print(Panel(msg, title="Commit Message"))
-                    
+            else:  # Version options
+                self.display_protoblock_version(versions[choice - 1])
                 input("\nPress Enter to continue...")
-            except Exception as e:
-                self.console.print(f"[red]Error displaying component: {e}[/red]")
-                input("\nPress Enter to continue...")
+                
+    def display_protoblock_version(self, version: dict) -> None:
+        """Display all components of a protoblock version at once."""
+        try:
+            # Show task specification
+            self.console.print("\n[bold cyan]Task Specification[/bold cyan]")
+            self.console.print(Panel(version['task']['specification']))
+            
+            # Show test specification
+            self.console.print("\n[bold cyan]Test Specification[/bold cyan]")
+            self.console.print(Panel(version['test']['specification']))
+            
+            # Show test data
+            self.console.print("\n[bold cyan]Test Data[/bold cyan]")
+            self.console.print(Panel(version['test']['data']))
+            
+            # Show files to write
+            self.console.print("\n[bold cyan]Files to Write[/bold cyan]")
+            files = version.get('write_files', [])
+            if files:
+                self.console.print(Panel("\n".join(files)))
+            else:
+                self.console.print("[yellow]No files to write specified[/yellow]")
+                
+            # Show context files
+            self.console.print("\n[bold cyan]Context Files[/bold cyan]")
+            files = version.get('context_files', [])
+            if files:
+                self.console.print(Panel("\n".join(files)))
+            else:
+                self.console.print("[yellow]No context files specified[/yellow]")
+                
+            # Show commit message
+            self.console.print("\n[bold cyan]Commit Message[/bold cyan]")
+            msg = version.get('commit_message', 'N/A')
+            self.console.print(Panel(msg))
+            
+        except Exception as e:
+            self.console.print(f"[red]Error displaying protoblock content: {e}[/red]")
                 
     def log_menu(self) -> None:
         """Show menu for a specific log file."""

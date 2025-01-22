@@ -60,6 +60,19 @@ Each block type focuses on a different aspect:
 - `--error`: Creates a block for error analysis and handling improvements
 - `--instructions`: Creates a block from custom task instructions
 
+### View Blocks and Logs
+
+View blocks and execution logs interactively:
+
+```bash
+tdac view
+```
+
+This command provides an interactive interface to:
+- Browse and inspect protoblocks with their versions and specifications
+- View execution logs with test results and changes
+- See block details including task specifications, test data, and file changes
+
 ### Test Management
 
 The framework provides several test-related commands:
@@ -89,14 +102,6 @@ tdac gather ./src/tdac
 - `--separator`: Separator between sections (default: "\n---\n")
 - `--code-fences`: Use code fences in output
 - `--exclusions`: Comma-separated directories to exclude (default: .git,__pycache__)
-
-### View Logs
-
-View execution logs interactively:
-
-```bash
-tdac log
-```
 
 ## ⚙️ Configuration
 
