@@ -27,13 +27,19 @@ class ProtoBlockFactory:
     # Predefined templates for different task types
     TEMPLATES = {
         "refactor": {
-            "instructions": """Conduct a thorough review of the entire codebase, focusing on one critical area to refactor only the single most problematic issue. For instance, that could mean reorganizing duplicated logic into a shared module or function, clarifying the intent of obscure variable names to make the code more self-explanatory, splitting excessively long methods into smaller, focused pieces, enforcing a consistent formatting style across all files, or adding robust error handling to improve stability. It may also involve consolidating configuration settings to a single source of truth, cleaning out unused or legacy code that no longer serves any purpose, replacing "magic numbers" with clearly named constants, or adopting modern language features to simplify and streamline key operations. The core goal is to address the underlying structural problems in the code so that it becomes easier to read, maintain, and extend—without altering the code's fundamental functionality. Consolidate  into well-designed, reusable functions or modules. This change is paramount to improving the maintainability and scalability of the codebase. Ensure that each consolidated function is properly named and documented. This targeted effort will lay the groundwork for a cleaner, more efficient project while simplifying collaboration for future contributors. HOWEVER KEEP IN MIND: PICK ONLY ONE SINGLE THING TO IMPLEMENT AND KEEP IT AS SIMPLE AS POSSIBLE!"""
+            "instructions": (
+                "Review the codebase and address one problematic area (e.g., duplicated logic, unclear naming, large functions). Improve it without changing fundamental logic. Keep the change small and focused."
+            )
         },
         "error": {
-            "instructions": """An error occurred while running the code. Analyze the error message, trace through the codebase, and determine the root cause of the issue. Focus on ONE specific error and propose a solution."""
+            "instructions": (
+                "Analyze a single runtime or logical error, identify its root cause, and propose a fix. Keep the scope limited to one clear issue."
+            )
         },
         "test": {
-            "instructions": """We want to add comprehensive tests to verify the existing functionality. Do NOT modify any code EXCEPT for the test files. We want to have maximum coverage of the codebase. Therefore you think through which would be a good test to add! Focus solely on creating this one robust, maintainable tests that document and verify the current behavior."""
+            "instructions": (
+                "Add one well-targeted test that validates newly implemented or existing functionality. Focus on clarity and maintainability of this single test."
+            )
         }
     }
     
@@ -80,10 +86,8 @@ class ProtoBlockFactory:
         Returns:
             str: Complete seed instructions for the LLM
         """
-        return f"""We have the following codebase:
-{codebase}
-
-I want you to generate instructions which are the input for a coding agent. The instructions have a very specific format that I need you to adhere to precisely. Write in very concise language, and write in a tone of giving direct and precise orders. The response should be a valid JSON object with the following structure:
+        return f"""We have the following codebase:\n{codebase}\n\n"
+            "Generate a valid JSON object with the structure:\n
 --------------------
 {{
     "task": {{
@@ -224,7 +228,7 @@ Please analyze the codebase and provide a protoblock that addresses this task.  
         """
         # Create messages for LLM
         messages = [
-            Message(role="system", content="You are a helpful assistant that generates JSON protoblocks for code tasks. Follow the template exactly and ensure the output is valid JSON. Do not use markdown code fences in your response."),
+            Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'test', 'write_files', 'context_files', 'commit_message'.No markdown, no code fences. Keep it short and strictly formatted."),
             Message(role="user", content=seed_instructions)
         ]
         
