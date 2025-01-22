@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import List, Optional
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.core.llm import LLMClient, Message
+import os
+from datetime import datetime
 
 @dataclass
 class ProtoBlockSpec:
@@ -22,13 +24,13 @@ class ProtoBlockFactory:
     # Predefined templates for different task types
     TEMPLATES = {
         "refactor": {
-            "instructions": "Conduct a thorough review of the entire codebase, focusing on one critical area to refactor only the single most problematic issue. For instance, that could mean reorganizing duplicated logic into a shared module or function, clarifying the intent of obscure variable names to make the code more self-explanatory, splitting excessively long methods into smaller, focused pieces, enforcing a consistent formatting style across all files, or adding robust error handling to improve stability. It may also involve consolidating configuration settings to a single source of truth, cleaning out unused or legacy code that no longer serves any purpose, replacing “magic numbers” with clearly named constants, or adopting modern language features to simplify and streamline key operations. The core goal is to address the underlying structural problems in the code so that it becomes easier to read, maintain, and extend—without altering the code's fundamental functionality. Consolidate  into well-designed, reusable functions or modules. This change is paramount to improving the maintainability and scalability of the codebase. Ensure that each consolidated function is properly named and documented. This targeted effort will lay the groundwork for a cleaner, more efficient project while simplifying collaboration for future contributors."
+            "instructions": """Conduct a thorough review of the entire codebase, focusing on one critical area to refactor only the single most problematic issue. For instance, that could mean reorganizing duplicated logic into a shared module or function, clarifying the intent of obscure variable names to make the code more self-explanatory, splitting excessively long methods into smaller, focused pieces, enforcing a consistent formatting style across all files, or adding robust error handling to improve stability. It may also involve consolidating configuration settings to a single source of truth, cleaning out unused or legacy code that no longer serves any purpose, replacing “magic numbers” with clearly named constants, or adopting modern language features to simplify and streamline key operations. The core goal is to address the underlying structural problems in the code so that it becomes easier to read, maintain, and extend—without altering the code's fundamental functionality. Consolidate  into well-designed, reusable functions or modules. This change is paramount to improving the maintainability and scalability of the codebase. Ensure that each consolidated function is properly named and documented. This targeted effort will lay the groundwork for a cleaner, more efficient project while simplifying collaboration for future contributors."""
         },
         "error": {
-            "instructions": "An error occurred while running the code. Analyze the error message, trace through the codebase, and determine the root cause of the issue. Focus on ONE specific error and propose a solution."
+            "instructions": """An error occurred while running the code. Analyze the error message, trace through the codebase, and determine the root cause of the issue. Focus on ONE specific error and propose a solution."""
         },
         "test": {
-            "instructions": "We want to add comprehensive tests to verify the existing functionality. Do NOT modify any code EXCEPT for the test files. We want to have maximum coverage of the codebase. Therefore you think through which would be a good test to add! Focus solely on creating this one robust, maintainable tests that document and verify the current behavior."
+            "instructions": """We want to add comprehensive tests to verify the existing functionality. Do NOT modify any code EXCEPT for the test files. We want to have maximum coverage of the codebase. Therefore you think through which would be a good test to add! Focus solely on creating this one robust, maintainable tests that document and verify the current behavior."""
         }
     }
     
@@ -152,7 +154,7 @@ Please analyze the codebase and provide a protoblock that addresses this task: {
         Returns:
             Path to the saved protoblock file
         """
-        data = {
+        version_data = {
             "task": {
                 "specification": spec.task_specification
             },
@@ -163,12 +165,35 @@ Please analyze the codebase and provide a protoblock that addresses this task: {
             },
             "write_files": spec.write_files,
             "context_files": spec.context_files,
-            "commit_message": spec.commit_message
+            "commit_message": spec.commit_message,
+            "timestamp": datetime.now().isoformat()
         }
         
         # Save to file using just the block_id
         filename = f".tdac_protoblock_{spec.block_id}.json"
+        
+        # Load existing data if file exists, otherwise create new structure
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                file_data = json.load(f)
+                if not isinstance(file_data, dict) or 'versions' not in file_data:
+                    # Convert old format to new format
+                    file_data = {
+                        'block_id': spec.block_id,
+                        'template_type': template_type,
+                        'versions': [file_data]  # Old data becomes first version
+                    }
+        else:
+            file_data = {
+                'block_id': spec.block_id,
+                'template_type': template_type,
+                'versions': []
+            }
+        
+        # Add new version
+        file_data['versions'].append(version_data)
+            
         with open(filename, 'w') as f:
-            json.dump(data, f, indent=2)
+            json.dump(file_data, f, indent=2)
             
         return filename 

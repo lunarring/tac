@@ -35,8 +35,16 @@ def load_block_from_json(json_path: str) -> Block:
     with open(json_path, 'r') as f:
         data = json.load(f)
     
-    task_data = data['task']
-    test_data = data['test']
+    # Handle new versioned format
+    if isinstance(data, dict) and 'versions' in data:
+        # Get the latest version
+        version_data = data['versions'][-1]
+    else:
+        # Handle legacy format
+        version_data = data
+    
+    task_data = version_data['task']
+    test_data = version_data['test']
     
     # Extract block ID from filename
     filename = os.path.basename(json_path)
@@ -50,9 +58,9 @@ def load_block_from_json(json_path: str) -> Block:
         task_description=task_data['specification'],
         test_specification=test_data['specification'],
         test_data_generation=test_data['data'],
-        write_files=data['write_files'],
-        context_files=data.get('context_files', []),
-        commit_message=data.get('commit_message')
+        write_files=version_data['write_files'],
+        context_files=version_data.get('context_files', []),
+        commit_message=version_data.get('commit_message')
     )
     
     # Set the block ID if we found one

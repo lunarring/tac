@@ -15,7 +15,7 @@ def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]
     - Context Files: Lists which code files must be examined/updated
     
     Args:
-        json_content: Either a JSON string or already parsed dict
+        json_content: Either a JSON string or parsed dict
         
     Returns:
         tuple[bool, str]: (is_valid, error_message)
@@ -37,44 +37,61 @@ def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]
         if not isinstance(data, dict):
             return False, "JSON content must be a dictionary"
             
-        # Required top-level keys
-        required_keys = ['seed', 'task', 'test', 'write_files', 'context_files', 'commit_message']
-        for key in required_keys:
-            if key not in data:
-                return False, f"Missing required top-level key: {key}"
-        
-        # Validate seed section
-        if not isinstance(data['seed'], dict) or 'instructions' not in data['seed']:
-            return False, "seed section must contain 'instructions'"
-            
-        # Validate task section
-        if not isinstance(data['task'], dict) or 'specification' not in data['task']:
-            return False, "task section must contain 'specification'"
-            
-        # Validate test section
-        test_section = data['test']
-        if not isinstance(test_section, dict):
-            return False, "test section must be a dictionary"
-        for key in ['specification', 'data', 'replacements']:
-            if key not in test_section:
-                return False, f"test section missing required key: {key}"
+        # Check if this is the new versioned format
+        if 'versions' in data:
+            if not isinstance(data['versions'], list) or not data['versions']:
+                return False, "versions must be a non-empty list"
+            if 'block_id' not in data:
+                return False, "block_id is required in versioned format"
+            if 'template_type' not in data:
+                return False, "template_type is required in versioned format"
                 
-        # Validate write_files and context_files
-        if not isinstance(data['write_files'], list):
-            return False, "write_files must be a list"
-        if not isinstance(data['context_files'], list):
-            return False, "context_files must be a list"
+            # Validate each version
+            for i, version in enumerate(data['versions']):
+                valid, error = _validate_version_content(version)
+                if not valid:
+                    return False, f"Version {i} is invalid: {error}"
+            return True, ""
+        else:
+            # Legacy format - validate as single version
+            return _validate_version_content(data)
             
-        # Validate commit message
-        if not isinstance(data['commit_message'], str) or not data['commit_message'].startswith('TDAC:'):
-            return False, "commit_message must be a string starting with 'TDAC:'"
-            
-        return True, ""
-        
     except json.JSONDecodeError as e:
         return False, f"Invalid JSON format: {str(e)}"
     except Exception as e:
         return False, f"Validation error: {str(e)}"
+
+def _validate_version_content(data: Dict) -> tuple[bool, str]:
+    """Helper function to validate a single version's content"""
+    # Required top-level keys
+    required_keys = ['task', 'test', 'write_files', 'context_files', 'commit_message']
+    for key in required_keys:
+        if key not in data:
+            return False, f"Missing required top-level key: {key}"
+    
+    # Validate task section
+    if not isinstance(data['task'], dict) or 'specification' not in data['task']:
+        return False, "task section must contain 'specification'"
+        
+    # Validate test section
+    test_section = data['test']
+    if not isinstance(test_section, dict):
+        return False, "test section must be a dictionary"
+    for key in ['specification', 'data', 'replacements']:
+        if key not in test_section:
+            return False, f"test section missing required key: {key}"
+            
+    # Validate write_files and context_files
+    if not isinstance(data['write_files'], list):
+        return False, "write_files must be a list"
+    if not isinstance(data['context_files'], list):
+        return False, "context_files must be a list"
+        
+    # Validate commit message
+    if not isinstance(data['commit_message'], str) or not data['commit_message'].startswith('TDAC:'):
+        return False, "commit_message must be a string starting with 'TDAC:'"
+        
+    return True, ""
 
 def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_id: str) -> tuple[str, str]:
     """
