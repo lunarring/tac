@@ -68,7 +68,9 @@ class TDACViewer:
         """Go back to the previous menu."""
         if self.history:
             menu_func, args = self.history.pop()
-            menu_func(*args)
+            # Instead of calling the menu function directly, return to let the current menu exit
+            return True
+        return False
             
     def main_menu(self) -> None:
         """Show main menu to choose between logs and protoblocks."""
@@ -78,7 +80,8 @@ class TDACViewer:
             choice = self.get_choice(len(options))
             
             if choice == 'b':
-                self.go_back()
+                if self.go_back():  # Only break the loop if we actually went back
+                    break
                 continue
                 
             self.add_to_history(self.main_menu)
@@ -107,7 +110,8 @@ class TDACViewer:
             choice = self.get_choice(len(logs))  # Still use original logs length
             
             if choice == 'b':
-                self.go_back()
+                if self.go_back():  # Only break the loop if we actually went back
+                    break
                 continue
                 
             self.add_to_history(self.logs_menu)
