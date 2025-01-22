@@ -8,6 +8,7 @@ from tdac.core.block import Block
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
 from tdac.utils.protoblock_reflector import ProtoBlockReflector
+from tdac.utils.protoblock_factory import ProtoBlockFactory
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class BlockExecutor:
         self.git_manager = GitManager()
         self.block_id = None  # Will be set when executing a block
         self.reflector = ProtoBlockReflector()  # Initialize reflector
+        self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
 
     def _load_config(self) -> dict:
@@ -38,7 +40,7 @@ class BlockExecutor:
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
 
-    def _write_log_file(self, attempt: int, success: bool) -> None:
+    def _write_log_file(self, attempt: int, success: bool, message: str) -> None:
         """
         Write a log file containing the config and executions data.
         The log file structure is:
@@ -59,6 +61,7 @@ class BlockExecutor:
         Args:
             attempt: The current attempt number
             success: Whether the attempt was successful
+            message: Additional message to include in the log
         """
         if not self.block_id:
             logger.warning("No block ID available for logging")
@@ -99,7 +102,8 @@ class BlockExecutor:
             'attempt': attempt,
             'success': success,
             'git_diff': git_diff,
-            'test_results': self.test_results
+            'test_results': self.test_results,
+            'message': message
         }
 
         try:
@@ -121,7 +125,7 @@ class BlockExecutor:
 
             # If execution failed, get analysis from reflector
             if not success:
-                analysis = self.reflector.analyze_failure(execution_data)
+                analysis, _ = self.reflector.analyze_and_update(execution_data)
                 execution_data['failure_analysis'] = analysis
                 print("\nFailure Analysis:")
                 print("="*50)
@@ -149,17 +153,27 @@ class BlockExecutor:
                 if self.block.commit_message and self.block.commit_message.startswith('TDAC:'):
                     self.block_id = self.block.commit_message.split(':')[1].strip().split()[0]
 
+            # Write initial log entry
+            self._write_log_file(0, None, "Starting block execution")
+
             max_retries = self.config['general']['max_retries']
             for attempt in range(max_retries):
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
                 
                 print("Executing task and generating tests simultaneously...")
                 try:
+                    # Write log before task execution
+                    self._write_log_file(attempt + 1, None, "Starting task execution")
+                    
                     self.agent.execute_task(previous_error=self.previous_error)
+                    
+                    # Write log after task execution
+                    self._write_log_file(attempt + 1, None, "Task execution completed")
+                    
                 except Exception as e:
                     print(f"Error during task execution: {e}")
                     # Write failure log
-                    self._write_log_file(attempt + 1, False)
+                    self._write_log_file(attempt + 1, False, f"Task execution failed: {str(e)}")
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
                         continue
@@ -174,15 +188,21 @@ class BlockExecutor:
                         return False
 
                 print("Running tests...")
+                # Write log before running tests
+                self._write_log_file(attempt + 1, None, "Starting test execution")
+                
                 if self.run_tests():
                     print("Protoblock could successfully be turned into Mergeblock.")
                     # Write success log
-                    self._write_log_file(attempt + 1, True)
+                    self._write_log_file(attempt + 1, True, "Tests passed successfully")
                     return True
                 else:
                     print("Tests failed.")
                     print("Test Results:")
                     print(self.get_test_results())
+                    
+                    # Write log for test failure
+                    self._write_log_file(attempt + 1, False, "Tests failed")
                     
                     # Get failure analysis and combine with test results for next attempt
                     execution_data = {
@@ -197,7 +217,43 @@ class BlockExecutor:
                         'git_diff': self.git_manager.repo.git.diff() if self.git_manager.repo else "",
                         'test_results': self.test_results
                     }
-                    analysis = self.reflector.analyze_failure(execution_data)
+                    
+                    # Write log before analysis
+                    self._write_log_file(attempt + 1, None, "Starting failure analysis")
+                    
+                    # Get analysis and updated protoblock
+                    analysis, updated_protoblock = self.reflector.analyze_and_update(execution_data)
+                    
+                    # Write log after analysis
+                    self._write_log_file(attempt + 1, None, "Failure analysis completed")
+                    
+                    # If we got an updated protoblock, create a new version
+                    if updated_protoblock:
+                        try:
+                            # Create new protoblock spec
+                            new_spec = self.reflector.create_updated_protoblock(self.block_id, updated_protoblock)
+                            
+                            # Update current block with new specifications
+                            self.block.task_description = new_spec.task_specification
+                            self.block.test_specification = new_spec.test_specification
+                            self.block.test_data_generation = new_spec.test_data
+                            self.block.write_files = new_spec.write_files
+                            self.block.context_files = new_spec.context_files
+                            self.block.commit_message = new_spec.commit_message
+                            
+                            # Save the updated protoblock to file
+                            template_type = "custom"  # Default to custom since this is an update
+                            if self.block_id:
+                                self.protoblock_factory.save_protoblock(new_spec, template_type)
+                                print("\nUpdated protoblock with refined specifications based on previous attempt.")
+                                # Write log for protoblock update
+                                self._write_log_file(attempt + 1, None, "Updated protoblock with new specifications")
+                            else:
+                                logger.error("Cannot save updated protoblock: no block ID available")
+                        except Exception as e:
+                            logger.error(f"Failed to update protoblock: {e}")
+                            # Write log for protoblock update failure
+                            self._write_log_file(attempt + 1, False, f"Failed to update protoblock: {str(e)}")
                     
                     # Combine test results and analysis for next attempt
                     self.previous_error = f"""Test Results:
@@ -206,10 +262,10 @@ class BlockExecutor:
 Previous Attempt Analysis:
 {analysis}"""
                     
-                    # Write failure log
-                    self._write_log_file(attempt + 1, False)
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
+                        # Write log before retry
+                        self._write_log_file(attempt + 1, None, "Preparing for retry")
                         continue
                     else:
                         print("Maximum retry attempts reached.")
@@ -219,6 +275,8 @@ Previous Attempt Analysis:
                                 print("Successfully reverted all changes.")
                             else:
                                 print("Failed to revert changes. Please check repository state manually.")
+                        # Write final failure log
+                        self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
                         return False
 
         except Exception as e:
@@ -228,7 +286,7 @@ Previous Attempt Analysis:
                 self.git_manager.revert_changes()
             # Write error log if we have a block ID
             if self.block_id:
-                self._write_log_file(attempt + 1 if 'attempt' in locals() else 1, False)
+                self._write_log_file(0, False, f"Unexpected error during execution: {str(e)}")
             return False
 
     def run_tests(self, test_path: str = None) -> bool:

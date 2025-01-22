@@ -306,7 +306,7 @@ class TDACViewer:
         """Show menu for specific execution components."""
         while True:
             options = [
-                "Basic info (timestamp, success, attempt)",
+                "Basic info (timestamp, success, attempt, status)",
                 "Protoblock details",
                 "Git diff",
                 "Test results",
@@ -331,8 +331,11 @@ class TDACViewer:
                     table.add_column("Field", style="cyan")
                     table.add_column("Value", style="green")
                     table.add_row("Timestamp", execution['timestamp'])
-                    table.add_row("Success", "✅" if execution['success'] else "❌")
+                    success_icon = "✅" if execution['success'] else "❌" if execution['success'] is False else "🔄"
+                    table.add_row("Success", success_icon)
                     table.add_row("Attempt", str(execution['attempt']))
+                    if 'message' in execution:
+                        table.add_row("Status", execution['message'])
                     self.console.print(table)
                     
                 elif choice == 2:

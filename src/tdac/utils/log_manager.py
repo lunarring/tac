@@ -82,6 +82,10 @@ class LogManager:
                 
     def _add_execution_to_tree(self, execution: Dict, parent: Tree) -> None:
         """Add execution details to tree."""
+        # Add status message if present
+        if 'message' in execution and execution['message']:
+            parent.add(f"📢 Status: {execution['message']}")
+            
         # Add protoblock info
         proto_branch = parent.add("📝 Protoblock")
         self._add_dict_to_tree(execution['protoblock'], proto_branch)
@@ -120,8 +124,10 @@ class LogManager:
         
         # Add basic info
         table.add_row("Timestamp", execution['timestamp'])
-        table.add_row("Success", "✅" if execution['success'] else "❌")
+        table.add_row("Success", "✅" if execution['success'] else "❌" if execution['success'] is False else "🔄")
         table.add_row("Attempt", str(execution['attempt']))
+        if 'message' in execution:
+            table.add_row("Status", execution['message'])
         
         self.console.print(table)
         
