@@ -40,7 +40,7 @@ class BlockExecutor:
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
 
-    def _write_log_file(self, attempt: int, success: bool, message: str) -> None:
+    def _write_log_file(self, attempt: int, success: bool, message: str) -> dict:
         """
         Write a log file containing the config and executions data.
         The log file structure is:
@@ -60,12 +60,12 @@ class BlockExecutor:
         
         Args:
             attempt: The current attempt number
-            success: Whether the attempt was successful
+            success: Whether the attempt was successful, or None if in progress
             message: Additional message to include in the log
         """
         if not self.block_id:
             logger.warning("No block ID available for logging")
-            return
+            return None
 
         log_filename = f".tdac_log_{self.block_id}"
         
@@ -123,20 +123,13 @@ class BlockExecutor:
                 log_data['executions'] = []
             log_data['executions'].append(execution_data)
 
-            # If execution failed, get analysis from reflector
-            if not success:
-                analysis, _ = self.reflector.analyze_and_update(execution_data)
-                execution_data['failure_analysis'] = analysis
-                print("\nFailure Analysis:")
-                print("="*50)
-                print(analysis)
-                print("="*50)
-
             # Write updated log file
             with open(log_filename, 'w', encoding='utf-8') as f:
                 json.dump(log_data, f, indent=2)
         except Exception as e:
             logger.error(f"Failed to write log file: {e}")
+            
+        return execution_data  # Return the data for potential error analysis
 
     def execute_block(self) -> bool:
         """
@@ -153,10 +146,10 @@ class BlockExecutor:
                 if self.block.commit_message and self.block.commit_message.startswith('TDAC:'):
                     self.block_id = self.block.commit_message.split(':')[1].strip().split()[0]
 
-            # Write initial log entry
-            self._write_log_file(0, None, "Starting block execution")
-
-            max_retries = self.config['general']['max_retries']
+            # Get max_retries from config, default to 3 if not found
+            max_retries = self.config.get('general', {}).get('max_retries', 3)
+            logger.info(f"Using max_retries={max_retries} from config")
+            
             for attempt in range(max_retries):
                 print(f"\nAttempt {attempt + 1}/{max_retries} to implement solution and tests...")
                 
@@ -172,8 +165,18 @@ class BlockExecutor:
                     
                 except Exception as e:
                     print(f"Error during task execution: {e}")
-                    # Write failure log
-                    self._write_log_file(attempt + 1, False, f"Task execution failed: {str(e)}")
+                    # Write failure log and get execution data
+                    execution_data = self._write_log_file(attempt + 1, False, f"Task execution failed: {str(e)}")
+                    
+                    # Analyze failure if we have execution data
+                    if execution_data:
+                        analysis, _ = self.reflector.analyze_and_update(execution_data)
+                        print("\nFailure Analysis:")
+                        print("="*50)
+                        print(analysis)
+                        print("="*50)
+                        self.previous_error = analysis
+                        
                     if attempt < max_retries - 1:
                         print("Retrying with a new implementation...")
                         continue

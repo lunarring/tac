@@ -1,11 +1,14 @@
 import json
 import uuid
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.core.llm import LLMClient, Message
 import os
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ProtoBlockSpec:
@@ -24,7 +27,7 @@ class ProtoBlockFactory:
     # Predefined templates for different task types
     TEMPLATES = {
         "refactor": {
-            "instructions": """Conduct a thorough review of the entire codebase, focusing on one critical area to refactor only the single most problematic issue. For instance, that could mean reorganizing duplicated logic into a shared module or function, clarifying the intent of obscure variable names to make the code more self-explanatory, splitting excessively long methods into smaller, focused pieces, enforcing a consistent formatting style across all files, or adding robust error handling to improve stability. It may also involve consolidating configuration settings to a single source of truth, cleaning out unused or legacy code that no longer serves any purpose, replacing “magic numbers” with clearly named constants, or adopting modern language features to simplify and streamline key operations. The core goal is to address the underlying structural problems in the code so that it becomes easier to read, maintain, and extend—without altering the code's fundamental functionality. Consolidate  into well-designed, reusable functions or modules. This change is paramount to improving the maintainability and scalability of the codebase. Ensure that each consolidated function is properly named and documented. This targeted effort will lay the groundwork for a cleaner, more efficient project while simplifying collaboration for future contributors."""
+            "instructions": """Conduct a thorough review of the entire codebase, focusing on one critical area to refactor only the single most problematic issue. For instance, that could mean reorganizing duplicated logic into a shared module or function, clarifying the intent of obscure variable names to make the code more self-explanatory, splitting excessively long methods into smaller, focused pieces, enforcing a consistent formatting style across all files, or adding robust error handling to improve stability. It may also involve consolidating configuration settings to a single source of truth, cleaning out unused or legacy code that no longer serves any purpose, replacing "magic numbers" with clearly named constants, or adopting modern language features to simplify and streamline key operations. The core goal is to address the underlying structural problems in the code so that it becomes easier to read, maintain, and extend—without altering the code's fundamental functionality. Consolidate  into well-designed, reusable functions or modules. This change is paramount to improving the maintainability and scalability of the codebase. Ensure that each consolidated function is properly named and documented. This targeted effort will lay the groundwork for a cleaner, more efficient project while simplifying collaboration for future contributors. HOWEVER KEEP IN MIND: PICK ONLY ONE SINGLE THING TO IMPLEMENT AND KEEP IT AS SIMPLE AS POSSIBLE!"""
         },
         "error": {
             "instructions": """An error occurred while running the code. Analyze the error message, trace through the codebase, and determine the root cause of the issue. Focus on ONE specific error and propose a solution."""
@@ -81,7 +84,7 @@ class ProtoBlockFactory:
 {codebase}
 
 I want you to generate instructions which are the input for a coding agent. The instructions have a very specific format that I need you to adhere to precisely. Write in very concise language, and write in a tone of giving direct and precise orders. The response should be a valid JSON object with the following structure:
-
+--------------------
 {{
     "task": {{
         "specification": "Given the entire codebase and the instructions, here we describe the task at hand very precisely. However we are not implementing the task here and we are not describing exactly HOW the code needs to be changed. You can come up with a proposal of how this could be achieved, but we do NOT need to implement it. Given your understanding of the seed block instructions and the codebase, you come up with a proposal for this!"
@@ -96,9 +99,116 @@ I want you to generate instructions which are the input for a coding agent. The 
     "commit_message": "Brief commit message about your changes."
 }}
 --------------------
+YOU NEED TO ADHERE TO THE JSON FORMAT ABOVE EXACTLY, as given in the example above between the fences.
 Now here are the instructions to make this json file:
-Please analyze the codebase and provide a protoblock that addresses this task: {task_instructions}"""
+Please analyze the codebase and provide a protoblock that addresses this task.  : {task_instructions}"""
     
+    def _clean_code_fences(self, content: str) -> str:
+        """
+        Clean markdown code fences from content, handling various formats.
+        
+        Args:
+            content: The content to clean
+            
+        Returns:
+            str: Content with code fences removed
+        """
+        # First strip whitespace
+        cleaned = content.strip()
+        
+        # Handle various code fence patterns
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            
+            # Skip first line regardless of what it contains (```json, ```, etc)
+            start_idx = 1
+            
+            # Find end (last ``` or end of content)
+            end_idx = len(lines)
+            for i in range(len(lines) - 1, 0, -1):
+                if lines[i].strip() == "```":
+                    end_idx = i
+                    break
+            
+            # Extract content between fences
+            cleaned = "\n".join(lines[start_idx:end_idx]).strip()
+            
+            # If we still have content and it looks like JSON, return it
+            if cleaned and cleaned.startswith("{"):
+                return cleaned
+            
+            # If we don't have valid-looking JSON, try one more time with the original
+            # This handles cases where the content might be wrapped multiple times
+            return self._clean_code_fences(cleaned)
+        
+        return cleaned
+
+    def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
+        """
+        Verifies that a protoblock JSON is valid and contains all required fields.
+        First tries to parse as-is, only cleans code fences if that fails.
+        
+        Args:
+            json_content: The JSON content to validate
+            
+        Returns:
+            Tuple[bool, str, Optional[dict]]: (is_valid, error_message, parsed_data)
+        """
+        content_to_try = json_content.strip()
+        
+        # First try parsing as-is
+        try:
+            data = json.loads(content_to_try)
+        except json.JSONDecodeError:
+            # If that fails, try cleaning code fences
+            try:
+                cleaned_content = self._clean_code_fences(content_to_try)
+                if not cleaned_content:
+                    return False, "Content is empty after cleaning", None
+                data = json.loads(cleaned_content)
+            except json.JSONDecodeError as e:
+                return False, f"Invalid JSON syntax: {str(e)}", None
+        except Exception as e:
+            return False, f"Validation error: {str(e)}", None
+            
+        try:
+            # Verify top-level structure
+            if not isinstance(data, dict):
+                return False, "JSON content must be a dictionary", None
+                
+            required_keys = ["task", "test", "write_files", "context_files", "commit_message"]
+            missing_keys = [key for key in required_keys if key not in data]
+            if missing_keys:
+                return False, f"Missing required keys: {', '.join(missing_keys)}", None
+            
+            # Verify task section
+            if not isinstance(data["task"], dict):
+                return False, "task must be a dictionary", None
+            if "specification" not in data["task"]:
+                return False, "task must contain 'specification'", None
+                
+            # Verify test section
+            test = data["test"]
+            if not isinstance(test, dict):
+                return False, "test must be a dictionary", None
+            test_keys = ["specification", "data", "replacements"]
+            missing_test_keys = [key for key in test_keys if key not in test]
+            if missing_test_keys:
+                return False, f"test section missing keys: {', '.join(missing_test_keys)}", None
+            if not isinstance(test["replacements"], list):
+                return False, "test.replacements must be a list", None
+                
+            # Verify lists
+            if not isinstance(data["write_files"], list):
+                return False, "write_files must be a list", None
+            if not isinstance(data["context_files"], list):
+                return False, "context_files must be a list", None
+                
+            return True, "", data
+            
+        except Exception as e:
+            return False, f"Validation error: {str(e)}", None
+
     def create_protoblock(self, seed_instructions: str) -> ProtoBlockSpec:
         """
         Create a protoblock from seed instructions that contain all necessary information.
@@ -108,6 +218,9 @@ Please analyze the codebase and provide a protoblock that addresses this task: {
             
         Returns:
             ProtoBlockSpec object containing the protoblock specification
+            
+        Raises:
+            ValueError: If unable to create a valid protoblock
         """
         # Create messages for LLM
         messages = [
@@ -117,31 +230,34 @@ Please analyze the codebase and provide a protoblock that addresses this task: {
         
         # Get response from LLM
         response = self.llm_client.chat_completion(messages)
-        json_content = response.strip()
         
-        # Strip markdown code fences if present
-        if json_content.startswith("```"):
-            lines = json_content.split("\n")
-            start_idx = next((i for i, line in enumerate(lines) if line.startswith("```")), 0) + 1
-            end_idx = next((i for i, line in enumerate(lines[start_idx:], start_idx) if line.startswith("```")), len(lines))
-            json_content = "\n".join(lines[start_idx:end_idx]).strip()
+        # Check for empty or whitespace-only response
+        if not response or not response.strip():
+            raise ValueError("Received empty response from LLM")
+            
+        # Log the raw response for debugging
+        logger.debug(f"Raw LLM Response for protoblock:\n{response}")
         
-        # Parse JSON content
-        try:
-            data = json.loads(json_content)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON response from LLM: {e}")
+        # Verify and parse the response
+        is_valid, error_msg, data = self.verify_protoblock(response)
+        if not is_valid:
+            # Include part of the response in the error message for context
+            preview = response[:200] + "..." if len(response) > 200 else response
+            raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
         
         # Create ProtoBlockSpec with short UUID (6 characters)
-        return ProtoBlockSpec(
-            task_specification=data["task"]["specification"],
-            test_specification=data["test"]["specification"],
-            test_data=data["test"]["data"],
-            write_files=data["write_files"],
-            context_files=data.get("context_files", []),
-            commit_message=f"TDAC: {data.get('commit_message', 'Update')}",
-            block_id=str(uuid.uuid4())[:6]
-        )
+        try:
+            return ProtoBlockSpec(
+                task_specification=data["task"]["specification"],
+                test_specification=data["test"]["specification"],
+                test_data=data["test"]["data"],
+                write_files=data["write_files"],
+                context_files=data.get("context_files", []),
+                commit_message=f"TDAC: {data.get('commit_message', 'Update')}",
+                block_id=str(uuid.uuid4())[:6]
+            )
+        except KeyError as e:
+            raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
     
     def save_protoblock(self, spec: ProtoBlockSpec, template_type: str) -> str:
         """
