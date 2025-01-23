@@ -21,7 +21,7 @@ llm:
     timeout: 120
 
 git:
-  auto_push: true
+  auto_push: false
 
 logging:
   tdac:

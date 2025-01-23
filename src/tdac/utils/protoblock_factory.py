@@ -87,14 +87,13 @@ class ProtoBlockFactory:
         "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible.",
         "replacements": ["List of tests that need to be replaced by the new test. Use relative file paths as given in the codebase. Leave empty if no replacements are needed."]
     }},
-    "write_files": ["List of files that may need to be written for the task. Use relative file paths as given in the codebase."],
-    "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Use relative file paths as given in the codebase."],
+    "write_files": ["List of files that may need to be written for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access!"],
+    "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}
 --------------------
-YOU NEED TO ADHERE TO THE JSON FORMAT ABOVE EXACTLY, as given in the example above between the fences.
-Now here are the instructions to make this json file:
-Please analyze the codebase and provide a protoblock that addresses this task.  : {task_instructions}"""
+YOU NEED TO ADHERE TO THE JSON FORMAT ABOVE EXACTLY, as given in the example above between the fences. Fill all the fields with as much detail as possible, provide as much context as possible and be sure to precisely reflect the below task instructions.
+The task instructions to make this json file are: {task_instructions}"""
     
     def _clean_code_fences(self, content: str) -> str:
         """

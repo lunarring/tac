@@ -9,6 +9,7 @@ from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
 from tdac.utils.protoblock_reflector import ProtoBlockReflector
 from tdac.utils.protoblock_factory import ProtoBlockFactory
+import git
 
 logger = logging.getLogger(__name__)
 
@@ -73,24 +74,8 @@ class ProtoBlockExecutor:
 
         log_filename = f".tdac_log_{self.protoblock_id}"
         
-        # Get git diff using GitManager for complete diff
-        try:
-            if self.git_manager.repo:
-                # Get staged and unstaged changes
-                staged_diff = self.git_manager.repo.git.diff('--staged')
-                unstaged_diff = self.git_manager.repo.git.diff()
-                # Combine both diffs with headers
-                git_diff = ""
-                if staged_diff:
-                    git_diff += "=== Staged Changes ===\n" + staged_diff + "\n"
-                if unstaged_diff:
-                    git_diff += "=== Unstaged Changes ===\n" + unstaged_diff
-                if not git_diff:
-                    git_diff = "No changes detected"
-            else:
-                git_diff = "Git repository not available"
-        except Exception as e:
-            git_diff = f"Failed to get git diff: {str(e)}"
+        # Get git diff using GitManager's new method
+        git_diff = self.git_manager.get_complete_diff()
 
         # Prepare execution data for this attempt
         execution_data = {
