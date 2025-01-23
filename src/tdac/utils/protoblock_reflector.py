@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from tdac.core.llm import LLMClient, Message
 from tdac.utils.file_gatherer import gather_python_files
-from tdac.utils.protoblock_factory import ProtoBlockSpec
+from tdac.core.protoblock import ProtoBlock
 
 logger = logging.getLogger(__name__)
 
@@ -106,21 +106,21 @@ UPDATED_PROTOBLOCK:
             logger.error(f"Failed to get LLM analysis: {e}")
             return f"Error analyzing failure: {str(e)}", None
     
-    def create_updated_protoblock(self, original_block_id: str, updated_data: Dict) -> ProtoBlockSpec:
+    def create_updated_protoblock(self, original_block_id: str, updated_data: Dict) -> ProtoBlock:
         """
-        Create a new ProtoBlockSpec with updated data while preserving the original block ID.
+        Create a new ProtoBlock with updated data while preserving the original block ID.
         
         Args:
             original_block_id: The ID of the original protoblock
             updated_data: The updated protoblock data from LLM
             
         Returns:
-            ProtoBlockSpec: A new protoblock specification with updated data
+            ProtoBlock: A new protoblock with updated data
         """
-        return ProtoBlockSpec(
-            task_specification=updated_data["task"]["specification"],
+        return ProtoBlock(
+            task_description=updated_data["task"]["specification"],
             test_specification=updated_data["test"]["specification"],
-            test_data=updated_data["test"]["data"],
+            test_data_generation=updated_data["test"]["data"],
             write_files=updated_data["write_files"],
             context_files=updated_data.get("context_files", []),
             commit_message=updated_data.get("commit_message", "Update based on previous execution"),

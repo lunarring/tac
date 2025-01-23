@@ -1,25 +1,14 @@
 import json
 import uuid
-from dataclasses import dataclass
 from typing import List, Optional, Tuple
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.core.llm import LLMClient, Message
 import os
 from datetime import datetime
 import logging
+from tdac.core.protoblock import ProtoBlock
 
 logger = logging.getLogger(__name__)
-
-@dataclass
-class ProtoBlockSpec:
-    """Specification for a protoblock"""
-    task_specification: str
-    test_specification: str
-    test_data: str
-    write_files: List[str]
-    context_files: List[str]
-    commit_message: str
-    block_id: str = None
 
 class ProtoBlockFactory:
     """Factory class for creating protoblocks"""
@@ -213,7 +202,7 @@ Please analyze the codebase and provide a protoblock that addresses this task.  
         except Exception as e:
             return False, f"Validation error: {str(e)}", None
 
-    def create_protoblock(self, seed_instructions: str) -> ProtoBlockSpec:
+    def create_protoblock(self, seed_instructions: str) -> ProtoBlock:
         """
         Create a protoblock from seed instructions that contain all necessary information.
         
@@ -221,7 +210,7 @@ Please analyze the codebase and provide a protoblock that addresses this task.  
             seed_instructions: Complete instructions for the LLM to generate the protoblock
             
         Returns:
-            ProtoBlockSpec object containing the protoblock specification
+            ProtoBlock object containing the protoblock specification
             
         Raises:
             ValueError: If unable to create a valid protoblock
@@ -249,26 +238,26 @@ Please analyze the codebase and provide a protoblock that addresses this task.  
             preview = response[:200] + "..." if len(response) > 200 else response
             raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
         
-        # Create ProtoBlockSpec with short UUID (6 characters)
+        # Create ProtoBlock directly
         try:
-            return ProtoBlockSpec(
-                task_specification=data["task"]["specification"],
+            return ProtoBlock(
+                task_description=data["task"]["specification"],
                 test_specification=data["test"]["specification"],
-                test_data=data["test"]["data"],
+                test_data_generation=data["test"]["data"],
                 write_files=data["write_files"],
                 context_files=data.get("context_files", []),
-                commit_message=f"TDAC: {data.get('commit_message', 'Update')}",
-                block_id=str(uuid.uuid4())[:6]
+                block_id=str(uuid.uuid4())[:6],
+                commit_message=f"TDAC: {data.get('commit_message', 'Update')}"
             )
         except KeyError as e:
             raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
-    
-    def save_protoblock(self, spec: ProtoBlockSpec, template_type: str) -> str:
+
+    def save_protoblock(self, block: ProtoBlock, template_type: str) -> str:
         """
-        Save a protoblock specification to a file.
+        Save a protoblock to a file.
         
         Args:
-            spec: ProtoBlockSpec object containing the specification
+            block: ProtoBlock object to save
             template_type: Type of template used
             
         Returns:
@@ -276,21 +265,21 @@ Please analyze the codebase and provide a protoblock that addresses this task.  
         """
         version_data = {
             "task": {
-                "specification": spec.task_specification
+                "specification": block.task_description
             },
             "test": {
-                "specification": spec.test_specification,
-                "data": spec.test_data,
-                "replacements": spec.write_files
+                "specification": block.test_specification,
+                "data": block.test_data_generation,
+                "replacements": block.write_files
             },
-            "write_files": spec.write_files,
-            "context_files": spec.context_files,
-            "commit_message": spec.commit_message,
+            "write_files": block.write_files,
+            "context_files": block.context_files,
+            "commit_message": block.commit_message,
             "timestamp": datetime.now().isoformat()
         }
         
         # Save to file using just the block_id
-        filename = f".tdac_protoblock_{spec.block_id}.json"
+        filename = f".tdac_protoblock_{block.block_id}.json"
         
         # Load existing data if file exists, otherwise create new structure
         if os.path.exists(filename):
@@ -299,13 +288,13 @@ Please analyze the codebase and provide a protoblock that addresses this task.  
                 if not isinstance(file_data, dict) or 'versions' not in file_data:
                     # Convert old format to new format
                     file_data = {
-                        'block_id': spec.block_id,
+                        'block_id': block.block_id,
                         'template_type': template_type,
                         'versions': [file_data]  # Old data becomes first version
                     }
         else:
             file_data = {
-                'block_id': spec.block_id,
+                'block_id': block.block_id,
                 'template_type': template_type,
                 'versions': []
             }
