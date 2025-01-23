@@ -160,7 +160,7 @@ class BlockExecutor:
                     # Write log before task execution
                     self._write_log_file(attempt + 1, None, "Starting task execution")
                     
-                    self.agent.execute_task(previous_error=self.previous_error)
+                    self.agent.run(self.block)
                     
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
