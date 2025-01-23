@@ -13,15 +13,16 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tdac.core.block import Block
+from tdac.core.protoblock import ProtoBlock
 from tdac.agents.aider_agent import AiderAgent
-from tdac.core.executor import BlockExecutor
+from tdac.core.executor import ProtoBlockExecutor
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.core.llm import LLMClient, Message
 from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
 from tdac.utils.protoblock_factory import ProtoBlockFactory
+from tdac.utils.seedblock_json_validator import validate_seedblock_json, save_seedblock
 
 logger = setup_logger(__name__)
 
@@ -30,8 +31,8 @@ def load_config():
     with open(config_path, 'r') as f:
         return yaml.safe_load(f)
 
-def load_block_from_json(json_path: str) -> Block:
-    """Load block definition from a JSON file"""
+def load_protoblock_from_json(json_path: str) -> ProtoBlock:
+    """Load protoblock definition from a JSON file"""
     with open(json_path, 'r') as f:
         data = json.load(f)
     
@@ -39,35 +40,26 @@ def load_block_from_json(json_path: str) -> Block:
     if isinstance(data, dict) and 'versions' in data:
         # Get the latest version
         version_data = data['versions'][-1]
+        block_id = data['block_id']  # Get ID from versioned format
     else:
         # Handle legacy format
         version_data = data
+        # Extract block ID from filename as fallback
+        filename = os.path.basename(json_path)
+        block_id = filename.replace('.tdac_protoblock_', '').replace('.json', '')
     
     task_data = version_data['task']
     test_data = version_data['test']
     
-    # Extract block ID from filename
-    filename = os.path.basename(json_path)
-    if filename.startswith('.tdac_protoblock_'):
-        # Format is .tdac_protoblock_ID.json
-        block_id = filename.replace('.tdac_protoblock_', '').replace('.json', '')
-    else:
-        block_id = None
-    
-    block = Block(
+    return ProtoBlock(
         task_description=task_data['specification'],
         test_specification=test_data['specification'],
         test_data_generation=test_data['data'],
         write_files=version_data['write_files'],
         context_files=version_data.get('context_files', []),
+        block_id=block_id,
         commit_message=version_data.get('commit_message')
     )
-    
-    # Set the block ID if we found one
-    if block_id:
-        block.block_id = block_id
-    
-    return block
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -88,17 +80,18 @@ def run_tests_command(args):
         logger.error(f"Test directory not found: {test_dir}")
         sys.exit(1)
     
-    # Create a minimal Block instance for running tests
-    block = Block(
+    # Create a minimal ProtoBlock instance for running tests
+    protoblock = ProtoBlock(
         task_description="",    # Not needed for test running
         test_specification="",  # Not needed for test running
         test_data_generation="", # Not needed for test running
         write_files=[],         # Not needed for test running
-        context_files=[]        # Not needed for test running
+        context_files=[],       # Not needed for test running
+        block_id=os.path.basename(test_dir)  # Use the test directory name as the ID
     )
     
     # Create executor and run tests
-    executor = BlockExecutor(block=block)
+    executor = ProtoBlockExecutor(protoblock=protoblock)
     
     # Run tests and print results
     success = executor.run_tests(test_path=test_dir)
@@ -206,15 +199,15 @@ def generate_seed_command(args):
             
             # Load and execute the protoblock
             logger.info("Executing protoblock...")
-            block = load_block_from_json(json_file)
-            block.block_id = protoblock.block_id  # Set the block ID
-            executor = BlockExecutor(block=block)
+            protoblock_loaded = load_protoblock_from_json(json_file)
+            protoblock_loaded.block_id = protoblock.block_id  # Set the block ID
+            executor = ProtoBlockExecutor(protoblock=protoblock_loaded)
             success = executor.execute_block()
             
             if success:
                 logger.info("Protoblock executed successfully")
                 # Handle git operations after successful execution
-                if not git_manager.handle_post_execution(config, block.commit_message):
+                if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
                     sys.exit(1)
             else:
                 logger.error("Protoblock execution failed")
@@ -504,18 +497,18 @@ def main():
             json_file = factory.save_protoblock(protoblock, template_type or "custom")
             abs_json_path = os.path.abspath(json_file)
             
-            # Load block from saved protoblock
-            block = load_block_from_json(json_file)
-            block.block_id = protoblock.block_id
+            # Load protoblock from saved file
+            protoblock_loaded = load_protoblock_from_json(json_file)
+            protoblock_loaded.block_id = protoblock.block_id
             
             # Create executor and run
-            executor = BlockExecutor(block=block, config=config)
+            executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
             success = executor.execute_block()
             
             if success:
                 logger.info("Task completed successfully.")
                 # Handle git operations after successful execution
-                if not git_manager.handle_post_execution(config, block.commit_message):
+                if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
                     sys.exit(1)
             else:
                 logger.error("Task execution failed.")

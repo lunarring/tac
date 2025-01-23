@@ -18,7 +18,7 @@ class AiderAgent(Agent):
         Executes the Aider command to implement both tests and functionality simultaneously.
         
         Args:
-            protoblock: The protoblock instance containing task details and specifications
+            protoblock: The ProtoBlock instance containing task details and specifications
         """
         task_description = protoblock.task_description
         test_specification = protoblock.test_specification

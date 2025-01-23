@@ -4,7 +4,7 @@ import yaml
 import logging
 import json
 from datetime import datetime
-from tdac.core.block import Block
+from tdac.core.protoblock import ProtoBlock
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
 from tdac.utils.protoblock_reflector import ProtoBlockReflector
@@ -12,24 +12,28 @@ from tdac.utils.protoblock_factory import ProtoBlockFactory
 
 logger = logging.getLogger(__name__)
 
-class BlockExecutor:
-    def __init__(self, block: Block, config: dict = None):
-        self.block = block
+class ProtoBlockExecutor:
+    """
+    Executes a ProtoBlock by managing the implementation process through an agent,
+    running tests, and handling version control operations.
+    """
+    def __init__(self, protoblock: ProtoBlock, config: dict = None):
+        self.protoblock = protoblock
         self.config = config if config else self._load_config()
         # Create agent with combined config
         agent_config = self.config.copy()
         agent_config.update({
-            'task_description': self.block.task_description,
-            'test_specification': self.block.test_specification,
-            'test_data_generation': self.block.test_data_generation,
-            'write_files': self.block.write_files,
-            'context_files': self.block.context_files
+            'task_description': self.protoblock.task_description,
+            'test_specification': self.protoblock.test_specification,
+            'test_data_generation': self.protoblock.test_data_generation,
+            'write_files': self.protoblock.write_files,
+            'context_files': self.protoblock.context_files
         })
-        self.agent = block.create_agent(agent_config)
+        self.agent = protoblock.create_agent(agent_config)
         self.test_results = ""
         self.previous_error = None  # Track previous error
         self.git_manager = GitManager()
-        self.block_id = None  # Will be set when executing a block
+        self.protoblock_id = protoblock.block_id  # Set ID directly from protoblock
         self.reflector = ProtoBlockReflector()  # Initialize reflector
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
@@ -63,11 +67,11 @@ class BlockExecutor:
             success: Whether the attempt was successful, or None if in progress
             message: Additional message to include in the log
         """
-        if not self.block_id:
-            logger.warning("No block ID available for logging")
+        if not self.protoblock_id:
+            logger.warning("No protoblock ID available for logging")
             return None
 
-        log_filename = f".tdac_log_{self.block_id}"
+        log_filename = f".tdac_log_{self.protoblock_id}"
         
         # Get git diff using GitManager for complete diff
         try:
@@ -91,12 +95,12 @@ class BlockExecutor:
         # Prepare execution data for this attempt
         execution_data = {
             'protoblock': {
-                'task_description': self.block.task_description,
-                'test_specification': self.block.test_specification,
-                'test_data_generation': self.block.test_data_generation,
-                'write_files': self.block.write_files,
-                'context_files': self.block.context_files,
-                'commit_message': self.block.commit_message
+                'task_description': self.protoblock.task_description,
+                'test_specification': self.protoblock.test_specification,
+                'test_data_generation': self.protoblock.test_data_generation,
+                'write_files': self.protoblock.write_files,
+                'context_files': self.protoblock.context_files,
+                'commit_message': self.protoblock.commit_message
             },
             'timestamp': datetime.now().isoformat(),
             'attempt': attempt,
@@ -138,14 +142,6 @@ class BlockExecutor:
             bool: True if execution was successful, False otherwise
         """
         try:
-            # Extract block ID from the protoblock filename if available
-            if hasattr(self.block, 'block_id'):
-                self.block_id = self.block.block_id
-            else:
-                # Default to extracting from commit message
-                if self.block.commit_message and self.block.commit_message.startswith('TDAC:'):
-                    self.block_id = self.block.commit_message.split(':')[1].strip().split()[0]
-
             # Get max_retries from config, default to 3 if not found
             max_retries = self.config.get('general', {}).get('max_retries', 3)
             logger.info(f"Using max_retries={max_retries} from config")
@@ -160,7 +156,7 @@ class BlockExecutor:
                     # Write log before task execution
                     self._write_log_file(attempt + 1, None, "Starting task execution")
                     
-                    self.agent.run(self.block)
+                    self.agent.run(self.protoblock)
                     
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
@@ -219,12 +215,12 @@ class BlockExecutor:
                     # Get failure analysis and combine with test results for next attempt
                     execution_data = {
                         'protoblock': {
-                            'task_description': self.block.task_description,
-                            'test_specification': self.block.test_specification,
-                            'test_data_generation': self.block.test_data_generation,
-                            'write_files': self.block.write_files,
-                            'context_files': self.block.context_files,
-                            'commit_message': self.block.commit_message
+                            'task_description': self.protoblock.task_description,
+                            'test_specification': self.protoblock.test_specification,
+                            'test_data_generation': self.protoblock.test_data_generation,
+                            'write_files': self.protoblock.write_files,
+                            'context_files': self.protoblock.context_files,
+                            'commit_message': self.protoblock.commit_message
                         },
                         'git_diff': self.git_manager.repo.git.diff() if self.git_manager.repo else "",
                         'test_results': self.test_results
@@ -243,25 +239,25 @@ class BlockExecutor:
                     if updated_protoblock:
                         try:
                             # Create new protoblock spec
-                            new_spec = self.reflector.create_updated_protoblock(self.block_id, updated_protoblock)
+                            new_spec = self.reflector.create_updated_protoblock(self.protoblock_id, updated_protoblock)
                             
                             # Update current block with new specifications
-                            self.block.task_description = new_spec.task_specification
-                            self.block.test_specification = new_spec.test_specification
-                            self.block.test_data_generation = new_spec.test_data
-                            self.block.write_files = new_spec.write_files
-                            self.block.context_files = new_spec.context_files
-                            self.block.commit_message = new_spec.commit_message
+                            self.protoblock.task_description = new_spec.task_specification
+                            self.protoblock.test_specification = new_spec.test_specification
+                            self.protoblock.test_data_generation = new_spec.test_data
+                            self.protoblock.write_files = new_spec.write_files
+                            self.protoblock.context_files = new_spec.context_files
+                            self.protoblock.commit_message = new_spec.commit_message
                             
                             # Save the updated protoblock to file
                             template_type = "custom"  # Default to custom since this is an update
-                            if self.block_id:
+                            if self.protoblock_id:
                                 self.protoblock_factory.save_protoblock(new_spec, template_type)
                                 print("\nUpdated protoblock with refined specifications based on previous attempt.")
                                 # Write log for protoblock update
                                 self._write_log_file(attempt + 1, None, "Updated protoblock with new specifications")
                             else:
-                                logger.error("Cannot save updated protoblock: no block ID available")
+                                logger.error("Cannot save updated protoblock: no protoblock ID available")
                         except Exception as e:
                             logger.error(f"Failed to update protoblock: {e}")
                             # Write log for protoblock update failure
@@ -301,8 +297,8 @@ Previous Attempt Analysis:
             # Try to revert changes on error only if configured to do so
             if self.revert_on_failure:
                 self.git_manager.revert_changes()
-            # Write error log if we have a block ID
-            if self.block_id:
+            # Write error log if we have a protoblock ID
+            if self.protoblock_id:
                 self._write_log_file(0, False, f"Unexpected error during execution: {str(e)}")
             return False
 
