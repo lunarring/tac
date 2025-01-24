@@ -75,24 +75,27 @@ class ProtoBlockFactory:
         Returns:
             str: Complete seed instructions for the LLM
         """
-        return f"""We have the following codebase:\n{codebase}\n\n"
-            "Generate a valid JSON object with the structure:\n
+        return f"""We have the following codebase:
+--------------------
+{codebase}
+--------------------"
+            "Now generate a valid JSON object with the structure:\n
 --------------------
 {{
     "task": {{
-        "specification": "Given the entire codebase and the instructions, here we describe the task at hand very precisely. However we are not implementing the task here and we are not describing exactly HOW the code needs to be changed. You can come up with a proposal of how this could be achieved, but we do NOT need to implement it. Given your understanding of the seed block instructions and the codebase, you come up with a proposal for this!"
+        "specification": "Given the entire codebase and the task instructions below,  we describe the task at hand very precisely and actionable, making it easy and clear to implement. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive. If helpful, you can come up with a proposal of how this could be achieved."
     }},
     "test": {{
-        "specification": "Given the entire codebase and the instructions, here we describe the test specification for the task at hand. We are aiming to just write ONE single test, which is able to infer whether the functionality update in the main code has been implemented correctly or not. Thus, the goal is is figure out if the task has been implemented correctly. Critically, the test needs to be fulfillable. We do NOT need to test anything else than the NEW functionality given the task specification. It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! The rest of the code will be tested by other means anyways, so don't mention it. However, if you are forseeing that the new test will clash with an existing test, because maybe code will be replaced, then mention it in the field 'replacements'.",
-        "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible.",
-        "replacements": ["List of tests that need to be replaced by the new test. Use relative file paths as given in the codebase. Leave empty if no replacements are needed."]
+        "specification": "Given the entire codebase and the instructions, here we describe the test specification for the task above. We are aiming to just write ONE single test ideally, which is able to infer whether the functionality update in the code has been implemented correctly or not. Thus, the goal is is figure out if the task instructions have been implemented correctly. Critically, the test needs to be fulfillable. We do NOT need to test anything else than the NEW functionality given the task specification. It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks!"
+        "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible."
     }},
-    "write_files": ["List of files that may need to be written for the task. Every file that is may be affected by the task NEEDS to be included! Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access!"],
-    "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
+    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access!"],
+    "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}
 --------------------
-YOU NEED TO ADHERE TO THE JSON FORMAT ABOVE EXACTLY, as given in the example above between the fences. Fill all the fields with as much detail as possible, provide as much context as possible and be sure to precisely reflect the below task instructions.
+YOU NEED TO ADHERE TO THE JSON FORMAT ABOVE EXACTLY, as given in the example above between the fences. Fill all the fields with as much detail as possible, provide as much context as possible and be sure to precisely reflect the below task instructions. 
+Generally, you should carefully review the codebase and really be sure that you include all the files that are needed for the task. Think through how given the codebase the task could be implemented!
 The task instructions to make this json file are: {task_instructions}"""
     
     def _clean_code_fences(self, content: str) -> str:
@@ -183,12 +186,10 @@ The task instructions to make this json file are: {task_instructions}"""
             test = data["test"]
             if not isinstance(test, dict):
                 return False, "test must be a dictionary", None
-            test_keys = ["specification", "data", "replacements"]
+            test_keys = ["specification", "data"]
             missing_test_keys = [key for key in test_keys if key not in test]
             if missing_test_keys:
                 return False, f"test section missing keys: {', '.join(missing_test_keys)}", None
-            if not isinstance(test["replacements"], list):
-                return False, "test.replacements must be a list", None
                 
             # Verify lists
             if not isinstance(data["write_files"], list):
