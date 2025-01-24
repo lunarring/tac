@@ -259,13 +259,12 @@ The task instructions to make this json file are: {task_instructions}"""
         except KeyError as e:
             raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
 
-    def save_protoblock(self, block: ProtoBlock, template_type: str) -> str:
+    def save_protoblock(self, block: ProtoBlock) -> str:
         """
         Save a protoblock to a file.
         
         Args:
             block: ProtoBlock object to save
-            template_type: Type of template used
             
         Returns:
             Path to the saved protoblock file
@@ -277,7 +276,8 @@ The task instructions to make this json file are: {task_instructions}"""
             "test": {
                 "specification": block.test_specification,
                 "data": block.test_data_generation,
-                "replacements": block.write_files
+                "replacements": block.write_files,
+                "results": block.test_results
             },
             "write_files": block.write_files,
             "context_files": block.context_files,
@@ -296,13 +296,11 @@ The task instructions to make this json file are: {task_instructions}"""
                     # Convert old format to new format
                     file_data = {
                         'block_id': block.block_id,
-                        'template_type': template_type,
                         'versions': [file_data]  # Old data becomes first version
                     }
         else:
             file_data = {
                 'block_id': block.block_id,
-                'template_type': template_type,
                 'versions': []
             }
         
@@ -312,4 +310,32 @@ The task instructions to make this json file are: {task_instructions}"""
         with open(filename, 'w') as f:
             json.dump(file_data, f, indent=2)
             
-        return filename 
+        return filename
+
+    def create_next_protoblock_with_test_results(self, previous_block: ProtoBlock, test_results: str) -> ProtoBlock:
+        """
+        Creates a new protoblock for the next attempt, with test results from the previous attempt.
+        
+        Args:
+            previous_block: Previous ProtoBlock instance that failed
+            test_results: Test results from the previous attempt
+            
+        Returns:
+            ProtoBlock: A new protoblock instance for the next attempt
+        """
+        # Create new protoblock with same specs but new test results
+        next_block = ProtoBlock(
+            task_description=previous_block.task_description,
+            test_specification=previous_block.test_specification,
+            test_data_generation=previous_block.test_data_generation,
+            write_files=previous_block.write_files,
+            context_files=previous_block.context_files,
+            block_id=previous_block.block_id,
+            commit_message=previous_block.commit_message,
+            test_results=test_results
+        )
+        
+        # Save the updated protoblock
+        self.save_protoblock(next_block)
+        
+        return next_block 

@@ -173,8 +173,13 @@ def generate_seed_command(args):
         # Generate complete seed instructions
         seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
         
-        # Create protoblock
+        # Create protoblock from seed instructions
         protoblock = factory.create_protoblock(seed_instructions)
+        
+        # Save protoblock to file
+        json_file = factory.save_protoblock(protoblock)
+        
+        print(f"\nCreated protoblock: {json_file}")
         
         if args.execute:
             # Initialize git manager and check status
@@ -182,18 +187,6 @@ def generate_seed_command(args):
             if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                 sys.exit(1)
                 
-            # Save protoblock to file
-            json_file = factory.save_protoblock(protoblock, template_type)
-            abs_json_path = os.path.abspath(json_file)
-            
-            # Verify file was saved
-            if not os.path.exists(abs_json_path):
-                logger.error(f"Failed to save protoblock JSON to {abs_json_path}")
-                sys.exit(1)
-                
-            logger.info(f"Saved protoblock to {abs_json_path}")
-            logger.info(f"Block ID: {protoblock.block_id}")
-            
             # Load configuration
             config = load_config()
             
@@ -525,12 +518,13 @@ def main():
             # Generate complete seed instructions
             seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
             
-            # Create protoblock
+            # Create protoblock from seed instructions
             protoblock = factory.create_protoblock(seed_instructions)
             
             # Save protoblock to file
-            json_file = factory.save_protoblock(protoblock, template_type or "custom")
-            abs_json_path = os.path.abspath(json_file)
+            json_file = factory.save_protoblock(protoblock)
+            
+            print(f"\nCreated protoblock: {json_file}")
             
             # Load protoblock from saved file
             protoblock_loaded = load_protoblock_from_json(json_file)

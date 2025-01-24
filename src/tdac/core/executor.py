@@ -230,63 +230,32 @@ class ProtoBlockExecutor:
                     if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                         logger.warning("Failed to commit changes after failed tests")
                     
-                    # Get failure analysis and combine with test results for next attempt
-                    execution_data = {
-                        'protoblock': {
-                            'task_description': self.protoblock.task_description,
-                            'test_specification': self.protoblock.test_specification,
-                            'test_data_generation': self.protoblock.test_data_generation,
-                            'write_files': self.protoblock.write_files,
-                            'context_files': self.protoblock.context_files,
-                            'commit_message': self.protoblock.commit_message
-                        },
-                        'git_diff': self.git_manager.repo.git.diff() if self.git_manager.repo else "",
-                        'test_results': self.test_results
-                    }
+                    # Update current protoblock with test results before creating next one
+                    self.protoblock.test_results = self.test_results
                     
-                    # Write log before analysis
-                    self._write_log_file(attempt + 1, None, "Starting failure analysis")
-                    
-                    # Get analysis and updated protoblock
-                    analysis, updated_protoblock = self.reflector.analyze_and_update(execution_data)
-                    
-                    # Write log after analysis
-                    self._write_log_file(attempt + 1, None, "Failure analysis completed")
-                    
-                    # If we got an updated protoblock, create a new version
-                    if updated_protoblock:
-                        try:
-                            # Create new protoblock spec
-                            new_spec = self.reflector.create_updated_protoblock(self.protoblock_id, updated_protoblock)
+                    # Create next protoblock with test results from previous attempt
+                    try:
+                        if self.protoblock_id:
+                            self.protoblock = self.protoblock_factory.create_next_protoblock_with_test_results(
+                                self.protoblock, 
+                                self.test_results
+                            )
+                            print("\nCreated next protoblock with test results from previous attempt.")
+                            # Write log for protoblock update
+                            self._write_log_file(attempt + 1, None, "Created next protoblock with test results")
                             
-                            # Update current block with new specifications
-                            self.protoblock.task_description = new_spec.task_specification
-                            self.protoblock.test_specification = new_spec.test_specification
-                            self.protoblock.test_data_generation = new_spec.test_data
-                            self.protoblock.write_files = new_spec.write_files
-                            self.protoblock.context_files = new_spec.context_files
-                            self.protoblock.commit_message = new_spec.commit_message
-                            
-                            # Save the updated protoblock to file
-                            template_type = "custom"  # Default to custom since this is an update
-                            if self.protoblock_id:
-                                self.protoblock_factory.save_protoblock(new_spec, template_type)
-                                print("\nUpdated protoblock with refined specifications based on previous attempt.")
-                                # Write log for protoblock update
-                                self._write_log_file(attempt + 1, None, "Updated protoblock with new specifications")
-                            else:
-                                logger.error("Cannot save updated protoblock: no protoblock ID available")
-                        except Exception as e:
-                            logger.error(f"Failed to update protoblock: {e}")
-                            # Write log for protoblock update failure
-                            self._write_log_file(attempt + 1, False, f"Failed to update protoblock: {str(e)}")
-                    
-                    # Combine test results and analysis for next attempt
-                    self.previous_error = f"""Test Results:
-{self.test_results}
-
-Previous Attempt Analysis:
-{analysis}"""
+                            # Commit the updated protoblock file
+                            protoblock_file = f".tdac_protoblock_{self.protoblock_id}.json"
+                            if os.path.exists(protoblock_file):
+                                commit_message = f"TDAC: Update protoblock with test results from attempt {attempt + 1}"
+                                if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                                    logger.warning("Failed to commit updated protoblock file")
+                        else:
+                            logger.error("Cannot create next protoblock: no protoblock ID available")
+                    except Exception as e:
+                        logger.error(f"Failed to create next protoblock: {e}")
+                        # Write log for protoblock creation failure
+                        self._write_log_file(attempt + 1, False, f"Failed to create next protoblock: {str(e)}")
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)

@@ -1,6 +1,6 @@
 general:
   type: "aider"
-  max_retries: 1
+  max_retries: 2
   total_timeout: 600
 
 aider:

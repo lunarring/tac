@@ -62,6 +62,9 @@ Test Requirements:
 - Test Specification: {test_specification}
 - Test Data Requirements: {test_data_generation}
 
+{f'''Previous Test Results (Failed):
+{protoblock.test_results}''' if protoblock.test_results else ''}
+
 Important Guidelines:
 - Write both the implementation and corresponding tests
 - Ensure tests are CONSISTENT with the code implemented!
@@ -99,15 +102,15 @@ Important Guidelines:
 
         command.extend(['--message', prompt])
         
-        logger.debug("Final Aider command: %s", ' '.join(command))
+        logger.info("Final Aider command: %s", ' '.join(command))
         
         try:
             logger.info("Executing Aider command...")
-            logger.debug("Command details:")
-            logger.debug(f"- Write files: {write_files}")
-            logger.debug(f"- Context files: {context_files}")
-            logger.debug(f"- Test files: {test_files}")
-            logger.debug(f"- Full command: {' '.join(command)}")
+            logger.info("Command details:")
+            logger.info(f"- Write files: {write_files}")
+            logger.info(f"- Context files: {context_files}")
+            logger.info(f"- Test files: {test_files}")
+            logger.info(f"- Full prompt:\n{prompt}")
             
             # Set timeout values
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
