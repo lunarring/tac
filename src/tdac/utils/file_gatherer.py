@@ -9,8 +9,10 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
 
     directory_tree = []
     file_contents = []
+    seen_files = set()  # Track unique files by their absolute path
 
     directory = str(directory)  # Ensure directory is a string
+    abs_directory = os.path.abspath(directory)  # Get absolute path of base directory
 
     for root, dirs, files in os.walk(directory):
         # Exclude specified directories and optionally dot directories
@@ -26,6 +28,18 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
                 not file.startswith('.#') and 
                 not (exclude_dot_files and file.startswith('.'))):
                 file_path = os.path.join(root, file)
+                abs_file_path = os.path.abspath(file_path)
+                real_path = os.path.realpath(abs_file_path)  # Resolve any symlinks
+                
+                # Skip if we've seen this file before (either directly or through symlink)
+                if real_path in seen_files:
+                    continue
+                
+                # Skip if file is outside the target directory
+                if not real_path.startswith(abs_directory):
+                    continue
+                
+                seen_files.add(real_path)
                 directory_tree.append(f"{indent}    {file}")
 
                 # Gather file content
