@@ -167,6 +167,11 @@ class ProtoBlockExecutor:
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
                     
+                    # Commit changes after successful implementation
+                    commit_message = f"TDAC: Implementation attempt {attempt + 1}"
+                    if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                        logger.warning("Failed to commit changes after implementation")
+                    
                 except Exception as e:
                     print(f"Error during task execution: {e}")
                     # Write failure log and get execution data
@@ -191,12 +196,10 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
-                        if self.revert_on_failure:
-                            print("Reverting all changes...")
-                            if self.git_manager.revert_changes():
-                                print("Successfully reverted all changes.")
-                            else:
-                                print("Failed to revert changes. Please check repository state manually.")
+                        # Commit any remaining changes before cleanup
+                        commit_message = f"TDAC: Failed implementation attempt {attempt + 1}"
+                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                            logger.warning("Failed to commit changes after failed attempt")
                         # Write final failure log
                         self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
                         break
@@ -209,6 +212,12 @@ class ProtoBlockExecutor:
                     print("Protoblock could successfully be turned into Mergeblock.")
                     # Write success log
                     self._write_log_file(attempt + 1, True, "Tests passed successfully")
+                    
+                    # Commit test changes if any
+                    commit_message = f"TDAC: Tests passed on attempt {attempt + 1}"
+                    if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                        logger.warning("Failed to commit changes after successful tests")
+                        
                     execution_success = True
                     break
                 else:
@@ -216,8 +225,10 @@ class ProtoBlockExecutor:
                     print("Test Results:")
                     print(self.get_test_results())
                     
-                    # Write log for test failure
-                    self._write_log_file(attempt + 1, False, "Tests failed")
+                    # Commit failed test changes
+                    commit_message = f"TDAC: Failed test attempt {attempt + 1}"
+                    if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                        logger.warning("Failed to commit changes after failed tests")
                     
                     # Get failure analysis and combine with test results for next attempt
                     execution_data = {
@@ -289,12 +300,10 @@ Previous Attempt Analysis:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
-                        if self.revert_on_failure:
-                            print("Reverting all changes...")
-                            if self.git_manager.revert_changes():
-                                print("Successfully reverted all changes.")
-                            else:
-                                print("Failed to revert changes. Please check repository state manually.")
+                        # Commit any remaining changes before cleanup
+                        commit_message = f"TDAC: Failed implementation attempt {attempt + 1}"
+                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                            logger.warning("Failed to commit changes after failed attempt")
                         # Write final failure log
                         self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
                         break
@@ -304,17 +313,11 @@ Previous Attempt Analysis:
             print("="*50)
             if execution_success:
                 print("Implementation successful! To merge the changes:")
-                print(f"  git checkout {original_branch}")
-                print(f"  git merge {block_branch}")
+                print(f"  git checkout {original_branch} && git merge {block_branch}")
                 print(f"  git branch -d {block_branch}  # Optional: delete branch after merging")
             else:
-                print("To delete this branch and start over:")
-                print(f"  git checkout {original_branch}")
-                print(f"  git branch -D {block_branch}")
-                print("\nOr to keep working on this branch:")
-                print("  1. Fix the issues manually")
-                print("  2. Commit your changes")
-                print(f"  3. Merge with: git checkout {original_branch} && git merge {block_branch}")
+                print("To clean up:")
+                print(f"  git restore . && git checkout {original_branch} && git branch -D {block_branch}")
             print("="*50)
 
             return execution_success

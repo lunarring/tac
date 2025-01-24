@@ -56,10 +56,8 @@ class GitManager:
         if not self.repo:
             return False
         try:
-            # First clean up any changes in working directory
-            self.revert_changes()
-            # Then checkout the branch
-            self.repo.git.checkout(branch_name)
+            # Force checkout, discarding any changes
+            self.repo.git.checkout(branch_name, force=True)
             return True
         except git.exc.GitCommandError as e:
             logger.error(f"Failed to checkout branch {branch_name}: {e}")
