@@ -7,6 +7,10 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
     if exclusions is None:
         exclusions = [".git", "__pycache__"]
 
+    # Size thresholds in bytes (100KB total, showing 40KB from start and end)
+    MAX_FILE_SIZE = 100 * 1024  
+    CHUNK_SIZE = 40 * 1024
+
     directory_tree = []
     file_contents = []
     seen_files = set()  # Track unique files by their absolute path
@@ -50,11 +54,22 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
                 header = f"{formatting_options['header']}{file}"
                 if formatting_options['use_code_fences']:
                     content = f"```python\n{content}\n```"
-                file_info = f"Size: {os.path.getsize(file_path)} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
+                
+                file_size = os.path.getsize(file_path)
+                file_info = f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
                 
                 # Handle large files by summarizing
-                if os.path.getsize(file_path) > 1024:  # Example threshold for large files
-                    content = content[:512] + "\n... [Content Truncated] ...\n" + content[-512:]
+                if file_size > MAX_FILE_SIZE:
+                    skipped_bytes = file_size - (2 * CHUNK_SIZE)
+                    content = (
+                        f"```python\n"
+                        f"# First {CHUNK_SIZE//1024}KB of file:\n"
+                        f"{content[3:CHUNK_SIZE+3]}\n\n"  # Skip first 3 chars which are ```
+                        f"# ... [{skipped_bytes//1024}KB truncated] ...\n\n"
+                        f"# Last {CHUNK_SIZE//1024}KB of file:\n"
+                        f"{content[-CHUNK_SIZE-4:-4]}\n"  # Skip last 4 chars which are \n```
+                        f"```"
+                    )
                 
                 file_contents.append(f"{header}\n{file_info}\n{content}")
 

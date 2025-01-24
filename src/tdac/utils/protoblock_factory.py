@@ -22,7 +22,7 @@ class ProtoBlockFactory:
         },
         "error": {
             "instructions": (
-                "Analyze a single runtime or logical error, identify its root cause, and propose a fix. Keep the scope limited to one clear issue."
+                "Analyze a single runtime or logical error, identify its root cause, and propose a fix. Include ALL files that are mentioned in the error message in the write_files field."
             )
         },
         "test": {
