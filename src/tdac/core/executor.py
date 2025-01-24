@@ -131,6 +131,27 @@ class ProtoBlockExecutor:
             max_retries = self.config.get('general', {}).get('max_retries', 3)
             logger.info(f"Using max_retries={max_retries} from config")
             
+            # Check git status and get current branch
+            status_ok, original_branch = self.git_manager.check_status()
+            if not status_ok:
+                return False
+                
+            # Verify we're on main/master branch
+            if original_branch not in ['main', 'master']:
+                logger.error(f"Must be on main or master branch to create feature branch. Currently on: {original_branch}")
+                print("\nPlease switch to main/master branch first:")
+                print("  git checkout main")
+                return False
+                
+            # Create and checkout new branch for block execution
+            block_branch = f"tdac_{self.protoblock_id}"
+            if not self.git_manager.create_and_checkout_branch(block_branch):
+                logger.error(f"Failed to create branch {block_branch}")
+                return False
+                
+            logger.info(f"Created and switched to branch: {block_branch}")
+            execution_success = False
+            
             for attempt in range(max_retries):
                 print("\n" + "="*60)
                 print(f"Starting attempt {attempt + 1} of {max_retries}")
@@ -178,7 +199,7 @@ class ProtoBlockExecutor:
                                 print("Failed to revert changes. Please check repository state manually.")
                         # Write final failure log
                         self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
-                        return False
+                        break
 
                 print("Running tests...")
                 # Write log before running tests
@@ -188,7 +209,8 @@ class ProtoBlockExecutor:
                     print("Protoblock could successfully be turned into Mergeblock.")
                     # Write success log
                     self._write_log_file(attempt + 1, True, "Tests passed successfully")
-                    return True
+                    execution_success = True
+                    break
                 else:
                     print("Tests failed.")
                     print("Test Results:")
@@ -275,13 +297,30 @@ Previous Attempt Analysis:
                                 print("Failed to revert changes. Please check repository state manually.")
                         # Write final failure log
                         self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
-                        return False
+                        break
+
+            # Print appropriate git commands based on execution result
+            print("\nGit Commands:")
+            print("="*50)
+            if execution_success:
+                print("Implementation successful! To merge the changes:")
+                print(f"  git checkout {original_branch}")
+                print(f"  git merge {block_branch}")
+                print(f"  git branch -d {block_branch}  # Optional: delete branch after merging")
+            else:
+                print("To delete this branch and start over:")
+                print(f"  git checkout {original_branch}")
+                print(f"  git branch -D {block_branch}")
+                print("\nOr to keep working on this branch:")
+                print("  1. Fix the issues manually")
+                print("  2. Commit your changes")
+                print(f"  3. Merge with: git checkout {original_branch} && git merge {block_branch}")
+            print("="*50)
+
+            return execution_success
 
         except Exception as e:
             print(f"An error occurred during block execution: {e}")
-            # Try to revert changes on error only if configured to do so
-            if self.revert_on_failure:
-                self.git_manager.revert_changes()
             # Write error log if we have a protoblock ID
             if self.protoblock_id:
                 self._write_log_file(0, False, f"Unexpected error during execution: {str(e)}")

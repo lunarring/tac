@@ -179,7 +179,7 @@ def generate_seed_command(args):
         if args.execute:
             # Initialize git manager and check status
             git_manager = GitManager()
-            if not git_manager.check_status():
+            if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                 sys.exit(1)
                 
             # Save protoblock to file
@@ -465,7 +465,7 @@ def main():
     if args.command == 'block':
         # Initialize git manager and check status
         git_manager = GitManager()
-        if not git_manager.check_status():
+        if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
             sys.exit(1)
             
         try:

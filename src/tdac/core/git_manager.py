@@ -1,7 +1,7 @@
 import git
 import logging
 import os
-from typing import Optional
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,54 @@ class GitManager:
         except git.exc.GitCommandError as e:
             logger.error(f"Error initializing git repository: {e}")
             self.repo = None
+
+    def create_and_checkout_branch(self, branch_name: str) -> bool:
+        """Create and checkout a new branch for block execution"""
+        if not self.repo:
+            logger.error("No git repository available")
+            return False
+
+        try:
+            # Store current branch for error handling
+            current = self.repo.active_branch.name
+
+            # Create and checkout new branch
+            logger.debug(f"Creating and checking out branch: {branch_name}")
+            self.repo.git.checkout('-b', branch_name)
+            logger.info(f"Successfully created and checked out branch: {branch_name}")
+            return True
+        except git.exc.GitCommandError as e:
+            logger.error(f"Failed to create/checkout branch {branch_name}: {e}")
+            try:
+                # Try to return to original branch on failure
+                if current:
+                    self.repo.git.checkout(current)
+            except:
+                pass
+            return False
+
+    def get_current_branch(self) -> Optional[str]:
+        """Get the name of the current branch"""
+        if not self.repo:
+            return None
+        try:
+            return self.repo.active_branch.name
+        except:
+            return None
+
+    def checkout_branch(self, branch_name: str) -> bool:
+        """Checkout an existing branch"""
+        if not self.repo:
+            return False
+        try:
+            # First clean up any changes in working directory
+            self.revert_changes()
+            # Then checkout the branch
+            self.repo.git.checkout(branch_name)
+            return True
+        except git.exc.GitCommandError as e:
+            logger.error(f"Failed to checkout branch {branch_name}: {e}")
+            return False
 
     def get_complete_diff(self) -> str:
         """
@@ -59,24 +107,26 @@ class GitManager:
         except Exception as e:
             return f"Failed to get git diff: {str(e)}"
 
-    def check_status(self) -> bool:
-        """Check if git repo exists and working tree is clean"""
+    def check_status(self) -> Tuple[bool, str]:
+        """Check if git repo exists and working tree is clean. Returns (success, current_branch)"""
         if not self.repo:
             logger.debug("No repository to check status.")
-            return False
+            return False, ""
             
         try:
+            current_branch = self.get_current_branch() or ""
+            
             if self.repo.is_dirty(untracked_files=True):
                 logger.error("Git working tree is not clean. Please commit or stash your changes before running TDAC!")
                 print("\nGit status:")
                 print(self.repo.git.status())
-                return False
+                return False, current_branch
                 
             logger.debug("Git working tree is clean.")
-            return True
+            return True, current_branch
         except git.exc.GitCommandError as e:
             logger.error(f"Error checking git status: {e}")
-            return False
+            return False, ""
 
     def handle_post_execution(self, config: dict, commit_message: Optional[str] = None) -> bool:
         """Handle git operations after successful block execution"""
@@ -120,15 +170,19 @@ class GitManager:
             return False
 
         try:
-            # Revert all changes to last commit
-            self.repo.git.reset('--hard')
-            logger.debug("Reverted all changes to the last commit.")
+            # First, reset any staged changes
+            self.repo.git.reset('HEAD')
+            logger.debug("Reset staged changes.")
+
+            # Then, discard changes in working directory
+            self.repo.git.checkout('--', '.')
+            logger.debug("Discarded changes in working directory.")
 
             # Clean untracked files and directories
             self.repo.git.clean('-fd')
             logger.debug("Cleaned untracked files and directories.")
 
-            logger.error("Reverted all changes and cleaned untracked files")
+            logger.info("Successfully reverted all changes and cleaned working directory")
             return True
         except Exception as e:
             logger.error(f"Error reverting changes: {e}")
