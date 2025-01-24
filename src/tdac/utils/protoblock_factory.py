@@ -22,7 +22,7 @@ class ProtoBlockFactory:
         },
         "error": {
             "instructions": (
-                "Analyze a single runtime or logical error, identify its root cause, and propose a fix. Include ALL files that are mentioned in the error message in the write_files field."
+                "Analyze the following error, identify its root cause, and propose a fix. Include ALL files that are mentioned in the error message in the write_files field."
             )
         },
         "test": {
@@ -38,7 +38,7 @@ class ProtoBlockFactory:
     def get_task_instructions(self, template_type: Optional[str] = None, direct_instructions: Optional[str] = None) -> str:
         """
         Get task-specific instructions either from a template or direct instructions.
-        Exactly one of template_type or direct_instructions must be provided.
+        If template_type is provided with direct_instructions, they will be combined.
         
         Args:
             template_type: Type of template to use (refactor, test, error)
@@ -48,21 +48,28 @@ class ProtoBlockFactory:
             str: The task-specific instructions to use
             
         Raises:
-            ValueError: If neither or both arguments are provided, or if template type is invalid
+            ValueError: If neither argument is provided, or if template type is invalid
         """
-        if direct_instructions is not None and template_type is not None:
-            raise ValueError("Cannot provide both template_type and direct_instructions")
-            
-        if direct_instructions is not None:
-            return direct_instructions
-            
-        if template_type is None:
+        if template_type is None and direct_instructions is None:
             raise ValueError("Must provide either template_type or direct_instructions")
             
-        if template_type not in self.TEMPLATES:
+        if template_type is not None and template_type not in self.TEMPLATES:
             raise ValueError(f"Invalid template type: {template_type}. Must be one of: {', '.join(self.TEMPLATES.keys())}")
             
-        return self.TEMPLATES[template_type]["instructions"]
+        if template_type is None:
+            return direct_instructions
+            
+        template_instructions = self.TEMPLATES[template_type]["instructions"]
+        
+        if not direct_instructions:
+            return template_instructions
+            
+        # Special handling for error template
+        if template_type == "error":
+            return f"{template_instructions}\n\nError message:\n{direct_instructions}"
+            
+        # For other templates, combine with additional instructions
+        return f"{template_instructions}\n\nAdditional specific instructions: {direct_instructions}"
     
     def get_seed_instructions(self, codebase: str, task_instructions: str) -> str:
         """

@@ -315,18 +315,24 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     block_parser.add_argument(
         '--test',
-        action='store_true',
-        help='Generate a test-focused block for the directory'
+        nargs='?',
+        const='',
+        metavar='INSTRUCTIONS',
+        help='Generate a test-focused block, optionally with specific test instructions'
     )
     block_parser.add_argument(
         '--refactor',
-        action='store_true',
-        help='Generate a refactoring-focused block'
+        nargs='?',
+        const='',
+        metavar='INSTRUCTIONS',
+        help='Generate a refactoring-focused block, optionally with specific refactor instructions'
     )
     block_parser.add_argument(
         '--error',
-        action='store_true',
-        help='Generate an error analysis block'
+        nargs='?',
+        const='',
+        metavar='INSTRUCTIONS',
+        help='Generate an error analysis block, optionally with specific error instructions'
     )
     block_parser.add_argument(
         '--instructions',
@@ -409,9 +415,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     if args.command == 'block':
         # Count how many template flags are used
         template_flags = sum([
-            args.test,
-            args.refactor,
-            args.error,
+            args.test is not None,
+            args.refactor is not None,
+            args.error is not None,
             bool(args.instructions),
             bool(args.json)  # Add json flag to template flags
         ])
@@ -492,12 +498,15 @@ def main():
             # Create block based on command type
             template_type = None
             direct_instructions = None
-            if args.test:
+            if args.test is not None:
                 template_type = "test"
-            elif args.refactor:
+                direct_instructions = args.test
+            elif args.refactor is not None:
                 template_type = "refactor"
-            elif args.error:
+                direct_instructions = args.refactor
+            elif args.error is not None:
                 template_type = "error"
+                direct_instructions = args.error
             elif args.instructions:
                 direct_instructions = args.instructions
             
