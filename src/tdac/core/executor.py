@@ -7,7 +7,6 @@ from datetime import datetime
 from tdac.core.protoblock import ProtoBlock
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
-from tdac.utils.protoblock_reflector import ProtoBlockReflector
 from tdac.utils.protoblock_factory import ProtoBlockFactory
 import git
 
@@ -35,7 +34,6 @@ class ProtoBlockExecutor:
         self.previous_error = None  # Track previous error
         self.git_manager = GitManager()
         self.protoblock_id = protoblock.block_id  # Set ID directly from protoblock
-        self.reflector = ProtoBlockReflector()  # Initialize reflector
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
 
@@ -177,15 +175,9 @@ class ProtoBlockExecutor:
                     # Write failure log and get execution data
                     execution_data = self._write_log_file(attempt + 1, False, f"Task execution failed: {str(e)}")
                     
-                    # Analyze failure if we have execution data
-                    if execution_data:
-                        analysis, _ = self.reflector.analyze_and_update(execution_data)
-                        print("\nFailure Analysis:")
-                        print("="*50)
-                        print(analysis)
-                        print("="*50)
-                        self.previous_error = analysis
-                        
+                    # Store error message for next attempt
+                    self.previous_error = str(e)
+                    
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
                         print("\n" + "="*60)
