@@ -333,6 +333,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         type=str,
         help='Generate a custom block with specific instructions'
     )
+    block_parser.add_argument(
+        '--json',
+        type=str,
+        help='Path to a JSON file containing a protoblock definition to execute'
+    )
     
     # File gathering command
     gather_parser = subparsers.add_parser('gather', 
@@ -407,13 +412,14 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
             args.test,
             args.refactor,
             args.error,
-            bool(args.instructions)
+            bool(args.instructions),
+            bool(args.json)  # Add json flag to template flags
         ])
         
         if template_flags == 0:
-            parser.error("Must specify one of: --test, --refactor, --error, or --instructions")
+            parser.error("Must specify one of: --test, --refactor, --error, --instructions, or --json")
         elif template_flags > 1:
-            parser.error("Can only use one of: --test, --refactor, --error, or --instructions")
+            parser.error("Can only use one of: --test, --refactor, --error, --instructions, or --json")
     
     return parser, args
 
@@ -462,6 +468,26 @@ def main():
             
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
+            
+            if args.json:
+                # Execute block from JSON file
+                try:
+                    protoblock_loaded = load_protoblock_from_json(args.json)
+                    executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
+                    success = executor.execute_block()
+                    
+                    if success:
+                        logger.info("Task completed successfully.")
+                        # Handle git operations after successful execution
+                        if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
+                            sys.exit(1)
+                    else:
+                        logger.error("Task execution failed.")
+                        sys.exit(1)
+                    return
+                except Exception as e:
+                    logger.error(f"Error loading or executing protoblock from JSON: {e}")
+                    sys.exit(1)
             
             # Create block based on command type
             template_type = None
