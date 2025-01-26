@@ -73,8 +73,6 @@ class ProtoBlockFactory:
     
     def get_seed_instructions(self, codebase: str, task_instructions: str) -> str:
         """
-        Generate complete seed instructions by combining codebase analysis with task instructions.
-        
         Args:
             codebase: The codebase content to analyze (result of gather_python_files)
             task_instructions: The specific task instructions to use
@@ -82,12 +80,28 @@ class ProtoBlockFactory:
         Returns:
             str: Complete seed instructions for the LLM
         """
-        return f"""We have the following codebase:
---------------------
+        return f"""<purpose>
+    You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your employees, who then implement the solution.   complete seed instructions by combining codebase analysis with task instructions. Your own inputs are <codebase> and <task_instructions>. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
+
+</purpose>
+
+<codebase>
 {codebase}
---------------------"
-            "Now generate a valid JSON object with the structure:\n
---------------------
+</codebase>
+
+<task_instructions>
+{task_instructions}
+</task_instructions>
+
+<planning_rules>
+- Create a plan how this task could be implemented.
+- Scan the codebase and review carefully and list every file that could potentially be needed for write access.
+- Scan the codebase and review carefully and list every file that could potentially be needed for read access.
+- Design a test that could be used to verify if the task has been implemented correctly.
+- Bring everything into the right format and structure.
+</planning_rules>
+
+<output_format>
 {{
     "task": {{
         "specification": "Given the entire codebase and the task instructions below,  we describe the task at hand very precisely and actionable, making it easy and clear to implement. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive. If helpful, you can come up with a proposal of how this could be achieved."
@@ -100,10 +114,8 @@ class ProtoBlockFactory:
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}
---------------------
-YOU NEED TO ADHERE TO THE JSON FORMAT ABOVE EXACTLY, as given in the example above between the fences. Fill all the fields with as much detail as possible, provide as much context as possible and be sure to precisely reflect the below task instructions. 
-Generally, you should carefully review the codebase and really be sure that you include all the files that are needed for the task. Think through how given the codebase the task could be implemented!
-The task instructions to make this json file are: {task_instructions}"""
+</output_format>
+"""
     
     def _clean_code_fences(self, content: str) -> str:
         """
