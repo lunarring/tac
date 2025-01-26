@@ -95,8 +95,7 @@ class ProtoBlockFactory:
 
 <planning_rules>
 - Create a plan how this task could be implemented.
-- Scan the codebase and review carefully and list every file that could potentially be needed for write access.
-- Scan the codebase and review carefully and list every file that could potentially be needed for read access.
+- Scan the codebase and review carefully and list every file that could potentially be needed for read or write access.
 - Design a test that could be used to verify if the task has been implemented correctly.
 - Bring everything into the right format and structure.
 </planning_rules>
