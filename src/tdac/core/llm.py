@@ -101,14 +101,18 @@ class LLMClient:
         # Convert messages to the format expected by the API
         formatted_messages = []
         
-        # Special handling for o1-mini model which doesn't support system messages
-        if self.config.model == "o1-mini":
+        # Special handling for models that don't support system messages
+        if self.config.model in ["o1-mini", "deepseek-reasoner"]:
             for msg in messages:
                 if msg.role == "system":
                     # Convert system message to user message
                     formatted_messages.append({
                         "role": "user",
                         "content": msg.content
+                    })                    
+                    formatted_messages.append({
+                        "role": "assistant",
+                        "content": "Understood."
                     })
                 else:
                     formatted_messages.append({
@@ -128,8 +132,8 @@ class LLMClient:
             "stream": stream,
         }
         
-        # o1-mini doesn't support temperature parameter
-        if self.config.model != "o1-mini":
+        # Models that don't support temperature parameter
+        if self.config.model not in ["o1-mini", "deepseek-reasoner"]:
             # Use settings from config if not overridden
             if temperature is None:
                 temperature = self.config.settings.get('temperature', 0.7)
