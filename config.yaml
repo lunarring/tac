@@ -2,6 +2,7 @@ general:
   type: "aider"
   max_retries: 2
   total_timeout: 600
+  use_file_summaries: true
 
 aider:
   model: "deepseek/deepseek-chat"

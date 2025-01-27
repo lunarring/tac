@@ -1,7 +1,20 @@
 import os
 from datetime import datetime
 
-def gather_python_files(directory, formatting_options=None, exclusions=None, exclude_dot_files=True):
+def gather_python_files(directory, formatting_options=None, exclusions=None, exclude_dot_files=True, use_summaries=False):
+    """
+    Gather Python files from directory, optionally using summaries instead of content.
+    
+    Args:
+        directory: Directory to scan
+        formatting_options: Options for formatting output
+        exclusions: List of directories to exclude
+        exclude_dot_files: Whether to exclude dot files
+        use_summaries: Whether to use file summaries instead of content
+        
+    Returns:
+        str: Formatted output of file tree and contents/summaries
+    """
     if formatting_options is None:
         formatting_options = {"header": "## File: ", "separator": "\n---\n", "use_code_fences": True}
     if exclusions is None:
@@ -14,6 +27,11 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
     directory_tree = []
     file_contents = []
     seen_files = set()  # Track unique files by their absolute path
+
+    # Initialize ProjectFiles if using summaries
+    if use_summaries:
+        from tdac.utils.project_files import ProjectFiles
+        project_files = ProjectFiles()
 
     directory = str(directory)  # Ensure directory is a string
     abs_directory = os.path.abspath(directory)  # Get absolute path of base directory
@@ -46,36 +64,49 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
                 seen_files.add(real_path)
                 directory_tree.append(f"{indent}    {file}")
 
-                # Gather file content
-                with open(file_path, 'r') as f:
-                    content = f.read()
-
-                # Format file content
-                header = f"{formatting_options['header']}{file}"
-                if formatting_options['use_code_fences']:
-                    content = f"```python\n{content}\n```"
-                
+                # Gather file info
                 file_size = os.path.getsize(file_path)
                 file_info = f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
-                
-                # Handle large files by summarizing
-                if file_size > MAX_FILE_SIZE:
-                    skipped_bytes = file_size - (2 * CHUNK_SIZE)
-                    content = (
-                        f"```python\n"
-                        f"# First {CHUNK_SIZE//1024}KB of file:\n"
-                        f"{content[3:CHUNK_SIZE+3]}\n\n"  # Skip first 3 chars which are ```
-                        f"# ... [{skipped_bytes//1024}KB truncated] ...\n\n"
-                        f"# Last {CHUNK_SIZE//1024}KB of file:\n"
-                        f"{content[-CHUNK_SIZE-4:-4]}\n"  # Skip last 4 chars which are \n```
-                        f"```"
-                    )
+
+                if use_summaries:
+                    # Get or generate summary
+                    summary = project_files.get_file_summary(file_path)
+                    if not summary:
+                        # Generate new summary
+                        project_files.update_summaries(exclusions=exclusions)
+                        summary = project_files.get_file_summary(file_path)
+                    
+                    if summary:
+                        if "error" in summary:
+                            content = f"Error analyzing file: {summary['error']}"
+                        else:
+                            content = summary["summary"]
+                    else:
+                        content = "Error: Could not generate summary"
+                else:
+                    # Use regular file content
+                    if file_size > MAX_FILE_SIZE:
+                        with open(file_path, 'r') as f:
+                            content = f.read()
+                        content = (
+                            f"# First {CHUNK_SIZE//1024}KB of file:\n"
+                            f"{content[:CHUNK_SIZE]}\n\n"
+                            f"# ... [{(file_size - 2*CHUNK_SIZE)//1024}KB truncated] ...\n\n"
+                            f"# Last {CHUNK_SIZE//1024}KB of file:\n"
+                            f"{content[-CHUNK_SIZE:]}"
+                        )
+                    else:
+                        with open(file_path, 'r') as f:
+                            content = f.read()
+
+                # Format content
+                header = f"{formatting_options['header']}{os.path.relpath(file_path, directory)}"
+                if formatting_options['use_code_fences']:
+                    content = f"```python\n{content}\n```"
                 
                 file_contents.append(f"{header}\n{file_info}\n{content}")
 
     if not file_contents:
         return "No Python files found."
 
-    # Combine directory tree and file contents
-    result = "\n".join(directory_tree) + formatting_options['separator'] + "\n".join(file_contents)
-    return result
+    return "\n".join(directory_tree) + formatting_options['separator'] + "\n".join(file_contents)

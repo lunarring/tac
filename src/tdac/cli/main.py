@@ -18,11 +18,13 @@ from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import ProtoBlockExecutor
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
+from tdac.utils.file_summarizer import FileSummarizer
 from tdac.core.llm import LLMClient, Message
 from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
 from tdac.utils.protoblock_factory import ProtoBlockFactory
 from tdac.utils.seedblock_json_validator import validate_seedblock_json, save_seedblock
+from tdac.utils.project_files import ProjectFiles
 
 logger = setup_logger(__name__)
 
@@ -63,15 +65,66 @@ def load_protoblock_from_json(json_path: str) -> ProtoBlock:
 
 def gather_files_command(args):
     """Handle the gather command execution"""
-    formatting_options = {
-        "header": args.header,
-        "separator": args.separator,
-        "use_code_fences": args.code_fences
-    }
-    exclusions = args.exclusions.split(',') if args.exclusions else None
-    
-    result = gather_python_files(args.directory, formatting_options, exclusions)
-    print(result)
+    if args.summarize:
+        project_files = ProjectFiles(args.directory)
+        
+        # Update summaries and show stats
+        exclusions = args.exclusions.split(',') if args.exclusions else None
+        stats = project_files.update_summaries(exclusions, not args.include_dot_files)
+        
+        print(f"\nSummary update stats:")
+        print(f"Added: {stats['added']} files")
+        print(f"Updated: {stats['updated']} files")
+        print(f"Unchanged: {stats['unchanged']} files")
+        print(f"Removed: {stats['removed']} files")
+        
+        # If it's a single file, show its summary
+        if os.path.isfile(args.directory) and args.directory.endswith('.py'):
+            summary = project_files.get_file_summary(args.directory)
+            if summary:
+                if "error" in summary:
+                    print(f"\nError analyzing file: {summary['error']}")
+                else:
+                    print(f"\n## File: {os.path.basename(args.directory)}")
+                    print(f"Size: {summary['size']} bytes, Last Modified: {summary['last_modified']}")
+                    print(f"\n```python\n{summary['summary']}\n```")
+        else:
+            # Show all summaries
+            data = project_files.get_all_summaries()
+            print(f"\nLast updated: {data['last_updated']}\n")
+            
+            for file_path, info in sorted(data["files"].items()):
+                if "error" in info:
+                    print(f"## File: {file_path}")
+                    print(f"Size: {info['size']} bytes, Last Modified: {info['last_modified']}")
+                    print(f"Error: {info['error']}\n")
+                else:
+                    print(f"## File: {file_path}")
+                    print(f"Size: {info['size']} bytes, Last Modified: {info['last_modified']}")
+                    print(f"\n```python\n{info['summary']}\n```\n")
+    else:
+        formatting_options = {
+            "header": args.header,
+            "separator": args.separator,
+            "use_code_fences": args.code_fences
+        }
+        if os.path.isfile(args.directory) and args.directory.endswith('.py'):
+            # Single file content
+            with open(args.directory, 'r') as f:
+                content = f.read()
+            file_size = os.path.getsize(args.directory)
+            file_info = f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(args.directory))}"
+            if formatting_options["use_code_fences"]:
+                content = f"```python\n{content}\n```"
+            print(f"{formatting_options['header']}{os.path.basename(args.directory)}\n{file_info}\n{content}")
+        else:
+            # Directory content
+            if not os.path.isdir(args.directory):
+                print(f"Error: {args.directory} is not a directory or Python file")
+                sys.exit(1)
+            exclusions = args.exclusions.split(',') if args.exclusions else None
+            result = gather_python_files(args.directory, formatting_options, exclusions)
+            print(result)
 
 def run_tests_command(args):
     """Handle the test run command"""
@@ -347,6 +400,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Directory to scan for Python files'
     )
     gather_parser.add_argument(
+        '--summarize',
+        action='store_true',
+        help='Generate detailed summaries of code structure instead of showing file contents'
+    )
+    gather_parser.add_argument(
         '--header',
         default="## File: ",
         help='Header format for each file (default: "## File: ")'
@@ -365,6 +423,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         '--exclusions',
         default=".git,__pycache__",
         help='Comma-separated directories to exclude (default: .git,__pycache__)'
+    )
+    gather_parser.add_argument(
+        '--include-dot-files',
+        action='store_true',
+        help='Include files and directories that start with a dot'
     )
     
     # Test command

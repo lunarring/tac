@@ -2,6 +2,7 @@ import json
 import uuid
 from typing import List, Optional, Tuple
 from tdac.utils.file_gatherer import gather_python_files
+from tdac.utils.project_files import ProjectFiles
 from tdac.core.llm import LLMClient, Message
 import os
 from datetime import datetime
@@ -34,7 +35,52 @@ class ProtoBlockFactory:
     
     def __init__(self):
         self.llm_client = LLMClient()
+        self.project_files = ProjectFiles()
     
+    def _load_config(self) -> dict:
+        """Load configuration from config.yaml"""
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+        with open(config_path, 'r') as f:
+            import yaml
+            return yaml.safe_load(f)
+
+    def _get_file_content(self, file_path: str, use_summaries: bool = False) -> str:
+        """
+        Get file content, either as full content or summary if enabled.
+        
+        Args:
+            file_path: Path to the file
+            use_summaries: Whether to use summaries instead of full content
+            
+        Returns:
+            str: File content or summary
+        """
+        if not use_summaries:
+            with open(file_path, 'r') as f:
+                return f.read()
+                
+        # Try to get summary from cache
+        summary = self.project_files.get_file_summary(file_path)
+        if summary:
+            if "error" in summary:
+                logger.warning(f"Error in cached summary for {file_path}: {summary['error']}")
+                return f"Error analyzing file: {summary['error']}"
+            return f"File Summary:\n{summary['summary']}"
+            
+        # Generate new summary if not cached
+        logger.info(f"Generating new summary for {file_path}")
+        stats = self.project_files.update_summaries(exclusions=[".git", "__pycache__"])
+        logger.debug(f"Summary update stats: {stats}")
+        
+        # Try to get summary again
+        summary = self.project_files.get_file_summary(file_path)
+        if summary:
+            if "error" in summary:
+                return f"Error analyzing file: {summary['error']}"
+            return f"File Summary:\n{summary['summary']}"
+            
+        return f"Error: Could not generate summary for {file_path}"
+
     def get_task_instructions(self, template_type: Optional[str] = None, direct_instructions: Optional[str] = None) -> str:
         """
         Get task-specific instructions either from a template or direct instructions.
@@ -70,7 +116,7 @@ class ProtoBlockFactory:
             
         # For other templates, combine with additional instructions
         return f"{template_instructions}\n\nAdditional specific instructions: {direct_instructions}"
-    
+
     def get_seed_instructions(self, codebase: str, task_instructions: str) -> str:
         """
         Args:
@@ -80,9 +126,21 @@ class ProtoBlockFactory:
         Returns:
             str: Complete seed instructions for the LLM
         """
+        # Load config to check if summaries are enabled
+        config = self._load_config()
+        use_summaries = config.get('general', {}).get('use_file_summaries', False)
+        
+        # Get codebase content, using summaries if enabled
+        if use_summaries:
+            logger.info("Using file summaries for seed instructions")
+            codebase = gather_python_files(
+                directory=".",  # Always use project root
+                exclusions=[".git", "__pycache__"],
+                use_summaries=True
+            )
+        
         return f"""<purpose>
     You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your employees, who then implement the solution.   complete seed instructions by combining codebase analysis with task instructions. Your own inputs are <codebase> and <task_instructions>. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
-
 </purpose>
 
 <codebase>
@@ -115,7 +173,7 @@ class ProtoBlockFactory:
 }}
 </output_format>
 """
-    
+
     def _clean_code_fences(self, content: str) -> str:
         """
         Clean markdown code fences from content, handling various formats.
@@ -233,6 +291,15 @@ class ProtoBlockFactory:
         Raises:
             ValueError: If unable to create a valid protoblock
         """
+        # Load config to check if summaries are enabled
+        config = self._load_config()
+        use_summaries = config.get('general', {}).get('use_file_summaries', False)
+        
+        if use_summaries:
+            logger.info("Using file summaries for protoblock creation")
+            # Update all summaries first to ensure they're current
+            self.project_files.update_summaries()
+        
         # Create messages for LLM
         messages = [
             Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'test', 'write_files', 'context_files', 'commit_message'.No markdown, no code fences. Keep it short and strictly formatted."),
