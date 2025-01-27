@@ -83,13 +83,14 @@ class ProtoBlockExecutor:
                 'test_data_generation': self.protoblock.test_data_generation,
                 'write_files': self.protoblock.write_files,
                 'context_files': self.protoblock.context_files,
-                'commit_message': self.protoblock.commit_message
+                'commit_message': self.protoblock.commit_message,
+                'test_results': self.protoblock.test_results  # Add test results to protoblock data
             },
             'timestamp': datetime.now().isoformat(),
             'attempt': attempt,
             'success': success,
             'git_diff': git_diff,
-            'test_results': self.test_results,
+            'test_results': self.test_results,  # Keep test results in execution data too
             'message': message
         }
 
@@ -202,6 +203,8 @@ class ProtoBlockExecutor:
                 
                 if self.run_tests():
                     print("Protoblock could successfully be turned into Mergeblock.")
+                    # Update protoblock with test results
+                    self.protoblock.test_results = self.test_results
                     # Write success log
                     self._write_log_file(attempt + 1, True, "Tests passed successfully")
                     
@@ -217,13 +220,13 @@ class ProtoBlockExecutor:
                     print("Test Results:")
                     print(self.get_test_results())
                     
+                    # Update protoblock with test results before anything else
+                    self.protoblock.test_results = self.test_results
+                    
                     # Commit failed test changes
                     commit_message = f"TDAC: Failed test attempt {attempt + 1}"
                     if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                         logger.warning("Failed to commit changes after failed tests")
-                    
-                    # Update current protoblock with test results before creating next one
-                    self.protoblock.test_results = self.test_results
                     
                     # Create next protoblock with test results from previous attempt
                     try:

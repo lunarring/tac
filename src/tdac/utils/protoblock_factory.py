@@ -355,7 +355,7 @@ class ProtoBlockFactory:
                 "specification": block.test_specification,
                 "data": block.test_data_generation,
                 "replacements": block.write_files,
-                "results": block.test_results
+                "results": block.test_results if block.test_results else None  # Ensure test results are included
             },
             "write_files": block.write_files,
             "context_files": block.context_files,

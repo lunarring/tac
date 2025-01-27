@@ -360,6 +360,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Directory to analyze and create block from'
     )
     block_parser.add_argument(
+        '--max-retries',
+        type=int,
+        help='Override the maximum number of retries (default from config.yaml)'
+    )
+    block_parser.add_argument(
         '--test',
         nargs='?',
         const='',
@@ -527,6 +532,10 @@ def main():
         try:
             # Load configuration
             config = load_config()
+            
+            # Override config values with command line arguments if provided
+            if args.max_retries is not None:
+                config['general']['max_retries'] = args.max_retries
             
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
