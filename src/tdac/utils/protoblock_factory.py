@@ -392,24 +392,87 @@ class ProtoBlockFactory:
 
     def create_next_protoblock_with_test_results(self, previous_block: ProtoBlock, test_results: str) -> ProtoBlock:
         """
-        Creates a new protoblock for the next attempt, with test results from the previous attempt.
+        Creates a new protoblock for the next attempt by analyzing test results and improving the approach.
         
         Args:
             previous_block: Previous ProtoBlock instance that failed
             test_results: Test results from the previous attempt
             
         Returns:
-            ProtoBlock: A new protoblock instance for the next attempt
+            ProtoBlock: A new protoblock instance with improved instructions and context
         """
-        # Create new protoblock with same specs but new test results
+        analysis_prompt = f"""<purpose>
+    You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to understand what went wrong and create an improved plan for the next attempt.
+</purpose>
+
+<previous_attempt>
+Task Description: {previous_block.task_description}
+Test Specification: {previous_block.test_specification}
+Test Data: {previous_block.test_data_generation}
+Files to Write: {previous_block.write_files}
+Context Files: {previous_block.context_files}
+</previous_attempt>
+
+<test_results>
+{test_results}
+</test_results>
+
+<planning_rules>
+- Analyze the test results to identify what went wrong
+- Consider if we're missing any necessary files in write_files or context_files
+- Check if the task description needs more clarity or specificity
+- Evaluate if the test specification or data need adjustments
+</planning_rules>
+
+<output_format>
+{{
+    "analysis": "Brief analysis of what went wrong in the previous attempt",
+    "task": {{
+        "specification": "Improved task description with clearer instructions"
+    }},
+    "test": {{
+        "specification": "Refined test specification based on previous failure",
+        "data": "Updated test data if needed"
+    }},
+    "write_files": ["Updated list of files that need to be modified"],
+    "context_files": ["Updated list of files needed for context"],
+    "commit_message": "Brief description of the revised approach"
+}}
+</output_format>"""
+
+        # Get analysis and improvements from LLM
+        messages = [
+            Message(role="system", content="You are a coding assistant analyzing test failures and improving implementation plans. Output must be valid JSON."),
+            Message(role="user", content=analysis_prompt)
+        ]
+        
+        response = self.llm_client.chat_completion(messages)
+        
+        # Verify and parse the response
+        is_valid, error_msg, data = self.verify_protoblock(response)
+        if not is_valid:
+            logger.warning(f"Failed to get valid improvement suggestions: {error_msg}")
+            # Fallback to original behavior if LLM analysis fails
+            return ProtoBlock(
+                task_description=previous_block.task_description,
+                test_specification=previous_block.test_specification,
+                test_data_generation=previous_block.test_data_generation,
+                write_files=previous_block.write_files,
+                context_files=previous_block.context_files,
+                block_id=previous_block.block_id,
+                commit_message=previous_block.commit_message,
+                test_results=test_results
+            )
+            
+        # Create new protoblock with improvements
         next_block = ProtoBlock(
-            task_description=previous_block.task_description,
-            test_specification=previous_block.test_specification,
-            test_data_generation=previous_block.test_data_generation,
-            write_files=previous_block.write_files,
-            context_files=previous_block.context_files,
+            task_description=data["task"]["specification"],
+            test_specification=data["test"]["specification"],
+            test_data_generation=data["test"]["data"],
+            write_files=data["write_files"],
+            context_files=data["context_files"],
             block_id=previous_block.block_id,
-            commit_message=previous_block.commit_message,
+            commit_message=data["commit_message"],
             test_results=test_results
         )
         
