@@ -180,7 +180,7 @@ Important: Do not include any markdown formatting, code fences, or extra charact
                 "content": None
             }
 
-    def summarize_directory(self, directory: str, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True) -> str:
+    def summarize_directory(self, directory: str, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True, for_protoblock: bool = False) -> str:
         """
         Summarize all Python files in a directory and its subdirectories.
         
@@ -188,6 +188,7 @@ Important: Do not include any markdown formatting, code fences, or extra charact
             directory: Path to the directory to analyze
             exclusions: List of directory names to exclude
             exclude_dot_files: Whether to exclude files/dirs starting with '.'
+            for_protoblock: If True, returns only summaries without metadata
             
         Returns:
             A formatted string containing the directory tree and file summaries
@@ -209,10 +210,11 @@ Important: Do not include any markdown formatting, code fences, or extra charact
             # Exclude specified directories and optionally dot directories
             dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
 
-            # Build directory tree
-            level = root.replace(directory, '').count(os.sep)
-            indent = ' ' * 4 * level
-            directory_tree.append(f"{indent}{os.path.basename(root)}/")
+            # Build directory tree if not for protoblock
+            if not for_protoblock:
+                level = root.replace(directory, '').count(os.sep)
+                indent = ' ' * 4 * level
+                directory_tree.append(f"{indent}{os.path.basename(root)}/")
 
             for file in files:
                 if (file.endswith('.py') and 
@@ -232,20 +234,22 @@ Important: Do not include any markdown formatting, code fences, or extra charact
                         continue
                     
                     seen_files.add(real_path)
-                    directory_tree.append(f"{indent}    {file}")
+                    if not for_protoblock:
+                        directory_tree.append(f"{indent}    {file}")
 
                     # Skip large files
                     file_size = os.path.getsize(file_path)
                     if file_size > MAX_FILE_SIZE:
-                        file_summaries.append(
-                            f"## File: {os.path.relpath(file_path, directory)}\n"
-                            f"Size: {file_size} bytes (too large to analyze), "
-                            f"Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
-                        )
+                        if not for_protoblock:
+                            file_summaries.append(
+                                f"## File: {os.path.relpath(file_path, directory)}\n"
+                                f"Size: {file_size} bytes (too large to analyze), "
+                                f"Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
+                            )
                         continue
 
                     # Analyze file
-                    file_info = f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
+                    file_info = "" if for_protoblock else f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
                     analysis = self._analyze_file(file_path)
 
                     if analysis["error"]:
@@ -268,9 +272,14 @@ Important: Do not include any markdown formatting, code fences, or extra charact
 
                         summary = "\n\n".join(summary_parts)
 
-                    file_summaries.append(f"## File: {os.path.relpath(file_path, directory)}\n{file_info}\n\n```python\n{summary}\n```")
+                    if for_protoblock:
+                        file_summaries.append(f"File: {os.path.relpath(file_path, directory)}\n{summary}")
+                    else:
+                        file_summaries.append(f"## File: {os.path.relpath(file_path, directory)}\n{file_info}\n\n```python\n{summary}\n```")
 
         if not file_summaries:
             return "No Python files found."
 
+        if for_protoblock:
+            return "\n\n---\n\n".join(file_summaries)
         return "\n".join(directory_tree) + "\n\n---\n\n" + "\n\n---\n\n".join(file_summaries) 
