@@ -3,12 +3,21 @@ import ast
 from datetime import datetime
 from typing import Dict, List, Optional
 from tdac.core.llm import LLMClient, Message
+import logging
+
+logger = logging.getLogger(__name__)
 
 class FileSummarizer:
     """Class for summarizing Python files using LLM analysis"""
     
     def __init__(self):
         self.llm_client = LLMClient()
+        # Load config for timeout
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+        with open(config_path, 'r') as f:
+            import yaml
+            config = yaml.safe_load(f)
+        self.timeout = config.get('general', {}).get('summarizer_timeout', 30)
 
     def _get_summary_prompt(self, code: str) -> str:
         """Generate the prompt for code summarization"""
@@ -32,11 +41,36 @@ Important: Do not include any markdown formatting, code fences, or extra charact
 
     def _summarize_code(self, code: str) -> str:
         """Use LLM to generate a summary of the code"""
-        messages = [
-            Message(role="system", content="You are a Python code analysis expert. Provide clear, concise, technical summaries of code structures."),
-            Message(role="user", content=self._get_summary_prompt(code))
-        ]
-        return self.llm_client.chat_completion(messages)
+        try:
+            messages = [
+                Message(role="system", content="You are a Python code analysis expert. Provide clear, concise, technical summaries of code structures."),
+                Message(role="user", content=self._get_summary_prompt(code))
+            ]
+            
+            import signal
+            from contextlib import contextmanager
+            
+            @contextmanager
+            def timeout(seconds):
+                def signal_handler(signum, frame):
+                    raise TimeoutError(f"LLM call timed out after {seconds} seconds")
+                signal.signal(signal.SIGALRM, signal_handler)
+                signal.alarm(seconds)
+                try:
+                    yield
+                finally:
+                    signal.alarm(0)
+            
+            # Call LLM with timeout
+            with timeout(self.timeout):
+                return self.llm_client.chat_completion(messages)
+                
+        except TimeoutError as e:
+            logger.error(str(e))
+            return f"Error: {str(e)}"
+        except Exception as e:
+            logger.error(f"LLM call failed: {str(e)}")
+            return f"Error: LLM call failed - {str(e)}"
 
     def _extract_code_block(self, node: ast.AST) -> str:
         """Extract the source code for a given AST node"""
@@ -47,82 +81,104 @@ Important: Do not include any markdown formatting, code fences, or extra charact
 
     def _analyze_file(self, file_path: str) -> Dict:
         """Analyze a single Python file and return its summary"""
-        with open(file_path, 'r') as f:
-            self.current_file_content = f.read()
-
         try:
-            tree = ast.parse(self.current_file_content)
-        except SyntaxError:
+            with open(file_path, 'r') as f:
+                self.current_file_content = f.read()
+
+            try:
+                tree = ast.parse(self.current_file_content)
+            except SyntaxError:
+                return {
+                    "error": "Could not parse file due to syntax error",
+                    "content": None
+                }
+
+            # Get all functions and classes at once
+            functions = []
+            classes = []
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, ast.FunctionDef):
+                    functions.append(node.name)
+                elif isinstance(node, ast.ClassDef):
+                    class_info = {"name": node.name, "methods": []}
+                    for child in ast.iter_child_nodes(node):
+                        if isinstance(child, ast.FunctionDef):
+                            class_info["methods"].append(child.name)
+                    classes.append(class_info)
+
+            # If no functions or classes found, return early
+            if not functions and not classes:
+                return {
+                    "error": None,
+                    "content": []  # Empty content is valid for files with no functions/classes
+                }
+
+            # Send entire file content to LLM once
+            summary = self._summarize_code(self.current_file_content)
+            
+            # If LLM call failed, return error
+            if summary.startswith("Error: LLM call failed"):
+                return {
+                    "error": summary,
+                    "content": None
+                }
+            
+            # Clean up any potential markdown artifacts
+            summary = summary.replace('```', '').strip()
+            
+            # Parse the summary to match our expected format
+            content = []
+            lines = summary.split('\n')
+            current_item = None
+            
+            for line in lines:
+                line = line.strip()
+                if not line:  # Skip empty lines
+                    continue
+                    
+                if line.startswith('[FUNCTION]'):
+                    if current_item:
+                        content.append(current_item)
+                    name = line.split(']')[1].strip()
+                    current_item = {"type": "function", "name": name, "summary": ""}
+                elif line.startswith('[CLASS]'):
+                    if current_item:
+                        content.append(current_item)
+                    name = line.split(']')[1].strip()
+                    current_item = {"type": "class", "name": name, "summary": "", "methods": []}
+                elif line.startswith('  [METHOD]') and current_item and current_item["type"] == "class":
+                    name = line.split(']')[1].strip()
+                    # Get the description part after the name
+                    desc_start = line.find(name) + len(name)
+                    description = line[desc_start:].strip()
+                    current_item["methods"].append({"name": name, "summary": description})
+                elif line and current_item:
+                    if current_item["type"] == "function":
+                        current_item["summary"] = line
+                    elif current_item["type"] == "class" and not line.startswith('  [METHOD]'):
+                        current_item["summary"] = line
+
+            if current_item:
+                content.append(current_item)
+
+            # Verify we got actual content
+            if not content:
+                return {
+                    "error": "No valid summaries generated from LLM response",
+                    "content": None
+                }
+
             return {
-                "error": "Could not parse file due to syntax error",
+                "error": None,
+                "content": content
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing file {file_path}: {str(e)}")
+            return {
+                "error": f"Unexpected error: {str(e)}",
                 "content": None
             }
-
-        # Get all functions and classes at once
-        functions = []
-        classes = []
-        for node in ast.iter_child_nodes(tree):
-            if isinstance(node, ast.FunctionDef):
-                functions.append(node.name)
-            elif isinstance(node, ast.ClassDef):
-                class_info = {"name": node.name, "methods": []}
-                for child in ast.iter_child_nodes(node):
-                    if isinstance(child, ast.FunctionDef):
-                        class_info["methods"].append(child.name)
-                classes.append(class_info)
-
-        # Send entire file content to LLM once
-        summary = self._summarize_code(self.current_file_content)
-        
-        # Clean up any potential markdown artifacts
-        summary = summary.replace('```', '').strip()
-        
-        # Parse the summary to match our expected format
-        content = []
-        lines = summary.split('\n')
-        current_item = None
-        
-        for line in lines:
-            line = line.strip()
-            if not line:  # Skip empty lines
-                continue
-                
-            if line.startswith('[FUNCTION]'):
-                if current_item:
-                    content.append(current_item)
-                name = line.split(']')[1].strip()
-                current_item = {"type": "function", "name": name, "summary": ""}
-            elif line.startswith('[CLASS]'):
-                if current_item:
-                    content.append(current_item)
-                name = line.split(']')[1].strip()
-                current_item = {"type": "class", "name": name, "summary": "", "methods": []}
-            elif line.startswith('  [METHOD]') and current_item and current_item["type"] == "class":
-                name = line.split(']')[1].strip()
-                # Get the description part after the name
-                desc_start = line.find(name) + len(name)
-                description = line[desc_start:].strip()
-                current_item["methods"].append({"name": name, "summary": description})
-            elif line and current_item:
-                if current_item["type"] == "function":
-                    current_item["summary"] = line
-                elif current_item["type"] == "class" and not line.startswith('  [METHOD]'):
-                    current_item["summary"] = line
-
-        if current_item:
-            content.append(current_item)
-
-        # Verify we got actual content
-        if not content:
-            return {
-                "error": "No valid summaries generated",
-                "content": None
-            }
-
-        return {
-            "error": None,
-            "content": content
-        }
 
     def summarize_directory(self, directory: str, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True) -> str:
         """
