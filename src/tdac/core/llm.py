@@ -24,8 +24,13 @@ class LLMConfig:
     """Configuration for LLM clients."""
     
     @staticmethod
-    def from_config_file(config_path: Optional[str] = None) -> 'LLMConfig':
-        """Create LLMConfig from config.yaml file."""
+    def from_config_file(config_path: Optional[str] = None, strength: str = "weak") -> 'LLMConfig':
+        """Create LLMConfig from config.yaml file.
+        
+        Args:
+            config_path: Path to config file
+            strength: Whether to use strong or weak LLM ("strong" or "weak", defaults to "weak")
+        """
         if config_path is None:
             # Use the same config path resolution as main CLI
             config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
@@ -36,7 +41,8 @@ class LLMConfig:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
         
-        llm_config = config.get('llm', {})
+        config_key = f"llm_{strength}"
+        llm_config = config.get(config_key, {})
         provider = llm_config.get('provider', 'deepseek')  # Default to deepseek
         model = llm_config.get('model', 'deepseek-chat')
         
@@ -64,9 +70,14 @@ class LLMConfig:
 class LLMClient:
     """Client for interacting with Language Models."""
     
-    def __init__(self, config: Optional[LLMConfig] = None):
-        """Initialize client with config from file or provided config."""
-        self.config = config or LLMConfig.from_config_file()
+    def __init__(self, config: Optional[LLMConfig] = None, strength: str = "weak"):
+        """Initialize client with config from file or provided config.
+        
+        Args:
+            config: Optional LLMConfig instance
+            strength: Whether to use strong or weak LLM ("strong" or "weak", defaults to "weak")
+        """
+        self.config = config or LLMConfig.from_config_file(strength=strength)
         self.client = self._initialize_client()
     
     def _initialize_client(self) -> OpenAI:
