@@ -225,54 +225,81 @@ class ProtoBlockFactory:
         Returns:
             Tuple[bool, str, Optional[dict]]: (is_valid, error_message, parsed_data)
         """
+        if not json_content or not json_content.strip():
+            return False, "Empty JSON content", None
+            
         content_to_try = json_content.strip()
+        data = None
         
-        # First try parsing as-is
-        try:
-            data = json.loads(content_to_try)
-        except json.JSONDecodeError:
-            # If that fails, try cleaning code fences
+        # Try parsing with different methods
+        parse_methods = [
+            lambda x: json.loads(x),  # Try direct parsing first
+            lambda x: json.loads(self._clean_code_fences(x))  # Try cleaning code fences if direct fails
+        ]
+        
+        parse_error = None
+        for parse_method in parse_methods:
             try:
-                cleaned_content = self._clean_code_fences(content_to_try)
-                if not cleaned_content:
-                    return False, "Content is empty after cleaning", None
-                data = json.loads(cleaned_content)
+                data = parse_method(content_to_try)
+                break
             except json.JSONDecodeError as e:
-                return False, f"Invalid JSON syntax: {str(e)}", None
-        except Exception as e:
-            return False, f"Validation error: {str(e)}", None
+                parse_error = str(e)
+                continue
+            except Exception as e:
+                return False, f"Unexpected error parsing JSON: {str(e)}", None
+                
+        if data is None:
+            return False, f"Failed to parse JSON: {parse_error}", None
             
         try:
             # Verify top-level structure
             if not isinstance(data, dict):
                 return False, "JSON content must be a dictionary", None
                 
-            required_keys = ["task", "test", "write_files", "context_files", "commit_message"]
-            missing_keys = [key for key in required_keys if key not in data]
-            if missing_keys:
-                return False, f"Missing required keys: {', '.join(missing_keys)}", None
+            # Define required structure
+            required_structure = {
+                "task": {
+                    "required_keys": ["specification"],
+                    "type": dict
+                },
+                "test": {
+                    "required_keys": ["specification", "data"],
+                    "type": dict
+                },
+                "write_files": {
+                    "type": list
+                },
+                "context_files": {
+                    "type": list
+                },
+                "commit_message": {
+                    "type": str
+                }
+            }
             
-            # Verify task section
-            if not isinstance(data["task"], dict):
-                return False, "task must be a dictionary", None
-            if "specification" not in data["task"]:
-                return False, "task must contain 'specification'", None
-                
-            # Verify test section
-            test = data["test"]
-            if not isinstance(test, dict):
-                return False, "test must be a dictionary", None
-            test_keys = ["specification", "data"]
-            missing_test_keys = [key for key in test_keys if key not in test]
-            if missing_test_keys:
-                return False, f"test section missing keys: {', '.join(missing_test_keys)}", None
-                
-            # Verify lists
-            if not isinstance(data["write_files"], list):
-                return False, "write_files must be a list", None
-            if not isinstance(data["context_files"], list):
-                return False, "context_files must be a list", None
-                
+            # Validate structure
+            for key, requirements in required_structure.items():
+                # Check if required key exists
+                if key not in data:
+                    return False, f"Missing required key: {key}", None
+                    
+                # Check type
+                if not isinstance(data[key], requirements["type"]):
+                    return False, f"{key} must be a {requirements['type'].__name__}", None
+                    
+                # Check nested required keys if any
+                if "required_keys" in requirements and isinstance(data[key], dict):
+                    missing_nested = [k for k in requirements["required_keys"] if k not in data[key]]
+                    if missing_nested:
+                        return False, f"{key} section missing keys: {', '.join(missing_nested)}", None
+            
+            # Additional validation for lists
+            for key in ["write_files", "context_files"]:
+                if not all(isinstance(item, str) for item in data[key]):
+                    return False, f"All items in {key} must be strings", None
+                if not all(item.strip() for item in data[key]):
+                    return False, f"Empty or whitespace-only items not allowed in {key}", None
+            
             return True, "", data
             
         except Exception as e:
