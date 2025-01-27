@@ -114,6 +114,11 @@ class GitManager:
         try:
             current_branch = self.get_current_branch() or ""
             
+            # Check if we're on master/main branch
+            if current_branch.lower() in ['master', 'main']:
+                logger.error("Cannot run TDAC directly on master/main branch. Please create and checkout a feature branch first!")
+                return False, current_branch
+            
             if self.repo.is_dirty(untracked_files=True):
                 logger.error("Git working tree is not clean. Please commit or stash your changes before running TDAC!")
                 print("\nGit status:")

@@ -6,7 +6,8 @@ general:
   summarizer_timeout: 45  # Timeout in seconds for file summarization
 
 aider:
-  model: "deepseek/deepseek-chat"
+  model: "openai/o1-mini"
+  # model: "deepseek/deepseek-chat"
   model_settings:
     edit_format: "diff"
     verify_ssl: true
