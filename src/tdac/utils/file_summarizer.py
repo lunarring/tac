@@ -194,7 +194,7 @@ Important: Do not include any markdown formatting, code fences, or extra charact
             A formatted string containing the directory tree and file summaries
         """
         if exclusions is None:
-            exclusions = [".git", "__pycache__"]
+            exclusions = [".git", "__pycache__", "build"]
 
         # Size thresholds in bytes (100KB total)
         MAX_FILE_SIZE = 100 * 1024
