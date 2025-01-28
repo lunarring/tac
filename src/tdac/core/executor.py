@@ -4,10 +4,15 @@ import yaml
 import logging
 import json
 from datetime import datetime
+import pytest
+from _pytest.config import Config
+from _pytest.terminal import TerminalReporter
+from _pytest.capture import CaptureManager
 from tdac.protoblock import ProtoBlock, ProtoBlockFactory
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
 import git
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -171,12 +176,14 @@ class ProtoBlockExecutor:
                         logger.warning("Failed to commit changes after implementation")
                     
                 except Exception as e:
-                    print(f"Error during task execution: {e}")
+                    error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
+                    print(f"\nExecution Error: {error_msg}")
+                    logger.error(error_msg)
                     # Write failure log and get execution data
-                    execution_data = self._write_log_file(attempt + 1, False, f"Task execution failed: {str(e)}")
+                    execution_data = self._write_log_file(attempt + 1, False, error_msg)
                     
                     # Store error message for next attempt
-                    self.previous_error = str(e)
+                    self.previous_error = error_msg
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
@@ -188,6 +195,8 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
+                        print(f"Last error: {error_msg}")
+                        print("="*60 + "\n")
                         # Commit any remaining changes before cleanup
                         commit_message = f"TDAC: Failed implementation attempt {attempt + 1}"
                         if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
@@ -278,8 +287,7 @@ class ProtoBlockExecutor:
             print("="*50)
             if execution_success:
                 print("Implementation successful! To merge the changes:")
-                print(f"  git checkout {original_branch} && git merge {block_branch}")
-                print(f"  git branch -d {block_branch}  # Optional: delete branch after merging")
+                print(f"git checkout {original_branch} && git merge {block_branch} && git branch -d {block_branch}")
             else:
                 print("To clean up:")
                 print(f"  git restore . && git checkout {original_branch} && git branch -D {block_branch}")
@@ -288,10 +296,12 @@ class ProtoBlockExecutor:
             return execution_success
 
         except Exception as e:
-            print(f"An error occurred during block execution: {e}")
+            error_msg = f"An error occurred during block execution: {type(e).__name__}: {str(e)}"
+            print(f"\nExecution Error: {error_msg}")
+            logger.error(error_msg)
             # Write error log if we have a protoblock ID
             if self.protoblock_id:
-                self._write_log_file(0, False, f"Unexpected error during execution: {str(e)}")
+                self._write_log_file(0, False, error_msg)
             return False
 
     def run_tests(self, test_path: str = None) -> bool:
@@ -312,7 +322,11 @@ class ProtoBlockExecutor:
             if os.path.exists(full_path):
                 logger.debug(f"Path exists. Is file: {os.path.isfile(full_path)}, Is dir: {os.path.isdir(full_path)}")
             else:
-                logger.debug(f"Path does not exist: {full_path}")
+                error_msg = f"Error: Test path not found: {full_path}"
+                logger.error(error_msg)
+                print(f"\nTest Error: {error_msg}")
+                self.test_results = error_msg
+                return False
 
             if os.path.isfile(full_path):
                 # Single test file case
@@ -321,69 +335,83 @@ class ProtoBlockExecutor:
             elif os.path.isdir(full_path):
                 # Directory case - discover and run all test files
                 logger.debug(f"Discovering tests in directory: {test_target}")
-                # Remove the restrictive pattern and let pytest discover all tests
-                result = self._run_pytest([test_target, '-v'] + pytest_args)
+                result = self._run_pytest([test_target] + pytest_args)
             else:
-                self.test_results = f"Error: Test path not found: {full_path}"
-                logger.error(self.test_results)
-                print(self.test_results)
+                error_msg = f"Error: Path is neither a file nor directory: {full_path}"
+                logger.error(error_msg)
+                print(f"\nTest Error: {error_msg}")
+                self.test_results = error_msg
                 return False
 
-            # Print test output and summary
-            print(self.test_results)
-            self._print_test_summary()
+            # Print test summary if we have results
+            if self.test_results:
+                self._print_test_summary()
+            
             return result
             
         except Exception as e:
-            self.test_results = str(e)
-            logger.exception("Error running tests")
-            print(f"Error running tests: {e}")
+            error_msg = f"Error running tests: {type(e).__name__}: {str(e)}"
+            logger.exception(error_msg)
+            print(f"\nTest Error: {error_msg}")
+            self.test_results = error_msg
             return False
 
     def _run_pytest(self, args: list) -> bool:
-        """Helper method to run pytest with given arguments"""
+        """Run tests using pytest's Python API directly"""
         try:
-            command = ['pytest'] + args
-            logger.debug(f"Running pytest command: {' '.join(command)}")
-            
             print("\nExecuting tests with pytest...")
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=30  # Add 30 second timeout
-            )
-            logger.debug(f"Pytest return code: {result.returncode}")
-            logger.debug(f"Pytest stdout: {result.stdout}")
-            logger.debug(f"Pytest stderr: {result.stderr}")
             
-            self.test_results = result.stdout + "\n" + result.stderr
+            # Convert command line args to pytest args
+            pytest_args = []
+            for arg in args:
+                if arg.startswith('--'):
+                    pytest_args.append(arg)
+                elif arg == '-v':
+                    pytest_args.append('-v')
+                else:
+                    # Assume it's a path
+                    pytest_args.append(arg)
             
-            # Always show test output
-            print("\nTest Output:")
-            print("="*60)
-            print(self.test_results)
-            print("="*60)
+            # Add verbosity if not already present
+            if '-v' not in pytest_args and '-vv' not in pytest_args:
+                pytest_args.append('-v')
             
-            return result.returncode == 0
-        except subprocess.TimeoutExpired as timeout_err:
-            # Capture any partial output that was generated before timeout
-            partial_output = ""
-            if timeout_err.stdout:
-                partial_output += "\nPartial stdout before timeout:\n" + timeout_err.stdout.decode('utf-8')
-            if timeout_err.stderr:
-                partial_output += "\nPartial stderr before timeout:\n" + timeout_err.stderr.decode('utf-8')
+            # Add -s to disable output capture and show print statements
+            if '-s' not in pytest_args:
+                pytest_args.append('-s')
             
-            error_msg = f"Error: Test discovery/execution timed out after 30 seconds\n{partial_output}"
+            print(f"Running pytest with args: {' '.join(pytest_args)}")
+            
+            # Run pytest and store output
+            result = pytest.main(pytest_args)
+            
+            # Map pytest exit codes to meaningful messages
+            exit_code_messages = {
+                pytest.ExitCode.OK: "All tests passed!",
+                pytest.ExitCode.TESTS_FAILED: "Some tests failed",
+                pytest.ExitCode.INTERRUPTED: "Testing was interrupted",
+                pytest.ExitCode.INTERNAL_ERROR: "Internal error in pytest",
+                pytest.ExitCode.USAGE_ERROR: "Pytest usage error",
+                pytest.ExitCode.NO_TESTS_COLLECTED: "No tests were collected",
+            }
+            
+            # Get meaningful message for the exit code
+            result_message = exit_code_messages.get(result, f"Unknown pytest exit code: {result}")
+            
+            # Store the result message
+            self.test_results = f"Test execution completed. Result: {result_message}"
+            
+            # Print error message if tests didn't pass
+            if result != pytest.ExitCode.OK:
+                print(f"\nTest Error: {result_message}")
+            
+            return result == pytest.ExitCode.OK
+            
+        except Exception as e:
+            error_msg = f"Error running pytest: {str(e)}\n{type(e).__name__}: {str(e)}"
             logger.error(error_msg)
             self.test_results = error_msg
-            print(self.test_results)
-            return False
-        except subprocess.SubprocessError as e:
-            error_msg = f"Error running pytest: {str(e)}"
-            logger.error(error_msg)
-            self.test_results = error_msg
-            print(self.test_results)
+            print(f"\nTest Error: {error_msg}")
             return False
 
     def _print_test_summary(self):
