@@ -257,7 +257,7 @@ class ProtoBlockFactory:
             if not isinstance(data, dict):
                 return False, "JSON content must be a dictionary", None
                 
-            # Define required structure
+            # Define required structure - only check these keys, ignore additional ones
             required_structure = {
                 "task": {
                     "required_keys": ["specification"],
@@ -278,31 +278,45 @@ class ProtoBlockFactory:
                 }
             }
             
+            # Extract only the required fields for validation, but keep optional fields
+            validated_data = {}
+            
+            # First validate and extract required fields
+            for key in required_structure:
+                if key not in data:
+                    return False, f"Missing required key: {key}", None
+                validated_data[key] = data[key]
+            
+            # Add any optional fields that might be useful (like analysis)
+            for key in data:
+                if key not in required_structure:
+                    validated_data[key] = data[key]
+            
             # Validate structure
             for key, requirements in required_structure.items():
                 # Check if required key exists
-                if key not in data:
+                if key not in validated_data:
                     return False, f"Missing required key: {key}", None
                     
                 # Check type
-                if not isinstance(data[key], requirements["type"]):
+                if not isinstance(validated_data[key], requirements["type"]):
                     return False, f"{key} must be a {requirements['type'].__name__}", None
                     
                 # Check nested required keys if any
-                if "required_keys" in requirements and isinstance(data[key], dict):
-                    missing_nested = [k for k in requirements["required_keys"] if k not in data[key]]
+                if "required_keys" in requirements and isinstance(validated_data[key], dict):
+                    missing_nested = [k for k in requirements["required_keys"] if k not in validated_data[key]]
                     if missing_nested:
                         return False, f"{key} section missing keys: {', '.join(missing_nested)}", None
             
             # Additional validation for lists
             for key in ["write_files", "context_files"]:
-                if not all(isinstance(item, str) for item in data[key]):
+                if not all(isinstance(item, str) for item in validated_data[key]):
                     return False, f"All items in {key} must be strings", None
-                if not all(item.strip() for item in data[key]):
+                if not all(item.strip() for item in validated_data[key]):
                     return False, f"Empty or whitespace-only items not allowed in {key}", None
 
             # Validate test file naming convention
-            for file_path in data["write_files"]:
+            for file_path in validated_data["write_files"]:
                 if file_path.startswith("tests/"):
                     # Ensure test files are directly in tests/ directory and follow naming convention
                     parts = file_path.split("/")
@@ -311,7 +325,7 @@ class ProtoBlockFactory:
                     if not parts[1].startswith("test_") or not parts[1].endswith(".py"):
                         return False, f"Test files must follow pattern 'test_*.py', found: {file_path}", None
             
-            return True, "", data
+            return True, "", validated_data
             
         except Exception as e:
             return False, f"Validation error: {str(e)}", None
