@@ -4,10 +4,9 @@ import yaml
 import logging
 import json
 from datetime import datetime
-from tdac.core.protoblock import ProtoBlock
+from tdac.protoblock import ProtoBlock, ProtoBlockFactory
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
-from tdac.utils.protoblock_factory import ProtoBlockFactory
 import git
 
 logger = logging.getLogger(__name__)

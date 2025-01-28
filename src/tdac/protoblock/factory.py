@@ -1,13 +1,14 @@
 import json
 import uuid
 from typing import List, Optional, Tuple
+from datetime import datetime
+import os
+import logging
+
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.project_files import ProjectFiles
 from tdac.core.llm import LLMClient, Message
-import os
-from datetime import datetime
-import logging
-from tdac.core.protoblock import ProtoBlock
+from .protoblock import ProtoBlock
 
 logger = logging.getLogger(__name__)
 
@@ -171,8 +172,7 @@ class ProtoBlockFactory:
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}
-</output_format>
-"""
+</output_format>"""
 
     def _clean_code_fences(self, content: str) -> str:
         """

@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from typing import Dict, Any
-from tdac.agents.base import Agent
-from tdac.agents.aider_agent import AiderAgent
 
 class ProtoBlock:
     """
@@ -35,4 +33,4 @@ class ProtoBlock:
             'block_id': self.block_id
         })
         
-        return AiderAgent(config)
+        return AiderAgent(config) 

@@ -13,16 +13,14 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tdac.core.protoblock import ProtoBlock
+from tdac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
 from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import ProtoBlockExecutor
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.file_summarizer import FileSummarizer
 from tdac.core.llm import LLMClient, Message
-from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
-from tdac.utils.protoblock_factory import ProtoBlockFactory
 from tdac.utils.project_files import ProjectFiles
 
 logger = setup_logger(__name__)
