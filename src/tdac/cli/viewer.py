@@ -15,6 +15,7 @@ class TDACViewer:
         self.log_manager = LogManager()
         self.current_log = None
         self.history = []  # Stack to track menu history and their arguments
+        self.items_per_page = 10  # Number of items to show per page
         
     def get_human_time_diff(self, timestamp: float) -> str:
         """Convert a timestamp into a human-friendly time difference string."""
@@ -33,18 +34,23 @@ class TDACViewer:
             days = diff / 86400
             return f"{days:.1f}days ago"
             
-    def show_menu(self, options: list, title: str = None) -> None:
+    def show_menu(self, options: list, title: str = None, show_nav: bool = False, has_next: bool = False, has_prev: bool = False) -> None:
         """Display a menu with numbered options."""
         if title:
             self.console.print(f"\n[bold cyan]{title}[/bold cyan]")
         self.console.print("\nChoose an option:")
         for i, option in enumerate(options, 1):
             self.console.print(f"{i}. {option}")
+        if show_nav:
+            if has_prev:
+                self.console.print("p. Previous page")
+            if has_next:
+                self.console.print("n. Next page")
         if self.history:  # Show back option only if we have history
             self.console.print("b. Back")
         self.console.print("q. Quit")
         
-    def get_choice(self, max_choice: int) -> str:
+    def get_choice(self, max_choice: int, allow_nav: bool = False, has_next: bool = False, has_prev: bool = False) -> str:
         """Get user choice with validation."""
         while True:
             choice = input("\nEnter your choice: ").lower()
@@ -52,6 +58,11 @@ class TDACViewer:
                 sys.exit(0)
             if choice == 'b' and self.history:
                 return 'b'
+            if allow_nav:
+                if choice == 'n' and has_next:
+                    return 'n'
+                if choice == 'p' and has_prev:
+                    return 'p'
             try:
                 num = int(choice)
                 if 1 <= num <= max_choice:
@@ -92,47 +103,80 @@ class TDACViewer:
                 
     def logs_menu(self) -> None:
         """Show menu with available log files."""
+        page = 0  # Start at first page
         while True:
             logs = self.log_manager.list_logs()
             if not logs:
                 self.console.print("[yellow]No log files found.[/yellow]")
                 input("Press Enter to continue...")
                 return
-                
+
+            # Calculate pagination
+            start_idx = page * self.items_per_page
+            end_idx = start_idx + self.items_per_page
+            current_logs = logs[start_idx:end_idx]
+            total_pages = (len(logs) + self.items_per_page - 1) // self.items_per_page
+
             # Create options with human-friendly times
             options = []
-            for log in logs:
+            for log in current_logs:
                 mtime = os.path.getmtime(log)
                 time_diff = self.get_human_time_diff(mtime)
                 options.append(f"{log} ({time_diff})")
-                
-            self.show_menu(options, "Available Log Files")
-            choice = self.get_choice(len(logs))  # Still use original logs length
-            
+
+            has_prev = page > 0
+            has_next = end_idx < len(logs)
+
+            self.show_menu(
+                options, 
+                f"Available Log Files (Page {page + 1}/{total_pages})",
+                show_nav=True,
+                has_next=has_next,
+                has_prev=has_prev
+            )
+            choice = self.get_choice(len(options), allow_nav=True, has_next=has_next, has_prev=has_prev)
+
             if choice == 'b':
-                if self.go_back():  # Only break the loop if we actually went back
+                if self.go_back():
                     break
                 continue
-                
-            self.add_to_history(self.logs_menu)
-            self.log_manager.load_log(logs[choice - 1])  # Use original log name
-            self.log_menu()
+
+            # Handle pagination navigation
+            if choice == 'p' and has_prev:
+                page -= 1
+                continue
+            if choice == 'n' and has_next:
+                page += 1
+                continue
+
+            # Handle log selection
+            if 1 <= choice <= len(current_logs):
+                self.add_to_history(self.logs_menu)
+                self.log_manager.load_log(current_logs[choice - 1])
+                self.log_menu()
             
     def protoblocks_menu(self) -> None:
         """Show menu with available protoblock files."""
+        page = 0  # Start at first page
         while True:
             protoblocks = [f for f in os.listdir('.') if f.startswith('.tdac_protoblock_') and f.endswith('.json')]
             if not protoblocks:
                 self.console.print("[yellow]No protoblock files found.[/yellow]")
                 input("Press Enter to continue...")
                 return
-                
+
             # Sort protoblocks by modification time (newest first)
             protoblocks.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-                
+
+            # Calculate pagination
+            start_idx = page * self.items_per_page
+            end_idx = start_idx + self.items_per_page
+            current_protoblocks = protoblocks[start_idx:end_idx]
+            total_pages = (len(protoblocks) + self.items_per_page - 1) // self.items_per_page
+
             # Create options with human-friendly times and template type
             options = []
-            for pb in protoblocks:
+            for pb in current_protoblocks:
                 mtime = os.path.getmtime(pb)
                 time_diff = self.get_human_time_diff(mtime)
                 try:
@@ -142,17 +186,36 @@ class TDACViewer:
                     options.append(f"{pb} ({template_type}, {time_diff})")
                 except:
                     options.append(f"{pb} (error reading file, {time_diff})")
-                
-            self.show_menu(options, "Available Protoblocks")
-            choice = self.get_choice(len(protoblocks))
-            
+
+            has_prev = page > 0
+            has_next = end_idx < len(protoblocks)
+
+            self.show_menu(
+                options, 
+                f"Available Protoblocks (Page {page + 1}/{total_pages})",
+                show_nav=True,
+                has_next=has_next,
+                has_prev=has_prev
+            )
+            choice = self.get_choice(len(options), allow_nav=True, has_next=has_next, has_prev=has_prev)
+
             if choice == 'b':
-                if self.go_back():  # Only break the loop if we actually went back
+                if self.go_back():
                     break
                 continue
-                
-            self.add_to_history(self.protoblocks_menu)
-            self.protoblock_menu(protoblocks[choice - 1])
+
+            # Handle pagination navigation
+            if choice == 'p' and has_prev:
+                page -= 1
+                continue
+            if choice == 'n' and has_next:
+                page += 1
+                continue
+
+            # Handle protoblock selection
+            if 1 <= choice <= len(current_protoblocks):
+                self.add_to_history(self.protoblocks_menu)
+                self.protoblock_menu(current_protoblocks[choice - 1])
             
     def protoblock_menu(self, protoblock_file: str) -> None:
         """Show menu for a specific protoblock file."""
