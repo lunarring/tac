@@ -391,12 +391,30 @@ class ProtoBlockExecutor:
                     }
                     self.no_tests_collected = False
 
+                def _should_capture_output(self, text):
+                    # Filter out debug and logging messages
+                    if not text:
+                        return False
+                    text = str(text)
+                    ignore_patterns = [
+                        'DEBUG    ',
+                        'INFO     ',
+                        'WARNING  ',
+                        'ERROR    ',
+                        'CRITICAL ',
+                        'httpcore.',
+                        'httpx:',
+                        'openai.',
+                    ]
+                    return not any(pattern in text for pattern in ignore_patterns)
+
                 def pytest_collectreport(self, report):
                     if report.outcome == 'passed' and not report.result:
                         self.no_tests_collected = True
                     # Add collection error handling
                     if report.outcome == 'failed':
-                        self.output.append(str(report.longrepr))
+                        if hasattr(report, 'longrepr') and self._should_capture_output(report.longrepr):
+                            self.output.append(str(report.longrepr))
 
                 def pytest_runtest_logreport(self, report):
                     # Capture test results
@@ -412,13 +430,13 @@ class ProtoBlockExecutor:
                         self.test_results['skipped'] += 1
 
                     # Capture test output
-                    if report.longrepr:
+                    if report.longrepr and self._should_capture_output(report.longrepr):
                         self.output.append(str(report.longrepr))
-                    if hasattr(report, 'caplog'):
+                    if hasattr(report, 'caplog') and self._should_capture_output(report.caplog):
                         self.output.append(report.caplog)
-                    if hasattr(report, 'capstdout'):
+                    if hasattr(report, 'capstdout') and self._should_capture_output(report.capstdout):
                         self.output.append(report.capstdout)
-                    if hasattr(report, 'capstderr'):
+                    if hasattr(report, 'capstderr') and self._should_capture_output(report.capstderr):
                         self.output.append(report.capstderr)
 
             output_capture = OutputCapture()
