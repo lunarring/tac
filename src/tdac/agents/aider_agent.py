@@ -86,7 +86,6 @@ Important Guidelines:
             'aider',
             '--yes-always',
             '--no-git',
-            '--quiet',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
@@ -107,11 +106,11 @@ Important Guidelines:
         
         try:
             logger.info("Executing Aider command...")
-            logger.info("Command details:")
-            logger.info(f"- Write files: {write_files}")
-            logger.info(f"- Context files: {context_files}")
-            logger.info(f"- Test files: {test_files}")
-            logger.info(f"- Full prompt:\n{prompt}")
+            # logger.info("Command details:")
+            # logger.info(f"- Write files: {write_files}")
+            # logger.info(f"- Context files: {context_files}")
+            # logger.info(f"- Test files: {test_files}")
+            # logger.info(f"- Full prompt:\n{prompt}")
             
             # Set timeout values
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
@@ -121,7 +120,7 @@ Important Guidelines:
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,  # Capture stderr instead of sending to DEVNULL
                 text=True,
                 bufsize=1,
                 universal_newlines=True
@@ -142,14 +141,16 @@ Important Guidelines:
                     raise TimeoutError("Aider process appears to be hung - no output for 30 seconds")
                 
                 # Use select to wait for output with timeout
-                reads = [process.stdout]
+                reads = [process.stdout, process.stderr]  # Add stderr to monitored pipes
                 ready_reads, _, _ = select.select(reads, [], [], READ_TIMEOUT)
                 
                 if process.poll() is not None:
                     # Process finished, get any remaining output
-                    remaining_stdout, _ = process.communicate()
+                    remaining_stdout, remaining_stderr = process.communicate()
                     if remaining_stdout:
                         logger.debug(f"FINAL STDOUT: {remaining_stdout}")
+                    if remaining_stderr:
+                        logger.error(f"FINAL STDERR: {remaining_stderr}")
                     break
                 
                 # Read from any ready pipes
@@ -157,16 +158,22 @@ Important Guidelines:
                     line = pipe.readline()
                     if line:
                         last_output_time = time.time()
-                        logger.debug(f"STDOUT: {line.strip()}")
+                        if pipe == process.stdout:
+                            logger.debug(f"STDOUT: {line.strip()}")
+                        else:
+                            logger.error(f"STDERR: {line.strip()}")
             
             if process.returncode != 0:
+                logger.error(f"Aider command that failed: {' '.join(command)}")
                 raise subprocess.CalledProcessError(process.returncode, command)
                 
             logger.info("Aider executed successfully.")
         except subprocess.CalledProcessError as e:
             logger.error(f"Aider execution failed with return code: {e.returncode}")
-            logger.error("Command that failed:")
-            logger.error(' '.join(command))
+            logger.error(f"Command that failed: {' '.join(command)}")
+            # Try to get any buffered error output
+            if hasattr(e, 'stderr') and e.stderr:
+                logger.error(f"Error output from Aider:\n{e.stderr}")
             raise
 
     def execute_task(self, previous_error: str = None) -> None:
