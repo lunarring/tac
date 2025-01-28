@@ -114,6 +114,7 @@ Important Guidelines:
             
             # Set timeout values
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
+            NO_OUTPUT_TIMEOUT = TOTAL_TIMEOUT / 2  # Set no-output timeout to half of total timeout
             READ_TIMEOUT = 1.0   # 1 second read timeout
             
             # Stream output in real-time with timeout handling
@@ -136,9 +137,9 @@ Important Guidelines:
                     raise TimeoutError(f"Aider process exceeded {TOTAL_TIMEOUT} seconds timeout")
                 
                 # Check if we've had no output for too long (possible hang)
-                if time.time() - last_output_time > 30:  # 30 seconds without output
+                if time.time() - last_output_time > NO_OUTPUT_TIMEOUT:
                     process.kill()
-                    raise TimeoutError("Aider process appears to be hung - no output for 30 seconds")
+                    raise TimeoutError(f"Aider process appears to be hung - no output for {NO_OUTPUT_TIMEOUT} seconds")
                 
                 # Use select to wait for output with timeout
                 reads = [process.stdout, process.stderr]  # Add stderr to monitored pipes
