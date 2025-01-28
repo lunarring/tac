@@ -293,6 +293,17 @@ class ProtoBlockExecutor:
             print("\nGit Commands:")
             print("="*50)
             if execution_success:
+                # Commit all changes with the protoblock's commit message or default message
+                commit_message = self.protoblock.commit_message or "TDAC auto commit, message missing"
+                commit_success = self.git_manager.handle_post_execution(
+                    {'git': {'auto_push': True}},  # Enable auto-push for successful execution
+                    commit_message
+                )
+                if commit_success:
+                    print("Changes have been committed and pushed!")
+                else:
+                    print("Warning: Failed to commit/push changes automatically.")
+                
                 print("Implementation successful! To merge the changes:")
                 print(f"git checkout {original_branch} && git merge {block_branch} && git branch -d {block_branch}")
             else:
