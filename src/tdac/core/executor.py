@@ -372,17 +372,35 @@ class ProtoBlockExecutor:
             class OutputCapture:
                 def __init__(self):
                     self.output = []
+                    self.test_results = {
+                        'passed': 0,
+                        'failed': 0,
+                        'error': 0,
+                        'skipped': 0
+                    }
 
                 def pytest_runtest_logreport(self, report):
-                    if report.longrepr:
-                        self.output.append(str(report.longrepr))
-                        
-                def pytest_collectreport(self, report):
-                    if report.longrepr:
-                        self.output.append(str(report.longrepr))
+                    # Capture test results
+                    if report.when == 'call':  # Only count the actual test result
+                        if report.passed:
+                            self.test_results['passed'] += 1
+                        elif report.failed:
+                            if report.when == 'setup' or report.when == 'teardown':
+                                self.test_results['error'] += 1
+                            else:
+                                self.test_results['failed'] += 1
+                    elif report.skipped:
+                        self.test_results['skipped'] += 1
 
-                def pytest_terminal_summary(self, terminalreporter, exitstatus):
-                    self.output.append(terminalreporter._tw.getvalue())
+                    # Capture test output
+                    if report.longrepr:
+                        self.output.append(str(report.longrepr))
+                    if hasattr(report, 'caplog'):
+                        self.output.append(report.caplog)
+                    if hasattr(report, 'capstdout'):
+                        self.output.append(report.capstdout)
+                    if hasattr(report, 'capstderr'):
+                        self.output.append(report.capstderr)
 
             output_capture = OutputCapture()
             
@@ -401,17 +419,26 @@ class ProtoBlockExecutor:
             if '-v' not in pytest_args and '-vv' not in pytest_args:
                 pytest_args.append('-v')
             
-            # Add -s to disable output capture and show print statements
-            if '-s' not in pytest_args:
-                pytest_args.append('-s')
-            
             print(f"Running pytest with args: {' '.join(pytest_args)}")
             
             # Run pytest with our output capture plugin
             result = pytest.main(pytest_args, plugins=[output_capture])
             
-            # Combine all captured output
-            full_output = '\n'.join(output_capture.output)
+            # Create summary from captured results
+            summary = "\nTest Summary:\n"
+            summary += f"Passed: {output_capture.test_results['passed']}\n"
+            if output_capture.test_results['failed'] > 0:
+                summary += f"Failed: {output_capture.test_results['failed']}\n"
+            if output_capture.test_results['error'] > 0:
+                summary += f"Errors: {output_capture.test_results['error']}\n"
+            if output_capture.test_results['skipped'] > 0:
+                summary += f"Skipped: {output_capture.test_results['skipped']}\n"
+            
+            # Combine captured output with summary
+            full_output = '\n'.join(filter(None, output_capture.output))  # Filter out empty strings
+            if full_output:
+                full_output += "\n"
+            full_output += summary
             
             # Map pytest exit codes to meaningful messages
             exit_code_messages = {
