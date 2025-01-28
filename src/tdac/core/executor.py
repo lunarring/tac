@@ -146,6 +146,13 @@ class ProtoBlockExecutor:
                 print("  git checkout main")
                 return False
                 
+            # Verify all tests pass before starting
+            print("\nVerifying all tests pass before starting...")
+            if not self.run_tests():
+                logger.error("Cannot proceed: some tests are failing on main/master branch")
+                print("\nCannot start implementation: Please fix failing tests on main/master branch first.")
+                return False
+                
             # Create and checkout new branch for block execution
             block_branch = f"tdac_{self.protoblock_id}"
             if not self.git_manager.create_and_checkout_branch(block_branch):
