@@ -481,18 +481,19 @@ class ProtoBlockExecutor:
             result_message = exit_code_messages.get(result, f"Unknown pytest exit code: {result}")
             
             # Store both the result message and the full output
-            self.test_results = f"Test execution completed. Result: {result_message}\n\nDetailed Output:\n{full_output}"
+            self.test_results = f"Test execution completed. Result: {result_message}\n{full_output}"
             
-            # Special case: if no tests were collected, treat this as success
-            if result == pytest.ExitCode.NO_TESTS_COLLECTED:
+            # Special case: if no tests were collected and no errors, treat this as success
+            if result == pytest.ExitCode.NO_TESTS_COLLECTED and not output_capture.output:
                 print("\nNo tests were found. This is not a failure - proceeding with implementation.")
                 return True
             
-            # Print error message if tests didn't pass
+            # Only print error message if tests didn't pass
             if result != pytest.ExitCode.OK:
                 print(f"\nTest Error: {result_message}")
-                print("\nDetailed Output:")
-                print(full_output)
+                if output_capture.output:  # Only print detailed output if we have errors
+                    print("\nDetailed Output:")
+                    print(full_output)
             
             return result == pytest.ExitCode.OK
             
