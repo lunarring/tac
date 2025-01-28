@@ -23,7 +23,6 @@ from tdac.core.llm import LLMClient, Message
 from tdac.utils.protoblock_manager import validate_protoblock_json, save_protoblock
 from tdac.core.git_manager import GitManager
 from tdac.utils.protoblock_factory import ProtoBlockFactory
-from tdac.utils.seedblock_json_validator import validate_seedblock_json, save_seedblock
 from tdac.utils.project_files import ProjectFiles
 
 logger = setup_logger(__name__)
