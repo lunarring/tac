@@ -186,6 +186,7 @@ class ProtoBlockFactory:
         """
         # First strip whitespace
         cleaned = content.strip()
+        cleaned = cleaned.replace("`", "")
         
         # Handle various code fence patterns
         if cleaned.startswith("```"):
@@ -349,6 +350,9 @@ class ProtoBlockFactory:
         # Check for empty or whitespace-only response
         if not response or not response.strip():
             raise ValueError("Received empty response from LLM")
+            
+        # Clean code fences from response
+        response = self._clean_code_fences(response)
             
         # Log the raw response for debugging
         logger.debug(f"Raw LLM Response for protoblock:\n{response}")

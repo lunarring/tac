@@ -233,7 +233,7 @@ def generate_seed_command(args):
         
         print(f"\n✨ Created new protoblock: {json_file}")
         print("\nProtoblock details:")
-        print(f"🎯 Task: {protoblock.task_specification}")
+        print(f"🎯 Task: {protoblock.task_description}")
         print(f"🧪 Test Specification: {protoblock.test_specification}")
         print(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
         print(f"📚 Context Files: {', '.join(protoblock.context_files)}")
@@ -592,7 +592,7 @@ def main():
             
             print(f"\n✨ Created new protoblock: {json_file}")
             print("\nProtoblock details:")
-            print(f"🎯 Task: {protoblock.task_specification}")
+            print(f"🎯 Task: {protoblock.task_description}")
             print(f"🧪 Test Specification: {protoblock.test_specification}")
             print(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
             print(f"📚 Context Files: {', '.join(protoblock.context_files)}")
