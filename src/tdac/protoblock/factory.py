@@ -29,7 +29,7 @@ class ProtoBlockFactory:
         },
         "test": {
             "instructions": (
-                "Add one well-targeted test that validates newly implemented or existing functionality. Focus on clarity and maintainability of this single test."
+                "Add one well-targeted test that validates newly implemented or existing functionality. Focus on clarity and maintainability of this single test. New test files should only be created in test/test_*.py."
             )
         }
     }
@@ -168,7 +168,7 @@ class ProtoBlockFactory:
         "specification": "Given the entire codebase and the instructions, here we describe the test specification for the task above. We are aiming to just write ONE single test ideally, which is able to infer whether the functionality update in the code has been implemented correctly or not. Thus, the goal is is figure out if the task instructions have been implemented correctly. Critically, the test needs to be fulfillable. We do NOT need to test anything else than the NEW functionality given the task specification. It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks!"
         "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible."
     }},
-    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access!"],
+    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in test/test_*.py."],
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}
@@ -299,6 +299,16 @@ class ProtoBlockFactory:
                     return False, f"All items in {key} must be strings", None
                 if not all(item.strip() for item in data[key]):
                     return False, f"Empty or whitespace-only items not allowed in {key}", None
+
+            # Validate test file naming convention
+            for file_path in data["write_files"]:
+                if file_path.startswith("tests/"):
+                    # Ensure test files are directly in tests/ directory and follow naming convention
+                    parts = file_path.split("/")
+                    if len(parts) > 2:
+                        return False, f"Test files must be directly in tests/ directory, found: {file_path}", None
+                    if not parts[1].startswith("test_") or not parts[1].endswith(".py"):
+                        return False, f"Test files must follow pattern 'test_*.py', found: {file_path}", None
             
             return True, "", data
             
