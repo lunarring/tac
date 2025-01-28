@@ -489,6 +489,8 @@ Context Files: {previous_block.context_files}
         
         response = self.llm_client.chat_completion(messages)
         logger.debug(f"Raw LLM response (updated): {response}")
+        # Clean code fences from response
+        response = self._clean_code_fences(response)
         
         # Verify and parse the response
         is_valid, error_msg, data = self.verify_protoblock(response)
