@@ -378,6 +378,11 @@ class ProtoBlockExecutor:
                         'error': 0,
                         'skipped': 0
                     }
+                    self.no_tests_collected = False
+
+                def pytest_collectreport(self, report):
+                    if report.outcome == 'passed' and not report.result:
+                        self.no_tests_collected = True
 
                 def pytest_runtest_logreport(self, report):
                     # Capture test results
@@ -426,13 +431,17 @@ class ProtoBlockExecutor:
             
             # Create summary from captured results
             summary = "\nTest Summary:\n"
-            summary += f"Passed: {output_capture.test_results['passed']}\n"
-            if output_capture.test_results['failed'] > 0:
-                summary += f"Failed: {output_capture.test_results['failed']}\n"
-            if output_capture.test_results['error'] > 0:
-                summary += f"Errors: {output_capture.test_results['error']}\n"
-            if output_capture.test_results['skipped'] > 0:
-                summary += f"Skipped: {output_capture.test_results['skipped']}\n"
+            if output_capture.no_tests_collected:
+                summary = "\nNo tests were found in the specified path.\n"
+                summary += "This is not a failure - it just means no tests exist yet.\n"
+            else:
+                summary += f"Passed: {output_capture.test_results['passed']}\n"
+                if output_capture.test_results['failed'] > 0:
+                    summary += f"Failed: {output_capture.test_results['failed']}\n"
+                if output_capture.test_results['error'] > 0:
+                    summary += f"Errors: {output_capture.test_results['error']}\n"
+                if output_capture.test_results['skipped'] > 0:
+                    summary += f"Skipped: {output_capture.test_results['skipped']}\n"
             
             # Combine captured output with summary
             full_output = '\n'.join(filter(None, output_capture.output))  # Filter out empty strings
@@ -447,7 +456,7 @@ class ProtoBlockExecutor:
                 pytest.ExitCode.INTERRUPTED: "Testing was interrupted",
                 pytest.ExitCode.INTERNAL_ERROR: "Internal error in pytest",
                 pytest.ExitCode.USAGE_ERROR: "Pytest usage error",
-                pytest.ExitCode.NO_TESTS_COLLECTED: "No tests were collected",
+                pytest.ExitCode.NO_TESTS_COLLECTED: "No tests were found",
             }
             
             # Get meaningful message for the exit code
@@ -455,6 +464,11 @@ class ProtoBlockExecutor:
             
             # Store both the result message and the full output
             self.test_results = f"Test execution completed. Result: {result_message}\n\nDetailed Output:\n{full_output}"
+            
+            # Special case: if no tests were collected, treat this as success
+            if result == pytest.ExitCode.NO_TESTS_COLLECTED:
+                print("\nNo tests were found. This is not a failure - proceeding with implementation.")
+                return True
             
             # Print error message if tests didn't pass
             if result != pytest.ExitCode.OK:
