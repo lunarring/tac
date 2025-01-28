@@ -220,6 +220,8 @@ def generate_seed_command(args):
         # Get codebase content
         codebase = gather_python_files(args.directory)
         
+        print("\n🔄 Generating protoblock from codebase...")
+        
         # Generate complete seed instructions
         seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
         
@@ -229,41 +231,34 @@ def generate_seed_command(args):
         # Save protoblock to file
         json_file = factory.save_protoblock(protoblock)
         
-        print(f"\nCreated protoblock: {json_file}")
+        print(f"\n✨ Created new protoblock: {json_file}")
+        print("\nProtoblock details:")
+        print(f"🎯 Task: {protoblock.task_specification}")
+        print(f"🧪 Test Specification: {protoblock.test_specification}")
+        print(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
+        print(f"📚 Context Files: {', '.join(protoblock.context_files)}")
+        print(f"💬 Commit Message: {protoblock.commit_message}\n")
         
-        if args.execute:
-            # Initialize git manager and check status
-            git_manager = GitManager()
-            if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
-                sys.exit(1)
-                
-            # Load configuration
-            config = load_config()
-            
-            # Load and execute the protoblock
-            logger.info("Executing protoblock...")
-            protoblock_loaded = load_protoblock_from_json(json_file)
-            protoblock_loaded.block_id = protoblock.block_id  # Set the block ID
-            executor = ProtoBlockExecutor(protoblock=protoblock_loaded)
-            success = executor.execute_block()
-            
-            if success:
-                logger.info("Protoblock executed successfully")
-                # Handle git operations after successful execution
-                if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
-                    sys.exit(1)
-            else:
-                logger.error("Protoblock execution failed")
+        # Load protoblock from saved file
+        protoblock_loaded = load_protoblock_from_json(json_file)
+        protoblock_loaded.block_id = protoblock.block_id
+        
+        print("🚀 Starting protoblock execution...\n")
+        
+        # Create executor and run
+        executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
+        success = executor.execute_block()
+        
+        if success:
+            print("\n✅ Task completed successfully!")
+            logger.info("Task completed successfully.")
+            # Handle git operations after successful execution
+            if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
                 sys.exit(1)
         else:
-            # Just print the protoblock details
-            print(f"Generated ProtoBlock (ID: {protoblock.block_id}):")
-            print(f"Task: {protoblock.task_specification}")
-            print(f"Test Specification: {protoblock.test_specification}")
-            print(f"Files to Write: {', '.join(protoblock.write_files)}")
-            print(f"Context Files: {', '.join(protoblock.context_files)}")
-            print(f"Commit Message: {protoblock.commit_message}")
-            
+            print("\n❌ Task execution failed.")
+            logger.error("Task execution failed.")
+            sys.exit(1)
     except Exception as e:
         logger.error(f"Error generating protoblock: {e}")
         sys.exit(1)
@@ -584,6 +579,8 @@ def main():
             # Get codebase content
             codebase = gather_python_files(args.directory)
             
+            print("\n🔄 Generating protoblock from codebase...")
+            
             # Generate complete seed instructions
             seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
             
@@ -593,22 +590,32 @@ def main():
             # Save protoblock to file
             json_file = factory.save_protoblock(protoblock)
             
-            print(f"\nCreated protoblock: {json_file}")
+            print(f"\n✨ Created new protoblock: {json_file}")
+            print("\nProtoblock details:")
+            print(f"🎯 Task: {protoblock.task_specification}")
+            print(f"🧪 Test Specification: {protoblock.test_specification}")
+            print(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
+            print(f"📚 Context Files: {', '.join(protoblock.context_files)}")
+            print(f"💬 Commit Message: {protoblock.commit_message}\n")
             
             # Load protoblock from saved file
             protoblock_loaded = load_protoblock_from_json(json_file)
             protoblock_loaded.block_id = protoblock.block_id
+            
+            print("🚀 Starting protoblock execution...\n")
             
             # Create executor and run
             executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
             success = executor.execute_block()
             
             if success:
+                print("\n✅ Task completed successfully!")
                 logger.info("Task completed successfully.")
                 # Handle git operations after successful execution
                 if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
                     sys.exit(1)
             else:
+                print("\n❌ Task execution failed.")
                 logger.error("Task execution failed.")
                 sys.exit(1)
                 

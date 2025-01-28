@@ -86,6 +86,7 @@ Important Guidelines:
             'aider',
             '--yes-always',
             '--no-git',
+            '--quiet',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
@@ -120,7 +121,7 @@ Important Guidelines:
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
                 text=True,
                 bufsize=1,
                 universal_newlines=True
@@ -141,16 +142,14 @@ Important Guidelines:
                     raise TimeoutError("Aider process appears to be hung - no output for 30 seconds")
                 
                 # Use select to wait for output with timeout
-                reads = [process.stdout, process.stderr]
+                reads = [process.stdout]
                 ready_reads, _, _ = select.select(reads, [], [], READ_TIMEOUT)
                 
                 if process.poll() is not None:
                     # Process finished, get any remaining output
-                    remaining_stdout, remaining_stderr = process.communicate()
+                    remaining_stdout, _ = process.communicate()
                     if remaining_stdout:
                         logger.debug(f"FINAL STDOUT: {remaining_stdout}")
-                    if remaining_stderr:
-                        logger.debug(f"FINAL STDERR: {remaining_stderr}")
                     break
                 
                 # Read from any ready pipes
@@ -158,10 +157,7 @@ Important Guidelines:
                     line = pipe.readline()
                     if line:
                         last_output_time = time.time()
-                        if pipe == process.stdout:
-                            logger.debug(f"STDOUT: {line.strip()}")
-                        else:
-                            logger.debug(f"STDERR: {line.strip()}")
+                        logger.debug(f"STDOUT: {line.strip()}")
             
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, command)

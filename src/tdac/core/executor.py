@@ -201,7 +201,7 @@ class ProtoBlockExecutor:
                 self._write_log_file(attempt + 1, None, "Starting test execution")
                 
                 if self.run_tests():
-                    print("Protoblock could successfully be turned into Mergeblock.")
+                    print("\n✅ All tests passed!")
                     # Update protoblock with test results
                     self.protoblock.test_results = self.test_results
                     # Write success log
@@ -215,9 +215,11 @@ class ProtoBlockExecutor:
                     execution_success = True
                     break
                 else:
-                    print("Tests failed.")
-                    print("Test Results:")
+                    print("\n❌ Tests failed.")
+                    print("\nTest Output:")
+                    print("="*60)
                     print(self.get_test_results())
+                    print("="*60)
                     
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results
@@ -344,6 +346,7 @@ class ProtoBlockExecutor:
             command = ['pytest'] + args
             logger.debug(f"Running pytest command: {' '.join(command)}")
             
+            print("\nExecuting tests with pytest...")
             result = subprocess.run(
                 command,
                 capture_output=True,
@@ -355,6 +358,13 @@ class ProtoBlockExecutor:
             logger.debug(f"Pytest stderr: {result.stderr}")
             
             self.test_results = result.stdout + "\n" + result.stderr
+            
+            # Always show test output
+            print("\nTest Output:")
+            print("="*60)
+            print(self.test_results)
+            print("="*60)
+            
             return result.returncode == 0
         except subprocess.TimeoutExpired as timeout_err:
             # Capture any partial output that was generated before timeout
