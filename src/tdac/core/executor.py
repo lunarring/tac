@@ -394,6 +394,9 @@ class ProtoBlockExecutor:
                 def pytest_collectreport(self, report):
                     if report.outcome == 'passed' and not report.result:
                         self.no_tests_collected = True
+                    # Add collection error handling
+                    if report.outcome == 'failed':
+                        self.output.append(str(report.longrepr))
 
                 def pytest_runtest_logreport(self, report):
                     # Capture test results
@@ -442,22 +445,26 @@ class ProtoBlockExecutor:
             
             # Create summary from captured results
             summary = "\nTest Summary:\n"
-            if output_capture.no_tests_collected:
+            if output_capture.no_tests_collected and not output_capture.output:
                 summary = "\nNo tests were found in the specified path.\n"
                 summary += "This is not a failure - it just means no tests exist yet.\n"
             else:
-                summary += f"Passed: {output_capture.test_results['passed']}\n"
-                if output_capture.test_results['failed'] > 0:
-                    summary += f"Failed: {output_capture.test_results['failed']}\n"
-                if output_capture.test_results['error'] > 0:
-                    summary += f"Errors: {output_capture.test_results['error']}\n"
-                if output_capture.test_results['skipped'] > 0:
-                    summary += f"Skipped: {output_capture.test_results['skipped']}\n"
+                # If we have output but no test results, it's likely a collection error
+                if not any(output_capture.test_results.values()) and output_capture.output:
+                    summary = "\nTest Collection Error:\n"
+                else:
+                    summary += f"Passed: {output_capture.test_results['passed']}\n"
+                    if output_capture.test_results['failed'] > 0:
+                        summary += f"Failed: {output_capture.test_results['failed']}\n"
+                    if output_capture.test_results['error'] > 0:
+                        summary += f"Errors: {output_capture.test_results['error']}\n"
+                    if output_capture.test_results['skipped'] > 0:
+                        summary += f"Skipped: {output_capture.test_results['skipped']}\n"
             
             # Combine captured output with summary
             full_output = '\n'.join(filter(None, output_capture.output))  # Filter out empty strings
             if full_output:
-                full_output += "\n"
+                full_output = f"\nDetailed Output:\n{full_output}\n"
             full_output += summary
             
             # Map pytest exit codes to meaningful messages
