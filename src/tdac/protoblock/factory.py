@@ -492,6 +492,7 @@ Context Files: {previous_block.context_files}
         # Verify and parse the response
         is_valid, error_msg, data = self.verify_protoblock(response)
         if not is_valid:
+            xxx
             logger.warning(f"Failed to get valid improvement suggestions: {error_msg}")
             # Fallback to original behavior if LLM analysis fails
             return ProtoBlock(

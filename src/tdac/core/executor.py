@@ -361,6 +361,24 @@ class ProtoBlockExecutor:
         try:
             print("\nExecuting tests with pytest...")
             
+            # Create a custom pytest plugin to capture output
+            class OutputCapture:
+                def __init__(self):
+                    self.output = []
+
+                def pytest_runtest_logreport(self, report):
+                    if report.longrepr:
+                        self.output.append(str(report.longrepr))
+                        
+                def pytest_collectreport(self, report):
+                    if report.longrepr:
+                        self.output.append(str(report.longrepr))
+
+                def pytest_terminal_summary(self, terminalreporter, exitstatus):
+                    self.output.append(terminalreporter._tw.getvalue())
+
+            output_capture = OutputCapture()
+            
             # Convert command line args to pytest args
             pytest_args = []
             for arg in args:
@@ -382,8 +400,11 @@ class ProtoBlockExecutor:
             
             print(f"Running pytest with args: {' '.join(pytest_args)}")
             
-            # Run pytest and store output
-            result = pytest.main(pytest_args)
+            # Run pytest with our output capture plugin
+            result = pytest.main(pytest_args, plugins=[output_capture])
+            
+            # Combine all captured output
+            full_output = '\n'.join(output_capture.output)
             
             # Map pytest exit codes to meaningful messages
             exit_code_messages = {
@@ -398,12 +419,14 @@ class ProtoBlockExecutor:
             # Get meaningful message for the exit code
             result_message = exit_code_messages.get(result, f"Unknown pytest exit code: {result}")
             
-            # Store the result message
-            self.test_results = f"Test execution completed. Result: {result_message}"
+            # Store both the result message and the full output
+            self.test_results = f"Test execution completed. Result: {result_message}\n\nDetailed Output:\n{full_output}"
             
             # Print error message if tests didn't pass
             if result != pytest.ExitCode.OK:
                 print(f"\nTest Error: {result_message}")
+                print("\nDetailed Output:")
+                print(full_output)
             
             return result == pytest.ExitCode.OK
             
