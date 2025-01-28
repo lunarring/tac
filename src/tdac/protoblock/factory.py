@@ -177,12 +177,13 @@ class ProtoBlockFactory:
     def _clean_code_fences(self, content: str) -> str:
         """
         Clean markdown code fences from content, handling various formats.
+        Also removes any comments in JSON that might have been added by the LLM.
         
         Args:
             content: The content to clean
             
         Returns:
-            str: Content with code fences removed
+            str: Content with code fences and comments removed
         """
         # First strip whitespace
         cleaned = content.strip()
@@ -204,16 +205,30 @@ class ProtoBlockFactory:
             
             # Extract content between fences
             cleaned = "\n".join(lines[start_idx:end_idx]).strip()
-            
-            # If we still have content and it looks like JSON, return it
-            if cleaned and cleaned.startswith("{"):
-                return cleaned
-            
-            # If we don't have valid-looking JSON, try one more time with the original
-            # This handles cases where the content might be wrapped multiple times
-            return self._clean_code_fences(cleaned)
         
-        return cleaned
+        # Remove any single-line comments (both // and #)
+        cleaned_lines = []
+        for line in cleaned.split('\n'):
+            # Remove everything after // or #
+            comment_start = min(
+                (pos for pos in (line.find('//'), line.find('#'))
+                if pos != -1),
+                default=-1
+            )
+            if comment_start != -1:
+                line = line[:comment_start]
+            if line.strip():  # Only keep non-empty lines
+                cleaned_lines.append(line)
+        
+        cleaned = '\n'.join(cleaned_lines)
+            
+        # If we still have content and it looks like JSON, return it
+        if cleaned and cleaned.strip().startswith("{"):
+            return cleaned
+            
+        # If we don't have valid-looking JSON, try one more time with the original
+        # This handles cases where the content might be wrapped multiple times
+        return self._clean_code_fences(cleaned)
 
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
         """
