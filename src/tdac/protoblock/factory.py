@@ -176,59 +176,65 @@ class ProtoBlockFactory:
 
     def _clean_code_fences(self, content: str) -> str:
         """
-        Clean markdown code fences from content, handling various formats.
-        Also removes any comments in JSON that might have been added by the LLM.
+        Clean markdown code fences and comments from content.
+        Handles JSON content more intelligently.
         
         Args:
             content: The content to clean
             
         Returns:
-            str: Content with code fences and comments removed
+            str: Cleaned content ready for JSON parsing
         """
-        # First strip whitespace
-        cleaned = content.strip()
-        cleaned = cleaned.replace("`", "")
-        
-        # Handle various code fence patterns
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
+        if not content or not content.strip():
+            return ""
             
-            # Skip first line regardless of what it contains (```json, ```, etc)
-            start_idx = 1
-            
-            # Find end (last ``` or end of content)
+        # First clean any markdown code fences
+        lines = content.strip().split('\n')
+        if content.strip().startswith("```"):
+            # Find the content between the code fences
+            start_idx = 1  # Skip the opening fence
             end_idx = len(lines)
+            
             for i in range(len(lines) - 1, 0, -1):
                 if lines[i].strip() == "```":
                     end_idx = i
                     break
-            
-            # Extract content between fences
-            cleaned = "\n".join(lines[start_idx:end_idx]).strip()
+                    
+            lines = lines[start_idx:end_idx]
         
-        # Remove any single-line comments (both // and #)
+        # Now clean the lines
         cleaned_lines = []
-        for line in cleaned.split('\n'):
-            # Remove everything after // or #
-            comment_start = min(
-                (pos for pos in (line.find('//'), line.find('#'))
-                if pos != -1),
-                default=-1
-            )
-            if comment_start != -1:
-                line = line[:comment_start]
-            if line.strip():  # Only keep non-empty lines
-                cleaned_lines.append(line)
+        in_string = False
+        string_char = None
         
-        cleaned = '\n'.join(cleaned_lines)
+        for line in lines:
+            cleaned_line = []
+            i = 0
+            while i < len(line):
+                char = line[i]
+                
+                # Handle string literals
+                if char in ['"', "'"] and (i == 0 or line[i-1] != '\\'):
+                    if not in_string:
+                        in_string = True
+                        string_char = char
+                    elif char == string_char:
+                        in_string = False
+                        string_char = None
+                
+                # Handle comments only if we're not in a string
+                elif char == '/' and i + 1 < len(line) and line[i + 1] == '/' and not in_string:
+                    break
+                
+                cleaned_line.append(char)
+                i += 1
             
-        # If we still have content and it looks like JSON, return it
-        if cleaned and cleaned.strip().startswith("{"):
-            return cleaned
-            
-        # If we don't have valid-looking JSON, try one more time with the original
-        # This handles cases where the content might be wrapped multiple times
-        return self._clean_code_fences(cleaned)
+            # Only add non-empty lines
+            cleaned = ''.join(cleaned_line).strip()
+            if cleaned:
+                cleaned_lines.append(cleaned)
+        
+        return '\n'.join(cleaned_lines)
 
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
         """
