@@ -35,7 +35,7 @@ class ProtoBlockFactory:
     }
     
     def __init__(self):
-        self.llm_client = LLMClient()
+        self.llm_client = LLMClient(strength="strong")
         self.project_files = ProjectFiles()
     
     def _load_config(self) -> dict:
@@ -168,7 +168,7 @@ class ProtoBlockFactory:
         "specification": "Given the entire codebase and the instructions, here we describe the test specification for the task above. We are aiming to just write ONE single test ideally, which is able to infer whether the functionality update in the code has been implemented correctly or not. Thus, the goal is is figure out if the task instructions have been implemented correctly. Critically, the test needs to be fulfillable. We do NOT need to test anything else than the NEW functionality given the task specification. It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks!"
         "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible."
     }},
-    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in test/test_*.py."],
+    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in test/test_*.py for instance tests/test_piano_trainer_main.py"],
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}

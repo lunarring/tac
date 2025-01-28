@@ -1,13 +1,13 @@
 general:
   type: "aider"
-  max_retries: 2
+  max_retries: 4
   total_timeout: 600
   use_file_summaries: true
   summarizer_timeout: 45  # Timeout in seconds for file summarization
 
 aider:
-  model: "openai/o1-mini"
-  # model: "deepseek/deepseek-chat"
+  # model: "openai/o1-mini"
+  model: "deepseek/deepseek-chat"
   model_settings:
     edit_format: "diff"
     verify_ssl: true
@@ -24,8 +24,8 @@ llm_strong:
     timeout: 120
 
 llm_weak:
-  provider: "openai"
-  model: "o1-mini"
+  provider: "deepseek"
+  model: "deepseek-chat"
   settings:
     temperature: 0.7
     max_tokens: null
