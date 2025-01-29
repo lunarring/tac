@@ -154,7 +154,7 @@ class ProtoBlockExecutor:
                 return False
                 
             # Create and checkout new branch for block execution
-            block_branch = f"tdac_{self.protoblock_id}"
+            block_branch = f"tac_{self.protoblock_id}"
             if not self.git_manager.create_and_checkout_branch(block_branch):
                 logger.error(f"Failed to create branch {block_branch}")
                 return False

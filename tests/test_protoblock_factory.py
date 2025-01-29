@@ -6,7 +6,7 @@ from src.tac.protoblock.factory import ProtoBlockFactory
 from src.tac.protoblock.protoblock import ProtoBlock
 
 class TestProtoBlockFactory(unittest.TestCase):
-    @patch('src.tdac.protoblock.factory.LLMClient')
+    @patch('src.tac.protoblock.factory.LLMClient')
     def test_create_protoblock(self, mock_llm_client):
         # Define sample configuration dictionary
         sample_config = {
@@ -14,12 +14,12 @@ class TestProtoBlockFactory(unittest.TestCase):
             "test_specification": "Ensure that user login and logout functionalities work correctly.",
             "test_data_generation": "Sample user credentials and session tokens.",
             "write_files": [
-                "src/tdac/protoblock/authentication.py",
-                "src/tdac/protoblock/utils.py"
+                "src/tac/protoblock/authentication.py",
+                "src/tac/protoblock/utils.py"
             ],
             "context_files": [
-                "src/tdac/protoblock/protoblock.py",
-                "src/tdac/protoblock/factory.py"
+                "src/tac/protoblock/protoblock.py",
+                "src/tac/protoblock/factory.py"
             ],
             "commit_message": "Add user authentication feature."
         }
@@ -31,7 +31,7 @@ class TestProtoBlockFactory(unittest.TestCase):
             "test_data_generation": sample_config["test_data_generation"],
             "write_files": sample_config["write_files"],
             "context_files": sample_config["context_files"],
-            "commit_message": f"TDAC: {sample_config['commit_message']}"
+            "commit_message": f"tac: {sample_config['commit_message']}"
         }
 
         # Mock LLMClient's chat_completion method to return a predetermined JSON response
