@@ -478,31 +478,30 @@ class ProtoBlockFactory:
             ProtoBlock: A new protoblock instance with improved instructions and context
         """
         analysis_prompt = f"""<purpose>
-    You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to understand what went wrong and create an improved plan for the next attempt.
+You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to understand what went wrong and create an improved plan for the next attempt.
 </purpose>
 
-<previous_attempt>
+<previous_json>
 Task Description: {previous_block.task_description}
 Test Specification: {previous_block.test_specification}
 Test Data: {previous_block.test_data_generation}
 Files to Write: {previous_block.write_files}
 Context Files: {previous_block.context_files}
-</previous_attempt>
+</previous_json>
 
 <test_results>
 {test_results}
 </test_results>
 
 <planning_rules>
-- Analyze the test results to identify what went wrong
+- Analyze the <test_results> to identify what exactly went wrong and how to overcome the errors that were raised
 - Consider if we're missing any necessary files in write_files or context_files
-- Check if the task description needs more clarity or specificity
+- Check if the <previous_json> needs more clarity or specificity
 - Evaluate if the test specification or data need adjustments
 </planning_rules>
 
 <output_format>
 {{
-    "analysis": "Brief analysis of what went wrong in the previous attempt",
     "task": {{
         "specification": "Improved task description with clearer instructions"
     }},
@@ -551,7 +550,7 @@ Context Files: {previous_block.context_files}
             write_files=data["write_files"],
             context_files=data["context_files"],
             block_id=previous_block.block_id,
-            commit_message=data["commit_message"],
+            commit_message=previous_block.commit_message,
             test_results=test_results
         )
         

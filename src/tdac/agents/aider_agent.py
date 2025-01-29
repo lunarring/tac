@@ -114,7 +114,7 @@ Important Guidelines:
             
             # Set timeout values
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
-            NO_OUTPUT_TIMEOUT = TOTAL_TIMEOUT / 2  # Set no-output timeout to half of total timeout
+            NO_OUTPUT_TIMEOUT = TOTAL_TIMEOUT * 0.9  # Set no-output timeout to half of total timeout
             READ_TIMEOUT = 1.0   # 1 second read timeout
             
             # Stream output in real-time with timeout handling

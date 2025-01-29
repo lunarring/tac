@@ -164,8 +164,15 @@ class LLMClient:
 
 # Example usage:
 if __name__ == "__main__":
-    # Create client using config.yaml
-    client = LLMClient()
+    # Create manual config
+    config = LLMConfig(
+        provider="deepseek",
+        model="deepseek-reasoner",
+        settings={"timeout": 120}
+    )
+    
+    # Create client with manual config
+    client = LLMClient(config=config)
     
     # Example messages
     messages = [
