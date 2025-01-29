@@ -308,7 +308,7 @@ class ProtoBlockExecutor:
                 print(f"git checkout {original_branch} && git merge {block_branch} && git branch -d {block_branch}")
             else:
                 print("To clean up:")
-                print(f"  git restore . && git checkout {original_branch} && git branch -D {block_branch}")
+                print(f"  git restore . && git checkout {original_branch} && git clean -fd && git branch -D {block_branch}")
             print("="*50)
 
             return execution_success
