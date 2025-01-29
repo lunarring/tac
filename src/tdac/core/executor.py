@@ -11,6 +11,7 @@ from _pytest.capture import CaptureManager
 from tdac.protoblock import ProtoBlock, ProtoBlockFactory
 from tdac.agents.base import Agent
 from tdac.core.git_manager import GitManager
+from tdac.core.test_runner import TestRunner
 import git
 import sys
 
@@ -34,7 +35,7 @@ class ProtoBlockExecutor:
             'context_files': self.protoblock.context_files
         })
         self.agent = protoblock.create_agent(agent_config)
-        self.test_results = ""
+        self.test_runner = TestRunner()
         self.previous_error = None  # Track previous error
         self.git_manager = GitManager()
         self.protoblock_id = protoblock.block_id  # Set ID directly from protoblock
@@ -87,14 +88,13 @@ class ProtoBlockExecutor:
                 'test_data_generation': self.protoblock.test_data_generation,
                 'write_files': self.protoblock.write_files,
                 'context_files': self.protoblock.context_files,
-                'commit_message': self.protoblock.commit_message,
-                'test_results': self.protoblock.test_results  # Add test results to protoblock data
+                'commit_message': self.protoblock.commit_message
             },
             'timestamp': datetime.now().isoformat(),
             'attempt': attempt,
             'success': success,
             'git_diff': git_diff,
-            'test_results': self.test_results,  # Keep test results in execution data too
+            'test_results': self.test_results,  # Store test results only once
             'message': message
         }
 
@@ -220,7 +220,7 @@ class ProtoBlockExecutor:
                     print("\n✅ All tests passed!")
                     # Update protoblock with test results
                     self.protoblock.test_results = self.test_results
-                    # Write success log
+                    # Write success log with test results
                     self._write_log_file(attempt + 1, True, "Tests passed successfully")
                     
                     # Commit test changes if any
@@ -232,13 +232,11 @@ class ProtoBlockExecutor:
                     break
                 else:
                     print("\n❌ Tests failed.")
-                    print("\nTest Output:")
-                    print("="*60)
-                    print(self.get_test_results())
-                    print("="*60)
-                    
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results
+                    
+                    # Write failure log with test results
+                    self._write_log_file(attempt + 1, False, "Tests failed")
                     
                     # Commit failed test changes
                     commit_message = f"TDAC: Failed test attempt {attempt + 1}"
@@ -253,8 +251,6 @@ class ProtoBlockExecutor:
                                 self.test_results
                             )
                             print("\nCreated next protoblock with test results from previous attempt.")
-                            # Write log for protoblock update
-                            self._write_log_file(attempt + 1, None, "Created next protoblock with test results")
                             
                             # Commit the updated protoblock file
                             protoblock_file = f".tdac_protoblock_{self.protoblock_id}.json"
@@ -275,8 +271,6 @@ class ProtoBlockExecutor:
                         print(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
                         print("Retrying with a new implementation...")
                         print("="*60 + "\n")
-                        # Write log before retry
-                        self._write_log_file(attempt + 1, None, "Preparing for retry")
                         continue
                     else:
                         print("\n" + "="*60)
@@ -285,14 +279,18 @@ class ProtoBlockExecutor:
                         commit_message = f"TDAC: Failed implementation attempt {attempt + 1}"
                         if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                             logger.warning("Failed to commit changes after failed attempt")
-                        # Write final failure log
-                        self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
                         break
 
             # Print appropriate git commands based on execution result
             print("\nGit Commands:")
             print("="*50)
             if execution_success:
+                # Show final test results
+                print("\nFinal Test Results:")
+                print("="*50)
+                print(self.test_results)
+                print("="*50)
+                
                 # Commit all changes with the protoblock's commit message or default message
                 commit_message = self.protoblock.commit_message or "TDAC auto commit, message missing"
                 commit_success = self.git_manager.handle_post_execution(
@@ -328,255 +326,10 @@ class ProtoBlockExecutor:
         Args:
             test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
         """
-        try:
-            # Default to running all test*.py files in tests directory
-            test_target = test_path or 'tests'
-            full_path = test_target
-            pytest_args = ['--disable-warnings', '-v']
-
-            logger.debug(f"Test target path: {full_path}")
-            logger.debug(f"Working directory: {os.getcwd()}")
-            
-            if os.path.exists(full_path):
-                logger.debug(f"Path exists. Is file: {os.path.isfile(full_path)}, Is dir: {os.path.isdir(full_path)}")
-            else:
-                error_msg = f"Error: Test path not found: {full_path}"
-                logger.error(error_msg)
-                print(f"\nTest Error: {error_msg}")
-                self.test_results = error_msg
-                return False
-
-            if os.path.isfile(full_path):
-                # Single test file case
-                logger.debug(f"Running single test file: {test_target}")
-                result = self._run_pytest([test_target] + pytest_args)
-            elif os.path.isdir(full_path):
-                # Directory case - discover and run all test files
-                logger.debug(f"Discovering tests in directory: {test_target}")
-                result = self._run_pytest([test_target] + pytest_args)
-            else:
-                error_msg = f"Error: Path is neither a file nor directory: {full_path}"
-                logger.error(error_msg)
-                print(f"\nTest Error: {error_msg}")
-                self.test_results = error_msg
-                return False
-
-            # Print test summary if we have results
-            if self.test_results:
-                self._print_test_summary()
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Error running tests: {type(e).__name__}: {str(e)}"
-            logger.exception(error_msg)
-            print(f"\nTest Error: {error_msg}")
-            self.test_results = error_msg
-            return False
-
-    def _run_pytest(self, args: list) -> bool:
-        """Run tests using pytest's Python API directly"""
-        try:
-            print("\nExecuting tests with pytest...")
-            
-            # Create a custom pytest plugin to capture output
-            class OutputCapture:
-                def __init__(self):
-                    self.output = []
-                    self.test_results = {
-                        'passed': 0,
-                        'failed': 0,
-                        'error': 0,
-                        'skipped': 0
-                    }
-                    self.no_tests_collected = False
-
-                def _should_capture_output(self, text):
-                    # Filter out debug and logging messages
-                    if not text:
-                        return False
-                    text = str(text)
-                    ignore_patterns = [
-                        'DEBUG    ',
-                        'INFO     ',
-                        'WARNING  ',
-                        'ERROR    ',
-                        'CRITICAL ',
-                        'httpcore.',
-                        'httpx:',
-                        'openai.',
-                    ]
-                    return not any(pattern in text for pattern in ignore_patterns)
-
-                def pytest_collectreport(self, report):
-                    if report.outcome == 'passed' and not report.result:
-                        self.no_tests_collected = True
-                    # Add collection error handling
-                    if report.outcome == 'failed':
-                        if hasattr(report, 'longrepr') and self._should_capture_output(report.longrepr):
-                            self.output.append(str(report.longrepr))
-
-                def pytest_runtest_logreport(self, report):
-                    # Capture test results
-                    if report.when == 'call':  # Only count the actual test result
-                        if report.passed:
-                            self.test_results['passed'] += 1
-                        elif report.failed:
-                            if report.when == 'setup' or report.when == 'teardown':
-                                self.test_results['error'] += 1
-                            else:
-                                self.test_results['failed'] += 1
-                    elif report.skipped:
-                        self.test_results['skipped'] += 1
-
-                    # Capture test output
-                    if report.longrepr and self._should_capture_output(report.longrepr):
-                        self.output.append(str(report.longrepr))
-                    if hasattr(report, 'caplog') and self._should_capture_output(report.caplog):
-                        self.output.append(report.caplog)
-                    if hasattr(report, 'capstdout') and self._should_capture_output(report.capstdout):
-                        self.output.append(report.capstdout)
-                    if hasattr(report, 'capstderr') and self._should_capture_output(report.capstderr):
-                        self.output.append(report.capstderr)
-
-            output_capture = OutputCapture()
-            
-            # Convert command line args to pytest args
-            pytest_args = []
-            for arg in args:
-                if arg.startswith('--'):
-                    pytest_args.append(arg)
-                elif arg == '-v':
-                    pytest_args.append('-v')
-                else:
-                    # Assume it's a path
-                    pytest_args.append(arg)
-            
-            # Add verbosity if not already present
-            if '-v' not in pytest_args and '-vv' not in pytest_args:
-                pytest_args.append('-v')
-            
-            print(f"Running pytest with args: {' '.join(pytest_args)}")
-            
-            # Run pytest with our output capture plugin
-            result = pytest.main(pytest_args, plugins=[output_capture])
-            
-            # Create summary from captured results
-            summary = "\nTest Summary:\n"
-            if output_capture.no_tests_collected and not output_capture.output:
-                summary = "\nNo tests were found in the specified path.\n"
-                summary += "This is not a failure - it just means no tests exist yet.\n"
-            else:
-                # If we have output but no test results, it's likely a collection error
-                if not any(output_capture.test_results.values()) and output_capture.output:
-                    summary = "\nTest Collection Error:\n"
-                else:
-                    summary += f"Passed: {output_capture.test_results['passed']}\n"
-                    if output_capture.test_results['failed'] > 0:
-                        summary += f"Failed: {output_capture.test_results['failed']}\n"
-                    if output_capture.test_results['error'] > 0:
-                        summary += f"Errors: {output_capture.test_results['error']}\n"
-                    if output_capture.test_results['skipped'] > 0:
-                        summary += f"Skipped: {output_capture.test_results['skipped']}\n"
-            
-            # Combine captured output with summary
-            full_output = '\n'.join(filter(None, output_capture.output))  # Filter out empty strings
-            if full_output:
-                full_output = f"\nDetailed Output:\n{full_output}\n"
-            full_output += summary
-            
-            # Map pytest exit codes to meaningful messages
-            exit_code_messages = {
-                pytest.ExitCode.OK: "All tests passed!",
-                pytest.ExitCode.TESTS_FAILED: "Some tests failed",
-                pytest.ExitCode.INTERRUPTED: "Testing was interrupted",
-                pytest.ExitCode.INTERNAL_ERROR: "Internal error in pytest",
-                pytest.ExitCode.USAGE_ERROR: "Pytest usage error",
-                pytest.ExitCode.NO_TESTS_COLLECTED: "No tests were found",
-            }
-            
-            # Get meaningful message for the exit code
-            result_message = exit_code_messages.get(result, f"Unknown pytest exit code: {result}")
-            
-            # Store both the result message and the full output
-            self.test_results = f"Test execution completed. Result: {result_message}\n{full_output}"
-            
-            # Special case: if no tests were collected and no errors, treat this as success
-            if result == pytest.ExitCode.NO_TESTS_COLLECTED and not output_capture.output:
-                print("\nNo tests were found. This is not a failure - proceeding with implementation.")
-                return True
-            
-            # Only print error message if tests didn't pass
-            if result != pytest.ExitCode.OK:
-                print(f"\nTest Error: {result_message}")
-                if output_capture.output:  # Only print detailed output if we have errors
-                    print("\nDetailed Output:")
-                    print(full_output)
-            
-            return result == pytest.ExitCode.OK
-            
-        except Exception as e:
-            error_msg = f"Error running pytest: {str(e)}\n{type(e).__name__}: {str(e)}"
-            logger.error(error_msg)
-            self.test_results = error_msg
-            print(f"\nTest Error: {error_msg}")
-            return False
-
-    def _print_test_summary(self):
-        """Parse test results and print a colored summary"""
-        import re
-        from colorama import init, Fore, Style
-        init()  # Initialize colorama
-
-        # Look for the test summary line
-        summary_match = re.search(r'=+ (.+) in [0-9.]+s =+', self.test_results)
-        if not summary_match:
-            return
-
-        summary = summary_match.group(1).strip()
-        
-        # Extract numbers using regex
-        numbers = re.findall(r'(\d+) (passed|failed|skipped|error|xfailed|xpassed)', summary)
-        if not numbers:
-            return
-
-        total = 0
-        results = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0, 'xfailed': 0, 'xpassed': 0}
-        
-        # Count the results
-        for count, status in numbers:
-            count = int(count)
-            results[status] = count
-            total += count
-
-        # Determine overall color
-        if results['failed'] > 0 or results['error'] > 0:
-            color = Fore.RED
-        elif results['passed'] == total:
-            color = Fore.GREEN
-        else:
-            color = Fore.YELLOW
-
-        # Print summary
-        print("\n" + "="*50)
-        print(f"{color}Test Summary:{Style.RESET_ALL}")
-        
-        if results['failed'] > 0 or results['error'] > 0:
-            print(f"{Fore.RED}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
-            if results['failed'] > 0:
-                print(f"{Fore.RED}Failed: {results['failed']}{Style.RESET_ALL}")
-            if results['error'] > 0:
-                print(f"{Fore.RED}Errors: {results['error']}{Style.RESET_ALL}")
-        else:
-            print(f"{Fore.GREEN}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
-        
-        if results['skipped'] > 0:
-            print(f"{Fore.YELLOW}Skipped: {results['skipped']}{Style.RESET_ALL}")
-        if results['xfailed'] > 0:
-            print(f"{Fore.YELLOW}Expected failures: {results['xfailed']}{Style.RESET_ALL}")
-        if results['xpassed'] > 0:
-            print(f"{Fore.YELLOW}Unexpected passes: {results['xpassed']}{Style.RESET_ALL}")
-        print("="*50)
+        success = self.test_runner.run_tests(test_path)
+        self.test_results = self.test_runner.get_test_results()
+        return success
 
     def get_test_results(self) -> str:
+        """Get the full test results including output and summary"""
         return self.test_results

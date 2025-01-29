@@ -16,6 +16,7 @@ if src_dir not in sys.path:
 from tdac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
 from tdac.agents.aider_agent import AiderAgent
 from tdac.core.executor import ProtoBlockExecutor
+from tdac.core.test_runner import TestRunner
 from tdac.core.log_config import setup_logger
 from tdac.utils.file_gatherer import gather_python_files
 from tdac.utils.file_summarizer import FileSummarizer
@@ -130,21 +131,9 @@ def run_tests_command(args):
         logger.error(f"Test directory not found: {test_dir}")
         sys.exit(1)
     
-    # Create a minimal ProtoBlock instance for running tests
-    protoblock = ProtoBlock(
-        task_description="",    # Not needed for test running
-        test_specification="",  # Not needed for test running
-        test_data_generation="", # Not needed for test running
-        write_files=[],         # Not needed for test running
-        context_files=[],       # Not needed for test running
-        block_id=os.path.basename(test_dir)  # Use the test directory name as the ID
-    )
-    
-    # Create executor and run tests
-    executor = ProtoBlockExecutor(protoblock=protoblock)
-    
-    # Run tests and print results
-    success = executor.run_tests(test_path=test_dir)
+    # Use TestRunner directly for running tests
+    test_runner = TestRunner()
+    success = test_runner.run_tests(test_path=test_dir)
     
     if not success:
         sys.exit(1)
