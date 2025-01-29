@@ -1,21 +1,21 @@
-# Test-driven Agentic Chains
+# Tested Agentic Chains
 
-Test-driven Agentic Chains (TDAC) combines the methodical approach of test-driven development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
+Tested Agentic Chains (TAC) combines the methodical approach of tested development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
 
 > **Warning** ⚠️  
 > This project is in **alpha**. Interfaces, commands, and features may change without notice. Use at your own risk and carefully test before deploying in production environments.
 
 ## What Is It?
 
-Test-driven Agentic Chains (TDAC) extends the principles of continuous testing and auditing into AI development. By structuring tasks as "blocks" validated by a series of automated tests and recorded changes, you can iteratively refine your AI's behavior while maintaining a transparent trail of its evolution. For a detailed technical overview of the system architecture and methodology, please refer to our [whitepaper](docs/whitepaper.md).
+Tested Agentic Chains (TAC) extends the principles of continuous testing and auditing into AI development. By structuring tasks as "blocks" validated by a series of automated tests and recorded changes, you can iteratively refine your AI's behavior while maintaining a transparent trail of its evolution. For a detailed technical overview of the system architecture and methodology, please refer to our [whitepaper](docs/whitepaper.md).
 
 ## 🚀 Installation
 
 1. **Clone this repository** (or download it) to your local machine:
 
    ```bash
-   git clone git@github.com:lunarring/tdac.git
-   cd tdac
+   git clone git@github.com:lunarring/tac.git
+   cd tac
    ```
 
 2. Activate your environment (e.g., mine is called 'good'):
@@ -42,16 +42,16 @@ Generate and execute new blocks for different purposes:
 
 ```bash
 # Generate and execute a test-focused block
-tdac block --test ./your/code/directory
+tac block --test ./your/code/directory
 
 # Generate and execute a refactoring block
-tdac block --refactor ./your/code/directory
+tac block --refactor ./your/code/directory
 
 # Generate and execute an error analysis block
-tdac block --error ./your/code/directory
+tac block --error ./your/code/directory
 
 # Generate and execute a custom block with specific instructions
-tdac block --instructions "Add error handling to all functions" ./your/code/directory
+tac block --instructions "Add error handling to all functions" ./your/code/directory
 ```
 
 Each block type focuses on a different aspect:
@@ -65,7 +65,7 @@ Each block type focuses on a different aspect:
 View blocks and execution logs interactively:
 
 ```bash
-tdac view
+tac view
 ```
 
 This command provides an interactive interface to:
@@ -79,13 +79,13 @@ The framework provides several test-related commands:
 
 ```bash
 # Run tests
-tdac test run [--directory tests]
+tac test run [--directory tests]
 
 # List available tests
-tdac test list [--directory tests]
+tac test list [--directory tests]
 
 # Generate tests (coming soon)
-tdac test generate
+tac test generate
 ```
 
 ### Gather Code Documentation
@@ -93,7 +93,7 @@ tdac test generate
 The gather command helps collect and document Python files in a directory:
 
 ```bash
-tdac gather ./src/tdac
+tac gather ./src/tac
 ```
 
 #### Command Options
@@ -109,7 +109,7 @@ The framework uses a configuration file (`config.yaml`) to control various aspec
 
 ```yaml
 logging:
-  tdac:
+  tac:
     level: DEBUG
 ```
 (Place config.yaml in the project root or update paths accordingly.)

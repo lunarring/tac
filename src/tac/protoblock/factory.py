@@ -5,9 +5,9 @@ from datetime import datetime
 import os
 import logging
 
-from tdac.utils.file_gatherer import gather_python_files
-from tdac.utils.project_files import ProjectFiles
-from tdac.core.llm import LLMClient, Message
+from tac.utils.file_gatherer import gather_python_files
+from tac.utils.project_files import ProjectFiles
+from tac.core.llm import LLMClient, Message
 from .protoblock import ProtoBlock
 
 logger = logging.getLogger(__name__)
@@ -408,7 +408,7 @@ class ProtoBlockFactory:
                 write_files=data["write_files"],
                 context_files=data.get("context_files", []),
                 block_id=str(uuid.uuid4())[:6],
-                commit_message=f"TDAC: {data.get('commit_message', 'Update')}"
+                commit_message=f"TAC: {data.get('commit_message', 'Update')}"
             )
         except KeyError as e:
             raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
@@ -440,7 +440,7 @@ class ProtoBlockFactory:
         }
         
         # Save to file using just the block_id
-        filename = f".tdac_protoblock_{block.block_id}.json"
+        filename = f".tac_protoblock_{block.block_id}.json"
         
         # Load existing data if file exists, otherwise create new structure
         if os.path.exists(filename):

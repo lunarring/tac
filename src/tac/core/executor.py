@@ -8,10 +8,10 @@ import pytest
 from _pytest.config import Config
 from _pytest.terminal import TerminalReporter
 from _pytest.capture import CaptureManager
-from tdac.protoblock import ProtoBlock, ProtoBlockFactory
-from tdac.agents.base import Agent
-from tdac.core.git_manager import GitManager
-from tdac.core.test_runner import TestRunner
+from tac.protoblock import ProtoBlock, ProtoBlockFactory
+from tac.agents.base import Agent
+from tac.core.git_manager import GitManager
+from tac.core.test_runner import TestRunner
 import git
 import sys
 
@@ -75,7 +75,7 @@ class ProtoBlockExecutor:
             logger.warning("No protoblock ID available for logging")
             return None
 
-        log_filename = f".tdac_log_{self.protoblock_id}"
+        log_filename = f".tac_log_{self.protoblock_id}"
         
         # Get git diff using GitManager's new method
         git_diff = self.git_manager.get_complete_diff()
@@ -178,7 +178,7 @@ class ProtoBlockExecutor:
                     self._write_log_file(attempt + 1, None, "Task execution completed")
                     
                     # Commit changes after successful implementation
-                    commit_message = f"TDAC: Implementation attempt {attempt + 1}"
+                    commit_message = f"TAC: Implementation attempt {attempt + 1}"
                     if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                         logger.warning("Failed to commit changes after implementation")
                     
@@ -205,7 +205,7 @@ class ProtoBlockExecutor:
                         print(f"Last error: {error_msg}")
                         print("="*60 + "\n")
                         # Commit any remaining changes before cleanup
-                        commit_message = f"TDAC: Failed implementation attempt {attempt + 1}"
+                        commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
                         if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                             logger.warning("Failed to commit changes after failed attempt")
                         # Write final failure log
@@ -224,7 +224,7 @@ class ProtoBlockExecutor:
                     self._write_log_file(attempt + 1, True, "Tests passed successfully")
                     
                     # Commit test changes if any
-                    commit_message = f"TDAC: Tests passed on attempt {attempt + 1}"
+                    commit_message = f"TAC: Tests passed on attempt {attempt + 1}"
                     if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                         logger.warning("Failed to commit changes after successful tests")
                         
@@ -239,7 +239,7 @@ class ProtoBlockExecutor:
                     self._write_log_file(attempt + 1, False, "Tests failed")
                     
                     # Commit failed test changes
-                    commit_message = f"TDAC: Failed test attempt {attempt + 1}"
+                    commit_message = f"TAC: Failed test attempt {attempt + 1}"
                     if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                         logger.warning("Failed to commit changes after failed tests")
                     
@@ -253,9 +253,9 @@ class ProtoBlockExecutor:
                             print("\nCreated next protoblock with test results from previous attempt.")
                             
                             # Commit the updated protoblock file
-                            protoblock_file = f".tdac_protoblock_{self.protoblock_id}.json"
+                            protoblock_file = f".tac_protoblock_{self.protoblock_id}.json"
                             if os.path.exists(protoblock_file):
-                                commit_message = f"TDAC: Update protoblock with test results from attempt {attempt + 1}"
+                                commit_message = f"TAC: Update protoblock with test results from attempt {attempt + 1}"
                                 if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                                     logger.warning("Failed to commit updated protoblock file")
                         else:
@@ -276,7 +276,7 @@ class ProtoBlockExecutor:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
                         # Commit any remaining changes before cleanup
-                        commit_message = f"TDAC: Failed implementation attempt {attempt + 1}"
+                        commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
                         if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                             logger.warning("Failed to commit changes after failed attempt")
                         break
@@ -292,7 +292,7 @@ class ProtoBlockExecutor:
                 print("="*50)
                 
                 # Commit all changes with the protoblock's commit message or default message
-                commit_message = self.protoblock.commit_message or "TDAC auto commit, message missing"
+                commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
                 commit_success = self.git_manager.handle_post_execution(
                     {'git': {'auto_push': True}},  # Enable auto-push for successful execution
                     commit_message

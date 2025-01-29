@@ -36,8 +36,8 @@ git:
   auto_push: false
 
 logging:
-  tdac:
-    level: DEBUG
-    color: green
+  tac:
+    level: "INFO"
+    color: "green"
   other_packages:
     level: "INFO"

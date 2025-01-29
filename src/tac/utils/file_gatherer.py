@@ -30,7 +30,7 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
 
     # Initialize ProjectFiles if using summaries
     if use_summaries:
-        from tdac.utils.project_files import ProjectFiles
+        from tac.utils.project_files import ProjectFiles
         project_files = ProjectFiles()
 
     directory = str(directory)  # Ensure directory is a string

@@ -2,7 +2,7 @@ import os
 import ast
 from datetime import datetime
 from typing import Dict, List, Optional
-from tdac.core.llm import LLMClient, Message
+from tac.core.llm import LLMClient, Message
 import logging
 
 logger = logging.getLogger(__name__)

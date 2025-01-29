@@ -2,8 +2,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 import json
 
-from src.tdac.protoblock.factory import ProtoBlockFactory
-from src.tdac.protoblock.protoblock import ProtoBlock
+from src.tac.protoblock.factory import ProtoBlockFactory
+from src.tac.protoblock.protoblock import ProtoBlock
 
 class TestProtoBlockFactory(unittest.TestCase):
     @patch('src.tdac.protoblock.factory.LLMClient')

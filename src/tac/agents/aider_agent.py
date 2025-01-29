@@ -1,8 +1,8 @@
 import os
 import subprocess
-from tdac.agents.base import Agent
-from tdac.core.log_config import setup_logger
-from tdac.utils.file_gatherer import gather_python_files
+from tac.agents.base import Agent
+from tac.core.log_config import setup_logger
+from tac.utils.file_gatherer import gather_python_files
 import select
 import time
 

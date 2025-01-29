@@ -3,13 +3,13 @@ import os
 import sys
 import json
 from rich.console import Console
-from tdac.utils.log_manager import LogManager
+from tac.utils.log_manager import LogManager
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from datetime import datetime
 
-class TDACViewer:
+class TACViewer:
     def __init__(self):
         self.console = Console()
         self.log_manager = LogManager()
@@ -87,7 +87,7 @@ class TDACViewer:
         """Show main menu to choose between logs and protoblocks."""
         while True:
             options = ["View Logs", "View Protoblocks"]
-            self.show_menu(options, "TDAC Viewer")
+            self.show_menu(options, "TAC Viewer")
             choice = self.get_choice(len(options))
             
             if choice == 'b':
@@ -159,7 +159,7 @@ class TDACViewer:
         """Show menu with available protoblock files."""
         page = 0  # Start at first page
         while True:
-            protoblocks = [f for f in os.listdir('.') if f.startswith('.tdac_protoblock_') and f.endswith('.json')]
+            protoblocks = [f for f in os.listdir('.') if f.startswith('.tac_protoblock_') and f.endswith('.json')]
             if not protoblocks:
                 self.console.print("[yellow]No protoblock files found.[/yellow]")
                 input("Press Enter to continue...")
@@ -453,7 +453,7 @@ class TDACViewer:
 
 def main():
     try:
-        viewer = TDACViewer()
+        viewer = TACViewer()
         viewer.main_menu()
     except KeyboardInterrupt:
         print("\nGoodbye!")

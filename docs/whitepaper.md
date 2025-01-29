@@ -3,9 +3,9 @@
 
 ## Overview
 
-**TDAC (Test-driven Agentic Chains)** is a framework to fully automate AI-driven software creation. The core idea is to create *blocks* of code change, which are validated through empirical testing. In much the same way that blockchain technology ensures the immutability of prior blocks, TDAC ensures each new code change is thoroughly tested and validated before linking it to the existing codebase. Thus, it addresses two critical limitations of AI coding agents: a lack of assurance that the implementation meets the requested functionality, and insufficient safeguards to prevent breaking the existing codebase. Consequently, they cannot be entirely automated—and this is where TDAC delivers its promise: a robust, structured framework that ensures every implementation is both functional and stable.
+**TAC (Tested Agentic Chains)** is a framework to fully automate AI-driven software creation. The core idea is to create *blocks* of code change, which are validated through empirical testing. In much the same way that blockchain technology ensures the immutability of prior blocks, TAC ensures each new code change is thoroughly tested and validated before linking it to the existing codebase. Thus, it addresses two critical limitations of AI coding agents: a lack of assurance that the code works as intended and a lack of transparency in the development process. While many AI agents can generate code, ensuring its correctness and stability has traditionally required human oversight—but this need not be entirely automated—and this is where TAC delivers its promise: a robust, structured framework that ensures every implementation is both functional and stable.
 
-A **high-level manager** orchestrates this chain of development tasks, preserving both the workflow’s integrity and efficiency. Just as every block in a blockchain references the hash of its predecessor, each stage of TDAC references a known snapshot of the codebase and confirms its correctness with automated tests, ensuring that merging new functionality can only occur when it does not break existing features.
+Just as each block in a blockchain contains a hash of its predecessor, each stage of TAC references a known snapshot of the codebase and confirms its correctness with automated tests, ensuring that merging new functionality can only occur when it does not break existing features.
 
 ---
 
@@ -13,7 +13,7 @@ A **high-level manager** orchestrates this chain of development tasks, preservin
 
 ### Seed Instructions
 
-In TDAC, the **seed instruction** consist of:
+In TAC, the **seed instruction** consist of:
 
 - **Global Instruction**: An overarching statement describing the core feature or fix to be implemented.
 - **Snapshot of the Entire Codebase**: Typically identified by a commit hash, tag, or version, ensuring an unchanging reference point for subsequent work.
@@ -29,7 +29,7 @@ A **proto block** serves as the detailed recipe or blueprint describing how to i
 
 ### Merge Block
 
-Once a proto block’s instructions have been executed and validated, the resulting changes form a **merge block**:
+Once a proto block's instructions have been executed and validated, the resulting changes form a **merge block**:
 
 - **Code Differences**: All new, modified, or deleted sections of code referencing a known snapshot (commit hash).
 - **New or Updated Tests**: Additional tests that verify the updated functionality.
@@ -38,12 +38,12 @@ The block is the final, certifiable artifact ready to be integrated into the mai
 
 ---
 
-## Single-Block Flow in TDAC
+## Single-Block Flow in TAC
 
-Below is a step-by-step outline of how TDAC handles **one** block from start to finish:
+Below is a step-by-step outline of how TAC handles **one** block from start to finish:
 
 1. **Seed Block Creation**  
-   - Identify the high-level instruction (e.g., “Add feature X”).  
+   - Identify the high-level instruction (e.g., "Add feature X").  
    - Reference the specific codebase state via a commit hash or version tag.
 
 2. **Proto Block Definition**  
@@ -59,15 +59,15 @@ Below is a step-by-step outline of how TDAC handles **one** block from start to 
    - Link the block back to the previous (or seed) state using a commit hash to maintain an immutable history.
 
 5. **Integration**  
-   - Integrate the block into the main or target branch, thus finalizing one complete TDAC cycle for this block.
+   - Integrate the block into the main or target branch, thus finalizing one complete TAC cycle for this block.
 
-At this point, you have a verified increment of development that cannot break existing functionality. Just like adding a new block to a blockchain, once appended, it solidifies that specific step in the project’s history.
+At this point, you have a verified increment of development that cannot break existing functionality. Just like adding a new block to a blockchain, once appended, it solidifies that specific step in the project's history.
 
 ---
 
 ## Orchestrating Larger Goals
 
-While each **seed → proto block → block** cycle addresses a single incremental improvement, TDAC also supports chaining multiple such cycles together to achieve **much larger or more complex** development goals. The key idea is:
+While each **seed → proto block → block** cycle addresses a single incremental improvement, TAC also supports chaining multiple such cycles together to achieve **much larger or more complex** development goals. The key idea is:
 
 1. **High-Level Plan**  
    - Begin by defining a **high-level, potentially very complex** functionality.  
@@ -88,23 +88,23 @@ While each **seed → proto block → block** cycle addresses a single increment
    - If a big feature spans multiple merges, the orchestrator can define checkpoints, each culminating in a block.  
    - Together, these merges build up the final functionality incrementally.
 
-By chaining seed blocks and their subsequent proto-to-block flows, TDAC can methodically develop intricate features or major refactors. Each step is validated by robust testing, ensuring that only correct and stable blocks are added to the codebase, mirroring the trustable, append-only nature of a blockchain.
+By chaining seed blocks and their subsequent proto-to-block flows, TAC can methodically develop intricate features or major refactors. Each step is validated by robust testing, ensuring that only correct and stable blocks are added to the codebase, mirroring the true spirit of tested development.
 
 ---
 
-## Advantages of TDAC
+## Advantages of TAC
 
 1. **Immutable Audit Trail**\
-   Each step (seed, proto block, block) references specific commits, creating a transparent “ledger” of changes.
+   Each step (seed, proto block, block) references specific commits, creating a transparent "ledger" of changes.
 
 2. **Incremental and Verified Development**\
-   Requiring full test suites to pass before integration ensures that each block solidifies the codebase’s integrity.
+   Requiring full test suites to pass before integration ensures that each block solidifies the codebase's integrity.
 
 3. **Modular and Extensible**\
    The framework can accommodate any AI Worker Agent. The block definitions remain consistent, thus reducing friction when agents or tools evolve.
 
 4. **Reduced Risks and Fewer Regressions**\
-   Repeated automated testing confirms that newly introduced features don’t interfere with existing functionality.
+   Repeated automated testing confirms that newly introduced features don't interfere with existing functionality.
 
 5. **Parallelized Efforts**\
    Multiple proto blocks can be developed simultaneously, each culminating in its own verified block.

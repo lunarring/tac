@@ -1,6 +1,6 @@
 # Byte-compiled / optimized / DLL files
 .cursorrules
-.tdac_*
+.tac_*
 .aider*
 __pycache__/
 *.py[cod]

@@ -10,7 +10,7 @@ from rich.text import Text
 
 class LogManager:
     """
-    A class to manage and navigate TDAC log files in an interactive way.
+    A class to manage and navigate TAC log files in an interactive way.
     Provides tree-like navigation and rich display of log contents.
     """
     
@@ -22,7 +22,7 @@ class LogManager:
     def list_logs(self) -> List[str]:
         """List all available log files in the current directory."""
         return sorted(
-            [f for f in os.listdir('.') if f.startswith('.tdac_log_')],
+            [f for f in os.listdir('.') if f.startswith('.tac_log_')],
             key=lambda x: os.path.getmtime(x),
             reverse=True
         )

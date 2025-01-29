@@ -3,7 +3,7 @@ import json
 import hashlib
 from datetime import datetime
 from typing import Dict, List, Optional
-from tdac.utils.file_summarizer import FileSummarizer
+from tac.utils.file_summarizer import FileSummarizer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class ProjectFiles:
     
     def __init__(self, project_root: str = "."):
         self.project_root = os.path.abspath(project_root)
-        self.summary_file = os.path.join(self.project_root, ".tdac_project_files.json")
+        self.summary_file = os.path.join(self.project_root, ".tac_project_files.json")
         self.summarizer = FileSummarizer()
         
     def _compute_file_hash(self, file_path: str) -> str:

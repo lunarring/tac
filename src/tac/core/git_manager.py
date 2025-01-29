@@ -116,11 +116,11 @@ class GitManager:
             
             # Ensure we are on master/main branch
             if current_branch.lower() not in ['master', 'main']:
-                logger.error(f"Must run TDAC from master/main branch. Currently on '{current_branch}'. Please checkout master/main first!")
+                logger.error(f"Must run TAC from master/main branch. Currently on '{current_branch}'. Please checkout master/main first!")
                 return False, current_branch
             
             if self.repo.is_dirty(untracked_files=True):
-                logger.error("Git working tree is not clean. Please commit or stash your changes before running TDAC!")
+                logger.error("Git working tree is not clean. Please commit or stash your changes before running TAC!")
                 print("\nGit status:")
                 print(self.repo.git.status())
                 return False, current_branch
@@ -149,7 +149,7 @@ class GitManager:
                 files_summary = ', '.join(changed_files[:3])
                 if len(changed_files) > 3:
                     files_summary += f" and {len(changed_files) - 3} more files"
-                commit_message = f"TDAC: Successfully implemented changes in {files_summary}"
+                commit_message = f"TAC: Successfully implemented changes in {files_summary}"
                 logger.debug(f"Auto-generated commit message: {commit_message}")
 
             # Commit changes

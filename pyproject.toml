@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "TDAC"
+name = "TAC"
 version = "0.1.1"
-description = "Test-driven Agentic Chains combines the methodical approach of test-driven development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance."
+description = "Tested Agentic Chains combines the methodical approach of tested development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance."
 readme = "README.md"
 requires-python = ">=3.8"
 license = "BSD-3-Clause"
@@ -18,7 +18,10 @@ dependencies = [
 ]
 
 [project.scripts]
-tdac = "tdac.cli.main:main"
+tac = "tac.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tdac"]
+packages = ["src/tac"]
+
+[tool.setuptools]
+packages = ["src/tac"]

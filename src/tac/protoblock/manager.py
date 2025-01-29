@@ -88,8 +88,8 @@ def _validate_version_content(data: Dict) -> tuple[bool, str]:
         return False, "context_files must be a list"
         
     # Validate commit message
-    if not isinstance(data['commit_message'], str) or not data['commit_message'].startswith('TDAC:'):
-        return False, "commit_message must be a string starting with 'TDAC:'"
+    if not isinstance(data['commit_message'], str) or not data['commit_message'].startswith('TAC:'):
+        return False, "commit_message must be a string starting with 'TAC:'"
         
     return True, ""
 
@@ -121,7 +121,7 @@ def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_i
         raise ValueError(f"Invalid protoblock JSON: {error}")
     
     # Use the provided unique ID only for filename
-    filename = f".tdac_protoblock_{unique_id}.json"
+    filename = f".tac_protoblock_{unique_id}.json"
     with open(filename, 'w', encoding='utf-8') as f:
         if isinstance(json_content, str):
             f.write(json_content)

@@ -13,16 +13,16 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tdac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
-from tdac.agents.aider_agent import AiderAgent
-from tdac.core.executor import ProtoBlockExecutor
-from tdac.core.test_runner import TestRunner
-from tdac.core.log_config import setup_logger
-from tdac.utils.file_gatherer import gather_python_files
-from tdac.utils.file_summarizer import FileSummarizer
-from tdac.core.llm import LLMClient, Message
-from tdac.core.git_manager import GitManager
-from tdac.utils.project_files import ProjectFiles
+from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
+from tac.agents.aider_agent import AiderAgent
+from tac.core.executor import ProtoBlockExecutor
+from tac.core.test_runner import TestRunner
+from tac.core.log_config import setup_logger
+from tac.utils.file_gatherer import gather_python_files
+from tac.utils.file_summarizer import FileSummarizer
+from tac.core.llm import LLMClient, Message
+from tac.core.git_manager import GitManager
+from tac.utils.project_files import ProjectFiles
 
 logger = setup_logger(__name__)
 
@@ -46,7 +46,7 @@ def load_protoblock_from_json(json_path: str) -> ProtoBlock:
         version_data = data
         # Extract block ID from filename as fallback
         filename = os.path.basename(json_path)
-        block_id = filename.replace('.tdac_protoblock_', '').replace('.json', '')
+        block_id = filename.replace('.tac_protoblock_', '').replace('.json', '')
     
     task_data = version_data['task']
     test_data = version_data['test']
@@ -254,9 +254,9 @@ def generate_seed_command(args):
 
 def list_logs_command(args):
     """Handle the log viewing command"""
-    # Get all .tdac_log files in current directory
+    # Get all .tac_log files in current directory
     log_files = sorted(
-        [f for f in os.listdir('.') if f.startswith('.tdac_log_')],
+        [f for f in os.listdir('.') if f.startswith('.tac_log_')],
         key=lambda x: os.path.getmtime(x),
         reverse=True
     )
@@ -269,7 +269,7 @@ def list_logs_command(args):
     print("\nAvailable log files (ordered by most recent):")
     for i, file in enumerate(log_files, 1):
         mtime = datetime.fromtimestamp(os.path.getmtime(file))
-        block_id = file.replace('.tdac_log_', '')
+        block_id = file.replace('.tac_log_', '')
         print(f"{i}. Block {block_id} - Last modified: {mtime.strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Get user selection
@@ -295,7 +295,7 @@ def list_logs_command(args):
             
         # Display log information
         print("\n" + "="*50)
-        print(f"Log for Block: {selected_file.replace('.tdac_log_', '')}")
+        print(f"Log for Block: {selected_file.replace('.tac_log_', '')}")
         print("="*50)
         
         # Display protoblock info
@@ -496,9 +496,9 @@ def main():
         return
         
     if args.command == 'view':
-        from tdac.cli.viewer import TDACViewer
+        from tac.cli.viewer import TACViewer
         try:
-            TDACViewer().main_menu()
+            TACViewer().main_menu()
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)
