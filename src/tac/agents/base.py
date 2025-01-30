@@ -13,4 +13,14 @@ class Agent(ABC):
 
     @abstractmethod
     def execute_task(self, previous_error: str = None) -> None:
-        pass 
+        pass
+
+    def run(self, protoblock: ProtoBlock, previous_analysis: str = None) -> None:
+        """
+        Run the agent to implement the protoblock.
+        
+        Args:
+            protoblock: The ProtoBlock to implement
+            previous_analysis: Optional analysis from previous failed attempt
+        """
+        raise NotImplementedError("Subclasses must implement run()") 

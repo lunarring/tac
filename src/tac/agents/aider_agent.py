@@ -13,7 +13,7 @@ class AiderAgent(Agent):
         super().__init__(config)
         self.agent_config = config.get('aider', {})
 
-    def run(self, protoblock) -> None:
+    def run(self, protoblock: ProtoBlock, previous_analysis: str = None) -> None:
         """
         Executes the Aider command to implement both tests and functionality simultaneously.
         
@@ -54,6 +54,17 @@ class AiderAgent(Agent):
         logger.debug("Files to be written: %s", write_files)
         logger.debug("Context files to be read: %s", context_files)
 
+        if previous_analysis:
+            error_chunk = f"""
+Previous Test Results (Failed):
+{protoblock.test_results}
+
+Analysis of the previous attempt:
+{previous_analysis}
+"""
+        else:
+            error_chunk = ""
+
         prompt = f"""Implement both the functionality AND its tests simultaneously according to these specifications:
 
 Task Description: {task_description}
@@ -61,10 +72,7 @@ Task Description: {task_description}
 Test Requirements:
 - Test Specification: {test_specification}
 - Test Data Requirements: {test_data_generation}
-
-{f'''Previous Test Results (Failed):
-{protoblock.test_results}''' if protoblock.test_results else ''}
-
+{error_chunk}
 Important Guidelines:
 - Write both the implementation and corresponding tests
 - Ensure tests are CONSISTENT with the code implemented!
@@ -96,21 +104,13 @@ Important Guidelines:
         for write_file in write_files:
             command.extend(['--file', write_file])
 
-        # Add all context files to be read
-        for context_file in context_files:
-            command.extend(['--read', context_file])
+            # Add all context files to be read
+            for context_file in context_files:
+                command.extend(['--read', context_file])
 
-        command.extend(['--message', prompt])
-        
-        logger.info("Final Aider command: %s", ' '.join(command))
-        
-        try:
-            logger.info("Executing Aider command...")
-            # logger.info("Command details:")
-            # logger.info(f"- Write files: {write_files}")
-            # logger.info(f"- Context files: {context_files}")
-            # logger.info(f"- Test files: {test_files}")
-            # logger.info(f"- Full prompt:\n{prompt}")
+            command.extend(['--message', prompt])
+            
+            logger.info("Final Aider command: %s", ' '.join(command))
             
             # Set timeout values
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified

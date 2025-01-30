@@ -166,6 +166,8 @@ class ProtoBlockExecutor:
                 
             logger.info(f"Created and switched to branch: {block_branch}")
             execution_success = False
+
+            analysis = None
             
             for attempt in range(max_retries):
                 print("\n" + "="*60)
@@ -177,7 +179,8 @@ class ProtoBlockExecutor:
                     # Write log before task execution
                     self._write_log_file(attempt + 1, None, "Starting task execution")
                     
-                    self.agent.run(self.protoblock)
+                    # Pass the previous attempt's analysis to the agent
+                    self.agent.run(self.protoblock, previous_analysis=analysis)
                     
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
@@ -197,6 +200,17 @@ class ProtoBlockExecutor:
                     # Store error message for next attempt
                     self.previous_error = error_msg
                     
+                    # Store analysis for next attempt
+                    analysis = self.error_analyzer.analyze_failure(
+                        self.protoblock, 
+                        self.test_results,
+                        self.codebase
+                    )
+                    print("\nError Analysis:")
+                    print("="*50)
+                    print(analysis)
+                    print("="*50)
+                    
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
                         print("\n" + "="*60)
@@ -207,14 +221,10 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
-                        print(f"Last error: {error_msg}")
-                        print("="*60 + "\n")
                         # Commit any remaining changes before cleanup
-                        commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
-                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                            logger.warning("Failed to commit changes after failed attempt")
-                        # Write final failure log
-                        self._write_log_file(attempt + 1, False, "Maximum retry attempts reached")
+                        # commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
+                        # if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                        #     logger.warning("Failed to commit changes after failed attempt")
                         break
 
                 print("Running tests...")
@@ -243,8 +253,7 @@ class ProtoBlockExecutor:
                     # Write failure log with test results
                     self._write_log_file(attempt + 1, False, "Tests failed")
                     
-                    # Analyze the failure
-                    print("\nAnalyzing test failure...")
+                    # Store analysis for next attempt
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
                         self.test_results,
@@ -254,19 +263,6 @@ class ProtoBlockExecutor:
                     print("="*50)
                     print(analysis)
                     print("="*50)
-                    
-                    # Create next protoblock with test results from previous attempt
-                    try:
-                        self.protoblock = self.protoblock_factory.create_next_protoblock_with_test_results(
-                            self.protoblock, 
-                            self.test_results
-                        )
-                        print("\nCreated next protoblock with test results from previous attempt.")
-                    
-                    except Exception as e:
-                        logger.error(f"Failed to create next protoblock: {e}")
-                        # Write log for protoblock creation failure
-                        self._write_log_file(attempt + 1, False, f"Failed to create next protoblock: {str(e)}")
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
