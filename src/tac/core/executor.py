@@ -53,28 +53,15 @@ class ProtoBlockExecutor:
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
 
-    def _write_log_file(self, attempt: int, success: bool, message: str) -> dict:
+    def _write_log_file(self, attempt: int, success: bool, message: str, analysis: str = None) -> dict:
         """
         Write a log file containing the config and executions data.
-        The log file structure is:
-        {
-            "config": {...},  # Global config
-            "executions": [   # List of execution attempts
-                {
-                    "protoblock": {...},
-                    "timestamp": "...",
-                    "attempt": N,
-                    "success": bool,
-                    "git_diff": "...",
-                    "test_results": "..."
-                }
-            ]
-        }
         
         Args:
             attempt: The current attempt number
             success: Whether the attempt was successful, or None if in progress
             message: Additional message to include in the log
+            analysis: Optional error analysis to include
         """
         if not self.protoblock_id:
             logger.warning("No protoblock ID available for logging")
@@ -99,9 +86,13 @@ class ProtoBlockExecutor:
             'attempt': attempt,
             'success': success,
             'git_diff': git_diff,
-            'test_results': self.test_results,  # Store test results only once
+            'test_results': self.test_results,
             'message': message
         }
+
+        # Add failure analysis if provided
+        if analysis:
+            execution_data['failure_analysis'] = analysis
 
         try:
             # Load existing log data if it exists
@@ -126,7 +117,7 @@ class ProtoBlockExecutor:
         except Exception as e:
             logger.error(f"Failed to write log file: {e}")
             
-        return execution_data  # Return the data for potential error analysis
+        return execution_data
 
     def execute_block(self) -> bool:
         """
@@ -194,18 +185,20 @@ class ProtoBlockExecutor:
                     error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
                     print(f"\nExecution Error: {error_msg}")
                     logger.error(error_msg)
-                    # Write failure log and get execution data
-                    execution_data = self._write_log_file(attempt + 1, False, error_msg)
                     
-                    # Store error message for next attempt
-                    self.previous_error = error_msg
-                    
-                    # Store analysis for next attempt
+                    # Get analysis before writing log
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
                         self.test_results,
                         self.codebase
                     )
+                    
+                    # Write failure log with analysis
+                    execution_data = self._write_log_file(attempt + 1, False, error_msg, analysis)
+                    
+                    # Store error message for next attempt
+                    self.previous_error = error_msg
+                    
                     print("\nError Analysis:")
                     print("="*50)
                     print(analysis)
@@ -250,15 +243,16 @@ class ProtoBlockExecutor:
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results
                     
-                    # Write failure log with test results
-                    self._write_log_file(attempt + 1, False, "Tests failed")
-                    
-                    # Store analysis for next attempt
+                    # Get analysis before writing log
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
                         self.test_results,
                         self.codebase
                     )
+                    
+                    # Write failure log with analysis
+                    self._write_log_file(attempt + 1, False, "Tests failed", analysis)
+                    
                     print("\nError Analysis:")
                     print("="*50)
                     print(analysis)
