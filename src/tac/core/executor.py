@@ -14,6 +14,9 @@ from tac.core.git_manager import GitManager
 from tac.core.test_runner import TestRunner
 import git
 import sys
+from tac.core.error_analyzer import ErrorAnalyzer
+from tac.utils.file_gatherer import gather_python_files
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +25,10 @@ class ProtoBlockExecutor:
     Executes a ProtoBlock by managing the implementation process through an agent,
     running tests, and handling version control operations.
     """
-    def __init__(self, protoblock: ProtoBlock, config: dict = None):
+    def __init__(self, protoblock: ProtoBlock, config: dict = None, codebase: Dict[str, str] = None):
         self.protoblock = protoblock
         self.config = config if config else self._load_config()
+        self.codebase = codebase  # Store codebase internally
         # Create agent with combined config
         agent_config = self.config.copy()
         agent_config.update({
@@ -41,6 +45,7 @@ class ProtoBlockExecutor:
         self.protoblock_id = protoblock.block_id  # Set ID directly from protoblock
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
+        self.error_analyzer = ErrorAnalyzer()
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -238,8 +243,18 @@ class ProtoBlockExecutor:
                     # Write failure log with test results
                     self._write_log_file(attempt + 1, False, "Tests failed")
                     
+                    # Analyze the failure
+                    print("\nAnalyzing test failure...")
+                    analysis = self.error_analyzer.analyze_failure(
+                        self.protoblock, 
+                        self.test_results,
+                        self.codebase
+                    )
+                    print("\nError Analysis:")
+                    print("="*50)
+                    print(analysis)
+                    print("="*50)
                     
-
                     # Create next protoblock with test results from previous attempt
                     try:
                         self.protoblock = self.protoblock_factory.create_next_protoblock_with_test_results(
@@ -247,8 +262,7 @@ class ProtoBlockExecutor:
                             self.test_results
                         )
                         print("\nCreated next protoblock with test results from previous attempt.")
-                            
-
+                    
                     except Exception as e:
                         logger.error(f"Failed to create next protoblock: {e}")
                         # Write log for protoblock creation failure

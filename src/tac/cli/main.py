@@ -234,8 +234,12 @@ def generate_seed_command(args):
         
         print("🚀 Starting protoblock execution...\n")
         
-        # Create executor and run
-        executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
+        # Create executor and run with codebase
+        executor = ProtoBlockExecutor(
+            protoblock=protoblock_loaded, 
+            config=config,
+            codebase=codebase  # Pass codebase to executor
+        )
         success = executor.execute_block()
         
         if success:
@@ -593,8 +597,12 @@ def main():
             
             print("🚀 Starting protoblock execution...\n")
             
-            # Create executor and run
-            executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
+            # Create executor and run with codebase
+            executor = ProtoBlockExecutor(
+                protoblock=protoblock_loaded, 
+                config=config,
+                codebase=codebase  # Pass codebase to executor
+            )
             success = executor.execute_block()
             
             if success:
