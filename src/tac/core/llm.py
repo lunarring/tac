@@ -141,6 +141,7 @@ class LLMClient:
             "model": self.config.model,
             "messages": formatted_messages,
             "stream": stream,
+            "timeout": self.config.settings.get('timeout', 120),
         }
         
         # Models that don't support temperature parameter
