@@ -157,10 +157,20 @@ class LLMClient:
             
         try:
             response = self.client.chat.completions.create(**params)
+            if not response or not response.choices:
+                raise ValueError("Empty response received from API")
             return response.choices[0].message.content
         except Exception as e:
             provider_name = self.config.provider.value.capitalize()
-            raise Exception(f"{provider_name} API call failed: {str(e)}")
+            # Add more detailed error information
+            error_msg = f"{provider_name} API call failed: {str(e)}"
+            if hasattr(e, 'response'):
+                error_msg += f"\nResponse status: {e.response.status_code}"
+                try:
+                    error_msg += f"\nResponse body: {e.response.text}"
+                except:
+                    pass
+            raise Exception(error_msg)
 
 # Example usage:
 if __name__ == "__main__":
