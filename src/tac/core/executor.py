@@ -249,6 +249,8 @@ class ProtoBlockExecutor:
                         self.test_results,
                         self.codebase
                     )
+
+                    
                     
                     # Write failure log with analysis
                     self._write_log_file(attempt + 1, False, "Tests failed", analysis)

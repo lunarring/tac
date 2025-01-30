@@ -466,6 +466,34 @@ class ProtoBlockFactory:
             
         return filename
 
+    def update_protoblock_from_analysis(self, protoblock: ProtoBlock, analysis: str) -> None:
+        """
+        Updates a protoblock based on the error analysis, particularly handling missing write files.
+        
+        Args:
+            protoblock: The ProtoBlock to update
+            analysis: The error analysis text containing potential missing files
+        """
+        if not analysis or "MISSING WRITE FILES:" not in analysis:
+            return
+            
+        try:
+            # Extract the missing files section
+            missing_files_section = analysis.split("MISSING WRITE FILES:")[1].strip()
+            # Try to parse as JSON list if it looks like one
+            if missing_files_section.startswith("[") and missing_files_section.endswith("]"):
+                import json
+                try:
+                    missing_files = json.loads(missing_files_section)
+                    if isinstance(missing_files, list) and all(isinstance(f, str) for f in missing_files):
+                        # Add missing files to protoblock's write_files
+                        protoblock.write_files.extend([f for f in missing_files if f not in protoblock.write_files])
+                        logger.info(f"Added missing write files to protoblock: {missing_files}")
+                except json.JSONDecodeError:
+                    logger.warning(f"Could not parse missing files as JSON: {missing_files_section}")
+        except Exception as e:
+            logger.warning(f"Error processing missing write files section: {str(e)}")
+
     def create_next_protoblock_with_test_results(self, previous_block: ProtoBlock, test_results: str) -> ProtoBlock:
         """
         Creates a new protoblock for the next attempt by analyzing test results and improving the approach.
@@ -530,6 +558,8 @@ Context Files: {previous_block.context_files}
         is_valid, error_msg, data = self.verify_protoblock(response)
         if not is_valid:
             logger.warning(f"Failed to get valid improvement suggestions: {error_msg}")
+            # Update the previous block with any missing files from test results analysis
+            self.update_protoblock_from_analysis(previous_block, test_results)
             # Fallback to original behavior if LLM analysis fails
             return ProtoBlock(
                 task_description=previous_block.task_description,
@@ -553,6 +583,9 @@ Context Files: {previous_block.context_files}
             commit_message=previous_block.commit_message,
             test_results=test_results
         )
+        
+        # Update with any missing files from test results analysis
+        self.update_protoblock_from_analysis(next_block, test_results)
         
         # Save the updated protoblock
         self.save_protoblock(next_block)
