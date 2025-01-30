@@ -238,28 +238,17 @@ class ProtoBlockExecutor:
                     # Write failure log with test results
                     self._write_log_file(attempt + 1, False, "Tests failed")
                     
-                    # Commit failed test changes
-                    commit_message = f"TAC: Failed test attempt {attempt + 1}"
-                    if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                        logger.warning("Failed to commit changes after failed tests")
                     
+
                     # Create next protoblock with test results from previous attempt
                     try:
-                        if self.protoblock_id:
-                            self.protoblock = self.protoblock_factory.create_next_protoblock_with_test_results(
-                                self.protoblock, 
-                                self.test_results
-                            )
-                            print("\nCreated next protoblock with test results from previous attempt.")
+                        self.protoblock = self.protoblock_factory.create_next_protoblock_with_test_results(
+                            self.protoblock, 
+                            self.test_results
+                        )
+                        print("\nCreated next protoblock with test results from previous attempt.")
                             
-                            # Commit the updated protoblock file
-                            protoblock_file = f".tac_protoblock_{self.protoblock_id}.json"
-                            if os.path.exists(protoblock_file):
-                                commit_message = f"TAC: Update protoblock with test results from attempt {attempt + 1}"
-                                if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                                    logger.warning("Failed to commit updated protoblock file")
-                        else:
-                            logger.error("Cannot create next protoblock: no protoblock ID available")
+
                     except Exception as e:
                         logger.error(f"Failed to create next protoblock: {e}")
                         # Write log for protoblock creation failure
