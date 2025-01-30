@@ -131,33 +131,30 @@ class ProtoBlockExecutor:
             logger.info(f"Using max_retries={max_retries} from config")
             
             # Check git status and get current branch
-            status_ok, original_branch = self.git_manager.check_status()
+            status_ok, current_branch = self.git_manager.check_status()
             if not status_ok:
-                return False
-                
-            # Verify we're on main/master branch
-            if original_branch not in ['main', 'master']:
-                logger.error(f"Must be on main or master branch to create feature branch. Currently on: {original_branch}")
-                print("\nPlease switch to main/master branch first:")
-                print("  git checkout main")
                 return False
                 
             # Verify all tests pass before starting
             print("\nVerifying all tests pass before starting...")
             if not self.run_tests():
-                logger.error("Cannot proceed: some tests are failing on main/master branch")
-                print("\nCannot start implementation: Please fix failing tests on main/master branch first.")
+                logger.error("Cannot proceed: some tests are failing")
+                print("\nCannot start implementation: Please fix failing tests first.")
                 return False
-                
-            # Create and checkout new branch for block execution
-            block_branch = f"tac_{self.protoblock_id}"
-            if not self.git_manager.create_and_checkout_branch(block_branch):
-                logger.error(f"Failed to create branch {block_branch}")
-                return False
-                
-            logger.info(f"Created and switched to branch: {block_branch}")
-            execution_success = False
 
+            # Only create feature branch if we're on main/master
+            block_branch = current_branch
+            if current_branch in ['main', 'master']:
+                block_branch = f"tac_{self.protoblock_id}"
+                if not self.git_manager.create_and_checkout_branch(block_branch):
+                    logger.error(f"Failed to create branch {block_branch}")
+                    return False
+                logger.info(f"Created and switched to branch: {block_branch}")
+            else:
+                logger.info(f"Working on existing branch: {current_branch}")
+
+            execution_success = False
+            
             analysis = None
             
             for attempt in range(max_retries):
@@ -297,11 +294,20 @@ class ProtoBlockExecutor:
                 else:
                     print("Warning: Failed to commit/push changes automatically.")
                 
-                print("Implementation successful! To merge the changes:")
-                print(f"git checkout {original_branch} && git merge {block_branch} && git branch -d {block_branch}")
+                # Only show merge instructions if we created a feature branch
+                if current_branch in ['main', 'master']:
+                    print("Implementation successful! To merge the changes:")
+                    print(f"git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
+                else:
+                    print("Implementation successful!")
             else:
-                print("To clean up:")
-                print(f"  git restore . && git checkout {original_branch} && git clean -fd && git branch -D {block_branch}")
+                # Only show cleanup instructions if we created a feature branch
+                if current_branch in ['main', 'master']:
+                    print("To clean up:")
+                    print(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
+                else:
+                    print("To revert changes:")
+                    print("  git restore . && git clean -fd")
             print("="*50)
 
             return execution_success
