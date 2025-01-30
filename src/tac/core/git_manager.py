@@ -114,11 +114,8 @@ class GitManager:
         try:
             current_branch = self.get_current_branch() or ""
             
-            # Ensure we are on master/main branch
-            if current_branch.lower() not in ['master', 'main']:
-                logger.error(f"Must run TAC from master/main branch. Currently on '{current_branch}'. Please checkout master/main first!")
-                return False, current_branch
-            
+            # No longer enforce master/main branch requirement
+            # Just check if working tree is clean
             if self.repo.is_dirty(untracked_files=True):
                 logger.error("Git working tree is not clean. Please commit or stash your changes before running TAC!")
                 print("\nGit status:")
