@@ -3,6 +3,7 @@ import subprocess
 from tac.agents.base import Agent
 from tac.core.log_config import setup_logger
 from tac.utils.file_gatherer import gather_python_files
+from tac.protoblock import ProtoBlock
 import select
 import time
 
@@ -104,14 +105,15 @@ Important Guidelines:
         for write_file in write_files:
             command.extend(['--file', write_file])
 
-            # Add all context files to be read
-            for context_file in context_files:
-                command.extend(['--read', context_file])
+        # Add all context files to be read
+        for context_file in context_files:
+            command.extend(['--read', context_file])
 
-            command.extend(['--message', prompt])
-            
-            logger.info("Final Aider command: %s", ' '.join(command))
-            
+        command.extend(['--message', prompt])
+        
+        logger.info("Final Aider command: %s", ' '.join(command))
+        
+        try:
             # Set timeout values
             TOTAL_TIMEOUT = self.agent_config.get('model_settings', {}).get('timeout', 600)  # Default to 10 minutes if not specified
             NO_OUTPUT_TIMEOUT = TOTAL_TIMEOUT * 0.9  # Set no-output timeout to half of total timeout
@@ -169,6 +171,7 @@ Important Guidelines:
                 raise subprocess.CalledProcessError(process.returncode, command)
                 
             logger.info("Aider executed successfully.")
+            
         except subprocess.CalledProcessError as e:
             logger.error(f"Aider execution failed with return code: {e.returncode}")
             logger.error(f"Command that failed: {' '.join(command)}")
