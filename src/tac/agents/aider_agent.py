@@ -79,7 +79,6 @@ Important Guidelines:
 - Ensure tests are CONSISTENT with the code implemented!
 - Tests should use the specified test data
 - Avoid timeouts in tests
-- Don't create __init__.py files
 - When dealing with longer-running processes, ensure clear exit conditions
 - Tests should be deterministic and reliable"""
 
