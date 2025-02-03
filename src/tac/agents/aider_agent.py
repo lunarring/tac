@@ -55,16 +55,8 @@ class AiderAgent(Agent):
         logger.debug("Files to be written: %s", write_files)
         logger.debug("Context files to be read: %s", context_files)
 
-        if previous_analysis:
-            error_chunk = f"""
-Previous Test Results (Failed):
-{protoblock.test_results}
-
-Analysis of the previous attempt:
-{previous_analysis}
-"""
-        else:
-            error_chunk = ""
+#Previous Test Results (Failed):
+#{protoblock.test_results}
 
         prompt = f"""Implement both the functionality AND its tests simultaneously according to these specifications:
 
@@ -73,7 +65,6 @@ Task Description: {task_description}
 Test Requirements:
 - Test Specification: {test_specification}
 - Test Data Requirements: {test_data_generation}
-{error_chunk}
 Important Guidelines:
 - Write both the implementation and corresponding tests
 - Ensure tests are CONSISTENT with the code implemented!
@@ -82,6 +73,12 @@ Important Guidelines:
 - Avoid timeouts in tests
 - When dealing with longer-running processes, ensure clear exit conditions
 - Tests should be deterministic and reliable"""
+        
+        if previous_analysis:
+            prompt +=f"""
+            The previous attempt of implementing has failed! now please fix it given the following analysis:
+            {previous_analysis}
+            """
 
         logger.debug("Execution prompt for Aider:\n%s", prompt)
         

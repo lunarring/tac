@@ -52,7 +52,7 @@ class ErrorAnalyzer:
         Args:
             protoblock: The ProtoBlock that failed
             test_results: The test results/error output
-            codebase: Dictionary mapping file paths to their contents
+            codebase: Dictionary mapping file paths to their contents or string content
             
         Returns:
             str: Detailed analysis of what went wrong and suggestions for improvement
@@ -60,7 +60,6 @@ class ErrorAnalyzer:
         logger.info("Starting LLM-based failure analysis")
         logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
         logger.debug(f"Test results length: {len(test_results) if test_results else 'None'}")
-        logger.debug(f"Codebase files to analyze: {list(codebase.keys())}")
         
         try:
             # Load config to check if summaries are enabled
@@ -71,13 +70,25 @@ class ErrorAnalyzer:
             # Format codebase for prompt
             logger.info("Formatting codebase for LLM prompt")
             codebase_content = []
-            for path, content in codebase.items():
-                logger.debug(f"Processing file: {path}")
-                if use_summaries:
-                    file_content = self._get_file_content(path, use_summaries=True)
-                else:
-                    file_content = content
-                codebase_content.append(f"File: {path}\n```python\n{file_content}\n```")
+            
+            # Handle string codebase
+            if isinstance(codebase, str):
+                codebase_content.append(f"Codebase Content:\n```python\n{codebase}\n```")
+            else:
+                # Handle dictionary codebase
+                logger.debug(f"Codebase files to analyze: {list(codebase.keys())}")
+                for path, content in codebase.items():
+                    logger.debug(f"Processing file: {path}")
+                    if use_summaries:
+                        # Use existing summaries instead of generating new ones
+                        summary = self.project_files._load_existing_summaries().get(path, {}).get('summary')
+                        if summary:
+                            file_content = f"File Summary:\n{summary}"
+                        else:
+                            file_content = content
+                    else:
+                        file_content = content
+                    codebase_content.append(f"File: {path}\n```python\n{file_content}\n```")
             
             codebase_str = "\n\n".join(codebase_content)
             logger.debug(f"Formatted codebase length: {len(codebase_str)} characters")

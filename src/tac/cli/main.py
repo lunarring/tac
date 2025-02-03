@@ -461,9 +461,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Interactive viewer for logs and protoblocks'
     )
     
-    git_parser = subparsers.add_parser('git', help='Perform git operations (merge, diff, restore)')
+    git_parser = subparsers.add_parser('git', help='Perform git operations (mergepush, diff, restore)')
     git_subparsers = git_parser.add_subparsers(dest='git_command', help='Git subcommands')
-    git_subparsers.add_parser('merge', help='Merge the current feature branch into main branch')
+    git_subparsers.add_parser('mergepush', help='Merge the current feature branch into main branch and push to remote')
     git_subparsers.add_parser('diff', help='Show differences between main branch and the current feature branch')
     git_subparsers.add_parser('restore', help='Restore the repository to main branch, discarding changes')
     
@@ -525,7 +525,7 @@ def main():
             print("Not a valid git repository.")
             sys.exit(1)
 
-        if args.git_command == 'merge':
+        if args.git_command == 'mergepush':
             main_branch = 'main'
             current_branch = git_manager.get_current_branch()
             if current_branch in ['main', 'master']:
@@ -538,10 +538,13 @@ def main():
                 try:
                     git_manager.repo.git.merge(feature_branch)
                     print(f"Successfully merged {feature_branch} into {main_branch}.")
+                    # Push changes to remote
+                    git_manager.repo.git.push('origin', main_branch)
+                    print(f"Successfully pushed changes to remote.")
                     git_manager.repo.git.branch('-d', feature_branch)
                     print(f"Deleted feature branch {feature_branch}.")
                 except Exception as e:
-                    print(f"Error during merging: {e}")
+                    print(f"Error during merging or pushing: {e}")
                     sys.exit(1)
         elif args.git_command == 'diff':
             main_branch = 'main'
@@ -572,7 +575,7 @@ def main():
                 else:
                     print("Failed to clean working directory.")
         else:
-            print("Invalid git subcommand. Use 'merge', 'diff', or 'restore'.")
+            print("Invalid git subcommand. Use 'mergepush', 'diff', or 'restore'.")
         sys.exit(0)
 
     if args.command == 'run':
