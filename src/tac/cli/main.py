@@ -337,50 +337,50 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Block command
-    block_parser = subparsers.add_parser('block',
+    run_parser = subparsers.add_parser('run',
         help='Generate and execute a new block with automated tests or custom instructions'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         'directory',
         help='Directory to analyze and create block from'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--max-retries',
         type=int,
         help='Override the maximum number of retries (default from config.yaml)'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--test',
         nargs='?',
         const='',
         metavar='INSTRUCTIONS',
         help='Generate a test-focused block, optionally with specific test instructions'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--refactor',
         nargs='?',
         const='',
         metavar='INSTRUCTIONS',
         help='Generate a refactoring-focused block, optionally with specific refactor instructions'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--error',
         nargs='?',
         const='',
         metavar='INSTRUCTIONS',
         help='Generate an error analysis block, optionally with specific error instructions'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--instructions',
         type=str,
         help='Generate a custom block with specific instructions'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--json',
         type=str,
         help='Path to a JSON file containing a protoblock definition to execute'
     )
-    block_parser.add_argument(
+    run_parser.add_argument(
         '--no-git',
         action='store_true',
         help='Disable all git operations (branch checks, commits, etc.)'
@@ -463,7 +463,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     args = parser.parse_args()
     
-    if args.command == 'block':
+    if args.command == 'run':
         # Count how many template flags are used
         template_flags = sum([
             args.test is not None,
@@ -513,7 +513,7 @@ def main():
             sys.exit(0)
         return
 
-    if args.command == 'block':
+    if args.command == 'run':
         # Initialize git manager and check status
         git_manager = GitManager()
         if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name

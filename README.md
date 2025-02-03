@@ -42,16 +42,16 @@ Generate and execute new blocks for different purposes:
 
 ```bash
 # Generate and execute a test-focused block
-tac block --test ./your/code/directory
+tac run --test ./your/code/directory
 
 # Generate and execute a refactoring block
-tac block --refactor ./your/code/directory
+tac run --refactor ./your/code/directory
 
 # Generate and execute an error analysis block
-tac block --error ./your/code/directory
+tac run --error ./your/code/directory
 
 # Generate and execute a custom block with specific instructions
-tac block --instructions "Add error handling to all functions" ./your/code/directory
+tac run --instructions "Add error handling to all functions" ./your/code/directory
 ```
 
 Each block type focuses on a different aspect:
