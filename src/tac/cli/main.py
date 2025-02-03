@@ -520,7 +520,6 @@ def main():
         return
 
     if args.command == 'git':
-        from tac.core.git_manager import GitManager
         git_manager = GitManager()
         if not git_manager.repo:
             print("Not a valid git repository.")
