@@ -461,6 +461,12 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Interactive viewer for logs and protoblocks'
     )
     
+    git_parser = subparsers.add_parser('git', help='Perform git operations (merge, diff, restore)')
+    git_subparsers = git_parser.add_subparsers(dest='git_command', help='Git subcommands')
+    git_subparsers.add_parser('merge', help='Merge the current feature branch into main branch')
+    git_subparsers.add_parser('diff', help='Show differences between main branch and the current feature branch')
+    git_subparsers.add_parser('restore', help='Restore the repository to main branch, discarding changes')
+    
     args = parser.parse_args()
     
     if args.command == 'run':
@@ -512,6 +518,63 @@ def main():
             print("\nGoodbye!")
             sys.exit(0)
         return
+
+    if args.command == 'git':
+        from tac.core.git_manager import GitManager
+        git_manager = GitManager()
+        if not git_manager.repo:
+            print("Not a valid git repository.")
+            sys.exit(1)
+
+        if args.git_command == 'merge':
+            main_branch = 'main'
+            current_branch = git_manager.get_current_branch()
+            if current_branch in ['main', 'master']:
+                print("Already on main branch, nothing to merge.")
+            else:
+                feature_branch = current_branch
+                if not git_manager.checkout_branch(main_branch):
+                    print(f"Failed to checkout {main_branch} branch.")
+                    sys.exit(1)
+                try:
+                    git_manager.repo.git.merge(feature_branch)
+                    print(f"Successfully merged {feature_branch} into {main_branch}.")
+                    git_manager.repo.git.branch('-d', feature_branch)
+                    print(f"Deleted feature branch {feature_branch}.")
+                except Exception as e:
+                    print(f"Error during merging: {e}")
+                    sys.exit(1)
+        elif args.git_command == 'diff':
+            main_branch = 'main'
+            current_branch = git_manager.get_current_branch()
+            if current_branch in ['main', 'master']:
+                print("Already on main branch, no differences to show.")
+            else:
+                try:
+                    diff_output = git_manager.repo.git.diff(f"{main_branch}..{current_branch}")
+                    if not diff_output:
+                        print(f"No differences found between {main_branch} and {current_branch}.")
+                    else:
+                        print(diff_output)
+                except Exception as e:
+                    print(f"Error while getting diff: {e}")
+                    sys.exit(1)
+        elif args.git_command == 'restore':
+            main_branch = 'main'
+            current_branch = git_manager.get_current_branch()
+            if current_branch in ['main', 'master']:
+                print("Already on main branch.")
+            else:
+                if not git_manager.checkout_branch(main_branch):
+                    print(f"Failed to checkout {main_branch} branch.")
+                    sys.exit(1)
+                if git_manager.revert_changes():
+                    print(f"Repository restored to {main_branch} branch with a clean working directory.")
+                else:
+                    print("Failed to clean working directory.")
+        else:
+            print("Invalid git subcommand. Use 'merge', 'diff', or 'restore'.")
+        sys.exit(0)
 
     if args.command == 'run':
         # Initialize git manager and check status
