@@ -300,13 +300,6 @@ class ProtoBlockExecutor:
             print("\nGit Commands:")
             print("="*50)
             if execution_success:
-                # Show final test results
-                if hasattr(self, 'test_results'):
-                    print("\nFinal Test Results:")
-                    print("="*50)
-                    print(self.test_results)
-                    print("="*50)
-                
                 if self.git_enabled:
                     # Commit all changes with the protoblock's commit message or default message
                     commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
