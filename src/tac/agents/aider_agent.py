@@ -96,7 +96,7 @@ Important Guidelines:
             '--no-git',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
-            '--chat-history-file', '/dev/null',
+            # '--chat-history-file', '/dev/null',
             '--llm-history-file', '.aider.llm.history_unified'
         ]
 
