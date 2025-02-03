@@ -201,7 +201,7 @@ class ProtoBlockExecutor:
                     logger.error(error_msg)
                     
                     # Get analysis before writing log
-                    analysis = self.error_analyzer.analyze_failure_with_llm(
+                    analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
                         self.test_results if hasattr(self, 'test_results') else None,
                         self.codebase
@@ -263,26 +263,21 @@ class ProtoBlockExecutor:
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
                     
-                    try:
                         # Get analysis before writing log
-                        analysis = self.error_analyzer.analyze_failure_with_llm(
-                            self.protoblock, 
-                            self.test_results,
-                            self.codebase
-                        )
-                        
-                        # Write failure log with analysis
-                        if analysis:
-                            self._write_log_file(attempt + 1, False, "Tests failed", analysis)
-                            print("\nError Analysis:")
-                            print("="*50)
-                            print(analysis)
-                            print("="*50)
-                    except Exception as e:
-                        logger.error(f"Error during failure analysis: {type(e).__name__}: {str(e)}")
-                        print(f"\nNote: Error analyzer encountered an issue: {type(e).__name__}: {str(e)}")
-                        # Write failure log without analysis
-                        self._write_log_file(attempt + 1, False, "Tests failed - Analysis failed")
+                    analysis = self.error_analyzer.analyze_failure(
+                        self.protoblock, 
+                        self.test_results,
+                        self.codebase
+                    )
+                    
+                    # Write failure log with analysis
+                    if analysis:
+                        self._write_log_file(attempt + 1, False, "Tests failed", analysis)
+                        print("\nError Analysis:")
+                        print("="*50)
+                        print(analysis)
+                        print("="*50)
+
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
