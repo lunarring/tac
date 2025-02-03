@@ -59,7 +59,69 @@ class ErrorAnalyzer:
             
         return f"Error: Could not generate summary for {file_path}"
 
-    def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
+    def analyze_failure(self, protoblock: ProtoBlock, test_results: Optional[str], codebase: Optional[Dict[str, str]]) -> Optional[str]:
+        """
+        Analyzes a test failure and provides debugging insights
+        
+        Args:
+            protoblock: The ProtoBlock being executed
+            test_results: The test results string, may be None
+            codebase: Dictionary of file contents, may be None
+            
+        Returns:
+            str: Analysis of the failure, or None if analysis not possible
+        """
+        try:
+            if not test_results:
+                logger.warning("No test results provided for analysis")
+                return "No test results available for analysis"
+
+            analysis = []
+            
+            # Check for common error patterns
+            if "ModuleNotFoundError" in test_results or "ImportError" in test_results:
+                analysis.append("Import Error Detected:")
+                analysis.append("- The test is unable to import required modules")
+                analysis.append("- This usually means Python can't find the module in its path")
+                analysis.append("- Check that your imports match your directory structure")
+                analysis.append("- Make sure you have __init__.py files in your package directories")
+            
+            if "AssertionError" in test_results:
+                analysis.append("Assertion Error Detected:")
+                analysis.append("- Test assertions are failing")
+                analysis.append("- Compare expected vs actual values in the test output")
+                analysis.append("- Check if the implementation matches the test requirements")
+            
+            if "TypeError" in test_results:
+                analysis.append("Type Error Detected:")
+                analysis.append("- Function arguments or return values have incorrect types")
+                analysis.append("- Check the function signatures match what the tests expect")
+            
+            if "AttributeError" in test_results:
+                analysis.append("Attribute Error Detected:")
+                analysis.append("- Trying to access attributes that don't exist")
+                analysis.append("- Check class definitions and object initialization")
+            
+            # Add codebase-specific analysis if available
+            if codebase:
+                # Safe iteration over codebase
+                for file_path, content in codebase.items():
+                    if not content:  # Skip empty content
+                        continue
+                    if file_path.endswith('__init__.py') and not content.strip():
+                        analysis.append(f"Note: Empty __init__.py found at {file_path}")
+            
+            if not analysis:
+                analysis.append("No specific patterns detected in the test failure.")
+                analysis.append("Review the full test output above for more details.")
+            
+            return "\n".join(analysis)
+            
+        except Exception as e:
+            logger.error(f"Error during failure analysis: {type(e).__name__}: {str(e)}")
+            return f"Error during analysis: {type(e).__name__}: {str(e)}"
+
+    def analyze_failure_with_llm(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
         Analyzes test failures and implementation errors to provide insights.
         

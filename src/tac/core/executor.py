@@ -244,23 +244,37 @@ class ProtoBlockExecutor:
                     break
                 else:
                     print("\n❌ Tests failed.")
+                    print("\nTest Failure Information:")
+                    print("="*50)
+                    if hasattr(self, 'test_results'):
+                        print(self.test_results)
+                    else:
+                        print("No test results available")
+                    print("="*50)
+                    
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
                     
-                    # Get analysis before writing log
-                    analysis = self.error_analyzer.analyze_failure(
-                        self.protoblock, 
-                        self.test_results if hasattr(self, 'test_results') else None,
-                        self.codebase
-                    )
-                    
-                    # Write failure log with analysis
-                    if analysis:
-                        self._write_log_file(attempt + 1, False, "Tests failed", analysis)
-                        print("\nError Analysis:")
-                        print("="*50)
-                        print(analysis)
-                        print("="*50)
+                    try:
+                        # Get analysis before writing log
+                        analysis = self.error_analyzer.analyze_failure(
+                            self.protoblock, 
+                            self.test_results if hasattr(self, 'test_results') else None,
+                            self.codebase
+                        )
+                        
+                        # Write failure log with analysis
+                        if analysis:
+                            self._write_log_file(attempt + 1, False, "Tests failed", analysis)
+                            print("\nError Analysis:")
+                            print("="*50)
+                            print(analysis)
+                            print("="*50)
+                    except Exception as e:
+                        logger.error(f"Error during failure analysis: {type(e).__name__}: {str(e)}")
+                        print(f"\nNote: Error analyzer encountered an issue: {type(e).__name__}: {str(e)}")
+                        # Write failure log without analysis
+                        self._write_log_file(attempt + 1, False, "Tests failed - Analysis failed")
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
@@ -340,9 +354,23 @@ class ProtoBlockExecutor:
         Args:
             test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
         """
-        success = self.test_runner.run_tests(test_path)
-        self.test_results = self.test_runner.get_test_results()
-        return success
+        try:
+            print("\nTest Execution Details:")
+            print("="*50)
+            print(f"Test path: {test_path or 'tests/'}")
+            print(f"Working directory: {os.getcwd()}")
+            print(f"Python path: {sys.path}")
+            print("="*50)
+            
+            success = self.test_runner.run_tests(test_path)
+            self.test_results = self.test_runner.get_test_results()
+            return success
+        except Exception as e:
+            error_msg = f"Error during test execution: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
+            print(f"\nTest Runner Error: {error_msg}")
+            self.test_results = error_msg
+            return False
 
     def get_test_results(self) -> str:
         """Get the full test results including output and summary"""

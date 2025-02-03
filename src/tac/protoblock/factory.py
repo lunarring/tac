@@ -29,7 +29,7 @@ class ProtoBlockFactory:
         },
         "test": {
             "instructions": (
-                "Add one well-targeted test that validates newly implemented or existing functionality. Focus on clarity and maintainability of this single test. New test files should only be created in tests/test_*.py."
+                "Add one well-targeted test that validates newly implemented or existing functionality. Focus on clarity and maintainability of this single test. New test files should only be created in tests/test_*.py. Don't make subfolders in tests/ - just files beginning with test_*.py"
             )
         }
     }
