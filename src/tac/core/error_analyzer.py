@@ -38,41 +38,12 @@ class ErrorAnalyzer:
         Returns:
             str: File content or summary
         """
-        logger.info(f"Getting file content for {file_path} (use_summaries={use_summaries})")
-        
-        if not use_summaries:
-            logger.debug(f"Reading full content of {file_path}")
+        try:
             with open(file_path, 'r') as f:
-                content = f.read()
-                logger.debug(f"Read {len(content)} characters from {file_path}")
-                return content
-                
-        # Try to get summary from cache
-        logger.debug("Attempting to get summary from cache")
-        summary = self.project_files.get_file_summary(file_path)
-        if summary:
-            if "error" in summary:
-                logger.warning(f"Error in cached summary for {file_path}: {summary['error']}")
-                return f"Error analyzing file: {summary['error']}"
-            logger.debug(f"Found cached summary for {file_path}")
-            return f"File Summary:\n{summary['summary']}"
-            
-        # Generate new summary if not cached
-        logger.info(f"No cached summary found for {file_path}, generating new summary")
-        stats = self.project_files.update_summaries(exclusions=[".git", "__pycache__"])
-        logger.debug(f"Summary update stats: {stats}")
-        
-        # Try to get summary again
-        summary = self.project_files.get_file_summary(file_path)
-        if summary:
-            if "error" in summary:
-                logger.warning(f"Error generating summary for {file_path}: {summary['error']}")
-                return f"Error analyzing file: {summary['error']}"
-            logger.debug(f"Generated new summary for {file_path}")
-            return f"File Summary:\n{summary['summary']}"
-            
-        logger.error(f"Failed to generate summary for {file_path}")
-        return f"Error: Could not generate summary for {file_path}"
+                return f.read()
+        except Exception as e:
+            logger.warning(f"Error reading file {file_path}: {str(e)}")
+            return f"Error reading file: {str(e)}"
 
     def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
