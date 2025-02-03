@@ -153,11 +153,14 @@ class GitManager:
             self.repo.git.commit('-m', commit_message)
             logger.debug("Committed changes.")
 
-            # Push changes
-            self.repo.git.push()
-            logger.debug("Pushed changes to remote repository.")
+            # Print instructions for viewing diff and merging
+            current_branch = self.get_current_branch()
+            print(f"\nTo view changes compared to main branch:")
+            print(f"git diff main..{current_branch}")
+            print(f"\nTo merge these changes:")
+            print(f"git checkout main && git merge {current_branch} && git branch -d {current_branch}")
 
-            logger.info(f"Successfully committed and pushed changes. Commit message: {commit_message}")
+            logger.info(f"Successfully committed changes. Commit message: {commit_message}")
             return True
         except Exception as e:
             logger.error(f"Error during git operations: {e}")

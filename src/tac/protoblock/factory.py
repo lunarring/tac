@@ -160,7 +160,23 @@ class ProtoBlockFactory:
 - Bring everything into the right format and structure.
 </planning_rules>
 
+stick exactly to the following output_format, filling in between <>
 <output_format>
+{{
+    "task": {{
+        "specification": "<>",
+    }},
+    "test": {{
+        "specification": "<>",
+        "data": "<>"
+    }},
+    "write_files": [<>"],
+    "context_files": ["<>"],
+    "commit_message": "<>"
+}}
+</output_format_explained>
+
+<output_format_explained>
 {{
     "task": {{
         "specification": "Given the entire codebase and the task instructions below,  we describe the task at hand very precisely and actionable, making it easy and clear to implement. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive. If helpful, you can come up with a proposal of how this could be achieved."
@@ -173,7 +189,7 @@ class ProtoBlockFactory:
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes."
 }}
-</output_format>"""
+</output_format_explained>"""
 
     def _clean_code_fences(self, content: str) -> str:
         """

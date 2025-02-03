@@ -201,7 +201,7 @@ class ProtoBlockExecutor:
                     logger.error(error_msg)
                     
                     # Get analysis before writing log
-                    analysis = self.error_analyzer.analyze_failure(
+                    analysis = self.error_analyzer.analyze_failure_with_llm(
                         self.protoblock, 
                         self.test_results if hasattr(self, 'test_results') else None,
                         self.codebase
@@ -265,9 +265,9 @@ class ProtoBlockExecutor:
                     
                     try:
                         # Get analysis before writing log
-                        analysis = self.error_analyzer.analyze_failure(
+                        analysis = self.error_analyzer.analyze_failure_with_llm(
                             self.protoblock, 
-                            self.test_results if hasattr(self, 'test_results') else None,
+                            self.test_results,
                             self.codebase
                         )
                         
