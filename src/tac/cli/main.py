@@ -380,6 +380,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         type=str,
         help='Path to a JSON file containing a protoblock definition to execute'
     )
+    block_parser.add_argument(
+        '--no-git',
+        action='store_true',
+        help='Disable all git operations (branch checks, commits, etc.)'
+    )
     
     # File gathering command
     gather_parser = subparsers.add_parser('gather', 
@@ -521,6 +526,12 @@ def main():
             # Override config values with command line arguments if provided
             if args.max_retries is not None:
                 config['general']['max_retries'] = args.max_retries
+                
+            # Add no_git flag to config
+            if args.no_git:
+                config['git'] = {'enabled': False}
+            elif 'git' not in config:
+                config['git'] = {'enabled': True}
             
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")

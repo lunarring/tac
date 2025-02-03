@@ -46,6 +46,7 @@ class ProtoBlockExecutor:
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
+        self.git_enabled = config.get('git', {}).get('enabled', True)  # Get git enabled status
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -130,10 +131,15 @@ class ProtoBlockExecutor:
             max_retries = self.config.get('general', {}).get('max_retries', 3)
             logger.info(f"Using max_retries={max_retries} from config")
             
-            # Check git status and get current branch
-            status_ok, current_branch = self.git_manager.check_status()
-            if not status_ok:
-                return False
+            # Only check git status if git is enabled
+            if self.git_enabled:
+                # Check git status and get current branch
+                status_ok, current_branch = self.git_manager.check_status()
+                if not status_ok:
+                    return False
+            else:
+                current_branch = None
+                logger.info("Git operations disabled")
                 
             # Verify all tests pass before starting
             print("\nVerifying all tests pass before starting...")
@@ -142,16 +148,18 @@ class ProtoBlockExecutor:
                 print("\nCannot start implementation: Please fix failing tests first.")
                 return False
 
-            # Only create feature branch if we're on main/master
+            # Only create feature branch if git is enabled and we're on main/master
             block_branch = current_branch
-            if current_branch in ['main', 'master']:
+            if self.git_enabled and current_branch in ['main', 'master']:
                 block_branch = f"tac_{self.protoblock_id}"
                 if not self.git_manager.create_and_checkout_branch(block_branch):
                     logger.error(f"Failed to create branch {block_branch}")
                     return False
                 logger.info(f"Created and switched to branch: {block_branch}")
-            else:
+            elif self.git_enabled:
                 logger.info(f"Working on existing branch: {current_branch}")
+            else:
+                logger.info("Git operations disabled - skipping branch creation")
 
             execution_success = False
             
@@ -173,10 +181,11 @@ class ProtoBlockExecutor:
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
                     
-                    # Commit changes after successful implementation
-                    commit_message = f"TAC: Implementation attempt {attempt + 1}"
-                    if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                        logger.warning("Failed to commit changes after implementation")
+                    # Commit changes after successful implementation if git is enabled
+                    if self.git_enabled:
+                        commit_message = f"TAC: Implementation attempt {attempt + 1}"
+                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                            logger.warning("Failed to commit changes after implementation")
                     
                 except Exception as e:
                     error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
@@ -225,10 +234,11 @@ class ProtoBlockExecutor:
                     # Write success log with test results
                     self._write_log_file(attempt + 1, True, "Tests passed successfully")
                     
-                    # Commit test changes if any
-                    commit_message = f"TAC: Tests passed on attempt {attempt + 1}"
-                    if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                        logger.warning("Failed to commit changes after successful tests")
+                    # Commit test changes if any and git is enabled
+                    if self.git_enabled:
+                        commit_message = f"TAC: Tests passed on attempt {attempt + 1}"
+                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                            logger.warning("Failed to commit changes after successful tests")
                         
                     execution_success = True
                     break
@@ -262,13 +272,14 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
-                        # Commit any remaining changes before cleanup
-                        commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
-                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                            logger.warning("Failed to commit changes after failed attempt")
+                        # Commit any remaining changes before cleanup if git is enabled
+                        if self.git_enabled:
+                            commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
+                            if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                                logger.warning("Failed to commit changes after failed attempt")
                         break
 
-            # Print appropriate git commands based on execution result
+            # Print appropriate git commands based on execution result and git status
             print("\nGit Commands:")
             print("="*50)
             if execution_success:
@@ -279,31 +290,37 @@ class ProtoBlockExecutor:
                     print(self.test_results)
                     print("="*50)
                 
-                # Commit all changes with the protoblock's commit message or default message
-                commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
-                commit_success = self.git_manager.handle_post_execution(
-                    {'git': {'auto_push': True}},  # Enable auto-push for successful execution
-                    commit_message
-                )
-                if commit_success:
-                    print("Changes have been committed and pushed!")
+                if self.git_enabled:
+                    # Commit all changes with the protoblock's commit message or default message
+                    commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
+                    commit_success = self.git_manager.handle_post_execution(
+                        {'git': {'auto_push': True}},  # Enable auto-push for successful execution
+                        commit_message
+                    )
+                    if commit_success:
+                        print("Changes have been committed and pushed!")
+                    else:
+                        print("Warning: Failed to commit/push changes automatically.")
+                    
+                    # Only show merge instructions if we created a feature branch
+                    if current_branch in ['main', 'master']:
+                        print("Implementation successful! To merge the changes:")
+                        print(f"git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
+                    else:
+                        print("Implementation successful!")
                 else:
-                    print("Warning: Failed to commit/push changes automatically.")
-                
-                # Only show merge instructions if we created a feature branch
-                if current_branch in ['main', 'master']:
-                    print("Implementation successful! To merge the changes:")
-                    print(f"git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
-                else:
-                    print("Implementation successful!")
+                    print("Implementation successful! (Git operations disabled)")
             else:
-                # Only show cleanup instructions if we created a feature branch
-                if current_branch in ['main', 'master']:
-                    print("To clean up:")
-                    print(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
+                if self.git_enabled:
+                    # Only show cleanup instructions if we created a feature branch
+                    if current_branch in ['main', 'master']:
+                        print("To clean up:")
+                        print(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
+                    else:
+                        print("To revert changes:")
+                        print("  git restore . && git clean -fd")
                 else:
-                    print("To revert changes:")
-                    print("  git restore . && git clean -fd")
+                    print("Implementation failed. (Git operations disabled)")
             print("="*50)
 
             return execution_success
