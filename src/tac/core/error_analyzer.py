@@ -10,17 +10,22 @@ import os
 logger = logging.getLogger(__name__)
 
 class ErrorAnalyzer:
-    """Analyzes test failures and implementation errors to provide insights"""
+    """Analyzes test failures and implementation errors to provide insights using LLM"""
     
     def __init__(self):
+        logger.info("Initializing ErrorAnalyzer")
         self.llm_client = LLMClient(strength="strong")
         self.project_files = ProjectFiles()
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
+        logger.info("Loading configuration from config.yaml")
         config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+        logger.debug(f"Config path: {config_path}")
         with open(config_path, 'r') as f:
-            return yaml.safe_load(f)
+            config = yaml.safe_load(f)
+            logger.debug(f"Loaded config: {config}")
+            return config
 
     def _get_file_content(self, file_path: str, use_summaries: bool = False) -> str:
         """
@@ -33,20 +38,27 @@ class ErrorAnalyzer:
         Returns:
             str: File content or summary
         """
+        logger.info(f"Getting file content for {file_path} (use_summaries={use_summaries})")
+        
         if not use_summaries:
+            logger.debug(f"Reading full content of {file_path}")
             with open(file_path, 'r') as f:
-                return f.read()
+                content = f.read()
+                logger.debug(f"Read {len(content)} characters from {file_path}")
+                return content
                 
         # Try to get summary from cache
+        logger.debug("Attempting to get summary from cache")
         summary = self.project_files.get_file_summary(file_path)
         if summary:
             if "error" in summary:
                 logger.warning(f"Error in cached summary for {file_path}: {summary['error']}")
                 return f"Error analyzing file: {summary['error']}"
+            logger.debug(f"Found cached summary for {file_path}")
             return f"File Summary:\n{summary['summary']}"
             
         # Generate new summary if not cached
-        logger.info(f"Generating new summary for {file_path}")
+        logger.info(f"No cached summary found for {file_path}, generating new summary")
         stats = self.project_files.update_summaries(exclusions=[".git", "__pycache__"])
         logger.debug(f"Summary update stats: {stats}")
         
@@ -54,76 +66,17 @@ class ErrorAnalyzer:
         summary = self.project_files.get_file_summary(file_path)
         if summary:
             if "error" in summary:
+                logger.warning(f"Error generating summary for {file_path}: {summary['error']}")
                 return f"Error analyzing file: {summary['error']}"
+            logger.debug(f"Generated new summary for {file_path}")
             return f"File Summary:\n{summary['summary']}"
             
+        logger.error(f"Failed to generate summary for {file_path}")
         return f"Error: Could not generate summary for {file_path}"
 
-    def analyze_failure(self, protoblock: ProtoBlock, test_results: Optional[str], codebase: Optional[Dict[str, str]]) -> Optional[str]:
+    def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
-        Analyzes a test failure and provides debugging insights
-        
-        Args:
-            protoblock: The ProtoBlock being executed
-            test_results: The test results string, may be None
-            codebase: Dictionary of file contents, may be None
-            
-        Returns:
-            str: Analysis of the failure, or None if analysis not possible
-        """
-        try:
-            if not test_results:
-                logger.warning("No test results provided for analysis")
-                return "No test results available for analysis"
-
-            analysis = []
-            
-            # Check for common error patterns
-            if "ModuleNotFoundError" in test_results or "ImportError" in test_results:
-                analysis.append("Import Error Detected:")
-                analysis.append("- The test is unable to import required modules")
-                analysis.append("- This usually means Python can't find the module in its path")
-                analysis.append("- Check that your imports match your directory structure")
-                analysis.append("- Make sure you have __init__.py files in your package directories")
-            
-            if "AssertionError" in test_results:
-                analysis.append("Assertion Error Detected:")
-                analysis.append("- Test assertions are failing")
-                analysis.append("- Compare expected vs actual values in the test output")
-                analysis.append("- Check if the implementation matches the test requirements")
-            
-            if "TypeError" in test_results:
-                analysis.append("Type Error Detected:")
-                analysis.append("- Function arguments or return values have incorrect types")
-                analysis.append("- Check the function signatures match what the tests expect")
-            
-            if "AttributeError" in test_results:
-                analysis.append("Attribute Error Detected:")
-                analysis.append("- Trying to access attributes that don't exist")
-                analysis.append("- Check class definitions and object initialization")
-            
-            # Add codebase-specific analysis if available
-            if codebase:
-                # Safe iteration over codebase
-                for file_path, content in codebase.items():
-                    if not content:  # Skip empty content
-                        continue
-                    if file_path.endswith('__init__.py') and not content.strip():
-                        analysis.append(f"Note: Empty __init__.py found at {file_path}")
-            
-            if not analysis:
-                analysis.append("No specific patterns detected in the test failure.")
-                analysis.append("Review the full test output above for more details.")
-            
-            return "\n".join(analysis)
-            
-        except Exception as e:
-            logger.error(f"Error during failure analysis: {type(e).__name__}: {str(e)}")
-            return f"Error during analysis: {type(e).__name__}: {str(e)}"
-
-    def analyze_failure_with_llm(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
-        """
-        Analyzes test failures and implementation errors to provide insights.
+        Analyzes test failures and implementation errors using LLM.
         
         Args:
             protoblock: The ProtoBlock that failed
@@ -133,22 +86,34 @@ class ErrorAnalyzer:
         Returns:
             str: Detailed analysis of what went wrong and suggestions for improvement
         """
-        # Load config to check if summaries are enabled
-        config = self._load_config()
-        use_summaries = config.get('general', {}).get('use_file_summaries', False)
+        logger.info("Starting LLM-based failure analysis")
+        logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
+        logger.debug(f"Test results length: {len(test_results) if test_results else 'None'}")
+        logger.debug(f"Codebase files to analyze: {list(codebase.keys())}")
         
-        # Format codebase for prompt, using summaries if enabled
-        codebase_content = []
-        for path, content in codebase.items():
-            if use_summaries:
-                file_content = self._get_file_content(path, use_summaries=True)
-                codebase_content.append(f"File: {path}\n{file_content}")
-            else:
-                codebase_content.append(f"File: {path}\n```python\n{content}\n```")
-        
-        codebase_str = "\n\n".join(codebase_content)
-        
-        analysis_prompt = f"""<purpose>
+        try:
+            # Load config to check if summaries are enabled
+            config = self._load_config()
+            use_summaries = config.get('general', {}).get('use_file_summaries', False)
+            logger.info(f"Using file summaries: {use_summaries}")
+            
+            # Format codebase for prompt
+            logger.info("Formatting codebase for LLM prompt")
+            codebase_content = []
+            for path, content in codebase.items():
+                logger.debug(f"Processing file: {path}")
+                if use_summaries:
+                    file_content = self._get_file_content(path, use_summaries=True)
+                else:
+                    file_content = content
+                codebase_content.append(f"File: {path}\n```python\n{file_content}\n```")
+            
+            codebase_str = "\n\n".join(codebase_content)
+            logger.debug(f"Formatted codebase length: {len(codebase_str)} characters")
+            
+            # Prepare prompt
+            logger.info("Preparing LLM prompt")
+            analysis_prompt = f"""<purpose>
 You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements.
 </purpose>
 
@@ -202,19 +167,26 @@ MISSING WRITE FILES:
 (Provide a list of files that the were previously not listed in Write Files of the protoblock above, but the coder needs write access to them. The format should be a list, e.g. ["tests/test_piano_trainer_main.py"])
 </output_format>"""
 
-        messages = [
-            Message(role="system", content="You are a coding assistant specialized in analyzing test failures and implementation errors. Provide clear, actionable analysis."),
-            Message(role="user", content=analysis_prompt)
-        ]
-        
-        try:
+            logger.debug(f"Prompt length: {len(analysis_prompt)} characters")
+            
+            messages = [
+                Message(role="system", content="You are a coding assistant specialized in analyzing test failures and implementation errors. Provide clear, actionable analysis."),
+                Message(role="user", content=analysis_prompt)
+            ]
+            
+            logger.info("Sending request to LLM")
             response = self.llm_client.chat_completion(messages)
+            
             if not response or not response.strip():
+                logger.error("Received empty response from LLM")
                 return "Error: Unable to generate analysis"
                 
-            logger.debug(f"Error analysis response:\n{response}")
+            logger.info("Successfully received LLM response")
+            logger.debug(f"LLM response length: {len(response)} characters")
+            logger.debug(f"Analysis response:\n{response}")
+            
             return response
             
         except Exception as e:
-            logger.error(f"Error during failure analysis: {str(e)}")
+            logger.error(f"Error during LLM failure analysis: {str(e)}", exc_info=True)
             return f"Error analyzing failure: {str(e)}" 
