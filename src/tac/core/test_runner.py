@@ -69,9 +69,11 @@ class TestRunner:
                         'passed': 0,
                         'failed': 0,
                         'error': 0,
-                        'skipped': 0
+                        'skipped': 0,
+                        'collection_error': 0  # Add counter for collection errors
                     }
                     self.no_tests_collected = False
+                    self.collection_errors = []  # Store collection error messages
 
                 def _should_capture_output(self, text):
                     # Filter out debug and logging messages
@@ -95,8 +97,12 @@ class TestRunner:
                         self.no_tests_collected = True
                     # Add collection error handling
                     if report.outcome == 'failed':
-                        if hasattr(report, 'longrepr') and self._should_capture_output(report.longrepr):
-                            self.output.append(str(report.longrepr))
+                        self.test_results['collection_error'] += 1
+                        if hasattr(report, 'longrepr'):
+                            error_msg = str(report.longrepr)
+                            self.collection_errors.append(error_msg)
+                            if self._should_capture_output(error_msg):
+                                self.output.append(error_msg)
 
                 def pytest_runtest_logreport(self, report):
                     # Capture test results
@@ -132,21 +138,27 @@ class TestRunner:
             
             # Create summary from captured results
             summary = "\nTest Summary:\n"
-            if output_capture.no_tests_collected and not output_capture.output:
+            
+            # Handle collection errors first
+            if output_capture.test_results['collection_error'] > 0:
+                summary = "\nTest Collection Errors:\n"
+                summary += f"Found {output_capture.test_results['collection_error']} collection error(s)\n"
+                if output_capture.collection_errors:
+                    summary += "\nError Details:\n"
+                    summary += "\n".join(output_capture.collection_errors)
+            # Handle no tests found
+            elif output_capture.no_tests_collected and not output_capture.output:
                 summary = "\nNo tests were found in the specified path.\n"
                 summary += "This is not a failure - it just means no tests exist yet.\n"
+            # Handle normal test execution
             else:
-                # If we have output but no test results, it's likely a collection error
-                if not any(output_capture.test_results.values()) and output_capture.output:
-                    summary = "\nTest Collection Error:\n"
-                else:
-                    summary += f"Passed: {output_capture.test_results['passed']}\n"
-                    if output_capture.test_results['failed'] > 0:
-                        summary += f"Failed: {output_capture.test_results['failed']}\n"
-                    if output_capture.test_results['error'] > 0:
-                        summary += f"Errors: {output_capture.test_results['error']}\n"
-                    if output_capture.test_results['skipped'] > 0:
-                        summary += f"Skipped: {output_capture.test_results['skipped']}\n"
+                summary += f"Passed: {output_capture.test_results['passed']}\n"
+                if output_capture.test_results['failed'] > 0:
+                    summary += f"Failed: {output_capture.test_results['failed']}\n"
+                if output_capture.test_results['error'] > 0:
+                    summary += f"Errors: {output_capture.test_results['error']}\n"
+                if output_capture.test_results['skipped'] > 0:
+                    summary += f"Skipped: {output_capture.test_results['skipped']}\n"
             
             # Combine captured output with summary
             full_output = '\n'.join(filter(None, output_capture.output))  # Filter out empty strings
@@ -167,7 +179,7 @@ class TestRunner:
             # Get meaningful message for the exit code
             result_message = exit_code_messages.get(result, f"Unknown pytest exit code: {result}")
             
-            # Store both the result message and the full output
+            # Always store test results, even for collection errors
             self.test_results = f"Test execution completed. Result: {result_message}\n{full_output}"
             
             # Special case: if no tests were collected and no errors, treat this as success
@@ -188,6 +200,7 @@ class TestRunner:
         except Exception as e:
             error_msg = f"Error running pytest: {str(e)}\n{type(e).__name__}: {str(e)}"
             logger.error(error_msg)
+            # Always store test results, even for exceptions
             self.test_results = error_msg
             print(f"\nTest Error: {error_msg}")
             return False

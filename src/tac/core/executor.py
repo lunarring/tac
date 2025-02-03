@@ -186,20 +186,21 @@ class ProtoBlockExecutor:
                     # Get analysis before writing log
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
-                        self.test_results,
+                        self.test_results if hasattr(self, 'test_results') else None,
                         self.codebase
                     )
                     
                     # Write failure log with analysis
-                    execution_data = self._write_log_file(attempt + 1, False, error_msg, analysis)
+                    self._write_log_file(attempt + 1, False, error_msg, analysis)
                     
                     # Store error message for next attempt
                     self.previous_error = error_msg
                     
-                    print("\nError Analysis:")
-                    print("="*50)
-                    print(analysis)
-                    print("="*50)
+                    if analysis:
+                        print("\nError Analysis:")
+                        print("="*50)
+                        print(analysis)
+                        print("="*50)
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
@@ -211,10 +212,6 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
-                        # Commit any remaining changes before cleanup
-                        # commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
-                        # if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                        #     logger.warning("Failed to commit changes after failed attempt")
                         break
 
                 print("Running tests...")
@@ -238,24 +235,22 @@ class ProtoBlockExecutor:
                 else:
                     print("\n❌ Tests failed.")
                     # Update protoblock with test results before anything else
-                    self.protoblock.test_results = self.test_results
+                    self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
                     
                     # Get analysis before writing log
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
-                        self.test_results,
+                        self.test_results if hasattr(self, 'test_results') else None,
                         self.codebase
                     )
-
-                    
                     
                     # Write failure log with analysis
-                    self._write_log_file(attempt + 1, False, "Tests failed", analysis)
-                    
-                    print("\nError Analysis:")
-                    print("="*50)
-                    print(analysis)
-                    print("="*50)
+                    if analysis:
+                        self._write_log_file(attempt + 1, False, "Tests failed", analysis)
+                        print("\nError Analysis:")
+                        print("="*50)
+                        print(analysis)
+                        print("="*50)
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
@@ -278,10 +273,11 @@ class ProtoBlockExecutor:
             print("="*50)
             if execution_success:
                 # Show final test results
-                print("\nFinal Test Results:")
-                print("="*50)
-                print(self.test_results)
-                print("="*50)
+                if hasattr(self, 'test_results'):
+                    print("\nFinal Test Results:")
+                    print("="*50)
+                    print(self.test_results)
+                    print("="*50)
                 
                 # Commit all changes with the protoblock's commit message or default message
                 commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
