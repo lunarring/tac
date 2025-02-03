@@ -6,7 +6,7 @@ general:
   summarizer_timeout: 45  # Timeout in seconds for file summarization
 
 aider:
-  model: "openai/o1-mini"
+  model: "openai/o3-mini"
   # model: "deepseek/deepseek-reasoner"
   model_settings:
     edit_format: "diff"
@@ -18,7 +18,7 @@ llm_strong:
   # provider: "deepseek"
   # model: "deepseek-reasoner"
   provider: "openai"
-  model: "o1-mini"
+  model: "o3-mini"
   settings:
     temperature: 0.7
     max_tokens: null
@@ -27,7 +27,7 @@ llm_strong:
 
 llm_weak:
   provider: "openai"
-  model: "o1-mini"
+  model: "o3-mini"
   settings:
     temperature: 0.7
     max_tokens: null
