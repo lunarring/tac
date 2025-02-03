@@ -1,6 +1,7 @@
 general:
   type: "aider"
   max_retries: 4
+  max_retries_protoblock_creation: 4
   total_timeout: 600
   use_file_summaries: true
   summarizer_timeout: 45  # Timeout in seconds for file summarization

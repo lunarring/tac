@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from datetime import datetime
 import os
 import logging
+import time
 
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.project_files import ProjectFiles
@@ -354,6 +355,7 @@ class ProtoBlockFactory:
     def create_protoblock(self, seed_instructions: str) -> ProtoBlock:
         """
         Create a protoblock from seed instructions that contain all necessary information.
+        Will retry creation based on max_retries_protoblock_creation from config.
         
         Args:
             seed_instructions: Complete instructions for the LLM to generate the protoblock
@@ -362,11 +364,12 @@ class ProtoBlockFactory:
             ProtoBlock object containing the protoblock specification
             
         Raises:
-            ValueError: If unable to create a valid protoblock
+            ValueError: If unable to create a valid protoblock after all retries
         """
-        # Load config to check if summaries are enabled
+        # Load config to check if summaries are enabled and get max retries
         config = self._load_config()
         use_summaries = config.get('general', {}).get('use_file_summaries', False)
+        max_retries = config.get('general', {}).get('max_retries_protoblock_creation', 4)
         
         if use_summaries:
             logger.info("Using file summaries for protoblock creation")
@@ -379,39 +382,55 @@ class ProtoBlockFactory:
             Message(role="user", content=seed_instructions)
         ]
         
-        # Get response from LLM
-        response = self.llm_client.chat_completion(messages)
-        
-        # Check for empty or whitespace-only response
-        if not response or not response.strip():
-            raise ValueError("Received empty response from LLM")
-            
-        # Clean code fences from response
-        response = self._clean_code_fences(response)
-            
-        # Log the raw response for debugging
-        logger.debug(f"Raw LLM Response for protoblock:\n{response}")
-        
-        # Verify and parse the response
-        is_valid, error_msg, data = self.verify_protoblock(response)
-        if not is_valid:
-            # Include part of the response in the error message for context
-            preview = response[:200] + "..." if len(response) > 200 else response
-            raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
-        
-        # Create ProtoBlock directly
-        try:
-            return ProtoBlock(
-                task_description=data["task"]["specification"],
-                test_specification=data["test"]["specification"],
-                test_data_generation=data["test"]["data"],
-                write_files=data["write_files"],
-                context_files=data.get("context_files", []),
-                block_id=str(uuid.uuid4())[:6],
-                commit_message=f"TAC: {data.get('commit_message', 'Update')}"
-            )
-        except KeyError as e:
-            raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting protoblock creation (attempt {attempt + 1}/{max_retries})")
+                
+                # Get response from LLM
+                response = self.llm_client.chat_completion(messages)
+                
+                # Check for empty or whitespace-only response
+                if not response or not response.strip():
+                    raise ValueError("Received empty response from LLM")
+                    
+                # Clean code fences from response
+                response = self._clean_code_fences(response)
+                    
+                # Log the raw response for debugging
+                logger.debug(f"Raw LLM Response for protoblock:\n{response}")
+                
+                # Verify and parse the response
+                is_valid, error_msg, data = self.verify_protoblock(response)
+                if not is_valid:
+                    # Include part of the response in the error message for context
+                    preview = response[:200] + "..." if len(response) > 200 else response
+                    raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
+                
+                # Create ProtoBlock directly
+                try:
+                    return ProtoBlock(
+                        task_description=data["task"]["specification"],
+                        test_specification=data["test"]["specification"],
+                        test_data_generation=data["test"]["data"],
+                        write_files=data["write_files"],
+                        context_files=data.get("context_files", []),
+                        block_id=str(uuid.uuid4())[:6],
+                        commit_message=f"TAC: {data.get('commit_message', 'Update')}"
+                    )
+                except KeyError as e:
+                    raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
+                    
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Protoblock creation failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                if attempt < max_retries - 1:
+                    # Add a small delay before retrying to avoid rate limits
+                    time.sleep(1)
+                    continue
+                
+        # If we get here, all retries failed
+        raise ValueError(f"Failed to create protoblock after {max_retries} attempts. Last error: {str(last_error)}")
 
     def save_protoblock(self, block: ProtoBlock) -> str:
         """

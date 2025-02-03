@@ -12,6 +12,7 @@ class TestRunner:
     def __init__(self):
         init()  # Initialize colorama
         self.test_results = ""
+        self.test_functions = []  # Store test function names
         
     def run_tests(self, test_path: str = None) -> bool:
         """
@@ -22,6 +23,9 @@ class TestRunner:
             bool: True if all tests passed or no tests were found, False otherwise
         """
         try:
+            # Reset test functions list before each run
+            self.test_functions = []
+            
             # Default to running all test*.py files in tests directory
             test_target = test_path or 'tests'
             full_path = test_target
@@ -74,6 +78,7 @@ class TestRunner:
                     }
                     self.no_tests_collected = False
                     self.collection_errors = []  # Store collection error messages
+                    self.test_functions = []  # Store test function names
 
                 def _should_capture_output(self, text):
                     # Filter out debug and logging messages
@@ -103,6 +108,11 @@ class TestRunner:
                             self.collection_errors.append(error_msg)
                             if self._should_capture_output(error_msg):
                                 self.output.append(error_msg)
+                    # Collect test function names during collection phase
+                    elif report.outcome == 'passed' and hasattr(report, 'result'):
+                        for item in report.result:
+                            if item.name.startswith('test_') or item.name.endswith('_test'):
+                                self.test_functions.append(f"{item.parent.name}::{item.name}")
 
                 def pytest_runtest_logreport(self, report):
                     # Capture test results
@@ -135,6 +145,9 @@ class TestRunner:
             
             # Run pytest with our output capture plugin
             result = pytest.main(args, plugins=[output_capture])
+            
+            # Store collected test functions
+            self.test_functions = output_capture.test_functions
             
             # Create summary from captured results
             summary = "\nTest Summary:\n"
@@ -239,3 +252,7 @@ class TestRunner:
     def get_test_results(self) -> str:
         """Get the full test results including output and summary"""
         return self.test_results 
+
+    def get_test_functions(self) -> list:
+        """Get the list of collected test function names"""
+        return self.test_functions 
