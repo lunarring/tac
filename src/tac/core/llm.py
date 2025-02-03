@@ -145,7 +145,7 @@ class LLMClient:
         }
         
         # Models that don't support temperature parameter
-        if self.config.model not in ["o1-mini", "deepseek-reasoner"]:
+        if self.config.model not in ["o1-mini", "deepseek-reasoner"] and "o3-mini" not in self.config.model:
             # Use settings from config if not overridden
             if temperature is None:
                 temperature = self.config.settings.get('temperature', 0.7)
