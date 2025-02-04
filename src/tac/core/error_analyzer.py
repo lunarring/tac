@@ -27,24 +27,6 @@ class ErrorAnalyzer:
             logger.debug(f"Loaded config: {config}")
             return config
 
-    def _get_file_content(self, file_path: str, use_summaries: bool = False) -> str:
-        """
-        Get file content, either as full content or summary if enabled.
-        
-        Args:
-            file_path: Path to the file
-            use_summaries: Whether to use summaries instead of full content
-            
-        Returns:
-            str: File content or summary
-        """
-        try:
-            with open(file_path, 'r') as f:
-                return f.read()
-        except Exception as e:
-            logger.warning(f"Error reading file {file_path}: {str(e)}")
-            return f"Error reading file: {str(e)}"
-
     def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
         Analyzes test failures and implementation errors using LLM.

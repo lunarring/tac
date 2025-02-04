@@ -46,43 +46,6 @@ class ProtoBlockFactory:
             import yaml
             return yaml.safe_load(f)
 
-    def _get_file_content(self, file_path: str, use_summaries: bool = False) -> str:
-        """
-        Get file content, either as full content or summary if enabled.
-        
-        Args:
-            file_path: Path to the file
-            use_summaries: Whether to use summaries instead of full content
-            
-        Returns:
-            str: File content or summary
-        """
-        if not use_summaries:
-            with open(file_path, 'r') as f:
-                return f.read()
-                
-        # Try to get summary from cache
-        summary = self.project_files.get_file_summary(file_path)
-        if summary:
-            if "error" in summary:
-                logger.warning(f"Error in cached summary for {file_path}: {summary['error']}")
-                return f"Error analyzing file: {summary['error']}"
-            return f"File Summary:\n{summary['summary']}"
-            
-        # Generate new summary if not cached
-        logger.info(f"Generating new summary for {file_path}")
-        stats = self.project_files.update_summaries(exclusions=[".git", "__pycache__"])
-        logger.debug(f"Summary update stats: {stats}")
-        
-        # Try to get summary again
-        summary = self.project_files.get_file_summary(file_path)
-        if summary:
-            if "error" in summary:
-                return f"Error analyzing file: {summary['error']}"
-            return f"File Summary:\n{summary['summary']}"
-            
-        return f"Error: Could not generate summary for {file_path}"
-
     def get_task_instructions(self, template_type: Optional[str] = None, direct_instructions: Optional[str] = None) -> str:
         """
         Get task-specific instructions either from a template or direct instructions.

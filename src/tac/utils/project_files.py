@@ -181,4 +181,31 @@ class ProjectFiles:
     
     def get_all_summaries(self) -> Dict:
         """Get all file summaries"""
-        return self._load_existing_summaries() 
+        return self._load_existing_summaries()
+
+    def get_file_content(self, file_path: str, use_summaries: bool = False) -> str:
+        """
+        Get file content, either as full content or summary if enabled.
+        
+        Args:
+            file_path: Path to the file
+            use_summaries: Whether to use summaries instead of full content
+            
+        Returns:
+            str: File content or summary
+        """
+        if not use_summaries:
+            try:
+                with open(file_path, 'r') as f:
+                    return f.read()
+            except Exception as e:
+                logger.warning(f"Error reading file {file_path}: {str(e)}")
+                return f"Error reading file: {str(e)}"
+
+        summary = self.get_file_summary(file_path)
+        if summary:
+            if "error" in summary:
+                return f"Error analyzing file: {summary['error']}"
+            return summary.get("summary", "No summary available")
+        
+        return f"No summary available for {file_path}" 
