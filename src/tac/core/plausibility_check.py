@@ -58,10 +58,10 @@ Context Files: {protoblock.context_files}
 
 <output_format>
 Provide your analysis in JSON format with the following fields:
-{
+{{
     "correct": true/false,  # Whether the implementation matches the requirements
     "reasoning": "Detailed explanation of why the implementation is correct or incorrect"
-}
+}}
 
 The reasoning should be specific and actionable, especially if the implementation is incorrect.
 </output_format>"""
