@@ -207,7 +207,7 @@ def generate_seed_command(args):
         task_instructions = factory.get_task_instructions(template_type=template_type)
         
         # Get codebase content
-        codebase = gather_python_files(args.directory)
+        codebase = gather_python_files(args.dir)
         
         print("\n🔄 Generating protoblock from codebase...")
         
@@ -341,8 +341,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Generate and execute a new block with automated tests or custom instructions'
     )
     run_parser.add_argument(
-        'directory',
-        help='Directory to analyze and create block from'
+        '--dir',
+        default='.',
+        help='Directory to analyze and create block from (default: current directory)'
     )
     run_parser.add_argument(
         '--max-retries',
@@ -646,7 +647,7 @@ def main():
             )
             
             # Get codebase content
-            codebase = gather_python_files(args.directory)
+            codebase = gather_python_files(args.dir)
             
             print("\n🔄 Generating protoblock from codebase...")
             
