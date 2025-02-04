@@ -243,6 +243,11 @@ class ProtoBlockExecutor:
                         logger.error("No test results available")
                     logger.error("="*50)
                     
+                    # Revert changes on the feature branch if git is enabled
+                    if self.git_enabled:
+                        logger.info("Reverting changes while staying on feature branch...")
+                        self.git_manager.restore_repo(keep_branch=True)
+                    
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
                     

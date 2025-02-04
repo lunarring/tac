@@ -76,7 +76,7 @@ Important Guidelines:
         
         if previous_analysis:
             prompt +=f"""
-The previous attempt of implementing has failed! now please fix it given the following analysis:
+Previously, you have been trying to implement this but failed, here are some hints what went wrong::
 {previous_analysis}
             """
 
