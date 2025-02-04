@@ -17,14 +17,14 @@ from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock
 from tac.agents.aider_agent import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
 from tac.core.test_runner import TestRunner
-from tac.core.log_config import setup_logger
+from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 
-logger = setup_logger(__name__)
+logger = setup_logging('tac.cli.main')
 
 def load_config():
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')

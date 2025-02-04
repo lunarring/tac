@@ -18,8 +18,9 @@ from tac.core.error_analyzer import ErrorAnalyzer
 from tac.core.plausibility_check import PlausibilityChecker
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
+from tac.core.log_config import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.core.executor')
 
 class ProtoBlockExecutor:
     """
@@ -176,7 +177,7 @@ class ProtoBlockExecutor:
             
             for attempt in range(max_retries):
                 logger.info("="*60)
-                logger.info(f"Starting attempt {attempt + 1} of {max_retries}")
+                logger.info(f"🔄 Starting attempt {attempt + 1} of {max_retries}")
                 logger.info("="*60)
                 
                 logger.info("Executing task and generating tests simultaneously...")

@@ -1,9 +1,9 @@
 import git
-import logging
 import os
 from typing import Optional, Tuple
+from tac.core.log_config import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.core.git_manager')
 
 class GitManager:
     def __init__(self, repo_path: str = '.'):
