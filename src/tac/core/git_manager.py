@@ -191,44 +191,4 @@ class GitManager:
             logger.error(f"Error reverting changes: {e}")
             return False
 
-    def restore_repo(self, keep_branch: bool = False) -> bool:
-        """
-        Restore the repository to a clean state, optionally staying on the current branch.
-        
-        Args:
-            keep_branch: If True, stays on current branch after restoring. If False, returns to main/master.
-            
-        Returns:
-            bool: True if restoration was successful, False otherwise
-        """
-        if not self.repo:
-            logger.debug("No repository to restore.")
-            return False
-
-        try:
-            current_branch = self.get_current_branch()
-            if not current_branch:
-                logger.error("Could not determine current branch")
-                return False
-
-            # Revert all changes in the working directory
-            success = self.revert_changes()
-            if not success:
-                return False
-
-            if not keep_branch:
-                # Determine main branch (main or master)
-                main_branch = 'main' if 'main' in self.repo.heads else 'master'
-                # Return to main branch
-                self.repo.git.checkout(main_branch, force=True)
-                # Delete the feature branch if it exists and we're not on it
-                if current_branch not in [main_branch, 'HEAD'] and current_branch in self.repo.heads:
-                    self.repo.git.branch('-D', current_branch)
-                logger.info(f"Restored to {main_branch} branch and deleted feature branch")
-            else:
-                logger.info(f"Restored working directory while staying on {current_branch} branch")
-
-            return True
-        except Exception as e:
-            logger.error(f"Error restoring repository: {e}")
-            return False
+  

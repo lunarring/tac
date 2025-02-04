@@ -181,7 +181,7 @@ class ProtoBlockExecutor:
                     # Revert changes on the feature branch if git is enabled
                     if self.git_enabled:
                         logger.info("Reverting changes while staying on feature branch...")
-                        self.git_manager.restore_repo(keep_branch=True)
+                        self.git_manager.revert_changes()
 
                 logger.info("="*60)
                 logger.info(f"🔄 Starting attempt {attempt + 1} of {max_retries}")
