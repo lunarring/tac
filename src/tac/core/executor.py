@@ -191,11 +191,7 @@ class ProtoBlockExecutor:
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
                     
-                    # Commit changes after successful implementation if git is enabled
-                    if self.git_enabled:
-                        commit_message = f"TAC: Implementation attempt {attempt + 1}"
-                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                            logger.warning("Failed to commit changes after implementation")
+                    # Remove intermediate commit - we'll only commit on full success
                     
                 except Exception as e:
                     error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
@@ -231,6 +227,7 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
+                        # Remove failed attempt commit
                         break
 
                 print("Running tests...")
@@ -261,12 +258,8 @@ class ProtoBlockExecutor:
                             # Write success log with test results
                             self._write_log_file(attempt + 1, True, "Tests passed and implementation verified")
                             
-                            # Commit test changes if any and git is enabled
-                            if self.git_enabled:
-                                commit_message = f"TAC: Tests passed and implementation verified on attempt {attempt + 1}"
-                                if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                                    logger.warning("Failed to commit changes after successful tests")
-                                
+                            # Remove intermediate commit - we'll only commit on full success
+                            
                             execution_success = True
                             break
                         else:
@@ -292,6 +285,7 @@ class ProtoBlockExecutor:
                             else:
                                 print("\n" + "="*60)
                                 print("Maximum retry attempts reached.")
+                                # Remove failed attempt commit
                                 break
                     else:
                         # If plausibility check is disabled, consider the implementation successful after tests pass
@@ -301,12 +295,8 @@ class ProtoBlockExecutor:
                         # Write success log with test results
                         self._write_log_file(attempt + 1, True, "Tests passed")
                         
-                        # Commit test changes if any and git is enabled
-                        if self.git_enabled:
-                            commit_message = f"TAC: Tests passed on attempt {attempt + 1}"
-                            if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                                logger.warning("Failed to commit changes after successful tests")
-                            
+                        # Remove intermediate commit - we'll only commit on full success
+                        
                         execution_success = True
                         break
                 else:
@@ -347,11 +337,7 @@ class ProtoBlockExecutor:
                     else:
                         print("\n" + "="*60)
                         print("Maximum retry attempts reached.")
-                        # Commit any remaining changes before cleanup if git is enabled
-                        if self.git_enabled:
-                            commit_message = f"TAC: Failed implementation attempt {attempt + 1}"
-                            if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                                logger.warning("Failed to commit changes after failed attempt")
+                        # Remove failed attempt commit
                         break
 
             # Print appropriate git commands based on execution result and git status
