@@ -243,52 +243,72 @@ class ProtoBlockExecutor:
                     # Get git diff for plausibility check
                     git_diff = self.git_manager.get_complete_diff() if self.git_enabled else ""
                     
-                    # Perform plausibility check
-                    print("\nVerifying implementation plausibility...")
-                    plausibility_result = self.plausibility_checker.check_implementation(
-                        self.protoblock,
-                        git_diff
-                    )
+                    # Only perform plausibility check if enabled in config
+                    plausibility_check_enabled = self.config.get('general', {}).get('plausibility_check', False)
                     
-                    if plausibility_result["correct"]:
-                        print("\n✅ Implementation verified as plausible!")
+                    if plausibility_check_enabled:
+                        # Perform plausibility check
+                        print("\nVerifying implementation plausibility...")
+                        plausibility_result = self.plausibility_checker.check_implementation(
+                            self.protoblock,
+                            git_diff
+                        )
+                        
+                        if plausibility_result["correct"]:
+                            print("\n✅ Implementation verified as plausible!")
+                            # Update protoblock with test results
+                            self.protoblock.test_results = self.test_results
+                            # Write success log with test results
+                            self._write_log_file(attempt + 1, True, "Tests passed and implementation verified")
+                            
+                            # Commit test changes if any and git is enabled
+                            if self.git_enabled:
+                                commit_message = f"TAC: Tests passed and implementation verified on attempt {attempt + 1}"
+                                if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                                    logger.warning("Failed to commit changes after successful tests")
+                                
+                            execution_success = True
+                            break
+                        else:
+                            print("\n❌ Implementation verification failed!")
+                            print("\nVerification Failure Information:")
+                            print("="*50)
+                            print(plausibility_result["reasoning"])
+                            print("="*50)
+                            
+                            # Store the plausibility check reasoning as the previous error
+                            self.previous_error = plausibility_result["reasoning"]
+                            
+                            # Write failure log with plausibility check results
+                            self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result["reasoning"])
+                            
+                            if attempt < max_retries - 1:
+                                remaining = max_retries - (attempt + 1)
+                                print("\n" + "="*60)
+                                print(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
+                                print("Retrying with a new implementation...")
+                                print("="*60 + "\n")
+                                continue
+                            else:
+                                print("\n" + "="*60)
+                                print("Maximum retry attempts reached.")
+                                break
+                    else:
+                        # If plausibility check is disabled, consider the implementation successful after tests pass
+                        print("\n✅ Implementation successful! (Plausibility check disabled)")
                         # Update protoblock with test results
                         self.protoblock.test_results = self.test_results
                         # Write success log with test results
-                        self._write_log_file(attempt + 1, True, "Tests passed and implementation verified")
+                        self._write_log_file(attempt + 1, True, "Tests passed")
                         
                         # Commit test changes if any and git is enabled
                         if self.git_enabled:
-                            commit_message = f"TAC: Tests passed and implementation verified on attempt {attempt + 1}"
+                            commit_message = f"TAC: Tests passed on attempt {attempt + 1}"
                             if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
                                 logger.warning("Failed to commit changes after successful tests")
                             
                         execution_success = True
                         break
-                    else:
-                        print("\n❌ Implementation verification failed!")
-                        print("\nVerification Failure Information:")
-                        print("="*50)
-                        print(plausibility_result["reasoning"])
-                        print("="*50)
-                        
-                        # Store the plausibility check reasoning as the previous error
-                        self.previous_error = plausibility_result["reasoning"]
-                        
-                        # Write failure log with plausibility check results
-                        self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result["reasoning"])
-                        
-                        if attempt < max_retries - 1:
-                            remaining = max_retries - (attempt + 1)
-                            print("\n" + "="*60)
-                            print(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
-                            print("Retrying with a new implementation...")
-                            print("="*60 + "\n")
-                            continue
-                        else:
-                            print("\n" + "="*60)
-                            print("Maximum retry attempts reached.")
-                            break
                 else:
                     print("\n❌ Tests failed.")
                     print("\nTest Failure Information:")
