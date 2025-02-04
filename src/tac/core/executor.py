@@ -352,21 +352,22 @@ class ProtoBlockExecutor:
                     
                     # Only show merge instructions if we created a feature branch
                     if current_branch in ['main', 'master']:
-                        print("Implementation successful! To merge the changes:")
-                        print(f"git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
+                        print("Implementation successful! To merge and push the changes:")
+                        print("tac git mergepush")
+                        print("\nOr manually with:")
+                        print(f"  git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
                     else:
                         print("Implementation successful!")
                 else:
                     print("Implementation successful! (Git operations disabled)")
             else:
                 if self.git_enabled:
-                    # Only show cleanup instructions if we created a feature branch
+                    print("To clean up and restore to main branch:")
+                    print("  tac git restore")
+                    # Only show alternative manual cleanup if we created a feature branch
                     if current_branch in ['main', 'master']:
-                        print("To clean up:")
+                        print("\nOr manually with:")
                         print(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
-                    else:
-                        print("To revert changes:")
-                        print("  git restore . && git clean -fd")
                 else:
                     print("Implementation failed. (Git operations disabled)")
             print("="*50)
