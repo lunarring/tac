@@ -316,16 +316,16 @@ stick exactly to the following output_format, filling in between <>
                 if not all(item.strip() for item in validated_data[key]):
                     return False, f"Empty or whitespace-only items not allowed in {key}", None
 
-            # Validate test file naming convention
+            # Validate test file naming convention and location
             for file_path in validated_data["write_files"]:
-                if file_path.startswith("tests/"):
-                    # Ensure test files are directly in tests/ directory and follow naming convention
-                    parts = file_path.split("/")
-                    if len(parts) > 2:
-                        return False, f"Test files must be directly in tests/ directory, found: {file_path}", None
-                    if not parts[1].startswith("test_") or not parts[1].endswith(".py"):
-                        return False, f"Test files must follow pattern 'test_*.py', found: {file_path}", None
-            
+                if "test_" in file_path:
+                    # Test files must be in tests/ directory with correct pattern
+                    if not file_path.startswith("tests/test_") or not file_path.endswith(".py"):
+                        return False, f"Test files must be in tests/ directory and follow pattern 'test_*.py', found: {file_path}", None
+                    # No subfolders allowed in tests/
+                    if file_path.count("/") > 1:
+                        return False, f"Test files must be directly in tests/ directory (no subfolders allowed), found: {file_path}", None
+
             return True, "", validated_data
             
         except Exception as e:
