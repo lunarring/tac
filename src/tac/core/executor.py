@@ -15,6 +15,7 @@ from tac.core.test_runner import TestRunner
 import git
 import sys
 from tac.core.error_analyzer import ErrorAnalyzer
+from tac.core.plausibility_check import PlausibilityChecker
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
 
@@ -46,6 +47,7 @@ class ProtoBlockExecutor:
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
+        self.plausibility_checker = PlausibilityChecker()  # Initialize plausibility checker
         self.git_enabled = config.get('git', {}).get('enabled', True)  # Get git enabled status
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
@@ -237,19 +239,56 @@ class ProtoBlockExecutor:
                 
                 if self.run_tests():
                     print("\n✅ All tests passed!")
-                    # Update protoblock with test results
-                    self.protoblock.test_results = self.test_results
-                    # Write success log with test results
-                    self._write_log_file(attempt + 1, True, "Tests passed successfully")
                     
-                    # Commit test changes if any and git is enabled
-                    if self.git_enabled:
-                        commit_message = f"TAC: Tests passed on attempt {attempt + 1}"
-                        if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
-                            logger.warning("Failed to commit changes after successful tests")
+                    # Get git diff for plausibility check
+                    git_diff = self.git_manager.get_complete_diff() if self.git_enabled else ""
+                    
+                    # Perform plausibility check
+                    print("\nVerifying implementation plausibility...")
+                    plausibility_result = self.plausibility_checker.check_implementation(
+                        self.protoblock,
+                        git_diff
+                    )
+                    
+                    if plausibility_result["correct"]:
+                        print("\n✅ Implementation verified as plausible!")
+                        # Update protoblock with test results
+                        self.protoblock.test_results = self.test_results
+                        # Write success log with test results
+                        self._write_log_file(attempt + 1, True, "Tests passed and implementation verified")
                         
-                    execution_success = True
-                    break
+                        # Commit test changes if any and git is enabled
+                        if self.git_enabled:
+                            commit_message = f"TAC: Tests passed and implementation verified on attempt {attempt + 1}"
+                            if not self.git_manager.handle_post_execution({'git': {'auto_push': False}}, commit_message):
+                                logger.warning("Failed to commit changes after successful tests")
+                            
+                        execution_success = True
+                        break
+                    else:
+                        print("\n❌ Implementation verification failed!")
+                        print("\nVerification Failure Information:")
+                        print("="*50)
+                        print(plausibility_result["reasoning"])
+                        print("="*50)
+                        
+                        # Store the plausibility check reasoning as the previous error
+                        self.previous_error = plausibility_result["reasoning"]
+                        
+                        # Write failure log with plausibility check results
+                        self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result["reasoning"])
+                        
+                        if attempt < max_retries - 1:
+                            remaining = max_retries - (attempt + 1)
+                            print("\n" + "="*60)
+                            print(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
+                            print("Retrying with a new implementation...")
+                            print("="*60 + "\n")
+                            continue
+                        else:
+                            print("\n" + "="*60)
+                            print("Maximum retry attempts reached.")
+                            break
                 else:
                     print("\n❌ Tests failed.")
                     print("\nTest Failure Information:")
@@ -263,7 +302,7 @@ class ProtoBlockExecutor:
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
                     
-                        # Get analysis before writing log
+                    # Get analysis before writing log
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
                         self.test_results,
@@ -277,7 +316,6 @@ class ProtoBlockExecutor:
                         print("="*50)
                         print(analysis)
                         print("="*50)
-
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
