@@ -16,7 +16,7 @@ class PlausibilityChecker:
         logger.info("Initializing PlausibilityChecker")
         self.llm_client = LLMClient(strength="strong")
 
-    def check_implementation(self, protoblock: ProtoBlock, git_diff: str) -> Dict[str, str]:
+    def check_implementation(self, protoblock: ProtoBlock, git_diff: str) -> str:
         """
         Analyzes the implementation against the promised changes.
         
@@ -25,7 +25,7 @@ class PlausibilityChecker:
             git_diff: The git diff showing implemented changes
             
         Returns:
-            dict: Contains 'correct' (bool) and 'reasoning' (str) fields
+            str: Formatted analysis string containing correctness and reasoning
         """
         logger.info("Starting LLM-based plausibility check")
         logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
@@ -57,19 +57,25 @@ Context Files: {protoblock.context_files}
 </analysis_rules>
 
 <output_format>
-Provide your analysis in JSON format with the following fields:
-{{
-    "correct": true/false,  # Whether the implementation matches the requirements
-    "reasoning": "Detailed explanation of why the implementation is correct or incorrect"
-}}
+Provide your analysis in the following format:
 
-The reasoning should be specific and actionable, especially if the implementation is incorrect.
+PLAUSIBILITY CHECK:
+(State whether the implementation is plausible or not)
+
+DETAILED ANALYSIS:
+(Provide in-depth analysis of what matches or mismatches with requirements)
+
+ROOT CAUSE:
+(If implausible, explain the fundamental issues)
+
+RECOMMENDATIONS:
+(List specific suggestions for improvement if needed)
 </output_format>"""
 
             logger.debug(f"Prompt length: {len(analysis_prompt)} characters")
             
             messages = [
-                Message(role="system", content="You are a coding assistant specialized in reviewing code changes for correctness and completeness. Provide clear, actionable analysis in JSON format."),
+                Message(role="system", content="You are a coding assistant specialized in reviewing code changes for correctness and completeness. Provide clear, actionable analysis."),
                 Message(role="user", content=analysis_prompt)
             ]
             
@@ -78,30 +84,13 @@ The reasoning should be specific and actionable, especially if the implementatio
             
             if not response or not response.strip():
                 logger.error("Received empty response from LLM")
-                return {
-                    "correct": False,
-                    "reasoning": "Error: Unable to generate analysis"
-                }
+                return "Error: Unable to generate plausibility analysis"
             
             logger.info("Successfully received LLM response")
             logger.debug(f"LLM response:\n{response}")
             
-            # Parse JSON response
-            try:
-                result = json.loads(response)
-                if not isinstance(result, dict) or 'correct' not in result or 'reasoning' not in result:
-                    raise ValueError("Invalid response format")
-                return result
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse LLM response as JSON: {e}")
-                return {
-                    "correct": False,
-                    "reasoning": f"Error parsing analysis response: {str(e)}"
-                }
+            return response
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)
-            return {
-                "correct": False,
-                "reasoning": f"Error during plausibility check: {str(e)}"
-            } 
+            return f"Error during plausibility check: {str(e)}" 

@@ -294,7 +294,12 @@ class ProtoBlockExecutor:
                             git_diff
                         )
                         
-                        if plausibility_result["correct"]:
+                        # Check if the result indicates plausibility
+                        is_plausible = "PLAUSIBILITY CHECK:" in plausibility_result and \
+                                     any(positive in plausibility_result.split("PLAUSIBILITY CHECK:")[1].split("\n")[0].lower() 
+                                         for positive in ["plausible", "correct", "matches", "successful"])
+                        
+                        if is_plausible:
                             logger.info("✅ Implementation verified as plausible!")
                             # Update protoblock with test results
                             self.protoblock.test_results = self.test_results
@@ -307,20 +312,27 @@ class ProtoBlockExecutor:
                             logger.error("❌ Implementation verification failed!")
                             logger.error("Verification Failure Information:")
                             logger.error("="*50)
-                            logger.error(plausibility_result["reasoning"])
+                            logger.error(plausibility_result)
                             logger.error("="*50)
                             
-                            # Store the plausibility check reasoning as the previous error
-                            self.previous_error = plausibility_result["reasoning"]
+                            # Revert changes on the feature branch if git is enabled
+                            if self.git_enabled:
+                                logger.info("Reverting changes while staying on feature branch...")
+                                self.git_manager.restore_repo(keep_branch=True)
+                            
+                            # Store the plausibility check result as the previous error
+                            self.previous_error = plausibility_result
                             
                             # Write failure log with plausibility check results
-                            self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result["reasoning"])
+                            self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result)
                             
                             if attempt < max_retries - 1:
                                 remaining = max_retries - (attempt + 1)
                                 logger.info("="*60)
                                 logger.info(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
                                 logger.info("Retrying with a new implementation...")
+                                # Pass plausibility check result to agent for next attempt
+                                self.agent.run(self.protoblock, previous_analysis=plausibility_result)
                                 logger.info("="*60)
                                 continue
                             else:
