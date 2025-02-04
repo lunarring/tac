@@ -118,8 +118,8 @@ SUMMARIZE THE LAST IMPLEMENTATION ATTEMPT:
 DESCRIBE WHY THE LAST IMPLEMENTATION ATTEMPT FAILED:
 (Describe why it failed)
 
-LESSONS LEARNED:
-(Describe in great detail what you learned from the last implementation attempt and how to do it better next time)
+HOW TO DO IT NEXT TIME:
+(Describe in detail given the failed implementation attempt what exactly needs to be done differently next time)
 
 MISSING WRITE FILES:
 (Provide a list of files that the were previously not listed in Write Files of the protoblock above, but the coder needs write access to them. The format should be a list, e.g. ["tests/test_piano_trainer_main.py"])
