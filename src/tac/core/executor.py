@@ -297,9 +297,8 @@ class ProtoBlockExecutor:
                         )
                         
                         # Check if the result indicates plausibility
-                        is_plausible = "PLAUSIBILITY CHECK:" in plausibility_result and \
-                                     any(positive in plausibility_result.split("PLAUSIBILITY CHECK:")[1].split("\n")[0].lower() 
-                                         for positive in ["plausible", "correct", "matches", "successful"])
+                        final_plausibility_section = plausibility_result.split("FINAL PLAUSIBILITY:")[1].split("\n")[0] if "FINAL PLAUSIBILITY:" in plausibility_result else ""
+                        is_plausible = "OK" in final_plausibility_section.upper()
                         
                         if is_plausible:
                             logger.info("✅ Implementation verified as plausible!")

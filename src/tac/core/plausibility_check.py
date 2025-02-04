@@ -34,7 +34,7 @@ class PlausibilityChecker:
         try:
             # Prepare prompt
             analysis_prompt = f"""<purpose>
-You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements.
+You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. However you don't need to be overly strict, as the implementation was done by a very junior developer and we don't want to scare them off. If the program sort of works, that's good enough.
 </purpose>
 
 <protoblock>
@@ -59,9 +59,6 @@ Context Files: {protoblock.context_files}
 <output_format>
 Provide your analysis in the following format:
 
-PLAUSIBILITY CHECK:
-(State whether the implementation is plausible or not)
-
 DETAILED ANALYSIS:
 (Provide in-depth analysis of what matches or mismatches with requirements)
 
@@ -70,6 +67,10 @@ ROOT CAUSE:
 
 RECOMMENDATIONS:
 (List specific suggestions for improvement if needed)
+
+FINAL PLAUSIBILITY:
+(answer only with one word "OK" or "BAD" here)
+
 </output_format>"""
 
             logger.debug(f"Prompt length: {len(analysis_prompt)} characters")
