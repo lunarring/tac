@@ -146,10 +146,10 @@ class ProtoBlockExecutor:
                 logger.info("Git operations disabled")
                 
             # Verify all tests pass before starting
-            print("\nVerifying all tests pass before starting...")
+            logger.info("Verifying all tests pass before starting...")
             if not self.run_tests():
                 logger.error("Cannot proceed: some tests are failing")
-                print("\nCannot start implementation: Please fix failing tests first.")
+                logger.error("Cannot start implementation: Please fix failing tests first.")
                 return False
                 
             # Store initial test information after first run
@@ -172,15 +172,14 @@ class ProtoBlockExecutor:
                 logger.info("Git operations disabled - skipping branch creation")
 
             execution_success = False
-            
             analysis = None
             
             for attempt in range(max_retries):
-                print("\n" + "="*60)
-                print(f"Starting attempt {attempt + 1} of {max_retries}")
-                print("="*60 + "\n")
+                logger.info("="*60)
+                logger.info(f"Starting attempt {attempt + 1} of {max_retries}")
+                logger.info("="*60)
                 
-                print("Executing task and generating tests simultaneously...")
+                logger.info("Executing task and generating tests simultaneously...")
                 try:
                     # Write log before task execution
                     self._write_log_file(attempt + 1, None, "Starting task execution")
@@ -191,17 +190,14 @@ class ProtoBlockExecutor:
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
                     
-                    # Remove intermediate commit - we'll only commit on full success
-                    
                 except Exception as e:
                     error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
-                    print(f"\nExecution Error: {error_msg}")
                     logger.error(error_msg)
                     
                     # Get analysis before writing log
                     analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
-                        self.test_results if hasattr(self, 'test_results') else None,
+                        error_msg,
                         self.codebase
                     )
                     
@@ -212,102 +208,39 @@ class ProtoBlockExecutor:
                     self.previous_error = error_msg
                     
                     if analysis:
-                        print("\nError Analysis:")
-                        print("="*50)
-                        print(analysis)
-                        print("="*50)
+                        logger.error("Error Analysis:")
+                        logger.error("="*50)
+                        logger.error(analysis)
+                        logger.error("="*50)
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
-                        print("\n" + "="*60)
-                        print(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
-                        print("Retrying with a new implementation...")
-                        print("="*60 + "\n")
+                        logger.info("="*60)
+                        logger.info(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
+                        logger.info("Retrying with a new implementation...")
+                        logger.info("="*60)
                         continue
                     else:
-                        print("\n" + "="*60)
-                        print("Maximum retry attempts reached.")
-                        # Remove failed attempt commit
+                        logger.info("="*60)
+                        logger.info("Maximum retry attempts reached.")
                         break
 
-                print("Running tests...")
+                logger.info("Running tests...")
                 # Write log before running tests
                 self._write_log_file(attempt + 1, None, "Starting test execution")
+
+                test_results = self.run_tests()
                 
-                if self.run_tests():
-                    print("\n✅ All tests passed!")
-                    
-                    # Get git diff for plausibility check
-                    git_diff = self.git_manager.get_complete_diff() if self.git_enabled else ""
-                    
-                    # Only perform plausibility check if enabled in config
-                    plausibility_check_enabled = self.config.get('general', {}).get('plausibility_check', False)
-                    
-                    if plausibility_check_enabled:
-                        # Perform plausibility check
-                        print("\nVerifying implementation plausibility...")
-                        plausibility_result = self.plausibility_checker.check_implementation(
-                            self.protoblock,
-                            git_diff
-                        )
-                        
-                        if plausibility_result["correct"]:
-                            print("\n✅ Implementation verified as plausible!")
-                            # Update protoblock with test results
-                            self.protoblock.test_results = self.test_results
-                            # Write success log with test results
-                            self._write_log_file(attempt + 1, True, "Tests passed and implementation verified")
-                            
-                            # Remove intermediate commit - we'll only commit on full success
-                            
-                            execution_success = True
-                            break
-                        else:
-                            print("\n❌ Implementation verification failed!")
-                            print("\nVerification Failure Information:")
-                            print("="*50)
-                            print(plausibility_result["reasoning"])
-                            print("="*50)
-                            
-                            # Store the plausibility check reasoning as the previous error
-                            self.previous_error = plausibility_result["reasoning"]
-                            
-                            # Write failure log with plausibility check results
-                            self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result["reasoning"])
-                            
-                            if attempt < max_retries - 1:
-                                remaining = max_retries - (attempt + 1)
-                                print("\n" + "="*60)
-                                print(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
-                                print("Retrying with a new implementation...")
-                                print("="*60 + "\n")
-                                continue
-                            else:
-                                print("\n" + "="*60)
-                                print("Maximum retry attempts reached.")
-                                # Remove failed attempt commit
-                                break
-                    else:
-                        # If plausibility check is disabled, consider the implementation successful after tests pass
-                        print("\n✅ Implementation successful! (Plausibility check disabled)")
-                        # Update protoblock with test results
-                        self.protoblock.test_results = self.test_results
-                        # Write success log with test results
-                        self._write_log_file(attempt + 1, True, "Tests passed")
-                        
-                        # Remove intermediate commit - we'll only commit on full success
-                        
-                        execution_success = True
-                        break
-                else:
-                    print("\n❌ Tests failed.")
-                    print("\nTest Failure Information:")
-                    print("="*50)
+                # Assume test results failed
+                if not test_results:
+                    logger.error("❌ Tests failed.")
+                    logger.error("Test Failure Information:")
+                    logger.error("="*50)
                     if hasattr(self, 'test_results'):
-                        print(self.test_results)
+                        logger.error(self.test_results)
                     else:
-                        print("No test results available")
-                    print("="*50)
+                        logger.error("No test results available")
+                    logger.error("="*50)
                     
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
@@ -322,27 +255,86 @@ class ProtoBlockExecutor:
                     # Write failure log with analysis
                     if analysis:
                         self._write_log_file(attempt + 1, False, "Tests failed", analysis)
-                        print("\nError Analysis:")
-                        print("="*50)
-                        print(analysis)
-                        print("="*50)
+                        logger.error("Error Analysis:")
+                        logger.error("="*50)
+                        logger.error(analysis)
+                        logger.error("="*50)
                     
                     if attempt < max_retries - 1:
                         remaining = max_retries - (attempt + 1)
-                        print("\n" + "="*60)
-                        print(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
-                        print("Retrying with a new implementation...")
-                        print("="*60 + "\n")
+                        logger.info("="*60)
+                        logger.info(f"Attempt {attempt + 1} failed. {remaining} attempts remaining.")
+                        logger.info("Retrying with a new implementation...")
+                        logger.info("="*60)
                         continue
                     else:
-                        print("\n" + "="*60)
-                        print("Maximum retry attempts reached.")
-                        # Remove failed attempt commit
+                        logger.info("="*60)
+                        logger.info("Maximum retry attempts reached.")
+                        break
+                else:
+                    logger.info("✅ All tests passed!")
+                    
+                    # Get git diff for plausibility check
+                    git_diff = self.git_manager.get_complete_diff() if self.git_enabled else ""
+                    
+                    # Only perform plausibility check if enabled in config
+                    plausibility_check_enabled = self.config.get('general', {}).get('plausibility_check', False)
+                    
+                    if plausibility_check_enabled:
+                        # Perform plausibility check
+                        logger.info("Verifying implementation plausibility...")
+                        plausibility_result = self.plausibility_checker.check_implementation(
+                            self.protoblock,
+                            git_diff
+                        )
+                        
+                        if plausibility_result["correct"]:
+                            logger.info("✅ Implementation verified as plausible!")
+                            # Update protoblock with test results
+                            self.protoblock.test_results = self.test_results
+                            # Write success log with test results
+                            self._write_log_file(attempt + 1, True, "Tests passed and implementation verified")
+                            
+                            execution_success = True
+                            break
+                        else:
+                            logger.error("❌ Implementation verification failed!")
+                            logger.error("Verification Failure Information:")
+                            logger.error("="*50)
+                            logger.error(plausibility_result["reasoning"])
+                            logger.error("="*50)
+                            
+                            # Store the plausibility check reasoning as the previous error
+                            self.previous_error = plausibility_result["reasoning"]
+                            
+                            # Write failure log with plausibility check results
+                            self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result["reasoning"])
+                            
+                            if attempt < max_retries - 1:
+                                remaining = max_retries - (attempt + 1)
+                                logger.info("="*60)
+                                logger.info(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
+                                logger.info("Retrying with a new implementation...")
+                                logger.info("="*60)
+                                continue
+                            else:
+                                logger.info("="*60)
+                                logger.info("Maximum retry attempts reached.")
+                                break
+                    else:
+                        # If plausibility check is disabled, consider the implementation successful after tests pass
+                        logger.info("✅ Implementation successful! (Plausibility check disabled)")
+                        # Update protoblock with test results
+                        self.protoblock.test_results = self.test_results
+                        # Write success log with test results
+                        self._write_log_file(attempt + 1, True, "Tests passed")
+                        
+                        execution_success = True
                         break
 
-            # Print appropriate git commands based on execution result and git status
-            print("\nGit Commands:")
-            print("="*50)
+            # Log appropriate git commands based on execution result and git status
+            logger.info("Git Commands:")
+            logger.info("="*50)
             if execution_success:
                 if self.git_enabled:
                     # Commit all changes with the protoblock's commit message or default message
@@ -352,37 +344,36 @@ class ProtoBlockExecutor:
                         commit_message
                     )
                     if commit_success:
-                        print("Changes have been committed and pushed!")
+                        logger.info("Changes have been committed and pushed!")
                     else:
-                        print("Warning: Failed to commit/push changes automatically.")
+                        logger.warning("Warning: Failed to commit/push changes automatically.")
                     
                     # Only show merge instructions if we created a feature branch
                     if current_branch in ['main', 'master']:
-                        print("Implementation successful! To merge and push the changes:")
-                        print("tac git mergepush")
-                        print("\nOr manually with:")
-                        print(f"  git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
+                        logger.info("Implementation successful! To merge and push the changes:")
+                        logger.info("tac git mergepush")
+                        logger.info("Or manually with:")
+                        logger.info(f"  git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
                     else:
-                        print("Implementation successful!")
+                        logger.info("Implementation successful!")
                 else:
-                    print("Implementation successful! (Git operations disabled)")
+                    logger.info("Implementation successful! (Git operations disabled)")
             else:
                 if self.git_enabled:
-                    print("To clean up and restore to main branch:")
-                    print("  tac git restore")
+                    logger.info("To clean up and restore to main branch:")
+                    logger.info("  tac git restore")
                     # Only show alternative manual cleanup if we created a feature branch
                     if current_branch in ['main', 'master']:
-                        print("\nOr manually with:")
-                        print(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
+                        logger.info("Or manually with:")
+                        logger.info(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
                 else:
-                    print("Implementation failed. (Git operations disabled)")
-            print("="*50)
+                    logger.info("Implementation failed. (Git operations disabled)")
+            logger.info("="*50)
 
             return execution_success
 
         except Exception as e:
             error_msg = f"An error occurred during block execution: {type(e).__name__}: {str(e)}"
-            print(f"\nExecution Error: {error_msg}")
             logger.error(error_msg)
             # Write error log if we have a protoblock ID
             if self.protoblock_id:
@@ -396,12 +387,12 @@ class ProtoBlockExecutor:
             test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
         """
         try:
-            print("\nTest Execution Details:")
-            print("="*50)
-            print(f"Test path: {test_path or 'tests/'}")
-            print(f"Working directory: {os.getcwd()}")
-            print(f"Python path: {sys.path}")
-            print("="*50)
+            logger.info("Test Execution Details:")
+            logger.info("="*50)
+            logger.info(f"Test path: {test_path or 'tests/'}")
+            logger.info(f"Working directory: {os.getcwd()}")
+            logger.info(f"Python path: {sys.path}")
+            logger.info("="*50)
             
             success = self.test_runner.run_tests(test_path)
             self.test_results = self.test_runner.get_test_results()
@@ -409,7 +400,6 @@ class ProtoBlockExecutor:
         except Exception as e:
             error_msg = f"Error during test execution: {type(e).__name__}: {str(e)}"
             logger.error(error_msg)
-            print(f"\nTest Runner Error: {error_msg}")
             self.test_results = error_msg
             return False
 
