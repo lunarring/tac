@@ -76,8 +76,8 @@ Important Guidelines:
         
         if previous_analysis:
             prompt +=f"""
-            The previous attempt of implementing has failed! now please fix it given the following analysis:
-            {previous_analysis}
+The previous attempt of implementing has failed! now please fix it given the following analysis:
+{previous_analysis}
             """
 
         logger.debug("Execution prompt for Aider:\n%s", prompt)
