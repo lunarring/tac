@@ -176,6 +176,13 @@ class ProtoBlockExecutor:
             analysis = None
             
             for attempt in range(max_retries):
+
+                if attempt > 0:
+                    # Revert changes on the feature branch if git is enabled
+                    if self.git_enabled:
+                        logger.info("Reverting changes while staying on feature branch...")
+                        self.git_manager.restore_repo(keep_branch=True)
+
                 logger.info("="*60)
                 logger.info(f"🔄 Starting attempt {attempt + 1} of {max_retries}")
                 logger.info("="*60)
@@ -243,11 +250,6 @@ class ProtoBlockExecutor:
                         logger.error("No test results available")
                     logger.error("="*50)
                     
-                    # Revert changes on the feature branch if git is enabled
-                    if self.git_enabled:
-                        logger.info("Reverting changes while staying on feature branch...")
-                        self.git_manager.restore_repo(keep_branch=True)
-                    
                     # Update protoblock with test results before anything else
                     self.protoblock.test_results = self.test_results if hasattr(self, 'test_results') else None
                     
@@ -314,11 +316,6 @@ class ProtoBlockExecutor:
                             logger.error("="*50)
                             logger.error(plausibility_result)
                             logger.error("="*50)
-                            
-                            # Revert changes on the feature branch if git is enabled
-                            if self.git_enabled:
-                                logger.info("Reverting changes while staying on feature branch...")
-                                self.git_manager.restore_repo(keep_branch=True)
                             
                             # Store the plausibility check result as the previous error
                             self.previous_error = plausibility_result

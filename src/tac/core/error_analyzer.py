@@ -112,20 +112,14 @@ Context Files: {protoblock.context_files}
 <output_format>
 Provide your analysis in the following structure:
 
-FAILURE TYPE:
-(Describe the category of failure)
+SUMMARIZE THE LAST IMPLEMENTATION ATTEMPT:
+(Brief summary of what was attempted)
 
-ERROR LOCATION:
-(Identify specific files/lines where errors occurred)
+DESCRIBE WHY THE LAST IMPLEMENTATION ATTEMPT FAILED:
+(Describe why it failed)
 
-ROOT CAUSE:
-(Explain the fundamental issue that caused the failure)
-
-DETAILED ANALYSIS:
-(Provide in-depth analysis of what went wrong)
-
-RECOMMENDATIONS:
-(List specific suggestions for fixing the issues)
+LESSONS LEARNED:
+(Describe in great detail what you learned from the last implementation attempt and how to do it better next time)
 
 MISSING WRITE FILES:
 (Provide a list of files that the were previously not listed in Write Files of the protoblock above, but the coder needs write access to them. The format should be a list, e.g. ["tests/test_piano_trainer_main.py"])
