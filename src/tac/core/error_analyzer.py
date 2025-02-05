@@ -78,7 +78,7 @@ class ErrorAnalyzer:
             # Prepare prompt
             logger.info("Preparing LLM prompt")
             analysis_prompt = f"""<purpose>
-You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements.
+You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements. The information for the junior software engineer who failed at their attempt is given in the <protoblock> section, the codebase in <codebase_str>, the test results in <test_results>. Your concrete analysis rules are given in <analysis_rules>.
 </purpose>
 
 <codebase_state>
@@ -99,30 +99,20 @@ Context Files: {protoblock.context_files}
 
 <analysis_rules>
 1. First identify the type of failure (syntax error, runtime error, test assertion, etc.)
-2. Locate the specific files and lines where errors occurred
-3. Analyze the root cause - what specifically went wrong?
-4. Consider if the error relates to:
-   - Implementation mistakes
-   - Missing dependencies or imports
-   - Incorrect test assumptions
-   - Environment/configuration issues
-5. Suggest specific improvements or fixes
+2. Gather understanding whether the error is due to an already existing test, that needs to be updated, because the protoblock makes it necessary to change existing tests.
+3. In case the error is due to an already existing test, that needs to be updated, provide a detailed description of how to update the test.
+4. In case the error is due to a missing file, list the files that need to be created.
+5. In case the error is due to a missing import, list the imports that need to be added.
 </analysis_rules>
 
 <output_format>
 Provide your analysis in the following structure:
 
-SUMMARIZE THE LAST IMPLEMENTATION ATTEMPT:
-(Brief summary of what was attempted)
-
-DESCRIBE WHY THE LAST IMPLEMENTATION ATTEMPT FAILED:
-(Describe why it failed)
-
-HOW TO DO IT NEXT TIME:
-(Describe in detail given the failed implementation attempt what exactly needs to be done differently next time)
+NEW STRATEGY FOR SOLVING THE TASK:
+(In more detail describe how the next implementation attempt should look like based on whst you learned from the previois attempt.)
 
 MISSING WRITE FILES:
-(Provide a list of files that the were previously not listed in Write Files of the protoblock above, but the coder needs write access to them. The format should be a list, e.g. ["tests/test_piano_trainer_main.py"])
+(so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If so, list them here in a list, e.g. ["tests/test_piano_trainer_main.py"])
 </output_format>"""
 
             logger.debug(f"Prompt length: {len(analysis_prompt)} characters")

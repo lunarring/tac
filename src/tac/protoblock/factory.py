@@ -105,7 +105,7 @@ class ProtoBlockFactory:
             )
         
         return f"""<purpose>
-    You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your employees, who then implement the solution.   complete seed instructions by combining codebase analysis with task instructions. Your own inputs are <codebase> and <task_instructions>. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
+    You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
 </purpose>
 
 <codebase>
@@ -118,7 +118,7 @@ class ProtoBlockFactory:
 
 <planning_rules>
 - Create a plan how this task could be implemented.
-- Scan the codebase and review carefully and list every file that could potentially be needed for read or write access.
+- Scan the codebase and review carefully and list every file that could potentially be needed for read or write access (read for context and write for making changes)
 - Design a test that could be used to verify if the task has been implemented correctly.
 - Bring everything into the right format and structure.
 </planning_rules>
@@ -142,10 +142,10 @@ stick exactly to the following output_format, filling in between <>
 <output_format_explained>
 {{
     "task": {{
-        "specification": "Given the entire codebase and the task instructions below,  we describe the task at hand very precisely and actionable, making it easy and clear to implement. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive. If helpful, you can come up with a proposal of how this could be achieved."
+        "specification": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, make a high level plan of what we want to implement and how this on a high level could be achieved. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive."
     }},
     "test": {{
-        "specification": "Given the entire codebase and the instructions, here we describe the test specification for the task above. We are aiming to just write ONE single test ideally, which is able to infer whether the functionality update in the code has been implemented correctly or not. Thus, the goal is is figure out if the task instructions have been implemented correctly. Critically, the test needs to be fulfillable. We do NOT need to test anything else than the NEW functionality given the task specification. It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks!",
+        "specification": "Given the entire codebase and the instructions, here we describe the test specification for the task above. We are aiming to just write ONE single test ideally, which is able to infer whether the functionality update in the code has been implemented correctly or not. Thus, the goal is is figure out if the task instructions have been implemented correctly. Critically, the test needs to be fulfillable. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks!",
         "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible."
     }},
     "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them!"],
