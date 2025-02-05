@@ -307,8 +307,6 @@ class ProtoBlockExecutor:
                         is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
                         
                         logger.info(f"Plausibility Score: {final_plausibility_score}")
-
-                        is_plausible = "A" in final_plausibility_score.upper()
                         
                         if is_plausible:
                             logger.info("✅ Implementation verified as plausible!")
