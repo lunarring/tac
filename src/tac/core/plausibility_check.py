@@ -68,8 +68,8 @@ ROOT CAUSE:
 RECOMMENDATIONS:
 (List specific suggestions for improvement if needed)
 
-FINAL PLAUSIBILITY:
-(answer only with one word "OK" or "BAD" here)
+PLAUSIBILITY SCORE RATING:
+(answer only with one letter with the rating, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F")
 
 </output_format>"""
 

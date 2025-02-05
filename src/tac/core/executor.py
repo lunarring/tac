@@ -297,8 +297,18 @@ class ProtoBlockExecutor:
                         )
                         
                         # Check if the result indicates plausibility
-                        final_plausibility_section = plausibility_result.split("FINAL PLAUSIBILITY:")[1].split("\n")[0] if "FINAL PLAUSIBILITY:" in plausibility_result else ""
-                        is_plausible = "OK" in final_plausibility_section.upper()
+                        final_plausibility_score = plausibility_result.split("PLAUSIBILITY SCORE RATING:")[1].split("\n")[0] if "PLAUSIBILITY SCORE RATING" in plausibility_result else ""
+                        final_plausibility_score = final_plausibility_score.upper()
+
+                        # Strip any whitespace and get just the letter grade
+                        final_plausibility_score = final_plausibility_score.strip()
+                        
+                        # A through D are considered passing grades
+                        is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
+                        
+                        logger.info(f"Plausibility Score: {final_plausibility_score}")
+
+                        is_plausible = "A" in final_plausibility_score.upper()
                         
                         if is_plausible:
                             logger.info("✅ Implementation verified as plausible!")
