@@ -297,12 +297,18 @@ class ProtoBlockExecutor:
                         )
                         
                         # Check if the result indicates plausibility
-                        final_plausibility_score = plausibility_result.split("PLAUSIBILITY SCORE RATING:")[1].split("\n")[0] if "PLAUSIBILITY SCORE RATING" in plausibility_result else ""
-                        final_plausibility_score = final_plausibility_score.upper()
-
-                        # Strip any whitespace and get just the letter grade
-                        final_plausibility_score = final_plausibility_score.strip()
+                        final_plausibility_score = ""
+                        if "PLAUSIBILITY SCORE RATING:" in plausibility_result:
+                            score_section = plausibility_result.split("PLAUSIBILITY SCORE RATING:")[1].strip()
+                            # Extract just the letter grade, ignoring any additional text
+                            for char in score_section:
+                                if char in "ABCDF":
+                                    final_plausibility_score = char
+                                    break
                         
+                        # Strip any whitespace and ensure uppercase
+                        final_plausibility_score = final_plausibility_score.strip().upper()
+
                         # A through D are considered passing grades
                         is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
                         
