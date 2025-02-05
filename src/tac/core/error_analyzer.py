@@ -112,7 +112,7 @@ NEW STRATEGY FOR SOLVING THE TASK:
 (In more detail describe how the next implementation attempt should look like based on whst you learned from the previois attempt.)
 
 MISSING WRITE FILES:
-(so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If so, list them here in a list, e.g. ["tests/test_piano_trainer_main.py"])
+(so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If there are files missing, directly mention them here in a list, without any additional text e.g. your reply is ["tests/test_piano_trainer_main.py"])
 </output_format>"""
 
             logger.debug(f"Prompt length: {len(analysis_prompt)} characters")
