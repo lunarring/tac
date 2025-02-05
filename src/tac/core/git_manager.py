@@ -167,25 +167,21 @@ class GitManager:
             return False
 
     def revert_changes(self) -> bool:
-        """Revert all changes and delete untracked files after failed execution"""
+        """Stash all changes and delete untracked files after failed execution"""
         if not self.repo:
             logger.debug("No repository to revert changes.")
             return False
 
         try:
-            # First, reset any staged changes
-            self.repo.git.reset('HEAD')
-            logger.debug("Reset staged changes.")
+            # Stash all changes including untracked files
+            self.repo.git.stash('push', '--include-untracked')
+            logger.debug("Stashed all changes including untracked files.")
 
-            # Then, discard changes in working directory
-            self.repo.git.checkout('--', '.')
-            logger.debug("Discarded changes in working directory.")
-
-            # Clean untracked files and directories
+            # Clean any remaining untracked files and directories
             self.repo.git.clean('-fd')
             logger.debug("Cleaned untracked files and directories.")
 
-            logger.info("Successfully reverted all changes and cleaned working directory")
+            logger.info("Successfully stashed all changes and cleaned working directory")
             return True
         except Exception as e:
             logger.error(f"Error reverting changes: {e}")
