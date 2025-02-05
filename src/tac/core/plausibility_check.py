@@ -54,6 +54,7 @@ Context Files: {protoblock.context_files}
 3. Check if any changes seem unrelated or potentially harmful
 4. Consider if the implementation is complete and sufficient
 5. Look for any missing requirements or incomplete implementations
+6. Come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
 </analysis_rules>
 
 <output_format>
