@@ -7,6 +7,7 @@ import ast
 import logging
 import json
 from datetime import datetime
+import git
 
 # Add the src directory to Python path for local development
 src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -364,17 +365,42 @@ def main():
                 print("Already on main branch, nothing to merge.")
             else:
                 feature_branch = current_branch
-                if not git_manager.checkout_branch(main_branch):
-                    print(f"Failed to checkout {main_branch} branch.")
-                    sys.exit(1)
+                
+                # Commit any pending changes
+                if git_manager.repo.is_dirty(untracked_files=True):
+                    print("Found uncommitted changes. Committing them automatically...")
+                    git_manager.repo.git.add('.')
+                    try:
+                        git_manager.repo.git.commit('-m', f"Auto-commit changes in {feature_branch} before merge")
+                        print("Successfully committed all changes.")
+                    except git.exc.GitCommandError as e:
+                        print(f"Failed to commit changes: {e}")
+                        sys.exit(1)
+                
                 try:
-                    git_manager.repo.git.merge(feature_branch)
-                    print(f"Successfully merged {feature_branch} into {main_branch}.")
-                    # Push changes to remote
-                    git_manager.repo.git.push('origin', main_branch)
-                    print(f"Successfully pushed changes to remote.")
-                    git_manager.repo.git.branch('-d', feature_branch)
-                    print(f"Deleted feature branch {feature_branch}.")
+                    # Checkout main branch
+                    if not git_manager.checkout_branch(main_branch):
+                        print(f"Failed to checkout {main_branch} branch.")
+                        sys.exit(1)
+                    
+                    # Merge the feature branch
+                    try:
+                        git_manager.repo.git.merge(feature_branch)
+                        print(f"Successfully merged {feature_branch} into {main_branch}.")
+                        
+                        # Push changes to remote
+                        git_manager.repo.git.push('origin', main_branch)
+                        print(f"Successfully pushed changes to remote.")
+                        
+                        # Delete the feature branch
+                        git_manager.repo.git.branch('-d', feature_branch)
+                        print(f"Deleted feature branch {feature_branch}.")
+                    except git.exc.GitCommandError as e:
+                        print(f"Error during merge: {e}")
+                        print("Aborting merge and returning to feature branch...")
+                        git_manager.repo.git.merge('--abort')
+                        git_manager.checkout_branch(feature_branch)
+                        sys.exit(1)
                 except Exception as e:
                     print(f"Error during merging or pushing: {e}")
                     sys.exit(1)

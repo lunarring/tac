@@ -56,8 +56,13 @@ class GitManager:
         if not self.repo:
             return False
         try:
-            # Force checkout, discarding any changes
-            self.repo.git.checkout(branch_name, force=True)
+            # Check if there are uncommitted changes
+            if self.repo.is_dirty(untracked_files=True):
+                logger.error("Cannot checkout branch: You have uncommitted changes. Please commit or stash them first.")
+                return False
+            
+            # Regular checkout without force
+            self.repo.git.checkout(branch_name)
             return True
         except git.exc.GitCommandError as e:
             logger.error(f"Failed to checkout branch {branch_name}: {e}")
