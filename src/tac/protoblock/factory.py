@@ -16,25 +16,6 @@ logger = logging.getLogger(__name__)
 class ProtoBlockFactory:
     """Factory class for creating protoblocks"""
     
-    # Predefined templates for different task types
-    TEMPLATES = {
-        "refactor": {
-            "instructions": (
-                "Review the codebase and address one problematic area (e.g., duplicated logic, unclear naming, large functions). Improve it without changing fundamental logic. Keep the change small and focused."
-            )
-        },
-        "error": {
-            "instructions": (
-                "Analyze the following error, identify its root cause, and propose a fix. Include ALL files that are mentioned in the error message in the write_files field."
-            )
-        },
-        "test": {
-            "instructions": (
-                "Add one well-targeted test that validates newly implemented or existing functionality. Focus on clarity and maintainability of this single test. New test files should only be created in tests/test_*.py. Don't make subfolders in tests/ - just files beginning with test_*.py"
-            )
-        }
-    }
-    
     def __init__(self):
         self.llm_client = LLMClient(strength="strong")
         self.project_files = ProjectFiles()
@@ -45,42 +26,6 @@ class ProtoBlockFactory:
         with open(config_path, 'r') as f:
             import yaml
             return yaml.safe_load(f)
-
-    def get_task_instructions(self, template_type: Optional[str] = None, direct_instructions: Optional[str] = None) -> str:
-        """
-        Get task-specific instructions either from a template or direct instructions.
-        If template_type is provided with direct_instructions, they will be combined.
-        
-        Args:
-            template_type: Type of template to use (refactor, test, error)
-            direct_instructions: Direct instructions provided by the user
-            
-        Returns:
-            str: The task-specific instructions to use
-            
-        Raises:
-            ValueError: If neither argument is provided, or if template type is invalid
-        """
-        if template_type is None and direct_instructions is None:
-            raise ValueError("Must provide either template_type or direct_instructions")
-            
-        if template_type is not None and template_type not in self.TEMPLATES:
-            raise ValueError(f"Invalid template type: {template_type}. Must be one of: {', '.join(self.TEMPLATES.keys())}")
-            
-        if template_type is None:
-            return direct_instructions
-            
-        template_instructions = self.TEMPLATES[template_type]["instructions"]
-        
-        if not direct_instructions:
-            return template_instructions
-            
-        # Special handling for error template
-        if template_type == "error":
-            return f"{template_instructions}\n\nError message:\n{direct_instructions}"
-            
-        # For other templates, combine with additional instructions
-        return f"{template_instructions}\n\nAdditional specific instructions: {direct_instructions}"
 
     def get_seed_instructions(self, codebase: str, task_instructions: str) -> str:
         """

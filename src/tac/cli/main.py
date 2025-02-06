@@ -199,7 +199,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     # Block command
     run_parser = subparsers.add_parser('run',
-        help='Generate and execute a new block with automated tests or custom instructions'
+        help='Execute a task with automated tests based on instructions'
+    )
+    run_parser.add_argument(
+        'instructions',
+        help='Instructions for the task to execute'
     )
     run_parser.add_argument(
         '--dir',
@@ -210,32 +214,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         '--max-retries',
         type=int,
         help='Override the maximum number of retries (default from config.yaml)'
-    )
-    run_parser.add_argument(
-        '--test',
-        nargs='?',
-        const='',
-        metavar='INSTRUCTIONS',
-        help='Generate a test-focused block, optionally with specific test instructions'
-    )
-    run_parser.add_argument(
-        '--refactor',
-        nargs='?',
-        const='',
-        metavar='INSTRUCTIONS',
-        help='Generate a refactoring-focused block, optionally with specific refactor instructions'
-    )
-    run_parser.add_argument(
-        '--error',
-        nargs='?',
-        const='',
-        metavar='INSTRUCTIONS',
-        help='Generate an error analysis block, optionally with specific error instructions'
-    )
-    run_parser.add_argument(
-        '--instructions',
-        type=str,
-        help='Generate a custom block with specific instructions'
     )
     run_parser.add_argument(
         '--json',
@@ -332,19 +310,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     args = parser.parse_args()
     
     if args.command == 'run':
-        # Count how many template flags are used
-        template_flags = sum([
-            args.test is not None,
-            args.refactor is not None,
-            args.error is not None,
-            bool(args.instructions),
-            bool(args.json)  # Add json flag to template flags
-        ])
-        
-        if template_flags == 0:
-            parser.error("Must specify one of: --test, --refactor, --error, --instructions, or --json")
-        elif template_flags > 1:
-            parser.error("Can only use one of: --test, --refactor, --error, --instructions, or --json")
+        # Only validate that we have either instructions or a JSON file
+        if not args.instructions and not args.json:
+            parser.error("Must provide either instructions or --json")
+        if args.instructions and args.json:
+            parser.error("Cannot provide both instructions and --json")
     
     return parser, args
 
@@ -462,7 +432,6 @@ def main():
             
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
-            
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")
@@ -484,29 +453,11 @@ def main():
                 protoblock = load_protoblock_from_json(args.json)
                 print(f"\n✨ Loaded protoblock: {args.json}")
             else:
-                # Create block based on command type
-                template_type = None
-                direct_instructions = None
-                if args.test is not None:
-                    template_type = "test"
-                    direct_instructions = args.test
-                elif args.refactor is not None:
-                    template_type = "refactor"
-                    direct_instructions = args.refactor
-                elif args.error is not None:
-                    template_type = "error"
-                    direct_instructions = args.error
-                elif args.instructions:
-                    direct_instructions = args.instructions
-                
                 # Create protoblock using factory
                 factory = ProtoBlockFactory()
                 
-                # Get task instructions
-                task_instructions = factory.get_task_instructions(
-                    template_type=template_type,
-                    direct_instructions=direct_instructions
-                )
+                # Get task instructions directly from args.instructions
+                task_instructions = args.instructions
                 
                 print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
                 

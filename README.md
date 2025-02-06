@@ -36,29 +36,28 @@ After this, you can run the command from anywhere in your terminal (as long as y
 
 The framework provides several commands to help with AI-driven development:
 
-### Create Blocks
+### Create and Execute Tasks
 
-Generate and execute new blocks for different purposes:
+Execute tasks with automated testing using a simple command:
 
 ```bash
-# Generate and execute a test-focused block
-tac run --test ./your/code/directory
+# Execute a task with specific instructions
+tac run "your instructions here"
 
-# Generate and execute a refactoring block
-tac run --refactor ./your/code/directory
+# Examples:
+tac run "add error handling to all functions"
+tac run "create a test for the parse_config function"
+tac run "refactor the duplicate code in utils.py"
 
-# Generate and execute an error analysis block
-tac run --error ./your/code/directory
+# Optional: Specify a different directory (default is current directory)
+tac run "your instructions" --dir ./your/code/directory
 
-# Generate and execute a custom block with specific instructions
-tac run --instructions "Add error handling to all functions" ./your/code/directory
+# Optional: Load from a JSON protoblock file
+tac run --json path/to/protoblock.json
+
+# Optional: Disable git operations
+tac run "your instructions" --no-git
 ```
-
-Each block type focuses on a different aspect:
-- `--test`: Creates a block focused on generating tests for the codebase
-- `--refactor`: Creates a block for analyzing and improving code structure and quality
-- `--error`: Creates a block for error analysis and handling improvements
-- `--instructions`: Creates a block from custom task instructions
 
 ### View Blocks and Logs
 
