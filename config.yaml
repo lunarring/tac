@@ -41,7 +41,7 @@ git:
 
 logging:
   tac:
-    level: "INFO"
+    level: "DEBUG"
     color: "green"
   other_packages:
     level: "INFO"

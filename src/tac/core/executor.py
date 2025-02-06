@@ -307,7 +307,7 @@ class ProtoBlockExecutor:
                         # A through D are considered passing grades
                         is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
                         
-                        logger.info(f"Plausibility Score: {final_plausibility_score}")
+                        logger.info(f"Plausibility Score: {final_plausibility_score}. Is plausible: {is_plausible}")
                         
                         if is_plausible:
                             logger.info("✅ Implementation verified as plausible!")
@@ -331,19 +331,19 @@ class ProtoBlockExecutor:
                             # Write failure log with plausibility check results
                             self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result)
                             
-                            if attempt < max_retries - 1:
-                                remaining = max_retries - (attempt + 1)
-                                logger.info("="*60)
-                                logger.info(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
-                                logger.info("Retrying with a new implementation...")
-                                # Pass plausibility check result to agent for next attempt
-                                self.agent.run(self.protoblock, previous_analysis=plausibility_result)
-                                logger.info("="*60)
-                                continue
-                            else:
-                                logger.info("="*60)
-                                logger.info("Maximum retry attempts reached.")
-                                break
+                            # if attempt < max_retries - 1:
+                            #     remaining = max_retries - (attempt + 1)
+                            #     logger.info("="*60)
+                            #     logger.info(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
+                            #     logger.info("Retrying with a new implementation...")
+                            #     # Pass plausibility check result to agent for next attempt
+                            #     self.agent.run(self.protoblock, previous_analysis=plausibility_result)
+                            #     logger.info("="*60)
+                            #     continue
+                            # else:
+                            #     logger.info("="*60)
+                            #     logger.info("Maximum retry attempts reached.")
+                            #     break
                     else:
                         # If plausibility check is disabled, consider the implementation successful after tests pass
                         logger.info("✅ Implementation successful! (Plausibility check disabled)")
