@@ -83,8 +83,12 @@ class TestRunner:
             output = []
             if process.stdout:
                 output.append(process.stdout)
+                # Print the full test output immediately
+                print(process.stdout)
             if process.stderr:
                 output.append(process.stderr)
+                # Print any error output immediately
+                print(process.stderr)
 
             # Parse test results
             results = {
