@@ -162,7 +162,9 @@ Previously, you have been trying to implement this but failed, here are some hin
             if process.returncode != 0:
                 logger.error(f"Aider command that failed: {' '.join(command)}")
                 raise subprocess.CalledProcessError(process.returncode, command)
-                
+            
+    
+
             logger.info("Aider executed successfully.")
             
         except subprocess.CalledProcessError as e:

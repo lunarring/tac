@@ -19,6 +19,7 @@ from tac.core.plausibility_check import PlausibilityChecker
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
 from tac.core.log_config import setup_logging
+import shutil
 
 logger = setup_logging('tac.core.executor')
 
@@ -126,6 +127,24 @@ class ProtoBlockExecutor:
             
         return execution_data
 
+    def _check_nested_tests(self) -> bool:
+        """
+        Check if tests/tests directory exists, which indicates a potential problem
+        from a previous run.
+        
+        Returns:
+            bool: True if nested tests directory exists, False otherwise
+        """
+        nested_tests_dir = os.path.join('tests', 'tests')
+        if os.path.exists(nested_tests_dir):
+            logger.error("="*80)
+            logger.error("Found nested tests directory (tests/tests/)!")
+            logger.error("This usually indicates a problem from a previous run.")
+            logger.error("Please move any test files from tests/tests/ to tests/ and remove the nested directory.")
+            logger.error("="*80)
+            return True
+        return False
+
     def execute_block(self) -> bool:
         """
         Executes the block with a unified test-and-implement approach.
@@ -133,6 +152,10 @@ class ProtoBlockExecutor:
             bool: True if execution was successful, False otherwise
         """
         try:
+            # Check for nested tests directory first
+            if self._check_nested_tests():
+                return False
+
             # Get max_retries from config, default to 3 if not found
             max_retries = self.config.get('general', {}).get('max_retries', 3)
             logger.info(f"Using max_retries={max_retries} from config")
@@ -189,6 +212,9 @@ class ProtoBlockExecutor:
                     
                     # Pass the previous attempt's analysis to the agent
                     self.agent.run(self.protoblock, previous_analysis=analysis)
+                    # Ensure no tests/tests/ directory exists
+                    self._cleanup_nested_tests()
+                    
                     
                     # Write log after task execution
                     self._write_log_file(attempt + 1, None, "Task execution completed")
@@ -330,20 +356,7 @@ class ProtoBlockExecutor:
                             
                             # Write failure log with plausibility check results
                             self._write_log_file(attempt + 1, False, "Implementation verification failed", plausibility_result)
-                            
-                            # if attempt < max_retries - 1:
-                            #     remaining = max_retries - (attempt + 1)
-                            #     logger.info("="*60)
-                            #     logger.info(f"Attempt {attempt + 1} failed plausibility check. {remaining} attempts remaining.")
-                            #     logger.info("Retrying with a new implementation...")
-                            #     # Pass plausibility check result to agent for next attempt
-                            #     self.agent.run(self.protoblock, previous_analysis=plausibility_result)
-                            #     logger.info("="*60)
-                            #     continue
-                            # else:
-                            #     logger.info("="*60)
-                            #     logger.info("Maximum retry attempts reached.")
-                            #     break
+
                     else:
                         # If plausibility check is disabled, consider the implementation successful after tests pass
                         logger.info("✅ Implementation successful! (Plausibility check disabled)")
@@ -354,6 +367,7 @@ class ProtoBlockExecutor:
                         
                         execution_success = True
                         break
+
 
             # Log appropriate git commands based on execution result and git status
             logger.info("Git Commands:")
@@ -429,3 +443,36 @@ class ProtoBlockExecutor:
     def get_test_results(self) -> str:
         """Get the full test results including output and summary"""
         return self.test_results
+
+    def _cleanup_nested_tests(self):
+        """
+        Cleanup nested test directory by moving files from tests/tests/ to tests/
+        and removing the tests/tests directory if it exists.
+        """
+        nested_tests_dir = os.path.join('tests', 'tests')
+        if not os.path.exists(nested_tests_dir):
+            return
+
+        logger.info("Found nested tests directory. Moving files to parent directory...")
+        
+        try:
+            # Move all files from tests/tests to tests
+            for item in os.listdir(nested_tests_dir):
+                src_path = os.path.join(nested_tests_dir, item)
+                dst_path = os.path.join('tests', item)
+                
+                if os.path.isfile(src_path):
+                    # If destination exists, remove it first
+                    if os.path.exists(dst_path):
+                        os.remove(dst_path)
+                        logger.info(f"Removed existing file {item} in tests/")
+                    
+                    os.rename(src_path, dst_path)
+                    logger.info(f"Moved {item} to tests/")
+            
+            # Force remove the tests/tests directory and all its contents
+            shutil.rmtree(nested_tests_dir)
+            logger.info("Removed nested tests directory and all its contents")
+            
+        except Exception as e:
+            logger.error(f"Error during test directory cleanup: {str(e)}")
