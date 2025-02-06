@@ -38,7 +38,7 @@ llm_weak:
     timeout: 120
 
 git:
-  auto_commit_if_success: false
+  auto_commit_if_success: true
 
 logging:
   tac:

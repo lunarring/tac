@@ -205,7 +205,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Block command
-    run_parser = subparsers.add_parser('run',
+    run_parser = subparsers.add_parser('make',
         help='Execute a task with automated tests based on instructions'
     )
     run_parser.add_argument(
@@ -456,7 +456,7 @@ def main():
             print("Invalid git subcommand. Use 'mergepush', 'diff', or 'restore'.")
         sys.exit(0)
 
-    if args.command == 'run':
+    if args.command == 'make':
         # Initialize git manager and check status
         git_manager = GitManager()
         if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
