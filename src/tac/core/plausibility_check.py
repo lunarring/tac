@@ -81,7 +81,7 @@ PLAUSIBILITY SCORE RATING:
                 Message(role="user", content=analysis_prompt)
             ]
             
-            logger.info("Sending request to LLM")
+            logger.info("Plausibility check starting, sending request to LLM")
             response = self.llm_client.chat_completion(messages)
             
             if not response or not response.strip():
