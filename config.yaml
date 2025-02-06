@@ -6,6 +6,7 @@ general:
   use_file_summaries: true
   summarizer_timeout: 45  # Timeout in seconds for file summarization
   plausibility_check: true  # Whether to perform plausibility check after implementation
+  halt_after_fail: false # Wait for the user to press Enter before starting the next attempt
 
 aider:
   model: "openai/o3-mini"

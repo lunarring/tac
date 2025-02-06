@@ -195,8 +195,11 @@ class ProtoBlockExecutor:
             for attempt in range(max_retries):
 
                 if attempt > 0:
+                    # Only show pause prompt if halt_after_fail is true in config
+                    if self.config.get('general', {}).get('halt_after_fail', False):
+                        input("Execution paused: press Enter to continue with the next attempt, or Ctrl+C to abort...")
+
                     # Revert changes on the feature branch if git is enabled
-                    input("Execution paused: press Enter to continue with the next attempt, or Ctrl+C to abort...")
                     if self.git_enabled:
                         logger.info("Reverting changes while staying on feature branch...")
                         self.git_manager.revert_changes()
