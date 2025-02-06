@@ -94,8 +94,8 @@ Previously, you have been trying to implement this but failed, here are some hin
             '--no-git',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
-            # '--chat-history-file', '/dev/null',
-            '--llm-history-file', '.aider.llm.history_unified'
+            '--chat-history-file', '/dev/null',
+            '--llm-history-file', '/dev/null',
         ]
 
         # Add all write files to be edited
