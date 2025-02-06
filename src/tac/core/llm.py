@@ -171,7 +171,7 @@ class LLMClient:
                     error_msg += f"\nResponse body: {e.response.text}"
                 except:
                     pass
-            raise Exception(error_msg)
+            return f"LLM failure: {error_msg}"
 
 # Example usage:
 if __name__ == "__main__":
