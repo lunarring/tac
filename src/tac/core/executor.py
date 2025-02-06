@@ -52,6 +52,7 @@ class ProtoBlockExecutor:
         self.git_enabled = config.get('git', {}).get('enabled', True)  # Get git enabled status
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
+        self.test_results = None
 
     def _load_config(self) -> dict:
         """Load configuration from config.yaml"""
@@ -146,13 +147,6 @@ class ProtoBlockExecutor:
                 current_branch = None
                 logger.info("Git operations disabled")
                 
-            # # Verify all tests pass before starting
-            # logger.info("Verifying all tests pass before starting...")
-            # if not self.run_tests():
-            #     logger.error("Cannot proceed: some tests are failing")
-            #     logger.error("Cannot start implementation: Please fix failing tests first.")
-            #     return False
-                
             # Store initial test information after first run
             self.initial_test_functions = self.test_runner.get_test_functions()
             self.initial_test_count = len(self.initial_test_functions)
@@ -179,6 +173,7 @@ class ProtoBlockExecutor:
 
                 if attempt > 0:
                     # Revert changes on the feature branch if git is enabled
+                    input("Execution paused: press Enter to continue with the next attempt, or Ctrl+C to abort...")
                     if self.git_enabled:
                         logger.info("Reverting changes while staying on feature branch...")
                         self.git_manager.revert_changes()

@@ -463,41 +463,6 @@ def main():
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
             
-            if args.json:
-                # Execute block from JSON file
-                try:
-                    protoblock_loaded = load_protoblock_from_json(args.json)
-                    executor = ProtoBlockExecutor(protoblock=protoblock_loaded, config=config)
-                    success = executor.execute_block()
-                    
-                    if success:
-                        logger.info("Task completed successfully.")
-                        # Handle git operations after successful execution
-                        if not git_manager.handle_post_execution(config, protoblock_loaded.commit_message):
-                            sys.exit(1)
-                    else:
-                        logger.error("Task execution failed.")
-                        sys.exit(1)
-                    return
-                except Exception as e:
-                    logger.error(f"Error loading or executing protoblock from JSON: {e}")
-                    sys.exit(1)
-            
-            # Create block based on command type
-            template_type = None
-            direct_instructions = None
-            if args.test is not None:
-                template_type = "test"
-                direct_instructions = args.test
-            elif args.refactor is not None:
-                template_type = "refactor"
-                direct_instructions = args.refactor
-            elif args.error is not None:
-                template_type = "error"
-                direct_instructions = args.error
-            elif args.instructions:
-                direct_instructions = args.instructions
-
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")
@@ -510,42 +475,57 @@ def main():
             if not success:
                 logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
                 sys.exit(1)
-            
-            # Create protoblock using factory
-            factory = ProtoBlockFactory()
-            
-            # Get task instructions
-            task_instructions = factory.get_task_instructions(
-                template_type=template_type,
-                direct_instructions=direct_instructions
-            )
-            
+
             # Get codebase content
             codebase = gather_python_files(args.dir)
-            
-            print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
-            
-            # Generate complete seed instructions
-            seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
-            
-            # Create protoblock from seed instructions
-            protoblock = factory.create_protoblock(seed_instructions)
-            
-            # Save protoblock to file
-            json_file = factory.save_protoblock(protoblock)
-            
-            print(f"\n✨ Created new protoblock: {json_file}")
+
+            # Load protoblock from JSON file if provided, otherwise create a new block
+            if args.json: 
+                protoblock = load_protoblock_from_json(args.json)
+                print(f"\n✨ Loaded protoblock: {args.json}")
+            else:
+                # Create block based on command type
+                template_type = None
+                direct_instructions = None
+                if args.test is not None:
+                    template_type = "test"
+                    direct_instructions = args.test
+                elif args.refactor is not None:
+                    template_type = "refactor"
+                    direct_instructions = args.refactor
+                elif args.error is not None:
+                    template_type = "error"
+                    direct_instructions = args.error
+                elif args.instructions:
+                    direct_instructions = args.instructions
+                
+                # Create protoblock using factory
+                factory = ProtoBlockFactory()
+                
+                # Get task instructions
+                task_instructions = factory.get_task_instructions(
+                    template_type=template_type,
+                    direct_instructions=direct_instructions
+                )
+                
+                print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
+                
+                # Generate complete seed instructions
+                seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
+                
+                # Create protoblock from seed instructions
+                protoblock = factory.create_protoblock(seed_instructions)
+                
+                # Save protoblock to file
+                json_file = factory.save_protoblock(protoblock)
+                print(f"\n✨ Created new protoblock: {json_file}")
+
             print("\nProtoblock details:")
             print(f"🎯 Task: {protoblock.task_description}")
             print(f"🧪 Test Specification: {protoblock.test_specification}")
             print(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
             print(f"📚 Context Files: {', '.join(protoblock.context_files)}")
             print(f"💬 Commit Message: {protoblock.commit_message}\n")
-            
-            # # Load protoblock from saved file
-            # protoblock_loaded = load_protoblock_from_json(json_file)
-            # protoblock_loaded.block_id = protoblock.block_id
-            
             print("🚀 Starting protoblock execution...\n")
             
             # Create executor and run with codebase
