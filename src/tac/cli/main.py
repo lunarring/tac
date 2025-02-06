@@ -389,7 +389,7 @@ def main():
                 # Commit any pending changes
                 if git_manager.repo.is_dirty(untracked_files=True):
                     print("Found uncommitted changes. Committing them automatically...")
-                    git_manager.repo.git.add('.')
+                    git_manager.repo.git.add('--all')  # Add all files including untracked
                     try:
                         git_manager.repo.git.commit('-m', f"Auto-commit changes in {feature_branch} before merge")
                         print("Successfully committed all changes.")

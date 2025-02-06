@@ -175,9 +175,9 @@ class GitManager:
             return True
 
         try:
-            # Stage all changes
-            self.repo.git.add('.')
-            logger.debug("Staged all changes.")
+            # Stage all changes including untracked files
+            self.repo.git.add('--all')
+            logger.debug("Staged all changes including untracked files.")
 
             # Generate commit message
             if not commit_message:
@@ -191,7 +191,7 @@ class GitManager:
 
             # Commit changes
             self.repo.git.commit('-m', commit_message)
-            logger.debug("Committed changes.")
+            logger.debug("Committed all changes.")
 
             # Print instructions for viewing diff and merging
             current_branch = self.get_current_branch()
