@@ -339,7 +339,7 @@ class ProtoBlockExecutor:
                         logger.info(f"Plausibility Score: {final_plausibility_score}. Is plausible: {is_plausible}")
                         
                         if is_plausible:
-                            logger.info("✅ Implementation verified as plausible! Score: {final_plausibility_score}")
+                            logger.info(f"✅ Implementation verified as plausible! Score: {final_plausibility_score}")
                             # Update protoblock with test results
                             self.protoblock.test_results = self.test_results
                             # Write success log with test results
@@ -378,12 +378,9 @@ class ProtoBlockExecutor:
             if execution_success:
                 if self.git_enabled:
                     # Commit all changes with the protoblock's commit message or default message
-                    commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
-                    commit_success = self.git_manager.handle_post_execution(
-                        commit_message
-                    )
+                    commit_success = self.git_manager.handle_post_execution(self.config, self.protoblock.commit_message)
                     if commit_success:
-                        logger.info("Changes have been committed and pushed!")
+                        logger.info("Changes have been committed into the current branch!")
                     else:
                         logger.warning("Warning: Failed to commit/push changes automatically.")
                     

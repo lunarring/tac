@@ -2,6 +2,9 @@ import os
 import logging
 import pytest
 from colorama import init, Fore, Style
+import subprocess
+import sys
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -63,159 +66,91 @@ class TestRunner:
             return False
 
     def _run_pytest(self, args: list) -> bool:
-        """Run tests using pytest's Python API directly"""
+        """Run tests using subprocess to ensure clean environment"""
         try:
-            # Create a custom pytest plugin to capture output
-            class OutputCapture:
-                def __init__(self):
-                    self.output = []
-                    self.test_results = {
-                        'passed': 0,
-                        'failed': 0,
-                        'error': 0,
-                        'skipped': 0,
-                        'collection_error': 0  # Add counter for collection errors
-                    }
-                    self.no_tests_collected = False
-                    self.collection_errors = []  # Store collection error messages
-                    self.test_functions = []  # Store test function names
+            # Construct command with proper Python executable and pytest module
+            cmd = [sys.executable, "-m", "pytest"] + args
 
-                def _should_capture_output(self, text):
-                    # Filter out debug and logging messages
-                    if not text:
-                        return False
-                    text = str(text)
-                    ignore_patterns = [
-                        'DEBUG    ',
-                        'INFO     ',
-                        'WARNING  ',
-                        'ERROR    ',
-                        'CRITICAL ',
-                        'httpcore.',
-                        'httpx:',
-                        'openai.',
-                    ]
-                    return not any(pattern in text for pattern in ignore_patterns)
+            # Run pytest in subprocess with output capture
+            process = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                env={**os.environ, 'PYTHONPATH': os.getcwd()}
+            )
 
-                def pytest_collectreport(self, report):
-                    if report.outcome == 'passed' and not report.result:
-                        self.no_tests_collected = True
-                    # Add collection error handling
-                    if report.outcome == 'failed':
-                        self.test_results['collection_error'] += 1
-                        if hasattr(report, 'longrepr'):
-                            error_msg = str(report.longrepr)
-                            self.collection_errors.append(error_msg)
-                            if self._should_capture_output(error_msg):
-                                self.output.append(error_msg)
-                    # Collect test function names during collection phase
-                    elif report.outcome == 'passed' and hasattr(report, 'result'):
-                        for item in report.result:
-                            if item.name.startswith('test_') or item.name.endswith('_test'):
-                                self.test_functions.append(f"{item.parent.name}::{item.name}")
+            # Store the output
+            output = []
+            if process.stdout:
+                output.append(process.stdout)
+            if process.stderr:
+                output.append(process.stderr)
 
-                def pytest_runtest_logreport(self, report):
-                    # Capture test results
-                    if report.when == 'call':  # Only count the actual test result
-                        if report.passed:
-                            self.test_results['passed'] += 1
-                        elif report.failed:
-                            if report.when == 'setup' or report.when == 'teardown':
-                                self.test_results['error'] += 1
-                            else:
-                                self.test_results['failed'] += 1
-                    elif report.skipped:
-                        self.test_results['skipped'] += 1
-
-                    # Capture test output
-                    if report.longrepr and self._should_capture_output(report.longrepr):
-                        self.output.append(str(report.longrepr))
-                    if hasattr(report, 'caplog') and self._should_capture_output(report.caplog):
-                        self.output.append(report.caplog)
-                    if hasattr(report, 'capstdout') and self._should_capture_output(report.capstdout):
-                        self.output.append(report.capstdout)
-                    if hasattr(report, 'capstderr') and self._should_capture_output(report.capstderr):
-                        self.output.append(report.capstderr)
-
-            output_capture = OutputCapture()
-            
-            # Add verbosity if not already present
-            if '-v' not in args and '-vv' not in args:
-                args.append('-v')
-            
-            # Run pytest with our output capture plugin
-            result = pytest.main(args, plugins=[output_capture])
-            
-            # Store collected test functions
-            self.test_functions = output_capture.test_functions
-            
-            # Create summary from captured results
-            summary = "\nTest Summary:\n"
-            
-            # Handle collection errors first
-            if output_capture.test_results['collection_error'] > 0:
-                summary = "\nTest Collection Errors:\n"
-                summary += f"Found {output_capture.test_results['collection_error']} collection error(s)\n"
-                if output_capture.collection_errors:
-                    summary += "\nError Details:\n"
-                    summary += "\n".join(output_capture.collection_errors)
-            # Handle no tests found
-            elif output_capture.no_tests_collected and not output_capture.output:
-                summary = "\nNo tests were found in the specified path.\n"
-                summary += "This is not a failure - it just means no tests exist yet.\n"
-            # Handle normal test execution
-            else:
-                summary += f"Passed: {output_capture.test_results['passed']}\n"
-                if output_capture.test_results['failed'] > 0:
-                    summary += f"Failed: {output_capture.test_results['failed']}\n"
-                if output_capture.test_results['error'] > 0:
-                    summary += f"Errors: {output_capture.test_results['error']}\n"
-                if output_capture.test_results['skipped'] > 0:
-                    summary += f"Skipped: {output_capture.test_results['skipped']}\n"
-            
-            # Combine captured output with summary
-            full_output = '\n'.join(filter(None, output_capture.output))  # Filter out empty strings
-            if full_output:
-                full_output = f"\nDetailed Output:\n{full_output}\n"
-            full_output += summary
-            
-            # Map pytest exit codes to meaningful messages
-            exit_code_messages = {
-                pytest.ExitCode.OK: "All tests passed!",
-                pytest.ExitCode.TESTS_FAILED: "Some tests failed",
-                pytest.ExitCode.INTERRUPTED: "Testing was interrupted",
-                pytest.ExitCode.INTERNAL_ERROR: "Internal error in pytest",
-                pytest.ExitCode.USAGE_ERROR: "Pytest usage error",
-                pytest.ExitCode.NO_TESTS_COLLECTED: "No tests were found",
+            # Parse test results
+            results = {
+                'passed': 0,
+                'failed': 0,
+                'error': 0,
+                'skipped': 0,
+                'collection_error': 0
             }
-            
-            # Get meaningful message for the exit code
-            result_message = exit_code_messages.get(result, f"Unknown pytest exit code: {result}")
-            
-            # Always store test results, even for collection errors
-            self.test_results = f"Test execution completed. Result: {result_message}\n{full_output}"
-            
-            # Special case: if no tests were collected and no errors, treat this as success
-            if result == pytest.ExitCode.NO_TESTS_COLLECTED and not output_capture.output:
-                print("\nNo tests were found. This is not a failure - proceeding with implementation.")
-                return True
-            
-            # Print test summary
-            self._print_test_summary(output_capture.test_results)
-            
-            # Only print error details if tests didn't pass
-            if result != pytest.ExitCode.OK and output_capture.output:
-                print("\nDetailed Output:")
-                print(full_output)
-            
-            return result == pytest.ExitCode.OK
-            
+
+            # Extract test results using regex
+            if process.stdout:
+                # Count passed tests
+                passed_match = re.search(r'(\d+) passed', process.stdout)
+                if passed_match:
+                    results['passed'] = int(passed_match.group(1))
+
+                # Count failed tests
+                failed_match = re.search(r'(\d+) failed', process.stdout)
+                if failed_match:
+                    results['failed'] = int(failed_match.group(1))
+
+                # Count errors
+                error_match = re.search(r'(\d+) error', process.stdout)
+                if error_match:
+                    results['error'] = int(error_match.group(1))
+
+                # Count skipped tests
+                skipped_match = re.search(r'(\d+) skipped', process.stdout)
+                if skipped_match:
+                    results['skipped'] = int(skipped_match.group(1))
+
+                # Extract test function names
+                self.test_functions = re.findall(r'test_\w+', process.stdout)
+
+            # Create summary
+            summary = "\nTest Summary:\n"
+            if process.returncode == 0:
+                summary += "All tests passed!\n"
+            elif process.returncode == 5:
+                summary += "No tests were found.\n"
+                summary += "This is not a failure - it just means no tests exist yet.\n"
+            else:
+                summary += f"Tests failed with return code {process.returncode}\n"
+
+            summary += f"Passed: {results['passed']}\n"
+            if results['failed'] > 0:
+                summary += f"Failed: {results['failed']}\n"
+            if results['error'] > 0:
+                summary += f"Errors: {results['error']}\n"
+            if results['skipped'] > 0:
+                summary += f"Skipped: {results['skipped']}\n"
+
+            # Store full results
+            self.test_results = '\n'.join(output) + summary
+
+            # Print colored summary
+            self._print_test_summary(results)
+
+            # Return True if all tests passed or no tests were found
+            return process.returncode in [0, 5]
+
         except Exception as e:
             error_msg = f"Error running pytest: {str(e)}\n{type(e).__name__}: {str(e)}"
             logger.error(error_msg)
-            # Always store test results, even for exceptions
             self.test_results = error_msg
-            print(f"\nTest Error: {error_msg}")
             return False
 
     def _print_test_summary(self, results: dict):
