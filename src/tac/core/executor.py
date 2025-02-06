@@ -380,7 +380,6 @@ class ProtoBlockExecutor:
                     # Commit all changes with the protoblock's commit message or default message
                     commit_message = self.protoblock.commit_message or "TAC auto commit, message missing"
                     commit_success = self.git_manager.handle_post_execution(
-                        {'git': {'auto_push': True}},  # Enable auto-push for successful execution
                         commit_message
                     )
                     if commit_success:

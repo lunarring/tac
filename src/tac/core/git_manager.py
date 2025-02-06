@@ -151,7 +151,7 @@ class GitManager:
 
     def handle_post_execution(self, config: dict, commit_message: Optional[str] = None) -> bool:
         """Handle git operations after successful block execution"""
-        if not self.repo or not config.get('git', {}).get('auto_push', False):
+        if not self.repo or not config.get('git', {}).get('auto_commit_if_success', False):
             logger.debug("Git operations not required based on configuration.")
             return True
 
