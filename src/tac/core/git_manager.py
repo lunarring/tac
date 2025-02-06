@@ -68,40 +68,61 @@ class GitManager:
         Get a complete diff of the current state, including:
         - Staged changes compared to HEAD
         - Unstaged changes
-        - Last commit changes if no current changes
+        - List of untracked files with their contents
         
         Returns:
-            str: A formatted string containing all relevant diffs
+            str: A formatted string containing all relevant diffs and file lists
         """
         if not self.repo:
             return "Git repository not available"
             
         try:
-            # Get complete diff including staged and working tree changes compared to HEAD
-            try:
-                # First, get the diff of staged changes compared to HEAD
-                staged_diff = self.repo.git.diff('HEAD', '--staged')
-                # Then get the diff of working tree compared to index
-                unstaged_diff = self.repo.git.diff()
-                
-                # Combine both diffs with headers
-                git_diff = ""
-                if staged_diff:
-                    git_diff += "=== Staged Changes (compared to HEAD) ===\n" + staged_diff + "\n"
-                if unstaged_diff:
-                    git_diff += "=== Unstaged Changes ===\n" + unstaged_diff
-                
-                # If no changes detected, try to get the diff of the last commit
-                if not git_diff and self.repo.head.is_valid():
+            git_diff = []
+            
+            # Get untracked files with contents
+            untracked = self.repo.untracked_files
+            if untracked:
+                git_diff.append("=== Untracked Files ===")
+                for file in sorted(untracked):
+                    git_diff.append(f"+ {file}")
                     try:
-                        last_commit_diff = self.repo.git.show('HEAD', '--patch')
-                        git_diff = "=== Last Commit Changes ===\n" + last_commit_diff
-                    except git.exc.GitCommandError:
-                        git_diff = "No changes detected in last commit"
+                        # Get absolute path by joining repo path with file path
+                        file_path = os.path.join(self.repo.working_dir, file)
+                        if os.path.exists(file_path):
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            git_diff.append("File contents:")
+                            git_diff.append("```")
+                            git_diff.append(content)
+                            git_diff.append("```")
+                    except Exception as e:
+                        git_diff.append(f"Error reading file contents: {str(e)}")
+                    git_diff.append("")  # Empty line for separation
+            
+            # Get staged changes compared to HEAD
+            try:
+                staged_diff = self.repo.git.diff('HEAD', '--staged')
+                if staged_diff:
+                    git_diff.append("=== Staged Changes (compared to HEAD) ===")
+                    git_diff.append(staged_diff)
+                    git_diff.append("")  # Empty line for separation
             except git.exc.GitCommandError as e:
-                git_diff = f"Failed to get git diff: {str(e)}"
+                git_diff.append(f"Error getting staged changes: {str(e)}")
+            
+            # Get unstaged changes
+            try:
+                unstaged_diff = self.repo.git.diff()
+                if unstaged_diff:
+                    git_diff.append("=== Unstaged Changes ===")
+                    git_diff.append(unstaged_diff)
+            except git.exc.GitCommandError as e:
+                git_diff.append(f"Error getting unstaged changes: {str(e)}")
+            
+            if not git_diff:
+                return "No changes detected (working directory clean)"
                 
-            return git_diff
+            return "\n".join(git_diff)
+            
         except Exception as e:
             return f"Failed to get git diff: {str(e)}"
 
