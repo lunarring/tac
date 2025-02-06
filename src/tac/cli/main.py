@@ -191,6 +191,12 @@ def generate_tests_command(args):
 
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
+    # Load config first to get defaults
+    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    general_config = config.get('general', {})
+
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -211,11 +217,25 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default='.',
         help='Directory to analyze and create block from (default: current directory)'
     )
-    run_parser.add_argument(
-        '--max-retries',
-        type=int,
-        help='Override the maximum number of retries (default from config.yaml)'
-    )
+    
+    # Dynamically add arguments from general config
+    for key, value in general_config.items():
+        arg_name = f'--{key.replace("_", "-")}'
+        arg_type = type(value)
+        if arg_type == bool:
+            run_parser.add_argument(
+                arg_name,
+                action='store_true' if not value else 'store_false',
+                help=f'{key.replace("_", " ").title()} (default: {value} from config.yaml)'
+            )
+        else:
+            run_parser.add_argument(
+                arg_name,
+                type=arg_type,
+                default=value,
+                help=f'{key.replace("_", " ").title()} (default: {value} from config.yaml)'
+            )
+
     run_parser.add_argument(
         '--json',
         type=str,
@@ -447,8 +467,10 @@ def main():
             config = load_config()
             
             # Override config values with command line arguments if provided
-            if args.max_retries is not None:
-                config['general']['max_retries'] = args.max_retries
+            for key in config['general'].keys():
+                arg_key = key.replace('-', '_')  # Convert CLI arg format back to config format
+                if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
+                    config['general'][key] = getattr(args, arg_key)
                 
             # Add no_git flag to config
             if args.no_git:
