@@ -74,7 +74,7 @@ PLAUSIBILITY SCORE RATING:
 
 </output_format>"""
 
-            logger.debug(f"Prompt length: {len(analysis_prompt)} characters")
+            logger.debug(f"Prompt for plausibility check: {analysis_prompt}")
             
             messages = [
                 Message(role="system", content="You are a coding assistant specialized in reviewing code changes for correctness and completeness. Provide clear, actionable analysis."),
