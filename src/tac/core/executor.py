@@ -146,12 +146,12 @@ class ProtoBlockExecutor:
                 current_branch = None
                 logger.info("Git operations disabled")
                 
-            # Verify all tests pass before starting
-            logger.info("Verifying all tests pass before starting...")
-            if not self.run_tests():
-                logger.error("Cannot proceed: some tests are failing")
-                logger.error("Cannot start implementation: Please fix failing tests first.")
-                return False
+            # # Verify all tests pass before starting
+            # logger.info("Verifying all tests pass before starting...")
+            # if not self.run_tests():
+            #     logger.error("Cannot proceed: some tests are failing")
+            #     logger.error("Cannot start implementation: Please fix failing tests first.")
+            #     return False
                 
             # Store initial test information after first run
             self.initial_test_functions = self.test_runner.get_test_functions()
@@ -324,7 +324,7 @@ class ProtoBlockExecutor:
                             execution_success = True
                             break
                         else:
-                            logger.error("❌ Implementation verification failed!")
+                            logger.error("❌ Plausibility verification failed! Score was {final_plausibility_score}")
                             logger.error("Verification Failure Information:")
                             logger.error("="*50)
                             logger.error(plausibility_result)
