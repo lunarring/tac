@@ -310,7 +310,7 @@ class ProtoBlockExecutor:
                         logger.info(f"Plausibility Score: {final_plausibility_score}. Is plausible: {is_plausible}")
                         
                         if is_plausible:
-                            logger.info("✅ Implementation verified as plausible!")
+                            logger.info("✅ Implementation verified as plausible! Score: {final_plausibility_score}")
                             # Update protoblock with test results
                             self.protoblock.test_results = self.test_results
                             # Write success log with test results
@@ -319,7 +319,7 @@ class ProtoBlockExecutor:
                             execution_success = True
                             break
                         else:
-                            logger.error("❌ Plausibility verification failed! Score was {final_plausibility_score}")
+                            logger.error("❌ Plausibility verification failed! Score: {final_plausibility_score}")
                             logger.error("Verification Failure Information:")
                             logger.error("="*50)
                             logger.error(plausibility_result)

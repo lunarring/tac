@@ -66,7 +66,6 @@ Important Guidelines:
 - Write both the implementation and corresponding tests
 - Ensure tests are CONSISTENT with the code implemented!
 - Tests should use the specified test data
-- all tests need to be stored in the tests subfolder, e.g. tests/test_your_test.py. DO NOT MAKE any subfolders in the /tests directory. Just store the files directly in tests/
 - Avoid timeouts in tests
 - When dealing with longer-running processes, ensure clear exit conditions
 - Tests should be deterministic and reliable"""
