@@ -42,10 +42,10 @@ Execute tasks with automated testing using a simple command:
 
 ```bash
 # Execute a task with specific instructions
-tac run "your instructions here"
+tac make "your instructions here"
 
 # Examples:
-tac run "add error handling to all functions"
+tac make "add error handling to all functions"
 tac run "create a test for the parse_config function"
 tac run "refactor the duplicate code in utils.py"
 
