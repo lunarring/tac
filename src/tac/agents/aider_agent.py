@@ -175,6 +175,43 @@ Previously, you have been trying to implement this but failed, here are some hin
                 logger.error(f"Error output from Aider:\n{e.stderr}")
             raise
 
+    def build_command(self, protoblock: ProtoBlock) -> str:
+        """
+        Constructs the command string for execution based on protoblock data.
+        """
+        # Deduplicate write_files and filter context_files
+        write_files = list(set(protoblock.write_files))
+        context_files = list(set(f for f in protoblock.context_files if f not in write_files))
+        if isinstance(write_files, str):
+            write_files = [write_files]
+        if isinstance(context_files, str):
+            context_files = [context_files]
+        write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
+        context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
+        
+        command = [
+            "aider",
+            "--yes-always",
+            "--no-git",
+            f"--model={self.agent_config.get('model')}",
+            "--input-history-file=/dev/null",
+            "--chat-history-file=/dev/null",
+            "--llm-history-file=/dev/null",
+        ]
+        
+        for wf in write_files:
+            command.append(f"--file={wf}")
+        for cf in context_files:
+            command.append(f"--read={cf}")
+        
+        task_description = protoblock.task_description
+        test_specification = protoblock.test_specification
+        test_data_generation = protoblock.test_data_generation
+        prompt = f"Task Description: {task_description}. Test: {test_specification}. Data: {test_data_generation}."
+        command.append(f"--message={prompt}")
+        
+        return " ".join(command)
+    
     def execute_task(self, previous_error: str = None) -> None:
         """Legacy method to maintain compatibility with base Agent class"""
         self.run(self.config) 
