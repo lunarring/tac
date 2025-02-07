@@ -1,6 +1,6 @@
 # Tested Agentic Chains
 
-Tested Agentic Chains (TAC) combines the methodical approach of tested development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance.
+Tested Agentic Chains (TAC) combines the methodical approach of tested development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing. 
 
 > **Warning** ⚠️  
 > This project is in **alpha**. Interfaces, commands, and features may change without notice. Use at your own risk and carefully test before deploying in production environments.
@@ -29,25 +29,24 @@ Tested Agentic Chains (TAC) extends the principles of continuous testing and aud
    ```bash
    pip install -e .
    ```
-
-After this, you can run the command from anywhere in your terminal (as long as your environment is activated).
-
+4. Be sure you have a valid API key for OpenAI in your system that can be retrieved by `os.getenv('OPENAI_API_KEY')`
 ## ⚙️ Usage
 
 The framework provides several commands to help with AI-driven development:
 
 ### Create and Execute Tasks
+TAC assumes that you have a clean git repository in the location from where you run it and you are in your project root directory.
 
-Execute tasks with automated testing using a simple command:
+Execute tasks including automated testing using a simple command:
 
 ```bash
 # Execute a task with specific instructions
 tac make "your instructions here"
 
 # Examples:
-tac make "add error handling to all functions"
-tac make "create a test for the parse_config function"
-tac make "refactor the duplicate code in utils.py"
+tac make "add error handling to function parse_config"
+tac make "create a test for the parse_config"
+tac make "refactor the duplicate code in utils"
 
 # Optional: Specify a different directory (default is current directory)
 tac make "your instructions" --dir ./your/code/directory
@@ -109,9 +108,6 @@ The gather command helps collect and document Python files in a directory:
 ```bash
 tac gather ./src/tac
 ```
-
-
-
 
 
 ## ⚙️ Configuration
