@@ -46,26 +46,24 @@ tac make "your instructions here"
 
 # Examples:
 tac make "add error handling to all functions"
-tac run "create a test for the parse_config function"
-tac run "refactor the duplicate code in utils.py"
+tac make "create a test for the parse_config function"
+tac make "refactor the duplicate code in utils.py"
 
 # Optional: Specify a different directory (default is current directory)
-tac run "your instructions" --dir ./your/code/directory
+tac make "your instructions" --dir ./your/code/directory
 
 # Optional: Load from a JSON protoblock file
-tac run --json path/to/protoblock.json
+tac make --json path/to/protoblock.json
 
 # Optional: Disable git operations
-tac run "your instructions" --no-git
+tac make "your instructions" --no-git
 ```
 ### Voice Interface (Experimental)
 
 TAC now includes an experimental voice interface that allows you to interact with the system using speech:
 
 ```bash
-# Start the voice interface
 tac voice
-
 ```
 
 The voice interface allows you to:
