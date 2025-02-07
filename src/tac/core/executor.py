@@ -383,9 +383,7 @@ class ProtoBlockExecutor:
                     # Only show merge instructions if we created a feature branch
                     if current_branch in ['main', 'master']:
                         logger.info("Implementation successful! To merge and push the changes:")
-                        logger.info("tac git mergepush")
-                        logger.info("Or manually with:")
-                        logger.info(f"  git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch}")
+                        logger.info(f"git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch} && git push")
                     else:
                         logger.info("Implementation successful!")
                 else:
