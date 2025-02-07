@@ -19,7 +19,7 @@ class VoiceUI:
         self.rtv = lt.RealTimeVoice(
             instructions=self.instructions,
             temperature=self.temperature,
-            on_audio_complete=self.on_audio_complete, 
+            on_ai_audio_complete=self.on_ai_audio_complete, 
             on_user_transcript=self.on_user_transcript
         )
 
@@ -68,7 +68,7 @@ class VoiceUI:
         logger.debug(f"Injecting message: {message}")
         self.rtv.inject_message(message)
 
-    async def on_audio_complete(self):
+    async def on_ai_audio_complete(self):
         """Callback when AI audio playback is complete."""
         logger.debug("🔊 AI audio playback completed")
         if self.task_instructions is not None:
