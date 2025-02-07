@@ -193,5 +193,5 @@ class TestRunner:
         return self.test_results 
 
     def get_test_functions(self) -> list:
-        """Get the list of collected test function names"""
-        return self.test_functions 
+        """Get the list of collected test function names, extracting function names after '::' if present"""
+        return [s.split("::")[-1].strip() if "::" in s else s for s in self.test_functions]
