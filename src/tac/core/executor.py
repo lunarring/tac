@@ -178,14 +178,12 @@ class ProtoBlockExecutor:
 
             # Only create feature branch if git is enabled and we're on main/master
             block_branch = current_branch
-            if self.git_enabled and current_branch in ['main', 'master']:
+            if self.git_enabled:
                 block_branch = f"tac_{self.protoblock_id}"
                 if not self.git_manager.create_and_checkout_branch(block_branch):
                     logger.error(f"Failed to create branch {block_branch}")
                     return False
                 logger.info(f"Created and switched to branch: {block_branch}")
-            elif self.git_enabled:
-                logger.info(f"Working on existing branch: {current_branch}")
             else:
                 logger.info("Git operations disabled - skipping branch creation")
 
@@ -379,9 +377,7 @@ class ProtoBlockExecutor:
                 if self.git_enabled:
                     # Commit all changes with the protoblock's commit message or default message
                     commit_success = self.git_manager.handle_post_execution(self.config, self.protoblock.commit_message)
-                    if commit_success:
-                        logger.info("Changes have been committed into the current branch!")
-                    else:
+                    if not commit_success:
                         logger.warning("Warning: Failed to commit/push changes automatically.")
                     
                     # Only show merge instructions if we created a feature branch
@@ -404,7 +400,6 @@ class ProtoBlockExecutor:
                         logger.info(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
                 else:
                     logger.info("Implementation failed. (Git operations disabled)")
-            logger.info("="*50)
 
             return execution_success
 

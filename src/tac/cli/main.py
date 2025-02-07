@@ -602,9 +602,6 @@ def main():
             if success:
                 print("\n✅ Task completed successfully!")
                 logger.info("Task completed successfully.")
-                # Handle git operations after successful execution
-                if not git_manager.handle_post_execution(config, protoblock.commit_message):
-                    sys.exit(1)
             else:
                 print("\n❌ Task execution failed.")
                 logger.error("Task execution failed.")

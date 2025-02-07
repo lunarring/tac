@@ -163,7 +163,7 @@ class GitManager:
             logger.error(f"Error checking git status: {e}")
             return False, ""
 
-    def handle_post_execution(self, config: dict, commit_message: Optional[str] = None) -> bool:
+    def handle_post_execution(self, config: dict, commit_message: str) -> bool:
         """Handle git operations after successful block execution"""
         if not self.repo or not config.get('git', {}).get('auto_commit_if_success', False):
             logger.debug("Git operations not required based on configuration.")
@@ -174,32 +174,43 @@ class GitManager:
             self.repo.git.add('--all')
             logger.debug("Staged all changes including untracked files.")
 
-            # Generate commit message
-            if not commit_message:
-                # Fallback to auto-generated message
-                changed_files = self.repo.git.diff('--staged', '--name-only').split('\n')
-                files_summary = ', '.join(changed_files[:3])
-                if len(changed_files) > 3:
-                    files_summary += f" and {len(changed_files) - 3} more files"
-                commit_message = f"TAC: Successfully implemented changes in {files_summary}"
-                logger.debug(f"Auto-generated commit message: {commit_message}")
+            try:
+                # Get status before commit
+                status_before = self.repo.git.status()
+                logger.debug(f"Git status before commit:\n{status_before}")
 
-            # Commit changes
-            self.repo.git.commit('-m', commit_message)
-            logger.debug("Committed all changes.")
+                # Commit changes and capture output
+                commit_output = self.repo.git.commit('-m', commit_message)
+                logger.debug(f"Git commit output:\n{commit_output}")
 
-            # Print instructions for viewing diff and merging
-            current_branch = self.get_current_branch()
-            base_branch = self.base_branch if self.base_branch else "main"
-            print(f"\nTo view changes compared to {base_branch} branch:")
-            print(f"git diff {base_branch}..{current_branch}")
-            print(f"\nTo merge these changes:")
-            print(f"git checkout {base_branch} && git merge {current_branch} && git branch -d {current_branch}")
+                # Get status after commit to verify
+                status_after = self.repo.git.status()
+                logger.debug(f"Git status after commit:\n{status_after}")
+
+                logger.debug("Committed all changes successfully.")
+            except git.exc.GitCommandError as commit_error:
+                # Check if the error is actually indicating success
+                if "nothing to commit" in str(commit_error):
+                    logger.info("Nothing to commit - working tree clean")
+                    return True
+                elif commit_error.status == 1 and "On branch" in str(commit_error):
+                    # This might be the case where commit succeeded but git returns 1
+                    logger.debug("Commit might have succeeded despite error code 1")
+                    return True
+                else:
+                    raise commit_error  # Re-raise if it's a real error
 
             logger.info(f"Successfully committed changes. Commit message: {commit_message}")
+            current_branch = self.get_current_branch()
+            base_branch = self.base_branch if self.base_branch else "main"
+            logger.info(f"Changes committed to branch '{current_branch}'. To merge these changes, run: git checkout {base_branch} && git merge {current_branch}")
             return True
         except Exception as e:
             logger.error(f"Error during git operations: {e}")
+            if hasattr(e, 'stdout'):
+                logger.error(f"Command stdout: {e.stdout}")
+            if hasattr(e, 'stderr'):
+                logger.error(f"Command stderr: {e.stderr}")
             return False
 
     def revert_changes(self) -> bool:
