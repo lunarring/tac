@@ -345,11 +345,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Disable all git operations (branch checks, commits, etc.)'
     )
     
-    git_parser = subparsers.add_parser('git', help='Perform git operations (mergepush, diff, restore)')
-    git_subparsers = git_parser.add_subparsers(dest='git_command', help='Git subcommands')
-    git_subparsers.add_parser('mergepush', help='Merge the current feature branch into main branch and push to remote')
-    git_subparsers.add_parser('diff', help='Show differences between main branch and the current feature branch')
-    git_subparsers.add_parser('restore', help='Restore the repository to main branch, discarding changes')
     
     args = parser.parse_args()
     
@@ -431,89 +426,6 @@ def main():
             print("\nGoodbye!")
             sys.exit(0)
 
-    if args.command == 'git':
-        git_manager = GitManager()
-        if not git_manager.repo:
-            print("Not a valid git repository.")
-            sys.exit(1)
-
-        if args.git_command == 'mergepush':
-            main_branch = 'main'
-            current_branch = git_manager.get_current_branch()
-            if current_branch in ['main', 'master']:
-                print("Already on main branch, nothing to merge.")
-            else:
-                feature_branch = current_branch
-                
-                # Commit any pending changes
-                if git_manager.repo.is_dirty(untracked_files=True):
-                    print("Found uncommitted changes. Committing them automatically...")
-                    git_manager.repo.git.add('--all')  # Add all files including untracked
-                    try:
-                        git_manager.repo.git.commit('-m', f"Auto-commit changes in {feature_branch} before merge")
-                        print("Successfully committed all changes.")
-                    except git.exc.GitCommandError as e:
-                        print(f"Failed to commit changes: {e}")
-                        sys.exit(1)
-                
-                try:
-                    # Checkout main branch
-                    if not git_manager.checkout_branch(main_branch):
-                        print(f"Failed to checkout {main_branch} branch.")
-                        sys.exit(1)
-                    
-                    # Merge the feature branch
-                    try:
-                        git_manager.repo.git.merge(feature_branch)
-                        print(f"Successfully merged {feature_branch} into {main_branch}.")
-                        
-                        # Push changes to remote
-                        git_manager.repo.git.push('origin', main_branch)
-                        print(f"Successfully pushed changes to remote.")
-                        
-                        # Delete the feature branch
-                        git_manager.repo.git.branch('-d', feature_branch)
-                        print(f"Deleted feature branch {feature_branch}.")
-                    except git.exc.GitCommandError as e:
-                        print(f"Error during merge: {e}")
-                        print("Aborting merge and returning to feature branch...")
-                        git_manager.repo.git.merge('--abort')
-                        git_manager.checkout_branch(feature_branch)
-                        sys.exit(1)
-                except Exception as e:
-                    print(f"Error during merging or pushing: {e}")
-                    sys.exit(1)
-        elif args.git_command == 'diff':
-            main_branch = 'main'
-            current_branch = git_manager.get_current_branch()
-            if current_branch in ['main', 'master']:
-                print("Already on main branch, no differences to show.")
-            else:
-                try:
-                    diff_output = git_manager.repo.git.diff(f"{main_branch}..{current_branch}")
-                    if not diff_output:
-                        print(f"No differences found between {main_branch} and {current_branch}.")
-                    else:
-                        print(diff_output)
-                except Exception as e:
-                    print(f"Error while getting diff: {e}")
-                    sys.exit(1)
-        elif args.git_command == 'restore':
-            main_branch = 'main'
-            current_branch = git_manager.get_current_branch()
-            if current_branch in ['main', 'master']:
-                print("Already on main branch.")
-            else:
-                if not git_manager.checkout_branch(main_branch):
-                    print(f"Failed to checkout {main_branch} branch.")
-                    sys.exit(1)
-                if git_manager.revert_changes():
-                    print(f"Repository restored to {main_branch} branch with a clean working directory.")
-                else:
-                    print("Failed to clean working directory.")
-        else:
-            print("Invalid git subcommand. Use 'mergepush', 'diff', or 'restore'.")
-        sys.exit(0)
 
     if args.command == 'make' or voice_ui is not None:
         # Initialize git manager and check status
