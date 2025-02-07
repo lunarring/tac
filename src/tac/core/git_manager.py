@@ -71,11 +71,9 @@ class GitManager:
     def get_complete_diff(self) -> str:
         """
         Get a complete diff of the current state, including:
-        - Changes from the last commit
-        - Staged changes compared to HEAD
-        - Unstaged changes
+        - All staged changes
+        - All unstaged changes
         - List of untracked files with their contents
-        - Complete git diff output with file metadata
         
         Returns:
             str: A formatted string containing all relevant diffs and file lists
@@ -85,21 +83,10 @@ class GitManager:
             
         try:
             git_diff = []
-
-            # Get changes from the last commit
-            try:
-                last_commit = self.repo.head.commit
-                last_commit_diff = self.repo.git.show('--format=', '--full-index', last_commit.hexsha)
-                if last_commit_diff:
-                    git_diff.append("=== Changes from Last Commit ===")
-                    git_diff.append(last_commit_diff)
-                    git_diff.append("")  # Empty line for separation
-            except git.exc.GitCommandError as e:
-                git_diff.append(f"Error getting last commit changes: {str(e)}")
             
             # Get complete diff output for staged changes
             try:
-                staged_diff = self.repo.git.diff('HEAD', '--staged', '--full-index')
+                staged_diff = self.repo.git.diff('--staged', '--full-index')
                 if staged_diff:
                     git_diff.append("=== Staged Changes ===")
                     git_diff.append(staged_diff)
