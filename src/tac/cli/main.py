@@ -339,6 +339,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default=0.8,
         help='Temperature for the voice agent responses'
     )
+    voice_parser.add_argument(
+        '--no-git',
+        action='store_true',
+        help='Disable all git operations (branch checks, commits, etc.)'
+    )
     
     git_parser = subparsers.add_parser('git', help='Perform git operations (mergepush, diff, restore)')
     git_subparsers = git_parser.add_subparsers(dest='git_command', help='Git subcommands')
@@ -390,6 +395,7 @@ def main():
             sys.exit(0)
         return
 
+    voice_ui = None
     if args.command == 'voice':
         from tac.cli.voice import VoiceUI
         try:
@@ -397,10 +403,33 @@ def main():
             if hasattr(args, 'temperature'):
                 voice_ui.temperature = args.temperature
             voice_ui.start()
+            logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
+            voice_instructions = voice_ui.task_instructions
+            
+            # Set up all necessary args that make command uses
+            # Load config to get defaults
+            config = load_config()
+            general_config = config.get('general', {})
+            
+            # Create a new Namespace with all the make command arguments
+            make_args = argparse.Namespace()
+            # Required arguments
+            make_args.dir = '.'
+            make_args.no_git = getattr(args, 'no_git', False)
+            make_args.json = None
+            make_args.instructions = None  # Will be set from voice_instructions later
+            
+            # Add all config-based arguments with their defaults
+            for key in general_config:
+                setattr(make_args, key.replace('-', '_'), general_config[key])
+            
+            # Merge the new arguments into the existing args namespace
+            for attr in vars(make_args):
+                setattr(args, attr, getattr(make_args, attr))
+            
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)
-        return
 
     if args.command == 'git':
         git_manager = GitManager()
@@ -486,7 +515,7 @@ def main():
             print("Invalid git subcommand. Use 'mergepush', 'diff', or 'restore'.")
         sys.exit(0)
 
-    if args.command == 'make':
+    if args.command == 'make' or voice_ui is not None:
         # Initialize git manager and check status
         git_manager = GitManager()
         if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
@@ -534,8 +563,11 @@ def main():
                 # Create protoblock using factory
                 factory = ProtoBlockFactory()
                 
-                # Get task instructions directly from args.instructions
-                task_instructions = args.instructions
+                # Get task instructions directly from args.instructions or voice_instructions
+                if voice_ui is not None:
+                    task_instructions = voice_instructions
+                else:
+                    task_instructions = args.instructions
                 
                 print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
                 
@@ -548,6 +580,8 @@ def main():
                 # Save protoblock to file
                 json_file = factory.save_protoblock(protoblock)
                 print(f"\n✨ Created new protoblock: {json_file}")
+                if voice_ui is not None:
+                    voice_ui.inject_message("Say that the protoblock has been successfully created, now we are launching the programming agents")
 
             print("\nProtoblock details:")
             print(f"🎯 Task: {protoblock.task_description}")
