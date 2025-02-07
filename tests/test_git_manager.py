@@ -49,5 +49,16 @@ class TestGitManager(unittest.TestCase):
         ).stdout.decode().strip()
         self.assertEqual(status_after, "", msg="Repository working directory is not clean after revert_changes.")
 
+    def test_get_current_branch(self):
+        # Instantiate GitManager
+        gm = GitManager(repo_path=self.repo_path)
+        # Monkey-patch subprocess.check_output to simulate a custom branch name.
+        original_check_output = subprocess.check_output
+        subprocess.check_output = lambda cmd, cwd, encoding: "feature/update-branch\n"
+        branch = gm.get_current_branch()
+        self.assertEqual(branch, "feature/update-branch")
+        # Restore the original check_output method.
+        subprocess.check_output = original_check_output
+
 if __name__ == "__main__":
     unittest.main()

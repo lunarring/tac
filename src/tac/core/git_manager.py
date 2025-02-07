@@ -1,5 +1,6 @@
 import git
 import os
+import subprocess
 from typing import Optional, Tuple
 from tac.core.log_config import setup_logging
 
@@ -9,7 +10,8 @@ class GitManager:
     def __init__(self, repo_path: str = '.'):
         try:
             self.repo = git.Repo(repo_path)
-            logger.debug(f"Git repository initialized successfully at {repo_path}.")
+            self.base_branch = self.get_current_branch()
+            logger.debug(f"Git repository initialized successfully at {repo_path} with base branch {self.base_branch}.")
         except git.exc.InvalidGitRepositoryError:
             logger.error("Not a git repository. Please initialize git first.")
             self.repo = None
@@ -43,12 +45,18 @@ class GitManager:
             return False
 
     def get_current_branch(self) -> Optional[str]:
-        """Get the name of the current branch"""
-        if not self.repo:
+        """Get the name of the current branch using git rev-parse --abbrev-ref HEAD"""
+        if not self.repo or not self.repo.working_dir:
             return None
         try:
-            return self.repo.active_branch.name
-        except:
+            branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.repo.working_dir,
+                encoding="utf-8"
+            ).strip()
+            return branch
+        except Exception as e:
+            logger.error(f"Error detecting branch: {e}")
             return None
 
     def checkout_branch(self, branch_name: str) -> bool:
@@ -182,10 +190,11 @@ class GitManager:
 
             # Print instructions for viewing diff and merging
             current_branch = self.get_current_branch()
-            print(f"\nTo view changes compared to main branch:")
-            print(f"git diff main..{current_branch}")
+            base_branch = self.base_branch if self.base_branch else "main"
+            print(f"\nTo view changes compared to {base_branch} branch:")
+            print(f"git diff {base_branch}..{current_branch}")
             print(f"\nTo merge these changes:")
-            print(f"git checkout main && git merge {current_branch} && git branch -d {current_branch}")
+            print(f"git checkout {base_branch} && git merge {current_branch} && git branch -d {current_branch}")
 
             logger.info(f"Successfully committed changes. Commit message: {commit_message}")
             return True
