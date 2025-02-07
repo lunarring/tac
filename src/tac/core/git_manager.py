@@ -223,4 +223,22 @@ class GitManager:
             logger.error(f"Error reverting changes: {e}")
             return False
 
+    def create_or_switch_to_tac_branch(self, tac_id: str) -> bool:
+        """Create or switch to a TAC branch with the given tac_id, regardless of current branch state."""
+        if not self.repo:
+            logger.error("No git repository available")
+            return False
+        try:
+            branches = [b.name for b in self.repo.branches]
+            if tac_id in branches:
+                self.repo.git.checkout(tac_id)
+                logger.info(f"Switched to existing TAC branch: {tac_id}")
+            else:
+                self.repo.git.checkout('-b', tac_id)
+                logger.info(f"Created and checked out new TAC branch: {tac_id}")
+            return True
+        except git.exc.GitCommandError as e:
+            logger.error(f"Failed to create or switch to TAC branch {tac_id}: {e}")
+            return False
+
   

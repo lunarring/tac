@@ -60,5 +60,30 @@ class TestGitManager(unittest.TestCase):
         # Restore the original check_output method.
         subprocess.check_output = original_check_output
 
+    def test_create_or_switch_to_tac_branch(self):
+        # Start from a non-primary branch, e.g., 'develop'
+        subprocess.run(["git", "checkout", "-b", "develop"], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        gm = GitManager(repo_path=self.repo_path)
+        tac_id = "tac_feature123"
+        # Create new tac branch
+        result = gm.create_or_switch_to_tac_branch(tac_id)
+        self.assertTrue(result, msg="Failed to create or switch to TAC branch")
+        # Check active branch is the new tac branch
+        active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
+        self.assertEqual(active_branch, tac_id, msg="Active branch is not the TAC branch after creation")
+
+    def test_switch_existing_tac_branch(self):
+        # Create a tac branch first
+        tac_id = "tac_existing"
+        subprocess.run(["git", "checkout", "-b", tac_id], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Switch to a different branch (create 'develop' if necessary)
+        subprocess.run(["git", "checkout", "-b", "develop"], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        gm = GitManager(repo_path=self.repo_path)
+        # Switch back to the existing tac branch
+        result = gm.create_or_switch_to_tac_branch(tac_id)
+        self.assertTrue(result, msg="Failed to switch back to existing TAC branch")
+        active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
+        self.assertEqual(active_branch, tac_id, msg="Active branch is not the expected existing TAC branch")
+        
 if __name__ == "__main__":
     unittest.main()
