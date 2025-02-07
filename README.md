@@ -58,6 +58,23 @@ tac run --json path/to/protoblock.json
 # Optional: Disable git operations
 tac run "your instructions" --no-git
 ```
+### Voice Interface (Experimental)
+
+TAC now includes an experimental voice interface that allows you to interact with the system using speech:
+
+```bash
+# Start the voice interface
+tac voice
+
+```
+
+The voice interface allows you to:
+- Speak your task instructions naturally
+- Get audio feedback from the AI assistant
+- Execute the same operations as the text-based interface
+- Maintain a conversational flow while coding (coming soon)
+
+> **Note**: The voice interface is currently experimental and may require additional setup for speech recognition and synthesis.
 
 ### View Blocks and Logs
 
@@ -95,12 +112,9 @@ The gather command helps collect and document Python files in a directory:
 tac gather ./src/tac
 ```
 
-#### Command Options
 
-- `--header`: Header format for each file (default: "## File: ")
-- `--separator`: Separator between sections (default: "\n---\n")
-- `--code-fences`: Use code fences in output
-- `--exclusions`: Comma-separated directories to exclude (default: .git,__pycache__)
+
+
 
 ## ⚙️ Configuration
 
