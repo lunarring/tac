@@ -16,6 +16,15 @@ class TACViewer:
         self.current_log = None
         self.history = []  # Stack to track menu history and their arguments
         self.items_per_page = 10  # Number of items to show per page
+
+    def render_dummy_logs(self, dummy_logs: list) -> str:
+        from rich.console import Console
+        test_console = Console(record=True)
+        test_console.print("[bold cyan]Dummy Log Navigation[/bold cyan]")
+        for i, entry in enumerate(dummy_logs, 1):
+            test_console.print(f"{i}. {entry['timestamp']} {entry['level']} {entry['message']}")
+        test_console.print("Navigation: use arrow keys")
+        return test_console.export_text()
         
     def get_human_time_diff(self, timestamp: float) -> str:
         """Convert a timestamp into a human-friendly time difference string."""
