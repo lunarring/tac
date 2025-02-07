@@ -323,6 +323,23 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Interactive viewer for logs and protoblocks'
     )
     
+    # Voice command
+    voice_parser = subparsers.add_parser('voice',
+        help='Start the voice interface'
+    )
+    voice_parser.add_argument(
+        '--codebase',
+        type=str,
+        default="There is a lot of code here.",
+        help='Description of the codebase for the voice agent'
+    )
+    voice_parser.add_argument(
+        '--temperature',
+        type=float,
+        default=0.8,
+        help='Temperature for the voice agent responses'
+    )
+    
     git_parser = subparsers.add_parser('git', help='Perform git operations (mergepush, diff, restore)')
     git_subparsers = git_parser.add_subparsers(dest='git_command', help='Git subcommands')
     git_subparsers.add_parser('mergepush', help='Merge the current feature branch into main branch and push to remote')
@@ -368,6 +385,18 @@ def main():
         from tac.cli.viewer import TACViewer
         try:
             TACViewer().main_menu()
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            sys.exit(0)
+        return
+
+    if args.command == 'voice':
+        from tac.cli.voice import VoiceUI
+        try:
+            voice_ui = VoiceUI(prompt_codebase=args.codebase)
+            if hasattr(args, 'temperature'):
+                voice_ui.temperature = args.temperature
+            voice_ui.start()
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)
