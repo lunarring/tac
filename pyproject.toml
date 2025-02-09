@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "TAC"
-version = "0.1.1"
+version = "0.1.2"
 description = "Tested Agentic Chains combines the methodical approach of tested development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing while maintaining a secure, transparent record of their evolution and performance."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -33,3 +33,6 @@ packages = ["src/tac"]
 
 [tool.setuptools]
 packages = ["src/tac"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
