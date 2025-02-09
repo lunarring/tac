@@ -32,11 +32,9 @@ Tested Agentic Chains (TAC) extends the principles of continuous testing and aud
 4. Be sure you have a valid API key for OpenAI in your system that can be retrieved by `os.getenv('OPENAI_API_KEY')`
 ## ⚙️ Usage
 
-The framework provides several commands to help with AI-driven development:
+Usually, you are running tac from your terminal and are within your project root. You need git to run tac.
 
 ### Create and Execute Tasks
-TAC assumes that you have a clean git repository in the location from where you run it and you are in your project root directory.
-
 Execute tasks including automated testing using a simple command:
 
 ```bash
@@ -57,6 +55,9 @@ tac make --json path/to/protoblock.json
 # Optional: Disable git operations
 tac make "your instructions" --no-git
 ```
+
+TAC will make a new branch with an id, e.g. tac_aa0cb8, where it will commit all changes if everything worked out.
+
 ### Voice Interface (Experimental)
 
 TAC now includes an experimental voice interface that allows you to interact with the system using speech:
