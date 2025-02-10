@@ -19,32 +19,23 @@ class FileSummarizer:
             config = yaml.safe_load(f)
         self.timeout = config.get('general', {}).get('summarizer_timeout', 30)
 
-    def _get_summary_prompt(self, code: str) -> str:
-        """Generate the prompt for code summarization"""
-        return f"""Analyze the following Python code and provide a concise summary of what each component does.
-Your response must follow this exact format, with NO additional formatting or code fences:
-
-[FUNCTION] name
-A clear, single-sentence description of what this function does and its purpose.
-
-[CLASS] name
-A clear, single-sentence description of this class's purpose and responsibility.
-
-  [METHOD] name
-  A clear, single-sentence description of what this method does.
-
-<code>
-{code}
-</code>
-
-Important: Do not include any markdown formatting, code fences, or extra characters. Start directly with [FUNCTION] or [CLASS] tags."""
-
-    def _summarize_code(self, code: str) -> str:
-        """Use LLM to generate a summary of the code"""
+    def _generate_detailed_summary(self, code: str, functions: list, classes: list) -> str:
+        """Generate a detailed analysis of the code by merging summarization responsibilities."""
+        prompt = "Analyze the following Python code in detail.\n"
+        if functions:
+            prompt += "Functions:\n" + "\n".join([f"- {f}" for f in functions]) + "\n"
+        if classes:
+            prompt += "Classes and their methods:\n"
+            for cls in classes:
+                methods = ", ".join(cls.get("methods", []))
+                prompt += f"- {cls['name']}: {methods}\n"
+        prompt += f"\nFull Code:\n<code>\n{code}\n</code>\n"
+        prompt += "Please provide a detailed technical analysis including inner workings, purpose, and commentary on each component."
+        
         try:
             messages = [
-                Message(role="system", content="You are a Python code analysis expert. Provide clear, concise, technical summaries of code structures."),
-                Message(role="user", content=self._get_summary_prompt(code))
+                Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
+                Message(role="user", content=prompt)
             ]
             
             import signal
@@ -61,10 +52,8 @@ Important: Do not include any markdown formatting, code fences, or extra charact
                 finally:
                     signal.alarm(0)
             
-            # Call LLM with timeout
             with timeout(self.timeout):
                 return self.llm_client.chat_completion(messages)
-                
         except TimeoutError as e:
             logger.error(str(e))
             return f"Error: {str(e)}"
@@ -113,65 +102,16 @@ Important: Do not include any markdown formatting, code fences, or extra charact
                     "content": []  # Empty content is valid for files with no functions/classes
                 }
 
-            # Send entire file content to LLM once
-            summary = self._summarize_code(self.current_file_content)
-            
-            # If LLM call failed, return error
-            if summary.startswith("Error: LLM call failed"):
+            summary = self._generate_detailed_summary(self.current_file_content, functions, classes)
+            if summary.startswith("Error:"):
                 return {
                     "error": summary,
                     "content": None
                 }
-            
-            # Clean up any potential markdown artifacts
-            summary = summary.replace('```', '').strip()
-            
-            # Parse the summary to match our expected format
-            content = []
-            lines = summary.split('\n')
-            current_item = None
-            
-            for line in lines:
-                line = line.strip()
-                if not line:  # Skip empty lines
-                    continue
-                    
-                if line.startswith('[FUNCTION]'):
-                    if current_item:
-                        content.append(current_item)
-                    name = line.split(']')[1].strip()
-                    current_item = {"type": "function", "name": name, "summary": ""}
-                elif line.startswith('[CLASS]'):
-                    if current_item:
-                        content.append(current_item)
-                    name = line.split(']')[1].strip()
-                    current_item = {"type": "class", "name": name, "summary": "", "methods": []}
-                elif line.startswith('  [METHOD]') and current_item and current_item["type"] == "class":
-                    name = line.split(']')[1].strip()
-                    # Get the description part after the name
-                    desc_start = line.find(name) + len(name)
-                    description = line[desc_start:].strip()
-                    current_item["methods"].append({"name": name, "summary": description})
-                elif line and current_item:
-                    if current_item["type"] == "function":
-                        current_item["summary"] = line
-                    elif current_item["type"] == "class" and not line.startswith('  [METHOD]'):
-                        current_item["summary"] = line
-
-            if current_item:
-                content.append(current_item)
-
-            # Verify we got actual content
-            if not content:
-                return {
-                    "error": "No valid summaries generated from LLM response",
-                    "content": None
-                }
-
             return {
-                "error": None,
-                "content": content
-            }
+                    "error": None,
+                    "content": summary
+                }
             
         except Exception as e:
             logger.error(f"Error analyzing file {file_path}: {str(e)}")
