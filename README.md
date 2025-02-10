@@ -43,20 +43,19 @@ tac make "your instructions here"
 
 # Examples:
 tac make "add error handling to function parse_config"
-tac make "create a test for the parse_config"
-tac make "refactor the duplicate code in utils"
 
 # Optional: Specify a different directory (default is current directory)
 tac make "your instructions" --dir ./your/code/directory
 
 # Optional: Load from a JSON protoblock file
 tac make --json path/to/protoblock.json
-
-# Optional: Disable git operations
-tac make "your instructions" --no-git
 ```
 
-TAC will make a new branch with an id, e.g. tac_aa0cb8, where it will commit all changes if everything worked out.
+### Git integration
+
+TAC will make a new branch with an id, e.g. tac_aa0cb8, where it will commit all changes IF everything worked out. 
+Otherwise you'll have to manually switch back to your previous branch.
+
 
 ### Voice Interface (Experimental)
 
