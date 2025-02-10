@@ -30,7 +30,7 @@ class FileSummarizer:
                 methods = ", ".join(cls.get("methods", []))
                 prompt += f"- {cls['name']}: {methods}\n"
         prompt += f"\nFull Code:\n<code>\n{code}\n</code>\n"
-        prompt += "Please provide a detailed technical analysis including inner workings, purpose, and commentary on each component."
+        prompt += "Please provide a detailed technical analysis including inner workings, purpose, dependencies, and input output expectations of each component. The output format should be a text beginning with the function/class name and then your analysis. Then in the next line, continue. Add no other formatting elements!"
         
         try:
             messages = [
