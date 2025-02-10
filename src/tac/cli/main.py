@@ -211,7 +211,8 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     run_parser.add_argument(
         'instructions',
-        help='Instructions for the task to execute'
+        nargs=argparse.REMAINDER,
+        help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
     )
     run_parser.add_argument(
         '--dir',
@@ -479,7 +480,7 @@ def main():
                 if voice_ui is not None:
                     task_instructions = voice_instructions
                 else:
-                    task_instructions = args.instructions
+                    task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
                 
                 print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
                 
