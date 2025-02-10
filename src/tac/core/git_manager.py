@@ -239,6 +239,12 @@ class GitManager:
         if not self.repo:
             logger.error("No git repository available")
             return False
+
+        current_branch = self.get_current_branch()
+        if current_branch.startswith("tac_"):
+            logger.info(f"Already on a TAC branch: {current_branch}. Retaining current branch.")
+            return True
+
         try:
             branches = [b.name for b in self.repo.branches]
             if tac_id in branches:
