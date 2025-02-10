@@ -195,22 +195,25 @@ class FileSummarizer:
                     if analysis["error"]:
                         summary = f"Error analyzing file: {analysis['error']}"
                     else:
-                        # Format summaries
-                        summary_parts = []
-                        for item in analysis["content"]:
-                            if item["type"] == "function":
-                                summary_parts.append(item["summary"])
-                            else:  # class
-                                class_summary = item["summary"]
-                                method_summaries = []
-                                for method in item["methods"]:
-                                    method_summary = method["summary"].replace('\n', '\n  ')
-                                    method_summaries.append(method_summary)
-                                if method_summaries:
-                                    class_summary += "\n\n" + "\n\n".join(method_summaries)
-                                summary_parts.append(class_summary)
-
-                        summary = "\n\n".join(summary_parts)
+                        if isinstance(analysis["content"], list):
+                            # Format summaries from structured data
+                            summary_parts = []
+                            for item in analysis["content"]:
+                                if item["type"] == "function":
+                                    summary_parts.append(item["summary"])
+                                else:  # class
+                                    class_summary = item["summary"]
+                                    method_summaries = []
+                                    for method in item["methods"]:
+                                        method_summary = method["summary"].replace('\n', '\n  ')
+                                        method_summaries.append(method_summary)
+                                    if method_summaries:
+                                        class_summary += "\n\n" + "\n\n".join(method_summaries)
+                                    summary_parts.append(class_summary)
+                            summary = "\n\n".join(summary_parts)
+                        else:
+                            # Using flat string summary returned by the LLM client
+                            summary = analysis["content"]
 
                     if for_protoblock:
                         file_summaries.append(f"File: {os.path.relpath(file_path, directory)}\n{summary}")
