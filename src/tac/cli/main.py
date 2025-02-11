@@ -478,7 +478,7 @@ def main():
                 
                 # Get task instructions directly from args.instructions or voice_instructions
                 if voice_ui is not None:
-                    task_instructions = voice_instructions
+                    task_instructions = voice_ui.wait_until_prompt()
                 else:
                     task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
                 

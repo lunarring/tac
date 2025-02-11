@@ -43,7 +43,6 @@ class VoiceUI:
         logger.info("🎙️ Starting TAC Voice Interface...")
         self.rtv.start()
         self.rtv.inject_message(self.prompt_startup)
-        self.wait_until_prompt()
         
 
     def stop(self):
@@ -52,13 +51,12 @@ class VoiceUI:
         self.rtv.stop()
 
     def wait_until_prompt(self):
-        """Wait until prompt is received by checking stop_ai_audio flag."""
         try:
             while True:
                 time.sleep(0.1)
-                if self.stop_ai_audio:
-                    logger.debug("stopping AI audio...")
-                    break
+                if self.task_instructions:
+                    logger.debug(f"got task instructions: {self.task_instructions}")
+                    return self.task_instructions
         except KeyboardInterrupt:
             logger.info("Received keyboard interrupt")
             self.stop()
@@ -87,6 +85,7 @@ class VoiceUI:
         """
         logger.info(f"👤 User: {transcript}")
         self.task_instructions = transcript
+        self.stop_ai_audio = True
 
     async def on_ai_transcript(self, transcript: str):
         """Callback when AI response is transcribed.
