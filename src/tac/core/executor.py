@@ -178,11 +178,16 @@ class ProtoBlockExecutor:
 
             # Ensure execution is on TAC branch
             if self.git_enabled:
+                current_git_branch = self.git_manager.get_current_branch() or ""
                 tac_branch = "tac_" + self.protoblock_id
-                if not self.git_manager.create_or_switch_to_tac_branch(tac_branch):
-                    logger.error(f"Failed to create or switch to TAC branch {tac_branch}")
-                    return False
-                logger.info(f"Switched to TAC branch: {tac_branch}")
+                if current_git_branch.startswith("tac_"):
+                    logger.info(f"Already on a TAC branch: {current_git_branch}. No branch switching necessary.")
+                    tac_branch = current_git_branch
+                else:
+                    if not self.git_manager.create_or_switch_to_tac_branch(tac_branch):
+                        logger.error(f"Failed to create or switch to TAC branch {tac_branch}")
+                        return False
+                    logger.info(f"Switched to TAC branch: {tac_branch}")
             else:
                 logger.info("Git operations disabled - skipping branch creation")
 

@@ -64,5 +64,34 @@ class TestExecutorGitBranch(unittest.TestCase):
         current_branch = gm.get_current_branch()
         self.assertEqual(current_branch, "tac_test123", msg=f"Expected branch 'tac_test123', got '{current_branch}'")
 
+    def test_executor_no_switch_when_already_on_tac_branch(self):
+        # Pre-create the TAC branch and check it out
+        import io, logging
+        subprocess.run(["git", "checkout", "-b", "tac_test123"], check=True)
+        
+        # Create dummy block with block_id = "test123"
+        block = DummyProtoBlock()
+        config = {"git": {"enabled": True}}
+        executor = ProtoBlockExecutor(block, config=config, codebase={})
+        executor.run_tests = lambda test_path=None: True
+        
+        # Capture logs from the executor
+        log_capture = io.StringIO()
+        log_handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger("tac.core.executor")
+        logger.setLevel(logging.INFO)
+        logger.addHandler(log_handler)
+        
+        executor.execute_block()
+        
+        logger.removeHandler(log_handler)
+        log_output = log_capture.getvalue()
+        
+        from tac.core.git_manager import GitManager
+        gm = GitManager()
+        current_branch = gm.get_current_branch()
+        self.assertEqual(current_branch, "tac_test123", msg=f"Expected branch 'tac_test123', got '{current_branch}'")
+        self.assertIn("Already on a TAC branch: tac_test123. No branch switching necessary.", log_output)
+
 if __name__ == '__main__':
     unittest.main()
