@@ -358,12 +358,13 @@ stick exactly to the following output_format, filling in between <>
         # If we get here, all retries failed
         raise ValueError(f"Failed to create protoblock after {max_retries} attempts. Last error: {str(last_error)}")
 
-    def save_protoblock(self, block: ProtoBlock) -> str:
+    def save_protoblock(self, block: ProtoBlock, filename: Optional[str] = None) -> str:
         """
         Save a protoblock to a file.
         
         Args:
             block: ProtoBlock object to save
+            filename: Optional filename to save to. If not provided, will use default format .tac_protoblock_{block_id}.json
             
         Returns:
             Path to the saved protoblock file
@@ -384,8 +385,9 @@ stick exactly to the following output_format, filling in between <>
             "timestamp": datetime.now().isoformat()
         }
         
-        # Save to file using just the block_id
-        filename = f".tac_protoblock_{block.block_id}.json"
+        # Use provided filename or generate default one
+        if filename is None:
+            filename = f".tac_protoblock_{block.block_id}.json"
         
         # Load existing data if file exists, otherwise create new structure
         if os.path.exists(filename):
