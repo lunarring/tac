@@ -429,10 +429,12 @@ def main():
 
 
     if args.command == 'make' or voice_ui is not None:
-        # Initialize git manager and check status
-        git_manager = GitManager()
-        if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
-            sys.exit(1)
+        # Initialize git manager and check status only if git is enabled
+        git_manager = None
+        if not args.no_git:
+            git_manager = GitManager()
+            if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
+                sys.exit(1)
             
         try:
             # Load configuration

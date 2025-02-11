@@ -44,13 +44,13 @@ class ProtoBlockExecutor:
         self.agent = protoblock.create_agent(agent_config)
         self.test_runner = TestRunner()
         self.previous_error = None  # Track previous error
-        self.git_manager = GitManager()
+        self.git_enabled = config.get('git', {}).get('enabled', True)  # Get git enabled status
+        self.git_manager = GitManager() if self.git_enabled else None
         self.protoblock_id = protoblock.block_id  # Set ID directly from protoblock
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
         self.plausibility_checker = PlausibilityChecker()  # Initialize plausibility checker
-        self.git_enabled = config.get('git', {}).get('enabled', True)  # Get git enabled status
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
         self.test_results = None
@@ -77,8 +77,8 @@ class ProtoBlockExecutor:
 
         log_filename = f".tac_log_{self.protoblock_id}"
         
-        # Get git diff using GitManager's new method
-        git_diff = self.git_manager.get_complete_diff()
+        # Get git diff using GitManager's new method if git is enabled
+        git_diff = self.git_manager.get_complete_diff() if self.git_manager else ""
 
         # Prepare execution data for this attempt
         execution_data = {
@@ -309,7 +309,7 @@ class ProtoBlockExecutor:
                     logger.info("✅ All tests passed!")
                     
                     # Get git diff for plausibility check
-                    git_diff = self.git_manager.get_complete_diff() if self.git_enabled else ""
+                    git_diff = self.git_manager.get_complete_diff() if self.git_manager else ""
                     
                     # Only perform plausibility check if enabled in config
                     plausibility_check_enabled = self.config.get('general', {}).get('plausibility_check', False)
