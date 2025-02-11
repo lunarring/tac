@@ -34,7 +34,7 @@ class PlausibilityChecker:
         try:
             # Prepare prompt
             analysis_prompt = f"""<purpose>
-You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. However you don't need to be overly strict, as the implementation was done by a very junior developer and we don't want to scare them off. If the program sort of works, that's good enough.
+You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. Critically, you need to determine if the implemented changes are also actively used in the codebase and integrated properly, especially when existing functionality is replaced with new one. However keep in mind, the implementation was done by a junior developer and we don't want to scare them off.
 </purpose>
 
 <protoblock>
@@ -52,13 +52,17 @@ Context Files: {protoblock.context_files}
 1. Compare the implemented changes against the task description
 2. Verify that the changes fulfill the promised functionality
 3. Check if any changes seem unrelated or potentially harmful
-4. Consider if the implementation is complete and sufficient
+4. Consider if the implementation is complete and sufficient, particularly that the new code is integrated properly into the program flow and not just isolated dead code.
 5. Look for any missing requirements or incomplete implementations
-6. Come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
+6. Look if there are any external dependencies that may have been hallucinated by the junior developer.
+7. Finally, come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
 </analysis_rules>
 
 <output_format>
 Provide your analysis in the following format:
+
+BRIEF SUMMARY OF THE APPROACH
+(Provide a brief summary of the approach taken to implement the changes)
 
 DETAILED ANALYSIS:
 (Provide in-depth analysis of what matches or mismatches with requirements)
