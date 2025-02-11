@@ -63,8 +63,9 @@ class ProtoBlockFactory:
 
 <planning_rules>
 - Create a plan how this task could be implemented.
+- Be sure that your plan also integrates the new functionality into the existing codebase and makes sure that some parts are replaced if needed.
 - Scan the codebase and review carefully and list every file that could potentially be needed for read or write access (read for context and write for making changes)
-- Design a test that could be used to verify if the task has been implemented correctly.
+- Design a test that could be used to verify if the task has been implemented correctly, particularly if the integration is correct. The test should be as close as possible to the real usage of the code.
 - Bring everything into the right format and structure.
 </planning_rules>
 
