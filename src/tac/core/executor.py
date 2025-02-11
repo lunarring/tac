@@ -176,14 +176,13 @@ class ProtoBlockExecutor:
             logger.info(f"Initial test count: {self.initial_test_count}")
             logger.debug(f"Initial test functions: {self.initial_test_functions}")
 
-            # Only create feature branch if git is enabled and we're on main/master
-            block_branch = current_branch
+            # Ensure execution is on TAC branch
             if self.git_enabled:
-                block_branch = f"tac_{self.protoblock_id}"
-                if not self.git_manager.create_and_checkout_branch(block_branch):
-                    logger.error(f"Failed to create branch {block_branch}")
+                tac_branch = "tac_" + self.protoblock_id
+                if not self.git_manager.create_or_switch_to_tac_branch(tac_branch):
+                    logger.error(f"Failed to create or switch to TAC branch {tac_branch}")
                     return False
-                logger.info(f"Created and switched to branch: {block_branch}")
+                logger.info(f"Switched to TAC branch: {tac_branch}")
             else:
                 logger.info("Git operations disabled - skipping branch creation")
 
@@ -383,7 +382,7 @@ class ProtoBlockExecutor:
                     # Only show merge instructions if we created a feature branch
                     if current_branch in ['main', 'master']:
                         logger.info("Implementation successful! To merge and push the changes:")
-                        logger.info(f"git checkout {current_branch} && git merge {block_branch} && git branch -d {block_branch} && git push")
+                        logger.info(f"git checkout {current_branch} && git merge {tac_branch} && git branch -d {tac_branch} && git push")
                     else:
                         logger.info("Implementation successful!")
                 else:
@@ -395,7 +394,7 @@ class ProtoBlockExecutor:
                     # Only show alternative manual cleanup if we created a feature branch
                     if current_branch in ['main', 'master']:
                         logger.info("Or manually with:")
-                        logger.info(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {block_branch}")
+                        logger.info(f"  git restore . && git checkout {current_branch} && git clean -fd && git branch -D {tac_branch}")
                 else:
                     logger.info("Implementation failed. (Git operations disabled)")
 
