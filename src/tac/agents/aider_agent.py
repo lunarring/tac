@@ -88,11 +88,11 @@ Previously, you have been trying to implement this but failed, here are some hin
             'aider',
             '--yes-always',
             '--no-git',
-            '--no-gui',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
             '--llm-history-file', '/dev/null',
+            '--no-gui', 
         ]
 
         # Add all write files to be edited
