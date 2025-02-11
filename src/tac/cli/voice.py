@@ -43,6 +43,16 @@ class VoiceUI:
         logger.info("🎙️ Starting TAC Voice Interface...")
         self.rtv.start()
         self.rtv.inject_message(self.prompt_startup)
+        self.wait_until_prompt()
+        
+
+    def stop(self):
+        """Stop the voice UI."""
+        logger.info("👋 Stopping Voice UI")
+        self.rtv.stop()
+
+    def wait_until_prompt(self):
+        """Wait until prompt is received by checking stop_ai_audio flag."""
         try:
             while True:
                 time.sleep(0.1)
@@ -52,13 +62,7 @@ class VoiceUI:
         except KeyboardInterrupt:
             logger.info("Received keyboard interrupt")
             self.stop()
-        
-
-    def stop(self):
-        """Stop the voice UI."""
-        logger.info("👋 Stopping Voice UI")
-        self.rtv.stop()
-
+    
     def inject_message(self, message: str):
         """Inject a message into the voice UI.
         
