@@ -55,7 +55,8 @@ Context Files: {protoblock.context_files}
 4. Consider if the implementation is complete and sufficient, particularly that the new code is integrated properly into the program flow and not just isolated dead code.
 5. Look for any missing requirements or incomplete implementations
 6. Look if there are any external dependencies that may have been hallucinated by the junior developer.
-7. Finally, come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
+7. Find out whether existing functionality is broken by the changes.
+8. Finally, come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
 </analysis_rules>
 
 <output_format>
