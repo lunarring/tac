@@ -2,11 +2,32 @@ import os
 import logging
 import pytest
 from colorama import init, Fore, Style
-import subprocess
+from _pytest.main import Session
+from _pytest.reports import TestReport
+from _pytest.terminal import TerminalReporter
 import sys
 import re
 
 logger = logging.getLogger(__name__)
+
+class CustomReporter:
+    def __init__(self):
+        self.test_functions = []
+        self.results = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
+        self.output_lines = []
+        
+    def pytest_runtest_logreport(self, report: TestReport):
+        if report.when == 'call' or (report.when == 'setup' and report.outcome == 'skipped'):
+            self.test_functions.append(report.nodeid.split("::")[-1])
+            if report.passed:
+                self.results['passed'] += 1
+            elif report.failed:
+                self.results['failed'] += 1
+            elif report.skipped:
+                self.results['skipped'] += 1
+        if hasattr(report, 'longrepr'):
+            if report.longrepr:
+                self.output_lines.append(str(report.longrepr))
 
 class TestRunner:
     """
@@ -15,7 +36,7 @@ class TestRunner:
     def __init__(self):
         init()  # Initialize colorama
         self.test_results = ""
-        self.test_functions = []  # Store test function names
+        self.test_functions = []
         
     def run_tests(self, test_path: str = None) -> bool:
         """
@@ -26,38 +47,39 @@ class TestRunner:
             bool: True if all tests passed or no tests were found, False otherwise
         """
         try:
-            # Reset test functions list before each run
-            self.test_functions = []
-            
-            # Default to running all test*.py files in tests directory
             test_target = test_path or 'tests'
             full_path = test_target
-            pytest_args = ['--disable-warnings', '-v']
 
-            logger.debug(f"Test target path: {full_path}")
-            logger.debug(f"Working directory: {os.getcwd()}")
-            
             if not os.path.exists(full_path):
                 error_msg = f"Error: Test path not found: {full_path}"
                 logger.error(error_msg)
                 self.test_results = error_msg
                 return False
 
-            if os.path.isfile(full_path):
-                # Single test file case
-                logger.debug(f"Running single test file: {test_target}")
-                result = self._run_pytest([test_target] + pytest_args)
-            elif os.path.isdir(full_path):
-                # Directory case - discover and run all test files
-                logger.debug(f"Discovering tests in directory: {test_target}")
-                result = self._run_pytest([test_target] + pytest_args)
-            else:
-                error_msg = f"Error: Path is neither a file nor directory: {full_path}"
-                logger.error(error_msg)
-                self.test_results = error_msg
-                return False
-
-            return result
+            reporter = CustomReporter()
+            plugins = [reporter]
+            
+            # Add current directory to Python path
+            if os.getcwd() not in sys.path:
+                sys.path.insert(0, os.getcwd())
+            
+            # Run pytest with captured output
+            args = ['-v', '--disable-warnings', test_target]
+            exit_code = pytest.main(args, plugins=plugins)
+            
+            # Process results
+            self.test_functions = reporter.test_functions
+            self._print_test_summary(reporter.results)
+            
+            # Store full output
+            self.test_results = "\n".join(reporter.output_lines)
+            if self.test_results:
+                self.test_results += "\n\n"
+            
+            summary = self._generate_summary(reporter.results, exit_code)
+            self.test_results += summary
+            
+            return exit_code in [0, 5]
             
         except Exception as e:
             error_msg = f"Error running tests: {type(e).__name__}: {str(e)}"
@@ -65,79 +87,24 @@ class TestRunner:
             self.test_results = error_msg
             return False
 
-    def _run_pytest(self, args: list) -> bool:
-        """Run tests using subprocess with real-time streaming output"""
-        try:
-            cmd = [sys.executable, "-m", "pytest"] + args
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env={**os.environ, 'PYTHONPATH': os.getcwd()}
-            )
-            output_lines = []
-            # Stream output line by line in real-time
-            while True:
-                line = process.stdout.readline()
-                if line == '' and process.poll() is not None:
-                    break
-                if line:
-                    print(line, end='', flush=True)
-                    output_lines.append(line)
-            # Collect any remaining output
-            remaining = process.stdout.read()
-            if remaining:
-                print(remaining, end='', flush=True)
-                output_lines.append(remaining)
-            full_output = "".join(output_lines)
-            # Parse test results using regex
-            results = {
-                'passed': 0,
-                'failed': 0,
-                'error': 0,
-                'skipped': 0,
-                'collection_error': 0
-            }
-            passed_match = re.search(r'(\d+) passed', full_output)
-            if passed_match:
-                results['passed'] = int(passed_match.group(1))
-            failed_match = re.search(r'(\d+) failed', full_output)
-            if failed_match:
-                results['failed'] = int(failed_match.group(1))
-            error_match = re.search(r'(\d+) error', full_output)
-            if error_match:
-                results['error'] = int(error_match.group(1))
-            skipped_match = re.search(r'(\d+) skipped', full_output)
-            if skipped_match:
-                results['skipped'] = int(skipped_match.group(1))
-            # Extract test function names
-            self.test_functions = re.findall(r'test_\w+', full_output)
-            # Create summary
-            summary = "\nTest Summary:\n"
-            returncode = process.wait()
-            if returncode == 0:
-                summary += "All tests passed!\n"
-            elif returncode == 5:
-                summary += "No tests were found.\n"
-                summary += "This is not a failure - it just means no tests exist yet.\n"
-            else:
-                summary += f"Tests failed with return code {returncode}\n"
-            summary += f"Passed: {results['passed']}\n"
-            if results['failed'] > 0:
-                summary += f"Failed: {results['failed']}\n"
-            if results['error'] > 0:
-                summary += f"Errors: {results['error']}\n"
-            if results['skipped'] > 0:
-                summary += f"Skipped: {results['skipped']}\n"
-            self.test_results = full_output + summary
-            self._print_test_summary(results)
-            return returncode in [0, 5]
-        except Exception as e:
-            error_msg = f"Error running pytest: {str(e)}\n{type(e).__name__}: {str(e)}"
-            logger.error(error_msg)
-            self.test_results = error_msg
-            return False
+    def _generate_summary(self, results: dict, exit_code: int) -> str:
+        summary = "\nTest Summary:\n"
+        if exit_code == 0:
+            summary += "All tests passed!\n"
+        elif exit_code == 5:
+            summary += "No tests were found.\n"
+            summary += "This is not a failure - it just means no tests exist yet.\n"
+        else:
+            summary += f"Tests failed with exit code {exit_code}\n"
+        
+        summary += f"Passed: {results['passed']}\n"
+        if results['failed'] > 0:
+            summary += f"Failed: {results['failed']}\n"
+        if results['error'] > 0:
+            summary += f"Errors: {results['error']}\n"
+        if results['skipped'] > 0:
+            summary += f"Skipped: {results['skipped']}\n"
+        return summary
 
     def _print_test_summary(self, results: dict):
         """Print a colored test summary"""
