@@ -2,9 +2,9 @@
 
 import logging
 import os
-import yaml
 from colorama import Fore, Style, init
 import sys
+from tac.core.config import config
 
 # Initialize colorama
 init()
@@ -12,16 +12,20 @@ init()
 # Store configured loggers to prevent duplicate setup
 _configured_loggers = {}
 
+def get_log_level(name: str = None) -> str:
+    """Get the log level from config, with fallback to default values."""
+    try:
+        if hasattr(config, 'logging'):
+            return config.logging.get_tac('level', 'INFO')
+        return 'INFO'
+    except Exception:
+        return 'INFO'
+
 def setup_logging(name: str = None) -> logging.Logger:
     """Setup logging configuration"""
     # If this logger was already configured, return it
     if name in _configured_loggers:
         return _configured_loggers[name]
-        
-    # Load config file
-    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
 
     # Create custom formatter
     class ColoredFormatter(logging.Formatter):
@@ -65,8 +69,8 @@ def setup_logging(name: str = None) -> logging.Logger:
     if logger.handlers:
         logger.handlers.clear()
     
-    # Set level from config or default to INFO
-    logger.setLevel(config.get('logging', {}).get('tac', {}).get('level', 'INFO'))
+    # Set level from config with fallback
+    logger.setLevel(get_log_level(name))
 
     # Create console handler
     console_handler = logging.StreamHandler(sys.stdout)

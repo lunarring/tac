@@ -112,14 +112,17 @@ tac gather ./src/tac
 
 ## ⚙️ Configuration
 
-The framework uses a configuration file (`config.yaml`) to control various aspects:
+The framework uses a built-in configuration system with sensible defaults that can be overridden via command-line arguments:
 
-```yaml
-logging:
-  tac:
-    level: DEBUG
+```bash
+# Example: Override configuration values
+tac make "your task" --plausibility-test false --max-retries 5
 ```
-(Place config.yaml in the project root or update paths accordingly.)
+
+All configuration options are documented in the command help:
+```bash
+tac make --help
+```
 
 ## ✍️ Contributing
 

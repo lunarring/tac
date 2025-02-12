@@ -1,7 +1,5 @@
-import os
-import yaml
 import pytest
-from src.tac.core.config import ConfigManager
+from src.tac.core.config import ConfigManager, Config, GeneralConfig, GitConfig, LLMConfig, LLMSettings
 
 @pytest.fixture(autouse=True)
 def reset_config_manager():
@@ -10,54 +8,69 @@ def reset_config_manager():
     yield
     ConfigManager._instance = None
 
-def test_config_manager(tmp_path):
-    # Prepare temporary YAML configuration file.
-    config_data = {
-        "general": {
-            "type": "aider",
-            "plausibility_test": True,
-            "use_file_summaries": False
-        },
-        "git": {
-            "enabled": True,
-            "auto_commit_if_success": False
-        },
-        "llm_weak": {
-            "provider": "openai",
-            "model": "o1-mini",
-            "settings": {
-                "temperature": 0.5,
-                "timeout": 120,
-                "max_tokens": 150
-            }
-        }
-    }
-    config_file = tmp_path / "temp_config.yaml"
-    with open(config_file, "w") as f:
-        yaml.dump(config_data, f)
-
-    # Instantiate ConfigManager and reload from the temporary YAML file.
+def test_config_manager():
+    # Instantiate ConfigManager with default values
     cm = ConfigManager()
-    cm.reload(str(config_file))
 
-    # Verify 'general' configuration.
+    # Verify 'general' configuration
     general = cm.general
     assert general.type == "aider"
     assert general.plausibility_test is True
-    assert general.use_file_summaries is False
+    assert general.use_file_summaries is True
+    assert general.summarizer_timeout == 45
+    assert general.max_retries == 4
+    assert general.max_retries_protoblock_creation == 4
+    assert general.total_timeout == 600
+    assert general.halt_after_fail is False
 
-    # Verify 'git' configuration.
+    # Verify 'git' configuration
     git = cm.git
     assert git.enabled is True
-    assert git.auto_commit_if_success is False
+    assert git.auto_commit_if_success is True
 
-    # Verify 'llm_weak' configuration.
+    # Verify 'llm_weak' configuration
     llm = cm.get_llm_config("weak")
-    assert llm.model == "o1-mini"
+    assert llm.model == "o3-mini"
     assert llm.provider == "openai"
-    assert llm.settings.temperature == 0.5
+    assert llm.settings.temperature == 0.7
     assert llm.settings.timeout == 120
-    assert llm.settings.max_tokens == 150
+    assert llm.settings.max_tokens is None
+    assert llm.settings.verify_ssl is True
 
-    # Verify default value when key is missing.
+    # Verify default value when key is missing
     assert cm.get("nonexistent_key", "default") == "default"
+
+def test_config_override():
+    cm = ConfigManager()
+    
+    # Test overriding general config
+    cm.override_with_args({
+        "general_type": "custom",
+        "general_max_retries": 10,
+        "plausibility_test": False  # Test unprefixed general config override
+    })
+    
+    assert cm.general.type == "custom"
+    assert cm.general.max_retries == 10
+    assert cm.general.plausibility_test is False
+    
+    # Test overriding git config
+    cm.override_with_args({
+        "git_enabled": False,
+        "git_auto_commit_if_success": False
+    })
+    
+    assert cm.git.enabled is False
+    assert cm.git.auto_commit_if_success is False
+
+def test_raw_config():
+    cm = ConfigManager()
+    raw = cm.raw_config
+    
+    assert isinstance(raw, dict)
+    assert 'general' in raw
+    assert 'git' in raw
+    assert 'aider' in raw
+    assert 'llm_strong' in raw
+    assert 'llm_weak' in raw
+    assert 'logging' in raw

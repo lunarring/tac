@@ -217,17 +217,30 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
         if arg_type == bool:
-            run_parser.add_argument(
-                arg_name,
-                action='store_true' if not value else 'store_false',
-                help=f'{key.replace("_", " ").title()} (default: {value} from config.yaml)'
+            # For boolean flags, create both positive and negative versions
+            positive_name = arg_name
+            negative_name = f'--no-{key.replace("_", "-")}'
+            # Create a mutually exclusive group
+            group = run_parser.add_mutually_exclusive_group()
+            group.add_argument(
+                positive_name,
+                action='store_true',
+                default=None,  # Don't override config default
+                help=f'Enable {key.replace("_", " ").title()} (default: {value})'
+            )
+            group.add_argument(
+                negative_name,
+                action='store_false',
+                dest=key.replace("-", "_"),
+                default=None,  # Don't override config default
+                help=f'Disable {key.replace("_", " ").title()} (default: {value})'
             )
         else:
             run_parser.add_argument(
                 arg_name,
                 type=arg_type,
                 default=value,
-                help=f'{key.replace("_", " ").title()} (default: {value} from config.yaml)'
+                help=f'{key.replace("_", " ").title()} (default: {value})'
             )
 
     run_parser.add_argument(
@@ -357,7 +370,10 @@ def main():
     )
     
     parser, args = parse_args()
+    logger = logging.getLogger(__name__)
+    logger.debug(f"Parsed args: {vars(args)}")
     config.override_with_args(vars(args))
+    logger.debug(f"Config after override: {config._config}")
     
     if args.command == 'gather':
         gather_files_command(args)

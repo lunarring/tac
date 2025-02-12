@@ -1,29 +1,42 @@
 import pytest
 from argparse import Namespace
-from src.tac.core.config import ConfigManager
+from src.tac.core.config import ConfigManager, Config, GeneralConfig, GitConfig
 
 def test_override_with_args():
-    # Create a new ConfigManager instance and override its internal _config for testing.
+    # Create a new ConfigManager instance
     cm = ConfigManager()
-    cm._config = {
-        "general": {
-            "type": "aider",
-            "plausibility_test": False,
-            "use_file_summaries": False,
-            "summarizer_timeout": 30,
-            "max_retries": 3,
-            "max_retries_protoblock_creation": 4,
-            "halt_after_fail": False
-        },
-        "git": {
-            "enabled": True,
-            "auto_commit_if_success": False
-        },
-    }
-    # Create dummy CLI arguments; note that other_arg should not affect the configuration.
+    
+    # Create a Config instance with test values
+    cm._config = Config(
+        general=GeneralConfig(
+            type="aider",
+            plausibility_test=False,
+            use_file_summaries=False,
+            summarizer_timeout=30,
+            max_retries=3,
+            max_retries_protoblock_creation=4,
+            halt_after_fail=False
+        ),
+        git=GitConfig(
+            enabled=True,
+            auto_commit_if_success=False
+        )
+    )
+
+    # Create dummy CLI arguments; note that other_arg should not affect the configuration
     args = Namespace(general_type="new_aider", git_enabled=False, other_arg=None)
+    
+    # Test the override
     cm.override_with_args(vars(args))
     
-    # Assert that the configuration values have been overridden.
+    # Verify the changes
     assert cm.general.type == "new_aider"
     assert cm.git.enabled is False
+    # Verify unchanged values
+    assert cm.general.plausibility_test is False
+    assert cm.general.use_file_summaries is False
+    assert cm.general.summarizer_timeout == 30
+    assert cm.general.max_retries == 3
+    assert cm.general.max_retries_protoblock_creation == 4
+    assert cm.general.halt_after_fail is False
+    assert cm.git.auto_commit_if_success is False

@@ -3,6 +3,7 @@ import ast
 from datetime import datetime
 from typing import Dict, List, Optional
 from tac.core.llm import LLMClient, Message
+from tac.core.config import config
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,12 +13,7 @@ class FileSummarizer:
     
     def __init__(self):
         self.llm_client = LLMClient()
-        # Load config for timeout
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-        with open(config_path, 'r') as f:
-            import yaml
-            config = yaml.safe_load(f)
-        self.timeout = config.get('general', {}).get('summarizer_timeout', 30)
+        self.timeout = config.general.summarizer_timeout
 
     def _generate_detailed_summary(self, code: str, functions: list, classes: list) -> str:
         """Generate a detailed analysis of the code by merging summarization responsibilities."""

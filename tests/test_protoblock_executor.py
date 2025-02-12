@@ -15,7 +15,7 @@ class TestProtoblockExecutor(unittest.TestCase):
             'task': 'dummy task',
             'test': 'dummy test',
             'write_files': {'dummy.py': 'print("Hello")'},
-            'context_files': {'config.yaml': 'key: value'},
+            'context_files': {'test.py': 'def test(): pass'},
             'commit_message': 'dummy commit'
         }
         agent = DummyAgent()

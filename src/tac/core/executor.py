@@ -250,6 +250,7 @@ class ProtoBlockExecutor:
                 
                 # Only perform plausibility check if enabled in config
                 plausibility_check_enabled = config.general.plausibility_test
+                logger.debug(f"Plausibility check enabled: {plausibility_check_enabled}")
                 if plausibility_check_enabled:
                     logger.info("Running plausibility check...")
                     if not self.plausibility_checker.check(self.protoblock):
