@@ -30,7 +30,7 @@ class FileSummarizer:
                 methods = ", ".join(cls.get("methods", []))
                 prompt += f"- {cls['name']}: {methods}\n"
         prompt += f"\nFull Code:\n<code>\n{code}\n</code>\n"
-        prompt += "Please provide a detailed technical analysis including inner workings, purpose, dependencies, and input output expectations of each component. The output format should be a text beginning with the function/class name and then your analysis. Then in the next line, continue. Add no other formatting elements!"
+        prompt += "You are a senior software engineer, and provide a concise high-level analysis of what functions and classes are doing, also talk about how they are interlinked. The output format should be the following: the first line is a short high-level summary of the entire file, then each next line is a text beginning with the function/class name and then your analysis. Then in the next line, continue with the next function/class. Add no other formatting elements!"
         
         messages = [
             Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
