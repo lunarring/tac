@@ -16,7 +16,3 @@ class ProtoBlock:
     block_id: str
     commit_message: str = None
     test_results: str = None
-
-    def __post_init__(self):
-        if self.commit_message is None:
-            self.commit_message = f"TAC:{self.block_id} Implementation" 
