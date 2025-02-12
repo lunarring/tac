@@ -152,26 +152,11 @@ class ProtoBlockExecutor:
             max_retries = config.general.max_retries
             logger.info(f"Using max_retries={max_retries} from config")
             
-            # Only check git status if git is enabled
-            if self.git_enabled:
-                # Check git status and get current branch
-                status_ok, current_branch = self.git_manager.check_status()
-                if not status_ok:
-                    return False
-            else:
-                current_branch = None
-                logger.info("Git operations disabled")
-                
-            # Store initial test information after first run
-            self.initial_test_functions = self.test_runner.get_test_functions()
-            self.initial_test_count = len(self.initial_test_functions)
-            logger.info(f"Initial test count: {self.initial_test_count}")
-            logger.debug(f"Initial test functions: {self.initial_test_functions}")
-
-            # Ensure execution is on TAC branch
+            # Handle git branch setup first if git is enabled
             if self.git_enabled:
                 current_git_branch = self.git_manager.get_current_branch() or ""
                 tac_branch = "tac_" + self.protoblock_id
+                
                 if current_git_branch.startswith("tac_"):
                     logger.info(f"Already on a TAC branch: {current_git_branch}. No branch switching necessary.")
                     tac_branch = current_git_branch
@@ -180,8 +165,19 @@ class ProtoBlockExecutor:
                         logger.error(f"Failed to create or switch to TAC branch {tac_branch}")
                         return False
                     logger.info(f"Switched to TAC branch: {tac_branch}")
+                    
+                # Now check git status, but only for tracked files
+                status_ok, _ = self.git_manager.check_status(ignore_untracked=True)
+                if not status_ok:
+                    return False
             else:
-                logger.info("Git operations disabled - skipping branch creation")
+                logger.info("Git operations disabled")
+                
+            # Store initial test information after first run
+            self.initial_test_functions = self.test_runner.get_test_functions()
+            self.initial_test_count = len(self.initial_test_functions)
+            logger.info(f"Initial test count: {self.initial_test_count}")
+            logger.debug(f"Initial test functions: {self.initial_test_functions}")
 
             execution_success = False
             analysis = None

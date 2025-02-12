@@ -98,8 +98,16 @@ class GitManager:
         except Exception as e:
             return f"Failed to get git diff: {str(e)}"
 
-    def check_status(self) -> Tuple[bool, str]:
-        """Check if git repo exists and working tree is clean. Returns (success, current_branch)"""
+    def check_status(self, ignore_untracked: bool = False) -> Tuple[bool, str]:
+        """
+        Check if git repo exists and working tree is clean.
+        
+        Args:
+            ignore_untracked: If True, untracked files will not cause the status check to fail
+            
+        Returns:
+            tuple: (success, current_branch)
+        """
         if not self.repo:
             logger.debug("No repository to check status.")
             return False, ""
@@ -107,16 +115,21 @@ class GitManager:
         try:
             current_branch = self.get_current_branch() or ""
             
-            # No longer enforce master/main branch requirement
-            # Just check if working tree is clean
-            if self.repo.is_dirty(untracked_files=True):
+            # Check if working tree is dirty, respecting ignore_untracked parameter
+            if ignore_untracked:
+                is_dirty = self.repo.is_dirty(untracked_files=False)  # Only check tracked files
+            else:
+                is_dirty = self.repo.is_dirty(untracked_files=True)  # Check all files
+                
+            if is_dirty:
                 logger.error("Git working tree is not clean. Please commit or stash your changes before running TAC!")
-                print("\nGit status:")
-                print(self.repo.git.status())
+                logger.error("\nGit status:")
+                logger.error(self.repo.git.status())
                 return False, current_branch
                 
             logger.debug("Git working tree is clean.")
             return True, current_branch
+            
         except git.exc.GitCommandError as e:
             logger.error(f"Error checking git status: {e}")
             return False, ""
