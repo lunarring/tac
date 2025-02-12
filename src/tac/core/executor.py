@@ -9,6 +9,7 @@ from _pytest.terminal import TerminalReporter
 from _pytest.capture import CaptureManager
 from tac.protoblock import ProtoBlock, ProtoBlockFactory
 from tac.agents.base import Agent
+from tac.agents.aider_agent import AiderAgent
 from tac.core.git_manager import GitManager
 from tac.core.test_runner import TestRunner
 import git
@@ -37,15 +38,8 @@ class ProtoBlockExecutor:
         if config_override:
             agent_config.update(config_override)
             
-        agent_config.update({
-            'task_description': self.protoblock.task_description,
-            'test_specification': self.protoblock.test_specification,
-            'test_data_generation': self.protoblock.test_data_generation,
-            'write_files': self.protoblock.write_files,
-            'context_files': self.protoblock.context_files
-        })
-        
-        self.agent = protoblock.create_agent(agent_config)
+        # Create agent directly
+        self.agent = AiderAgent(agent_config)
         self.test_runner = TestRunner()
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
