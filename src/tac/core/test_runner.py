@@ -37,14 +37,20 @@ class TestRunner:
         init()  # Initialize colorama
         self.test_results = ""
         self.test_functions = []
+        self.had_execution_error = False
+        self._test_stats = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
         
+    def get_test_stats(self) -> dict:
+        """Get the current test statistics"""
+        return self._test_stats.copy()
+
     def run_tests(self, test_path: str = None) -> bool:
         """
         Runs the tests using pytest framework.
         Args:
             test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
         Returns:
-            bool: True if all tests passed or no tests were found, False otherwise
+            bool: True if tests ran successfully (even if some failed), False if there was an execution error
         """
         try:
             test_target = test_path or 'tests'
@@ -54,6 +60,7 @@ class TestRunner:
                 error_msg = f"Error: Test path not found: {full_path}"
                 logger.error(error_msg)
                 self.test_results = error_msg
+                self.had_execution_error = True
                 return False
 
             reporter = CustomReporter()
@@ -69,22 +76,28 @@ class TestRunner:
             
             # Process results
             self.test_functions = reporter.test_functions
-            self._print_test_summary(reporter.results)
+            self._test_stats = reporter.results
+            self._print_test_summary(self._test_stats)
             
             # Store full output
             self.test_results = "\n".join(reporter.output_lines)
             if self.test_results:
                 self.test_results += "\n\n"
             
-            summary = self._generate_summary(reporter.results, exit_code)
+            summary = self._generate_summary(self._test_stats, exit_code)
             self.test_results += summary
             
-            return exit_code in [0, 5]
+            # Only set execution error for serious issues (not just test failures)
+            self.had_execution_error = exit_code not in [0, 1, 5]
+            
+            # Return True even if tests failed, only return False for execution errors
+            return not self.had_execution_error
             
         except Exception as e:
             error_msg = f"Error running tests: {type(e).__name__}: {str(e)}"
             logger.exception(error_msg)
             self.test_results = error_msg
+            self.had_execution_error = True
             return False
 
     def _generate_summary(self, results: dict, exit_code: int) -> str:

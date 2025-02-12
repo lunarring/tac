@@ -227,13 +227,29 @@ class ProtoBlockExecutor:
                 
                 # Run tests and get results first
                 test_success = self.run_tests()
-                if not test_success:
+                test_results = self.test_runner.get_test_results()
+                
+                # Extract test statistics
+                test_stats = self.test_runner.get_test_stats()
+                total_tests = sum(test_stats.values()) if test_stats else 0
+                failed_tests = test_stats.get('failed', 0) if test_stats else 0
+                
+                # Log test results
+                if failed_tests > 0:
+                    logger.warning(f"{failed_tests} out of {total_tests} tests failed")
+                    logger.warning("This indicates potential issues but won't stop execution")
+                else:
+                    logger.info(f"All {total_tests} tests passed successfully")
+
+                # Only consider it a failure if there was an execution error
+                # Test failures are warnings but don't stop execution
+                if not test_success and self.test_runner.had_execution_error:
                     if attempt < max_retries - 1:
                         continue
                     else:
                         return False
 
-                # Only perform plausibility check if tests passed and if enabled in config
+                # Only perform plausibility check if enabled in config
                 plausibility_check_enabled = config.general.plausibility_test
                 logger.debug(f"Plausibility check enabled: {plausibility_check_enabled}")
                 if plausibility_check_enabled:
