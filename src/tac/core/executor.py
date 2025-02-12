@@ -250,7 +250,7 @@ class ProtoBlockExecutor:
                     if attempt < max_retries - 1:
                         continue
                     else:
-                    logger.debug("Software test result: SUCCESS!")
+                        logger.debug("Software test result: SUCCESS!")
                         return False
 
                 # Only perform plausibility check if enabled in config
