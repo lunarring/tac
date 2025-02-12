@@ -306,7 +306,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     run_test_parser.add_argument(
         '--directory',
         default='tests',
-        help='Directory containing tests (default: tests)'
+        help='Directory or file path containing tests (default: tests)'
     )
     
     # List tests command
