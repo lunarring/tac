@@ -131,6 +131,7 @@ class ConfigManager:
         """Override configuration values with command-line arguments.
         
         Arguments with prefixes 'general_' or 'git_' update the corresponding nested dicts.
+        Unprefixed arguments that match keys in general config are also applied to general config.
         Values that are None will not override the configuration.
         """
         for key, value in args.items():
@@ -141,6 +142,9 @@ class ConfigManager:
                 elif key.startswith("git_"):
                     subkey = key[len("git_"):]
                     self._config.setdefault("git", {})[subkey] = value
+                # Handle unprefixed arguments that match general config keys
+                elif key.replace("-", "_") in vars(self.general):
+                    self._config.setdefault("general", {})[key.replace("-", "_")] = value
                 else:
                     self._config[key] = value
 
