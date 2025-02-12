@@ -182,10 +182,6 @@ def list_tests_command(args):
     
     print(f"\nTotal tests found: {test_count}")
 
-def generate_tests_command(args):
-    """Handle the test generate command"""
-    print("\nTest generation feature is coming soon!")
-    print("This will help you automatically generate test cases for your functions.")
 
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
@@ -319,10 +315,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Directory containing tests (default: tests)'
     )
     
-    # Generate tests command
-    generate_parser = test_subparsers.add_parser('generate',
-        help='Generate tests (placeholder)'
-    )
     
     # View command
     view_parser = subparsers.add_parser('view',
@@ -384,10 +376,8 @@ def main():
             run_tests_command(args)
         elif args.test_command == 'list':
             list_tests_command(args)
-        elif args.test_command == 'generate':
-            generate_tests_command(args)
         else:
-            parser.error("Please specify a test command (run, list, or generate)")
+            parser.error("Please specify a test command (run or list)")
         return
         
     if args.command == 'view':
