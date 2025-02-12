@@ -7,6 +7,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LogManager:
     """
@@ -30,14 +33,85 @@ class LogManager:
     def load_log(self, log_path: str) -> bool:
         """Load a specific log file into memory."""
         try:
-            with open(log_path, 'r', encoding='utf-8') as f:
-                self.current_log = json.load(f)
+            if os.path.exists(log_path):
+                with open(log_path, 'r', encoding='utf-8') as f:
+                    self.current_log = json.load(f)
+            else:
+                # Initialize new log structure if file doesn't exist
+                self.current_log = {
+                    'config': {},
+                    'executions': []
+                }
             self.current_log_path = log_path
             return True
-        except Exception as e:
-            self.console.print(f"[red]Error loading log file: {e}[/red]")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error loading log file {log_path}: {str(e)}")
             return False
+        except Exception as e:
+            logger.error(f"Error loading log file {log_path}: {str(e)}")
+            return False
+
+    def safe_update_log(self, execution_data: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Safely update the log file with new execution data and optionally update config.
+        
+        Args:
+            execution_data: Dictionary containing execution data to append
+            config: Optional dictionary containing config data to update
             
+        Returns:
+            bool: True if update was successful, False otherwise
+        """
+        if not self.current_log_path:
+            logger.error("No log file path set")
+            return False
+
+        try:
+            # Load current log data or initialize new structure
+            if not self.load_log(self.current_log_path):
+                logger.error("Failed to load or initialize log file")
+                return False
+
+            # Update config if provided
+            if config is not None:
+                self.current_log['config'] = config
+
+            # Ensure executions list exists
+            if 'executions' not in self.current_log:
+                self.current_log['executions'] = []
+
+            # Append new execution data
+            self.current_log['executions'].append(execution_data)
+
+            # Write updated log with temporary file approach for safety
+            temp_path = f"{self.current_log_path}.tmp"
+            try:
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.current_log, f, indent=2, default=str)
+                
+                # If successful, replace the original file
+                os.replace(temp_path, self.current_log_path)
+                return True
+            except Exception as e:
+                logger.error(f"Error writing log file: {str(e)}")
+                # Clean up temp file if it exists
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except:
+                        pass
+                return False
+
+        except Exception as e:
+            logger.error(f"Error updating log: {str(e)}")
+            return False
+
+    def get_latest_execution(self) -> Optional[Dict[str, Any]]:
+        """Get the most recent execution entry from the log."""
+        if not self.current_log or 'executions' not in self.current_log or not self.current_log['executions']:
+            return None
+        return self.current_log['executions'][-1]
+
     def display_log_tree(self) -> None:
         """Display the current log file as a navigable tree structure."""
         if not self.current_log:

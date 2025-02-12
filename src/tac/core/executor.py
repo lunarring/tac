@@ -21,6 +21,7 @@ from typing import Dict
 from tac.core.log_config import setup_logging
 from tac.core.config import config
 import shutil
+from tac.utils.log_manager import LogManager
 
 logger = setup_logging('tac.core.executor')
 
@@ -52,6 +53,7 @@ class ProtoBlockExecutor:
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
         self.test_results = None
+        self.log_manager = LogManager()  # Initialize log manager
 
     def _write_log_file(self, attempt: int, success: bool, message: str, analysis: str = None) -> dict:
         """
@@ -68,12 +70,6 @@ class ProtoBlockExecutor:
             return None
 
         log_filename = f".tac_log_{self.protoblock_id}"
-        # Check if log file directory is writable
-        log_dir = os.path.dirname(os.path.abspath(log_filename)) or '.'
-        if not os.access(log_dir, os.W_OK):
-            error_msg = f"Directory {log_dir} is not writable."
-            logger.error(error_msg)
-            return {"error": error_msg}
         
         # Get git diff using GitManager's new method if git is enabled
         git_diff = self.git_manager.get_complete_diff() if self.git_manager else ""
@@ -92,7 +88,7 @@ class ProtoBlockExecutor:
             'attempt': attempt,
             'success': success,
             'git_diff': git_diff,
-            'test_results': self.test_results,
+            'test_results': self.test_results or "",
             'message': message
         }
 
@@ -100,32 +96,12 @@ class ProtoBlockExecutor:
         if analysis:
             execution_data['failure_analysis'] = analysis
 
-        try:
-            # Load existing log data if it exists
-            if os.path.exists(log_filename):
-                with open(log_filename, 'r', encoding='utf-8') as f:
-                    log_data = json.load(f)
-            else:
-                # Initialize new log data with config and executions
-                log_data = {
-                    'config': config.raw_config,  # Use centralized config
-                    'executions': []
-                }
-            
-            # Append new execution data
-            if 'executions' not in log_data:
-                log_data['executions'] = []
-            log_data['executions'].append(execution_data)
-
-            # Write updated log file
-            with open(log_filename, 'w', encoding='utf-8') as f:
-                json.dump(log_data, f, indent=2)
-        except Exception as e:
-            error_msg = f"Failed to write log file: {e}"
-            logger.error(error_msg)
-            return {"error": error_msg}
-            
-        return execution_data
+        # Use the log manager to safely update the log file
+        if self.log_manager.safe_update_log(execution_data, config=config.raw_config):
+            return execution_data
+        else:
+            logger.error("Failed to update log file")
+            return None
 
     def _check_nested_tests(self) -> bool:
         """
