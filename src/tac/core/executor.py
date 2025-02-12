@@ -85,7 +85,8 @@ class ProtoBlockExecutor:
                 'test_data_generation': self.protoblock.test_data_generation,
                 'write_files': self.protoblock.write_files,
                 'context_files': self.protoblock.context_files,
-                'commit_message': self.protoblock.commit_message
+                'commit_message': self.protoblock.commit_message,
+                'branch_name': self.protoblock.branch_name
             },
             'timestamp': datetime.now().isoformat(),
             'attempt': attempt,

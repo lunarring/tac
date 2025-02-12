@@ -15,4 +15,5 @@ class ProtoBlock:
     context_files: list
     block_id: str
     commit_message: str = None
+    branch_name: str = None
     test_results: str = None
