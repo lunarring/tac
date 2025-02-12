@@ -10,6 +10,7 @@ class DummyProtoBlock(ProtoBlock):
         self.write_files = ['path/to/file1.py', 'path/to/file2.py']
         self.context_files = ['path/to/context1.py']
         self.block_id = "dummyid"
+        self.branch_name = None
         self.commit_message = "dummy commit"
         self.test_results = None
 
