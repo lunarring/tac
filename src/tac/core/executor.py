@@ -71,6 +71,9 @@ class ProtoBlockExecutor:
 
         log_filename = f".tac_log_{self.protoblock_id}"
         
+        # Set the log file path in the log manager
+        self.log_manager.current_log_path = log_filename
+        
         # Get git diff using GitManager's new method if git is enabled
         git_diff = self.git_manager.get_complete_diff() if self.git_manager else ""
 

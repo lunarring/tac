@@ -63,13 +63,19 @@ class LogManager:
             bool: True if update was successful, False otherwise
         """
         if not self.current_log_path:
-            logger.error("No log file path set")
+            logger.error("No log file path set - make sure to set current_log_path before calling safe_update_log")
             return False
 
         try:
+            # Check if directory is writable
+            log_dir = os.path.dirname(os.path.abspath(self.current_log_path)) or '.'
+            if not os.access(log_dir, os.W_OK):
+                logger.error(f"Directory {log_dir} is not writable")
+                return False
+
             # Load current log data or initialize new structure
             if not self.load_log(self.current_log_path):
-                logger.error("Failed to load or initialize log file")
+                logger.error(f"Failed to load or initialize log file at {self.current_log_path}")
                 return False
 
             # Update config if provided
@@ -79,6 +85,11 @@ class LogManager:
             # Ensure executions list exists
             if 'executions' not in self.current_log:
                 self.current_log['executions'] = []
+
+            # Validate execution data
+            if not isinstance(execution_data, dict):
+                logger.error(f"Invalid execution data type: expected dict, got {type(execution_data)}")
+                return False
 
             # Append new execution data
             self.current_log['executions'].append(execution_data)
@@ -91,19 +102,20 @@ class LogManager:
                 
                 # If successful, replace the original file
                 os.replace(temp_path, self.current_log_path)
+                logger.debug(f"Successfully updated log file at {self.current_log_path}")
                 return True
             except Exception as e:
-                logger.error(f"Error writing log file: {str(e)}")
+                logger.error(f"Error writing log file {self.current_log_path}: {str(e)}")
                 # Clean up temp file if it exists
                 if os.path.exists(temp_path):
                     try:
                         os.remove(temp_path)
-                    except:
-                        pass
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to clean up temporary file {temp_path}: {cleanup_error}")
                 return False
 
         except Exception as e:
-            logger.error(f"Error updating log: {str(e)}")
+            logger.error(f"Unexpected error updating log {self.current_log_path}: {str(e)}")
             return False
 
     def get_latest_execution(self) -> Optional[Dict[str, Any]]:
