@@ -221,8 +221,10 @@ class ProtoBlockExecutor:
                         logger.error("="*50)
                     
                     if attempt < max_retries - 1:
+                        logger.debug("Software test result: NO SUCCESS!")
                         continue
                     else:
+                        logger.debug("Software test result: SUCCESS!") 
                         return False
                 
                 # Run tests and get results first
