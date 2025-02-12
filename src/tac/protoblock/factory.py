@@ -101,68 +101,6 @@ stick exactly to the following output_format, filling in between <>
 }}
 </output_format_explained>"""
 
-    def _clean_code_fences(self, content: str) -> str:
-        """
-        Clean markdown code fences and comments from content.
-        Handles JSON content more intelligently.
-        
-        Args:
-            content: The content to clean
-            
-        Returns:
-            str: Cleaned content ready for JSON parsing
-        """
-        if not content or not content.strip():
-            return ""
-            
-        # First clean any markdown code fences
-        lines = content.strip().split('\n')
-        if content.strip().startswith("```"):
-            # Find the content between the code fences
-            start_idx = 1  # Skip the opening fence
-            end_idx = len(lines)
-            
-            for i in range(len(lines) - 1, 0, -1):
-                if lines[i].strip() == "```":
-                    end_idx = i
-                    break
-                    
-            lines = lines[start_idx:end_idx]
-        
-        # Now clean the lines
-        cleaned_lines = []
-        in_string = False
-        string_char = None
-        
-        for line in lines:
-            cleaned_line = []
-            i = 0
-            while i < len(line):
-                char = line[i]
-                
-                # Handle string literals
-                if char in ['"', "'"] and (i == 0 or line[i-1] != '\\'):
-                    if not in_string:
-                        in_string = True
-                        string_char = char
-                    elif char == string_char:
-                        in_string = False
-                        string_char = None
-                
-                # Handle comments only if we're not in a string
-                elif char == '/' and i + 1 < len(line) and line[i + 1] == '/' and not in_string:
-                    break
-                
-                cleaned_line.append(char)
-                i += 1
-            
-            # Only add non-empty lines
-            cleaned = ''.join(cleaned_line).strip()
-            if cleaned:
-                cleaned_lines.append(cleaned)
-        
-        return '\n'.join(cleaned_lines)
-
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
         """
         Verifies that a protoblock JSON is valid and contains all required fields.
@@ -183,7 +121,7 @@ stick exactly to the following output_format, filling in between <>
         # Try parsing with different methods
         parse_methods = [
             lambda x: json.loads(x),  # Try direct parsing first
-            lambda x: json.loads(self._clean_code_fences(x))  # Try cleaning code fences if direct fails
+            lambda x: json.loads(self._llm_client.clean_code_fences(x))  # Try cleaning code fences if direct fails
         ]
         
         parse_error = None
@@ -321,7 +259,7 @@ stick exactly to the following output_format, filling in between <>
                     raise ValueError("Received empty response from LLM")
                     
                 # Clean code fences from response
-                response = self._clean_code_fences(response)
+                response = self.llm_client._clean_code_fences(response)
                     
                 # Log the raw response for debugging
                 logger.debug(f"Raw LLM Response for protoblock:\n{response}")
