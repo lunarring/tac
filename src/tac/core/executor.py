@@ -68,6 +68,12 @@ class ProtoBlockExecutor:
             return None
 
         log_filename = f".tac_log_{self.protoblock_id}"
+        # Check if log file directory is writable
+        log_dir = os.path.dirname(os.path.abspath(log_filename)) or '.'
+        if not os.access(log_dir, os.W_OK):
+            error_msg = f"Directory {log_dir} is not writable."
+            logger.error(error_msg)
+            return {"error": error_msg}
         
         # Get git diff using GitManager's new method if git is enabled
         git_diff = self.git_manager.get_complete_diff() if self.git_manager else ""
@@ -115,7 +121,9 @@ class ProtoBlockExecutor:
             with open(log_filename, 'w', encoding='utf-8') as f:
                 json.dump(log_data, f, indent=2)
         except Exception as e:
-            logger.error(f"Failed to write log file: {e}")
+            error_msg = f"Failed to write log file: {e}"
+            logger.error(error_msg)
+            return {"error": error_msg}
             
         return execution_data
 
