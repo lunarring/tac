@@ -1,6 +1,7 @@
 import time
 import lunar_tools as lt
 from tac.core.log_config import setup_logging
+from src.tac.utils.project_files import ProjectFiles
 
 logger = setup_logging('tac.cli.voice')
 
@@ -34,7 +35,16 @@ class VoiceUI:
 
     def update_instructions(self):
         """Update the RTV instructions with current instructions."""
-        logger.info("Updating voice agent instructions")
+        from src.tac.utils.project_files import ProjectFiles
+        pf = ProjectFiles(project_root=".")
+        summaries = pf.get_all_summaries()
+        if summaries["files"]:
+            summary_lines = [f"{fname}: {details.get('summary', details.get('error', ''))}" for fname, details in summaries["files"].items()]
+            new_codebase = "\n".join(summary_lines)
+        else:
+            new_codebase = "No file summaries available."
+        self.prompt_codebase = new_codebase
+        logger.info("Updating voice agent instructions with file summaries")
         self.instructions = self.generate_instructions()
         self.rtv.update_instructions(self.instructions)
 
