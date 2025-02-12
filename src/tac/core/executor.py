@@ -245,10 +245,12 @@ class ProtoBlockExecutor:
 
                 # Only consider it a failure if there was an execution error
                 # Test failures are warnings but don't stop execution
-                if not test_success and self.test_runner.had_execution_error:
+                if not test_success:
+                    logger.debug("Software test result: NO SUCCESS!")
                     if attempt < max_retries - 1:
                         continue
                     else:
+                    logger.debug("Software test result: SUCCESS!")
                         return False
 
                 # Only perform plausibility check if enabled in config
