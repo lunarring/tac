@@ -32,41 +32,14 @@ class FileSummarizer:
         prompt += f"\nFull Code:\n<code>\n{code}\n</code>\n"
         prompt += "Please provide a detailed technical analysis including inner workings, purpose, dependencies, and input output expectations of each component. The output format should be a text beginning with the function/class name and then your analysis. Then in the next line, continue. Add no other formatting elements!"
         
-        try:
-            messages = [
-                Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
-                Message(role="user", content=prompt)
-            ]
-            
-            import signal
-            from contextlib import contextmanager
-            
-            @contextmanager
-            def timeout(seconds):
-                def signal_handler(signum, frame):
-                    raise TimeoutError(f"LLM call timed out after {seconds} seconds")
-                signal.signal(signal.SIGALRM, signal_handler)
-                signal.alarm(seconds)
-                try:
-                    yield
-                finally:
-                    signal.alarm(0)
-            
-            with timeout(self.timeout):
-                return self.llm_client.chat_completion(messages)
-        except TimeoutError as e:
-            logger.error(str(e))
-            return f"Error: {str(e)}"
-        except Exception as e:
-            logger.error(f"LLM call failed: {str(e)}")
-            return f"Error: LLM call failed - {str(e)}"
+        messages = [
+            Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
+            Message(role="user", content=prompt)
+        ]
 
-    def _extract_code_block(self, node: ast.AST) -> str:
-        """Extract the source code for a given AST node"""
-        if hasattr(node, 'lineno') and hasattr(node, 'end_lineno'):
-            lines = self.current_file_content.splitlines()
-            return '\n'.join(lines[node.lineno - 1:node.end_lineno])
-        return ""
+        response = self.llm_client.chat_completion(messages)
+        return response
+
 
     def _analyze_file(self, file_path: str) -> Dict:
         """Analyze a single Python file and return its summary"""
