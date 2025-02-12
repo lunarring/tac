@@ -66,31 +66,32 @@ class TestRunner:
             return False
 
     def _run_pytest(self, args: list) -> bool:
-        """Run tests using subprocess to ensure clean environment"""
+        """Run tests using subprocess with real-time streaming output"""
         try:
-            # Construct command with proper Python executable and pytest module
             cmd = [sys.executable, "-m", "pytest"] + args
-
-            # Run pytest in subprocess with output capture
-            process = subprocess.run(
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 env={**os.environ, 'PYTHONPATH': os.getcwd()}
             )
-
-            # Store the output
-            output = []
-            if process.stdout:
-                output.append(process.stdout)
-                # Print the full test output immediately
-                print(process.stdout)
-            if process.stderr:
-                output.append(process.stderr)
-                # Print any error output immediately
-                print(process.stderr)
-
-            # Parse test results
+            output_lines = []
+            # Stream output line by line in real-time
+            while True:
+                line = process.stdout.readline()
+                if line == '' and process.poll() is not None:
+                    break
+                if line:
+                    print(line, end='', flush=True)
+                    output_lines.append(line)
+            # Collect any remaining output
+            remaining = process.stdout.read()
+            if remaining:
+                print(remaining, end='', flush=True)
+                output_lines.append(remaining)
+            full_output = "".join(output_lines)
+            # Parse test results using regex
             results = {
                 'passed': 0,
                 'failed': 0,
@@ -98,42 +99,30 @@ class TestRunner:
                 'skipped': 0,
                 'collection_error': 0
             }
-
-            # Extract test results using regex
-            if process.stdout:
-                # Count passed tests
-                passed_match = re.search(r'(\d+) passed', process.stdout)
-                if passed_match:
-                    results['passed'] = int(passed_match.group(1))
-
-                # Count failed tests
-                failed_match = re.search(r'(\d+) failed', process.stdout)
-                if failed_match:
-                    results['failed'] = int(failed_match.group(1))
-
-                # Count errors
-                error_match = re.search(r'(\d+) error', process.stdout)
-                if error_match:
-                    results['error'] = int(error_match.group(1))
-
-                # Count skipped tests
-                skipped_match = re.search(r'(\d+) skipped', process.stdout)
-                if skipped_match:
-                    results['skipped'] = int(skipped_match.group(1))
-
-                # Extract test function names
-                self.test_functions = re.findall(r'test_\w+', process.stdout)
-
+            passed_match = re.search(r'(\d+) passed', full_output)
+            if passed_match:
+                results['passed'] = int(passed_match.group(1))
+            failed_match = re.search(r'(\d+) failed', full_output)
+            if failed_match:
+                results['failed'] = int(failed_match.group(1))
+            error_match = re.search(r'(\d+) error', full_output)
+            if error_match:
+                results['error'] = int(error_match.group(1))
+            skipped_match = re.search(r'(\d+) skipped', full_output)
+            if skipped_match:
+                results['skipped'] = int(skipped_match.group(1))
+            # Extract test function names
+            self.test_functions = re.findall(r'test_\w+', full_output)
             # Create summary
             summary = "\nTest Summary:\n"
-            if process.returncode == 0:
+            returncode = process.wait()
+            if returncode == 0:
                 summary += "All tests passed!\n"
-            elif process.returncode == 5:
+            elif returncode == 5:
                 summary += "No tests were found.\n"
                 summary += "This is not a failure - it just means no tests exist yet.\n"
             else:
-                summary += f"Tests failed with return code {process.returncode}\n"
-
+                summary += f"Tests failed with return code {returncode}\n"
             summary += f"Passed: {results['passed']}\n"
             if results['failed'] > 0:
                 summary += f"Failed: {results['failed']}\n"
@@ -141,16 +130,9 @@ class TestRunner:
                 summary += f"Errors: {results['error']}\n"
             if results['skipped'] > 0:
                 summary += f"Skipped: {results['skipped']}\n"
-
-            # Store full results
-            self.test_results = '\n'.join(output) + summary
-
-            # Print colored summary
+            self.test_results = full_output + summary
             self._print_test_summary(results)
-
-            # Return True if all tests passed or no tests were found
-            return process.returncode in [0, 5]
-
+            return returncode in [0, 5]
         except Exception as e:
             error_msg = f"Error running pytest: {str(e)}\n{type(e).__name__}: {str(e)}"
             logger.error(error_msg)
