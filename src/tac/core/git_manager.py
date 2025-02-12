@@ -19,31 +19,6 @@ class GitManager:
             logger.error(f"Error initializing git repository: {e}")
             self.repo = None
 
-    def create_and_checkout_branch(self, branch_name: str) -> bool:
-        """Create and checkout a new branch for block execution"""
-        if not self.repo:
-            logger.error("No git repository available")
-            return False
-
-        try:
-            # Store current branch for error handling
-            current = self.repo.active_branch.name
-
-            # Create and checkout new branch
-            logger.debug(f"Creating and checking out branch: {branch_name}")
-            self.repo.git.checkout('-b', branch_name)
-            logger.info(f"Successfully created and checked out branch: {branch_name}")
-            return True
-        except git.exc.GitCommandError as e:
-            logger.error(f"Failed to create/checkout branch {branch_name}: {e}")
-            try:
-                # Try to return to original branch on failure
-                if current:
-                    self.repo.git.checkout(current)
-            except:
-                pass
-            return False
-
     def get_current_branch(self) -> Optional[str]:
         """Get the name of the current branch using git rev-parse --abbrev-ref HEAD"""
         if not self.repo or not self.repo.working_dir:
@@ -58,23 +33,6 @@ class GitManager:
         except Exception as e:
             logger.error(f"Error detecting branch: {e}")
             return None
-
-    def checkout_branch(self, branch_name: str) -> bool:
-        """Checkout an existing branch"""
-        if not self.repo:
-            return False
-        try:
-            # Check if there are uncommitted changes
-            if self.repo.is_dirty(untracked_files=True):
-                logger.error("Cannot checkout branch: You have uncommitted changes. Please commit or stash them first.")
-                return False
-            
-            # Regular checkout without force
-            self.repo.git.checkout(branch_name)
-            return True
-        except git.exc.GitCommandError as e:
-            logger.error(f"Failed to checkout branch {branch_name}: {e}")
-            return False
 
     def get_complete_diff(self) -> str:
         """
