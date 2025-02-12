@@ -249,6 +249,7 @@ class ProtoBlockExecutor:
                             return False
                     else:
                         # If we got here, both tests and plausibility check (if enabled) passed
+                        logger.debug("Plausibility check passed")
                         execution_success = True
                         break
                     
