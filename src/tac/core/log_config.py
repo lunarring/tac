@@ -53,7 +53,7 @@ def setup_logging(name: str = None) -> logging.Logger:
     # Configure root logger first
     root = logging.getLogger()
     if not root.handlers:  # Only configure root once
-        root_handler = logging.StreamHandler(sys.stdout)
+        root_handler = logging.StreamHandler(sys.__stdout__)
         root_handler.setLevel(logging.WARNING)  # Set root to WARNING level
         root_handler.setFormatter(ColoredFormatter('%(levelname)s - %(message)s [%(name)s]'))
         root.addHandler(root_handler)
@@ -73,7 +73,7 @@ def setup_logging(name: str = None) -> logging.Logger:
     logger.setLevel(get_log_level(name))
 
     # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler = logging.StreamHandler(sys.__stdout__)
     console_handler.setLevel(logging.DEBUG)
 
     # Create formatter and add it to the handler
