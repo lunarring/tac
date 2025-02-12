@@ -431,25 +431,10 @@ def main():
     if args.command == 'make' or voice_ui is not None:
         # Initialize git manager and check status only if git is enabled
         git_manager = None
-        config = load_config()
-        if not args.no_git:
-            git_manager = GitManager()
-            if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
-                sys.exit(1)
-        else:
-            # Check if plausibility test is enabled but git is disabled
-            
-            if config.get('general', {}).get('plausibility_test', False):
-                print("\nError: Plausibility test requires git to be enabled.")
-                print("To proceed, either:")
-                print("1. Enable git by removing --no-git flag")
-                print("2. Disable plausibility test using one of these methods:")
-                print("   - Use --plausibility-test false via CLI")
-                sys.exit(1)
-
+        # Load configuration
+        
         try:
-            # Load configuration
-            
+            config = load_config()
             # Override config values with command line arguments if provided
             for key in config['general'].keys():
                 arg_key = key.replace('-', '_')  # Convert CLI arg format back to config format
@@ -461,7 +446,21 @@ def main():
                 config['git'] = {'enabled': False}
             elif 'git' not in config:
                 config['git'] = {'enabled': True}
-            
+
+            if config.get('git', {}).get('enabled', True):
+                git_manager = GitManager()
+                if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
+                    sys.exit(1)
+            else:
+                # Check if plausibility test is enabled but git is disabled
+                if config.get('general', {}).get('plausibility_test', False):
+                    print("\nError: Plausibility test requires git to be enabled.")
+                    print("To proceed, either:")
+                    print("1. Enable git by removing --no-git flag")
+                    print("2. Disable plausibility test using one of these methods:")
+                    print("   - Use --plausibility-test false via CLI")
+                    sys.exit(1)
+                
             if config['general']['type'] != 'aider':
                 raise ValueError(f"Unknown agent type: {config['general']['type']}")
 
