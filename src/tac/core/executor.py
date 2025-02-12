@@ -243,7 +243,9 @@ class ProtoBlockExecutor:
                 logger.debug(f"Plausibility check enabled: {plausibility_check_enabled}")
                 if plausibility_check_enabled:
                     logger.info("Running plausibility check...")
-                    if not self.plausibility_checker.check(self.protoblock):
+                    # Get git diff for plausibility check
+                    git_diff = self.git_manager.get_complete_diff()
+                    if not self.plausibility_checker.check(self.protoblock, git_diff):
                         logger.error("Plausibility check failed")
                         if attempt < max_retries - 1:
                             continue

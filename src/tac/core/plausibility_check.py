@@ -16,7 +16,7 @@ class PlausibilityChecker:
         logger.info("Initializing PlausibilityChecker")
         self.llm_client = LLMClient(strength="strong")
 
-    def check_implementation(self, protoblock: ProtoBlock, git_diff: str) -> str:
+    def check(self, protoblock: ProtoBlock, git_diff: str) -> str:
         """
         Analyzes the implementation against the promised changes.
         
