@@ -29,23 +29,19 @@ class DummyAgent:
 
 class TestExecutorGitBranch(unittest.TestCase):
     def setUp(self):
-        # Create a temporary directory and set it as current working directory.
-        self.test_dir = tempfile.TemporaryDirectory()
-        self.original_dir = os.getcwd()
-        os.chdir(self.test_dir.name)
-        # Initialize a new git repository.
-        subprocess.run(["git", "init"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], check=True)
-        subprocess.run(["git", "config", "user.name", "Test User"], check=True)
-        # Create an initial commit so that branch switching works.
-        with open("dummy.txt", "w", encoding="utf-8") as f:
-            f.write("dummy")
-        subprocess.run(["git", "add", "dummy.txt"], check=True)
-        subprocess.run(["git", "commit", "-m", "Initial commit"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Override GitManager methods to avoid expensive git subprocess calls.
+        from src.tac.core.git_manager import GitManager
+        GitManager.dummy_branch = ""
+        def dummy_get_current(self):
+            return GitManager.dummy_branch
+        def dummy_create_or_switch(self, tac_id):
+            GitManager.dummy_branch = tac_id
+            return True
+        GitManager.get_current_branch = dummy_get_current
+        GitManager.create_or_switch_to_tac_branch = dummy_create_or_switch
 
     def tearDown(self):
-        os.chdir(self.original_dir)
-        self.test_dir.cleanup()
+        pass
 
     def test_executor_switches_to_tac_branch(self):
         # Instantiate DummyProtoBlock and configuration with git enabled.
@@ -70,8 +66,9 @@ class TestExecutorGitBranch(unittest.TestCase):
         self.assertEqual(current_branch, "tac_test123", msg=f"Expected branch 'tac_test123', got '{current_branch}'")
 
     def test_executor_no_switch_when_already_on_tac_branch(self):
-        # Pre-create the TAC branch and check it out
-        subprocess.run(["git", "checkout", "-b", "tac_test123"], check=True)
+        # Simulate already being on TAC branch
+        from src.tac.core.git_manager import GitManager
+        GitManager.dummy_branch = "tac_test123"
         
         # Create dummy block with block_id = "test123"
         block = DummyProtoBlock()
@@ -93,7 +90,8 @@ class TestExecutorGitBranch(unittest.TestCase):
         logger.removeHandler(log_handler)
         log_output = log_capture.getvalue()
         
-        from tac.core.git_manager import GitManager
+        # Check that the executor did not switch branches and remains on tac_test123.
+        from src.tac.core.git_manager import GitManager
         gm = GitManager()
         current_branch = gm.get_current_branch()
         self.assertEqual(current_branch, "tac_test123", msg=f"Expected branch 'tac_test123', got '{current_branch}'")
