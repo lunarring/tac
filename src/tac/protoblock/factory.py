@@ -97,6 +97,7 @@ stick exactly to the following output_format, filling in between <>
         """
         Verifies that a protoblock JSON is valid and contains all required fields.
         First tries to parse as-is, only cleans code fences if that fails.
+        Test sections can be empty strings if no test is needed.
         
         Args:
             json_content: The JSON content to validate
@@ -143,7 +144,8 @@ stick exactly to the following output_format, filling in between <>
                 },
                 "test": {
                     "required_keys": ["specification", "data"],
-                    "type": dict
+                    "type": dict,
+                    "allow_empty": True  # New flag to indicate empty values are allowed
                 },
                 "write_files": {
                     "type": list
@@ -182,9 +184,20 @@ stick exactly to the following output_format, filling in between <>
                     
                 # Check nested required keys if any
                 if "required_keys" in requirements and isinstance(validated_data[key], dict):
-                    missing_nested = [k for k in requirements["required_keys"] if k not in validated_data[key]]
-                    if missing_nested:
-                        return False, f"{key} section missing keys: {', '.join(missing_nested)}", None
+                    # For test section, allow empty strings for required fields
+                    allow_empty = requirements.get("allow_empty", False)
+                    if allow_empty and key == "test":
+                        # Ensure all required keys exist but can be empty strings
+                        for req_key in requirements["required_keys"]:
+                            if req_key not in validated_data[key]:
+                                return False, f"{key} section missing key: {req_key}", None
+                            # Allow empty string for test section fields
+                            if not isinstance(validated_data[key][req_key], str):
+                                validated_data[key][req_key] = ""
+                    else:
+                        missing_nested = [k for k in requirements["required_keys"] if k not in validated_data[key]]
+                        if missing_nested:
+                            return False, f"{key} section missing keys: {', '.join(missing_nested)}", None
             
             # Additional validation for lists
             for key in ["write_files", "context_files"]:
