@@ -7,16 +7,25 @@ logger = setup_logging('tac.cli.voice')
 
 
 class VoiceUI:
-    def __init__(self, prompt_codebase="There is a lot of code here."):
+    def __init__(self):
         logger.info("Initializing Voice UI")
         self.temperature = 0.8
         self.stop_ai_audio = False
-        self.prompt_codebase = prompt_codebase
+        self.task_instructions = None
+        from tac.utils.project_files import ProjectFiles
+        pf = ProjectFiles(project_root=".")
+        summaries = pf.get_all_summaries()
+        if summaries["files"]:
+            summary_lines = [f"{fname}: {details.get('summary', details.get('error', ''))}" for fname, details in summaries["files"].items()]
+            new_codebase = "\n".join(summary_lines)
+        else:
+            new_codebase = "No file summaries available."
+        self.prompt_codebase = new_codebase
+        logger.info("Updating voice agent instructions with file summaries")
         self.prompt_tac = """You are the TAC Voice Agent, a sassy and sarcastic voice assistant for coding. You are controlling AI coding agents that make software updates for the user. After you asked the user what they want to program, you just acknowledge their request and say that you will start programming."""
         self.prompt_startup = """Ask the user what they want to program"""
         self.instructions = self.generate_instructions()
-        self.task_instructions = None
-        logger.debug(f"Generated instructions with codebase prompt: {prompt_codebase}")
+        logger.debug(f"Generated instructions with codebase prompt: {self.prompt_codebase}")
         self.rtv = lt.RealTimeVoice(
             instructions=self.instructions,
             temperature=self.temperature,
@@ -33,20 +42,7 @@ class VoiceUI:
         logger.debug("Generating instructions")
         return self.prompt_tac + "\n" + self.prompt_codebase
 
-    def update_instructions(self):
-        """Update the RTV instructions with current instructions."""
-        from tac.utils.project_files import ProjectFiles
-        pf = ProjectFiles(project_root=".")
-        summaries = pf.get_all_summaries()
-        if summaries["files"]:
-            summary_lines = [f"{fname}: {details.get('summary', details.get('error', ''))}" for fname, details in summaries["files"].items()]
-            new_codebase = "\n".join(summary_lines)
-        else:
-            new_codebase = "No file summaries available."
-        self.prompt_codebase = new_codebase
-        logger.info("Updating voice agent instructions with file summaries")
-        self.instructions = self.generate_instructions()
-        self.rtv.update_instructions(self.instructions)
+
 
     def start(self):
         """Start the voice UI."""
