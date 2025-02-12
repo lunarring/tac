@@ -393,7 +393,7 @@ def main():
     if args.command == 'voice':
         from tac.cli.voice import VoiceUI
         try:
-            voice_ui = VoiceUI(prompt_codebase=args.codebase)
+            voice_ui = VoiceUI()
             if hasattr(args, 'temperature'):
                 voice_ui.temperature = args.temperature
             voice_ui.start()
