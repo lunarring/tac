@@ -27,14 +27,14 @@ class ProtoBlockFactory:
             import yaml
             return yaml.safe_load(f)
 
-    def get_seed_instructions(self, codebase: str, task_instructions: str) -> str:
+    def get_protoblock_genesis_prompt(self, codebase: str, task_instructions: str) -> str:
         """
         Args:
             codebase: The codebase content to analyze (result of gather_python_files)
             task_instructions: The specific task instructions to use
             
         Returns:
-            str: Complete seed instructions for the LLM
+            str: Complete protoblock genesis prompt for the LLM
         """
         # Load config to check if summaries are enabled
         config = self._load_config()
@@ -216,13 +216,13 @@ stick exactly to the following output_format, filling in between <>
         except Exception as e:
             return False, f"Validation error: {str(e)}", None
 
-    def create_protoblock(self, seed_instructions: str) -> ProtoBlock:
+    def create_protoblock(self, protoblock_genesis_prompt: str) -> ProtoBlock:
         """
-        Create a protoblock from seed instructions that contain all necessary information.
+        Create a protoblock from genesis prompt that contain all necessary information.
         Will retry creation based on max_retries_protoblock_creation from config.
         
         Args:
-            seed_instructions: Complete instructions for the LLM to generate the protoblock
+            protoblock_genesis_prompt: Complete instructions for the LLM to generate the protoblock
             
         Returns:
             ProtoBlock object containing the protoblock specification
@@ -243,7 +243,7 @@ stick exactly to the following output_format, filling in between <>
         # Create messages for LLM
         messages = [
             Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'test', 'write_files', 'context_files', 'commit_message'.No markdown, no code fences. Keep it short and strictly formatted."),
-            Message(role="user", content=seed_instructions)
+            Message(role="user", content=protoblock_genesis_prompt)
         ]
         
         last_error = None

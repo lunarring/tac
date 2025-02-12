@@ -486,11 +486,11 @@ def main():
                 
                 print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
                 
-                # Generate complete seed instructions
-                seed_instructions = factory.get_seed_instructions(codebase, task_instructions)
+                # Generate complete genesis prompt
+                protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(codebase, task_instructions)
                 
-                # Create protoblock from seed instructions
-                protoblock = factory.create_protoblock(seed_instructions)
+                # Create protoblock from genesis prompt
+                protoblock = factory.create_protoblock(protoblock_genesis_prompt)
                 
                 # Save protoblock to file
                 json_file = factory.save_protoblock(protoblock)
