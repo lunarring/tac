@@ -33,8 +33,8 @@ class TestPlausibilityChecker(unittest.TestCase):
             return "DETAILED ANALYSIS: This is a dummy analysis report. PLAUSIBILITY SCORE RATING: A"
         checker.llm_client.chat_completion = dummy_chat_completion
 
-        # Call check_implementation and get the response
-        response = checker.check_implementation(dummy_protoblock, dummy_git_diff)
+        # Call check and get the response
+        response = checker.check(dummy_protoblock, dummy_git_diff)
 
         # Assert that the response is non-empty and contains expected keywords
         self.assertTrue(response)
