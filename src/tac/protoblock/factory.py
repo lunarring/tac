@@ -9,6 +9,7 @@ import time
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.project_files import ProjectFiles
 from tac.core.llm import LLMClient, Message
+from tac.core.config import config
 from .protoblock import ProtoBlock
 
 logger = logging.getLogger(__name__)
@@ -20,13 +21,6 @@ class ProtoBlockFactory:
         self.llm_client = LLMClient(strength="strong")
         self.project_files = ProjectFiles()
     
-    def _load_config(self) -> dict:
-        """Load configuration from config.yaml"""
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-        with open(config_path, 'r') as f:
-            import yaml
-            return yaml.safe_load(f)
-
     def get_protoblock_genesis_prompt(self, codebase: str, task_instructions: str) -> str:
         """
         Args:
@@ -36,9 +30,8 @@ class ProtoBlockFactory:
         Returns:
             str: Complete protoblock genesis prompt for the LLM
         """
-        # Load config to check if summaries are enabled
-        config = self._load_config()
-        use_summaries = config.get('general', {}).get('use_file_summaries', False)
+        # Use centralized config
+        use_summaries = config.general.use_file_summaries
         
         # Get codebase content, using summaries if enabled
         if use_summaries:
@@ -121,7 +114,7 @@ stick exactly to the following output_format, filling in between <>
         # Try parsing with different methods
         parse_methods = [
             lambda x: json.loads(x),  # Try direct parsing first
-            lambda x: json.loads(self._llm_client.clean_code_fences(x))  # Try cleaning code fences if direct fails
+            lambda x: json.loads(self.llm_client._clean_code_fences(x))  # Try cleaning code fences if direct fails
         ]
         
         parse_error = None
@@ -230,10 +223,9 @@ stick exactly to the following output_format, filling in between <>
         Raises:
             ValueError: If unable to create a valid protoblock after all retries
         """
-        # Load config to check if summaries are enabled and get max retries
-        config = self._load_config()
-        use_summaries = config.get('general', {}).get('use_file_summaries', False)
-        max_retries = config.get('general', {}).get('max_retries_protoblock_creation', 4)
+        # Use centralized config
+        use_summaries = config.general.use_file_summaries
+        max_retries = config.general.max_retries_protoblock_creation
         
         if use_summaries:
             logger.info("Using file summaries for protoblock creation")

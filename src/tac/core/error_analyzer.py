@@ -4,8 +4,7 @@ from tac.core.llm import LLMClient, Message
 from tac.protoblock import ProtoBlock
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.project_files import ProjectFiles
-import yaml
-import os
+from tac.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -16,16 +15,6 @@ class ErrorAnalyzer:
         logger.info("Initializing ErrorAnalyzer")
         self.llm_client = LLMClient(strength="strong")
         self.project_files = ProjectFiles()
-
-    def _load_config(self) -> dict:
-        """Load configuration from config.yaml"""
-        logger.info("Loading configuration from config.yaml")
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-        logger.debug(f"Config path: {config_path}")
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-            logger.debug(f"Loaded config: {config}")
-            return config
 
     def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
@@ -44,9 +33,8 @@ class ErrorAnalyzer:
         logger.debug(f"Test results length: {len(test_results) if test_results else 'None'}")
         
         try:
-            # Load config to check if summaries are enabled
-            config = self._load_config()
-            use_summaries = config.get('general', {}).get('use_file_summaries', False)
+            # Use centralized config
+            use_summaries = config.general.use_file_summaries
             logger.info(f"Using file summaries: {use_summaries}")
             
             # Format codebase for prompt

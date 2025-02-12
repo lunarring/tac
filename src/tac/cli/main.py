@@ -24,14 +24,11 @@ from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
+from tac.core.config import config
 
 logger = setup_logging('tac.cli.main')
 
-def load_config(config_path=None):
-    if config_path is None:
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
+
 
 def load_protoblock_from_json(json_path: str) -> ProtoBlock:
     """Load protoblock definition from a JSON file"""
@@ -192,12 +189,6 @@ def generate_tests_command(args):
 
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
-    # Load config first to get defaults
-    config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-    with open(config_path, 'r') as f:
-        config = yaml.safe_load(f)
-    general_config = config.get('general', {})
-
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -221,7 +212,8 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     
     # Dynamically add arguments from general config
-    for key, value in general_config.items():
+    general_config = config.general
+    for key, value in vars(general_config).items():
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
         if arg_type == bool:
@@ -346,7 +338,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Disable all git operations (branch checks, commits, etc.)'
     )
     
-    
     args = parser.parse_args()
     
     if args.command == 'run':
@@ -403,10 +394,6 @@ def main():
             voice_instructions = voice_ui.task_instructions
             
             # Set up all necessary args that make command uses
-            # Load config to get defaults
-            config = load_config()
-            general_config = config.get('general', {})
-            
             # Create a new Namespace with all the make command arguments
             make_args = argparse.Namespace()
             # Required arguments
@@ -416,8 +403,8 @@ def main():
             make_args.instructions = None  # Will be set from voice_instructions later
             
             # Add all config-based arguments with their defaults
-            for key in general_config:
-                setattr(make_args, key.replace('-', '_'), general_config[key])
+            for key in vars(config.general):
+                setattr(make_args, key.replace('-', '_'), getattr(config.general, key))
             
             # Merge the new arguments into the existing args namespace
             for attr in vars(make_args):
@@ -427,33 +414,29 @@ def main():
             print("\nGoodbye!")
             sys.exit(0)
 
-
     if args.command == 'make' or voice_ui is not None:
         # Initialize git manager and check status only if git is enabled
         git_manager = None
-        # Load configuration
         
         try:
-            config = load_config()
             # Override config values with command line arguments if provided
-            for key in config['general'].keys():
+            config_override = {}
+            for key in vars(config.general):
                 arg_key = key.replace('-', '_')  # Convert CLI arg format back to config format
                 if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
-                    config['general'][key] = getattr(args, arg_key)
+                    config_override[key] = getattr(args, arg_key)
                 
             # Add no_git flag to config
             if args.no_git:
-                config['git'] = {'enabled': False}
-            elif 'git' not in config:
-                config['git'] = {'enabled': True}
+                config_override['git'] = {'enabled': False}
 
-            if config.get('git', {}).get('enabled', True):
+            if config.git.enabled:
                 git_manager = GitManager()
                 if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                     sys.exit(1)
             else:
                 # Check if plausibility test is enabled but git is disabled
-                if config.get('general', {}).get('plausibility_test', False):
+                if config.general.plausibility_test:
                     print("\nError: Plausibility test requires git to be enabled.")
                     print("To proceed, either:")
                     print("1. Enable git by removing --no-git flag")
@@ -461,8 +444,8 @@ def main():
                     print("   - Use --plausibility-test false via CLI")
                     sys.exit(1)
                 
-            if config['general']['type'] != 'aider':
-                raise ValueError(f"Unknown agent type: {config['general']['type']}")
+            if config.general.type != 'aider':
+                raise ValueError(f"Unknown agent type: {config.general.type}")
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")
@@ -518,7 +501,7 @@ def main():
             # Create executor and run with codebase
             executor = ProtoBlockExecutor(
                 protoblock=protoblock, 
-                config=config,
+                config_override=config_override,
                 codebase=codebase  # Pass codebase to executor
             )
             success = executor.execute_block()
