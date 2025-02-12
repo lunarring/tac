@@ -125,14 +125,14 @@ def gather_files_command(args):
 
 def run_tests_command(args):
     """Handle the test run command"""
-    test_dir = args.directory
-    if not os.path.exists(test_dir):
-        logger.error(f"Test directory not found: {test_dir}")
+    test_path = args.directory
+    if not os.path.exists(test_path):
+        logger.error(f"Test path not found: {test_path}")
         sys.exit(1)
     
     # Use TestRunner directly for running tests
     test_runner = TestRunner()
-    success = test_runner.run_tests(test_path=test_dir)
+    success = test_runner.run_tests(test_path=test_path)
     
     if not success:
         sys.exit(1)
