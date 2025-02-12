@@ -357,6 +357,7 @@ def main():
     )
     
     parser, args = parse_args()
+    config.override_with_args(vars(args))
     
     if args.command == 'gather':
         gather_files_command(args)

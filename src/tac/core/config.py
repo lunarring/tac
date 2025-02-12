@@ -127,6 +127,23 @@ class ConfigManager:
         """Get a value from config by key with a default."""
         return self._config.get(key, default)
 
+    def override_with_args(self, args: dict) -> None:
+        """Override configuration values with command-line arguments.
+        
+        Arguments with prefixes 'general_' or 'git_' update the corresponding nested dicts.
+        Values that are None will not override the configuration.
+        """
+        for key, value in args.items():
+            if value is not None:
+                if key.startswith("general_"):
+                    subkey = key[len("general_"):]
+                    self._config.setdefault("general", {})[subkey] = value
+                elif key.startswith("git_"):
+                    subkey = key[len("git_"):]
+                    self._config.setdefault("git", {})[subkey] = value
+                else:
+                    self._config[key] = value
+
 
 # Global instance
 config = ConfigManager() 
