@@ -238,7 +238,15 @@ class ProtoBlockExecutor:
                     else:
                         return False
                 
-                # Only perform plausibility check if enabled in config
+                # Run tests and get results first
+                test_success = self.run_tests()
+                if not test_success:
+                    if attempt < max_retries - 1:
+                        continue
+                    else:
+                        return False
+
+                # Only perform plausibility check if tests passed and if enabled in config
                 plausibility_check_enabled = config.general.plausibility_test
                 logger.debug(f"Plausibility check enabled: {plausibility_check_enabled}")
                 if plausibility_check_enabled:
@@ -252,11 +260,9 @@ class ProtoBlockExecutor:
                         else:
                             return False
                 
-                # Run tests and get results
-                test_success = self.run_tests()
-                if test_success:
-                    execution_success = True
-                    break
+                # If we got here, both tests and plausibility check (if enabled) passed
+                execution_success = True
+                break
                 
                 if attempt < max_retries - 1:
                     continue
