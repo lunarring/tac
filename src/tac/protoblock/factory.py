@@ -89,7 +89,8 @@ stick exactly to the following output_format, filling in between <>
     }},
     "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them!"],
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
-    "commit_message": "Brief commit message about your changes."
+    "commit_message": "Brief commit message about your changes.",
+    "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue."
 }}
 </output_format_explained>"""
 
@@ -154,6 +155,9 @@ stick exactly to the following output_format, filling in between <>
                     "type": list
                 },
                 "commit_message": {
+                    "type": str
+                },
+                "branch_name": {
                     "type": str
                 }
             }
@@ -284,7 +288,8 @@ stick exactly to the following output_format, filling in between <>
                         write_files=data["write_files"],
                         context_files=data.get("context_files", []),
                         block_id=str(uuid.uuid4())[:6],
-                        commit_message=f"TAC: {data.get('commit_message', 'Update')}"
+                        commit_message=f"TAC: {data.get('commit_message', 'Update')}",
+                        branch_name=data.get("branch_name")
                     )
                 except KeyError as e:
                     raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
@@ -324,6 +329,7 @@ stick exactly to the following output_format, filling in between <>
             "write_files": block.write_files,
             "context_files": block.context_files,
             "commit_message": block.commit_message,
+            "branch_name": block.branch_name,
             "timestamp": datetime.now().isoformat()
         }
         
