@@ -4,10 +4,13 @@ import os
 from enum import Enum
 from typing import List, Dict, Optional, Union
 from dataclasses import dataclass
-import yaml
-
+import logging
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
+from tac.core.log_config import setup_logging
+from tac.core.config import config
+
+logger = setup_logging('tac.core.llm')
 
 class LLMProvider(Enum):
     """Supported LLM providers."""
@@ -20,74 +23,37 @@ class Message:
     role: str
     content: str
 
-class LLMConfig:
-    """Configuration for LLM clients."""
-    
-    @staticmethod
-    def from_config_file(config_path: Optional[str] = None, strength: str = "weak") -> 'LLMConfig':
-        """Create LLMConfig from config.yaml file.
-        
-        Args:
-            config_path: Path to config file
-            strength: Whether to use strong or weak LLM ("strong" or "weak", defaults to "weak")
-        """
-        if config_path is None:
-            # Use the same config path resolution as main CLI
-            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
-            
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Could not find config file at: {config_path}")
-        
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        config_key = f"llm_{strength}"
-        llm_config = config.get(config_key, {})
-        provider = llm_config.get('provider', 'deepseek')  # Default to deepseek
-        model = llm_config.get('model', 'deepseek-chat')
-        
-        return LLMConfig(provider=provider, model=model, settings=llm_config.get('settings', {}))
-    
-    def __init__(self, provider: Union[LLMProvider, str], model: str, settings: Optional[Dict] = None):
-        if isinstance(provider, str):
-            provider = LLMProvider(provider.lower())
-        self.provider = provider
-        self.model = model
-        self.settings = settings or {}
-        
-        # Load API keys from environment variables
-        if provider == LLMProvider.DEEPSEEK:
-            self.api_key = os.getenv("DEEPSEEK_API_KEY")
-            if not self.api_key:
-                raise ValueError("DEEPSEEK_API_KEY environment variable not set")
-            self.base_url = "https://api.deepseek.com"
-        else:  # OpenAI
-            self.api_key = os.getenv("OPENAI_API_KEY")
-            if not self.api_key:
-                raise ValueError("OPENAI_API_KEY environment variable not set")
-            self.base_url = None  # OpenAI uses default base URL
-
 class LLMClient:
     """Client for interacting with Language Models."""
     
-    def __init__(self, config: Optional[LLMConfig] = None, strength: str = "weak"):
+    def __init__(self, config_override: Optional[Dict] = None, strength: str = "weak"):
         """Initialize client with config from file or provided config.
         
         Args:
-            config: Optional LLMConfig instance
+            config_override: Optional config override dictionary
             strength: Whether to use strong or weak LLM ("strong" or "weak", defaults to "weak")
         """
-        self.config = config or LLMConfig.from_config_file(strength=strength)
+        # Get config from centralized config
+        llm_config = config.get_llm_config(strength)
+        if config_override:
+            # Override settings if provided
+            for key, value in config_override.items():
+                setattr(llm_config, key, value)
+        
+        self.config = llm_config
         self.client = self._initialize_client()
     
     def _initialize_client(self) -> OpenAI:
         """Initialize the OpenAI client with appropriate configuration."""
         kwargs = {
-            "api_key": self.config.api_key,
-            "timeout": self.config.settings.get('timeout', 120),
+            "api_key": self.config.api_key or os.getenv(f"{self.config.provider.upper()}_API_KEY"),
+            "timeout": self.config.settings.timeout,
         }
         if self.config.base_url:
             kwargs["base_url"] = self.config.base_url
+        elif self.config.provider == "deepseek":
+            kwargs["base_url"] = "https://api.deepseek.com"
+            
         return OpenAI(**kwargs)
     
     def chat_completion(
@@ -141,18 +107,18 @@ class LLMClient:
             "model": self.config.model,
             "messages": formatted_messages,
             "stream": stream,
-            "timeout": self.config.settings.get('timeout', 120),
+            "timeout": self.config.settings.timeout,
         }
         
         # Models that don't support temperature parameter
         if self.config.model not in ["o1-mini", "deepseek-reasoner"] and "o3-mini" not in self.config.model:
             # Use settings from config if not overridden
             if temperature is None:
-                temperature = self.config.settings.get('temperature', 0.7)
+                temperature = self.config.settings.temperature
             params["temperature"] = temperature
         
         if max_tokens is None:
-            max_tokens = self.config.settings.get('max_tokens')
+            max_tokens = self.config.settings.max_tokens
         if max_tokens:
             params["max_tokens"] = max_tokens
             
@@ -162,7 +128,7 @@ class LLMClient:
                 raise ValueError("Empty response received from API")
             return response.choices[0].message.content
         except Exception as e:
-            provider_name = self.config.provider.value.capitalize()
+            provider_name = self.config.provider.capitalize()
             # Add more detailed error information
             error_msg = f"{provider_name} API call failed: {str(e)}"
             if hasattr(e, 'response'):
@@ -171,6 +137,7 @@ class LLMClient:
                     error_msg += f"\nResponse body: {e.response.text}"
                 except:
                     pass
+            logger.error(error_msg)
             return f"LLM failure: {error_msg}"
         
     def _clean_code_fences(self, content: str) -> str:
@@ -237,21 +204,14 @@ class LLMClient:
 
 # Example usage:
 if __name__ == "__main__":
-    # Create manual config
-    config = LLMConfig(
-        provider="deepseek",
-        model="deepseek-reasoner",
-        settings={"timeout": 120}
-    )
-    
-    # Create client with manual config
-    client = LLMClient(config=config)
-    
     # Example messages
     messages = [
         Message(role="system", content="You are a helpful assistant"),
         Message(role="user", content="Hello!")
     ]
+    
+    # Create client with default config
+    client = LLMClient()
     
     # Get completion
     response = client.chat_completion(messages)

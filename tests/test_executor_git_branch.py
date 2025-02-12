@@ -2,8 +2,11 @@ import os
 import tempfile
 import subprocess
 import unittest
+import io
+import logging
 
 from src.tac.core.executor import ProtoBlockExecutor
+from src.tac.core.config import GitConfig
 
 # Define a dummy ProtoBlock with minimal attributes.
 class DummyProtoBlock:
@@ -47,9 +50,11 @@ class TestExecutorGitBranch(unittest.TestCase):
     def test_executor_switches_to_tac_branch(self):
         # Instantiate DummyProtoBlock and configuration with git enabled.
         block = DummyProtoBlock()
-        config = {"git": {"enabled": True}}
+        config_override = {
+            'git': {'enabled': True}
+        }
         # Instantiate the executor with a dummy codebase.
-        executor = ProtoBlockExecutor(block, config=config, codebase={})
+        executor = ProtoBlockExecutor(block, config_override=config_override, codebase={})
         
         # Stub out run_tests to avoid running any real tests.
         executor.run_tests = lambda test_path=None: True
@@ -66,13 +71,14 @@ class TestExecutorGitBranch(unittest.TestCase):
 
     def test_executor_no_switch_when_already_on_tac_branch(self):
         # Pre-create the TAC branch and check it out
-        import io, logging
         subprocess.run(["git", "checkout", "-b", "tac_test123"], check=True)
         
         # Create dummy block with block_id = "test123"
         block = DummyProtoBlock()
-        config = {"git": {"enabled": True}}
-        executor = ProtoBlockExecutor(block, config=config, codebase={})
+        config_override = {
+            'git': {'enabled': True}
+        }
+        executor = ProtoBlockExecutor(block, config_override=config_override, codebase={})
         executor.run_tests = lambda test_path=None: True
         
         # Capture logs from the executor

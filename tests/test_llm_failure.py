@@ -1,13 +1,18 @@
 import pytest
-from src.tac.core.llm import LLMClient, Message, LLMConfig
+from src.tac.core.llm import LLMClient, Message
+from src.tac.core.config import LLMConfig, LLMSettings
 
 def dummy_failure(*args, **kwargs):
     raise Exception("Simulated API failure")
 
 def test_llm_failure(monkeypatch):
     # Setup a dummy config and instantiate the LLM client
-    config = LLMConfig(provider="openai", model="o1-mini", settings={"timeout": 120})
-    client = LLMClient(config=config)
+    config_override = {
+        "provider": "openai",
+        "model": "o1-mini",
+        "settings": LLMSettings(timeout=120)
+    }
+    client = LLMClient(config_override=config_override)
     
     # Monkey-patch the chat completions create method to simulate failure
     monkeypatch.setattr(client.client.chat.completions, "create", dummy_failure)
