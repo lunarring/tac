@@ -164,3 +164,35 @@ class TestRunner:
     def get_test_functions(self) -> list:
         """Get the list of collected test function names, extracting function names after '::' if present"""
         return [s.split("::")[-1].strip() if "::" in s else s for s in self.test_functions]
+
+    def collect_all_tests(self, tests_dir: str = "tests") -> list:
+        """Recursively scan the specified tests directory to collect all test function names"""
+        test_names = []
+        for root, dirs, files in os.walk(tests_dir):
+            for file in files:
+                if file.endswith(".py") and (file.startswith("test_") or file.endswith("_test.py")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            content = f.read()
+                            test_names.extend(re.findall(r"def (test_[a-zA-Z0-9_]+)\(", content))
+                    except Exception as e:
+                        logger.error(f"Failed to read file {filepath}: {e}")
+        return test_names
+
+    def get_modified_tests(self, baseline: float, tests_dir: str = "tests") -> list:
+        """Determine which test functions have been modified since the given baseline timestamp"""
+        modified_tests = []
+        for root, dirs, files in os.walk(tests_dir):
+            for file in files:
+                if file.endswith(".py") and (file.startswith("test_") or file.endswith("_test.py")):
+                    filepath = os.path.join(root, file)
+                    try:
+                        mtime = os.path.getmtime(filepath)
+                        if mtime > baseline:
+                            with open(filepath, "r", encoding="utf-8") as f:
+                                content = f.read()
+                                modified_tests.extend(re.findall(r"def (test_[a-zA-Z0-9_]+)\(", content))
+                    except Exception as e:
+                        logger.error(f"Failed to process file {filepath}: {e}")
+        return modified_tests
