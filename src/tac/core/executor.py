@@ -222,11 +222,7 @@ class ProtoBlockExecutor:
                         logger.error("="*50)
                     
                     if attempt < max_retries - 1:
-                        logger.debug("Software test result: NO SUCCESS!")
                         continue
-                    else:
-                        logger.debug("Software test result: SUCCESS!") 
-                        return False
                 
                 # Run tests and get results first
                 test_success = self.run_tests()
@@ -249,10 +245,15 @@ class ProtoBlockExecutor:
                 if not test_success:
                     logger.debug("Software test result: NO SUCCESS!")
                     if attempt < max_retries - 1:
+                                            # Get analysis before writing log
+                        analysis = self.error_analyzer.analyze_failure(
+                            self.protoblock, 
+                            test_results,
+                            self.codebase
+                        )
                         continue
                     else:
                         logger.debug("Software test result: SUCCESS!")
-                        return False
 
                 # Only perform plausibility check if enabled in config
                 plausibility_check_enabled = config.general.plausibility_test
