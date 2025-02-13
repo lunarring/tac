@@ -38,6 +38,7 @@ class ProtoBlockExecutor:
         agent_config = config.raw_config.copy()
         if config_override:
             agent_config.update(config_override)
+        config.override_with_dict(config_override)
             
         # Create agent directly
         self.agent = AiderAgent(agent_config)

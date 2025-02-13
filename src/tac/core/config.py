@@ -200,6 +200,42 @@ class ConfigManager:
         if self._logger:
             self._logger.debug(f"Final general config after override: {vars(self._config.general)}")
 
+    def override_with_dict(self, config_dict: Dict[str, Dict[str, Any]]) -> None:
+        """Override configuration values with a nested dictionary.
+        
+        The dictionary should have top-level keys matching config sections
+        (general, git, aider, etc.) with nested dictionaries of settings.
+        
+        Example:
+            {
+                'general': {'plausibility_test': False},
+                'git': {'auto_commit_if_success': False}
+            }
+        """
+        self._setup_logger()
+
+        if self._logger:
+            self._logger.debug(f"Overriding config with dict: {config_dict}")
+
+        for section, settings in config_dict.items():
+            if hasattr(self._config, section):
+                section_config = getattr(self._config, section)
+                for key, value in settings.items():
+                    if hasattr(section_config, key):
+                        setattr(section_config, key, value)
+                        if self._logger:
+                            self._logger.debug(
+                                f"Set {section} config {key}={value}"
+                            )
+                    else:
+                        if self._logger:
+                            self._logger.warning(
+                                f"Unknown config key '{key}' in section '{section}'"
+                            )
+            else:
+                if self._logger:
+                    self._logger.warning(f"Unknown config section: {section}")
+
 
 # Global instance
 config = ConfigManager() 
