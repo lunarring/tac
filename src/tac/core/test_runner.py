@@ -50,7 +50,7 @@ class TestRunner:
         Args:
             test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
         Returns:
-            bool: True if tests ran successfully (even if some failed), False if there was an execution error
+            bool: True only if all tests passed successfully, False if there were any failures or execution errors
         """
         try:
             test_target = test_path or 'tests'
@@ -87,11 +87,18 @@ class TestRunner:
             summary = self._generate_summary(self._test_stats, exit_code)
             self.test_results += summary
             
-            # Only set execution error for serious issues (not just test failures)
-            self.had_execution_error = exit_code not in [0, 1, 5]
+            # Determine test success:
+            # - exit_code 0: all tests passed
+            # - exit_code 5: no tests found (considered ok)
+            # - failed_tests == 0: no test failures
+            execution_ok = exit_code in [0, 5]
+            no_test_failures = self._test_stats['failed'] == 0
+            test_success = execution_ok and no_test_failures
             
-            # Return True even if tests failed, only return False for execution errors
-            return not self.had_execution_error
+            # Update execution error state for other parts of the system
+            self.had_execution_error = not execution_ok
+            
+            return test_success
             
         except Exception as e:
             error_msg = f"Error running tests: {type(e).__name__}: {str(e)}"
