@@ -74,7 +74,9 @@ stick exactly to the following output_format, filling in between <>
     }},
     "write_files": [<>"],
     "context_files": ["<>"],
-    "commit_message": "<>"
+    "commit_message": "<>",
+    "branch_name": "<>"
+    
 }}
 </output_format_explained>
 
