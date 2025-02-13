@@ -95,8 +95,23 @@ PLAUSIBILITY SCORE RATING:
             
             logger.info("Successfully received LLM response")
             logger.debug(f"LLM response:\n{response}")
+
+            final_plausibility_score = ""
+            if "PLAUSIBILITY SCORE RATING:" in response:
+                score_section = response.split("PLAUSIBILITY SCORE RATING:")[1].strip()
+                # Extract just the letter grade, ignoring any additional text
+                for char in score_section:
+                    if char in "ABCDF":
+                        final_plausibility_score = char
+                        break
             
-            return response
+            # Strip any whitespace and ensure uppercase
+            final_plausibility_score = final_plausibility_score.strip().upper()
+
+            # A through D are considered passing grades
+            is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
+            
+            return is_plausible
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)
