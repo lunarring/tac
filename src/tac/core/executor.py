@@ -143,7 +143,7 @@ class ProtoBlockExecutor:
             # Handle git branch setup first if git is enabled
             if self.git_enabled:
                 current_git_branch = self.git_manager.get_current_branch() or ""
-                tac_branch = self.branch_name
+                tac_branch = self.protoblock.branch_name
                 
                 if current_git_branch.startswith("tac/"):
                     logger.info(f"Already on a TAC branch: {current_git_branch}. No branch switching necessary.")
