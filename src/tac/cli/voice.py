@@ -62,6 +62,7 @@ class VoiceUI:
                 time.sleep(0.1)
                 if self.task_instructions:
                     logger.debug(f"got task instructions: {self.task_instructions}")
+                    self.rtv.mute_mic()
                     return self.task_instructions
         except KeyboardInterrupt:
             logger.info("Received keyboard interrupt")
