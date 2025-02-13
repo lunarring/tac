@@ -226,7 +226,7 @@ class ProtoBlockExecutor:
                         continue
                 
                 # Run tests and get results first
-                test_success = self.run_tests()
+                test_success = self.run_tests(config.general.test_path)
                 test_results = self.test_runner.get_test_results()
                 
                 # Extract test statistics
@@ -308,12 +308,13 @@ class ProtoBlockExecutor:
         """
         Runs the tests using pytest framework.
         Args:
-            test_path: Optional path to test file or directory. If None, runs all tests/test*.py files
+            test_path: Path to test file or directory. Defaults to config.general.test_path
         """
         try:
+            test_path = test_path or config.general.test_path
             logger.info("Test Execution Details:")
             logger.info("="*50)
-            logger.info(f"Test path: {test_path or 'tests/'}")
+            logger.info(f"Test path: {test_path}")
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
             logger.info("="*50)

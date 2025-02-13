@@ -22,6 +22,7 @@ class GeneralConfig:
     max_retries_protoblock_creation: int = 4
     total_timeout: int = 600
     halt_after_fail: bool = False
+    test_path: str = "tests/"  # Add default test path
 
 
 @dataclass
