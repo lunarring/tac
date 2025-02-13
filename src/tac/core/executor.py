@@ -277,7 +277,10 @@ class ProtoBlockExecutor:
                         logger.debug("Plausibility check passed")
                         execution_success = True
                         break
-                    
+                else:
+                    logger.debug("Plausibility check disabled")
+                    execution_success = True
+                    break
                 if attempt < max_retries - 1:
                     continue
             
