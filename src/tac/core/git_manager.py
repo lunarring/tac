@@ -174,7 +174,19 @@ class GitManager:
             logger.info(f"Successfully committed changes. Commit message: {commit_message}")
             current_branch = self.get_current_branch()
             base_branch = self.base_branch if self.base_branch else "main"
-            logger.info(f"Changes committed to branch '{current_branch}'. To merge these changes, run: git checkout {base_branch} && git merge {current_branch}")
+            
+            # Push changes if configured
+            if config.get('git', {}).get('auto_push_if_success', False):
+                try:
+                    self.repo.git.push('origin', current_branch)
+                    logger.info(f"Successfully pushed changes to origin/{current_branch}")
+                except git.exc.GitCommandError as e:
+                    logger.error(f"Failed to push changes: {e}")
+                    # Continue execution even if push fails
+            
+            github_url = self.get_github_web_url()
+            pr_url = f"{github_url}/pull/new/{current_branch}" if github_url else "https://github.com/<owner>/<repo>/pull/new/{current_branch}"
+            logger.info(f"Changes committed to branch '{current_branch}'. \nTo merge these changes from the terminal, run: \ngit switch {base_branch} && git merge {current_branch}\n\nTo merge these changes from github UI, go to {pr_url}")
             return True
         except Exception as e:
             logger.error(f"Error during git operations: {e}")
@@ -228,5 +240,22 @@ class GitManager:
         except git.exc.GitCommandError as e:
             logger.error(f"Failed to create or switch to TAC branch {tac_id}: {e}")
             return False
+
+    def get_github_web_url(self) -> str:
+        """Get the GitHub web URL for the repository"""
+        try:
+            remote_url = self.repo.remotes.origin.url
+            # Handle SSH or HTTPS URLs
+            if remote_url.startswith('git@github.com:'):
+                # Convert SSH URL to HTTPS format
+                repo_path = remote_url.split('git@github.com:')[1].rstrip('.git')
+            elif remote_url.startswith('https://github.com/'):
+                repo_path = remote_url.split('https://github.com/')[1].rstrip('.git')
+            else:
+                return None
+            return f"https://github.com/{repo_path}"
+        except Exception as e:
+            logger.error(f"Error getting GitHub URL: {e}")
+            return None
 
   

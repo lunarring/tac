@@ -9,6 +9,7 @@ import logging
 class GitConfig:
     enabled: bool = True
     auto_commit_if_success: bool = True
+    auto_push_if_success: bool = True
 
 
 @dataclass
