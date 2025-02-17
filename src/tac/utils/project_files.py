@@ -51,7 +51,7 @@ class ProjectFiles:
             Dict containing stats about the update
         """
         if exclusions is None:
-            exclusions = [".git", "__pycache__", "venv", "env"]
+            exclusions = [".git", "__pycache__", "venv", "env", "build"]
             
         # Load existing data
         data = self._load_existing_summaries()
