@@ -18,7 +18,7 @@ def gather_python_files(directory, formatting_options=None, exclusions=None, exc
     if formatting_options is None:
         formatting_options = {"header": "## File: ", "separator": "\n---\n", "use_code_fences": True}
     if exclusions is None:
-        exclusions = [".git", "__pycache__"]
+        exclusions = [".git", "__pycache__", "build"]
 
     # Size thresholds in bytes (100KB total, showing 40KB from start and end)
     MAX_FILE_SIZE = 100 * 1024  
