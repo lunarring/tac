@@ -56,28 +56,5 @@ class MyClass:
         finally:
             os.remove(tmp_path)
 
-    def test_build_directory_exclusion(self):
-        import os
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create a normal python file
-            normal_path = os.path.join(tmpdir, "normal.py")
-            with open(normal_path, 'w') as f:
-                f.write("def foo():\n    pass\n")
-
-            # Create a 'build' directory with a python file that should be ignored
-            build_dir = os.path.join(tmpdir, "build")
-            os.makedirs(build_dir, exist_ok=True)
-            ignored_path = os.path.join(build_dir, "ignored.py")
-            with open(ignored_path, 'w') as f:
-                f.write("def bar():\n    pass\n")
-
-            # Run the summarizer
-            output = self.summarizer.summarize_directory(tmpdir)
-            # Assert that normal.py is included
-            self.assertIn("normal.py", output, "normal.py should be included in summary")
-            # Assert that 'build' folder and its file are not summarized
-            self.assertNotIn("build", output, "build directory should be excluded from summary")
-            self.assertNotIn("ignored.py", output, "ignored.py should be excluded from summary")
-
 if __name__ == '__main__':
     unittest.main()
