@@ -83,7 +83,7 @@ Previously, you have been trying to implement this but failed, here are some hin
         test_files = list(set(f for f in os.listdir('tests') 
                      if f.startswith('test_') and f.endswith('.py')))
         
-        logger.debug("Found test files: %s", test_files)
+        # logger.debug("Found test files: %s", test_files)
         
         command = [
             'aider',
@@ -106,7 +106,7 @@ Previously, you have been trying to implement this but failed, here are some hin
 
         command.extend(['--message', prompt])
         
-        logger.info("Final Aider command: %s", ' '.join(command))
+        logger.debug("Final Aider command: %s", ' '.join(command))
         
         try:
             # Set timeout values
@@ -147,12 +147,12 @@ Previously, you have been trying to implement this but failed, here are some hin
                     remaining_stdout, remaining_stderr = process.communicate()
                     if remaining_stdout:
                         logger.debug(f"FINAL STDOUT: {remaining_stdout}")
-                        sys.stdout.write(remaining_stdout)
-                        sys.stdout.flush()
+                        # sys.stdout.write(remaining_stdout)
+                        # sys.stdout.flush()
                     if remaining_stderr:
                         logger.error(f"FINAL STDERR: {remaining_stderr}")
-                        sys.stdout.write(remaining_stderr)
-                        sys.stdout.flush()
+                        # sys.stdout.write(remaining_stderr)
+                        # sys.stdout.flush()
                     break
                 
                 # Read from any ready pipes
