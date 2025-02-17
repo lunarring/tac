@@ -6,6 +6,7 @@ from tac.utils.file_gatherer import gather_python_files
 from tac.protoblock import ProtoBlock
 import select
 import time
+import sys
 
 logger = setup_logging('tac.agents.aider_agent')
 
@@ -146,8 +147,12 @@ Previously, you have been trying to implement this but failed, here are some hin
                     remaining_stdout, remaining_stderr = process.communicate()
                     if remaining_stdout:
                         logger.debug(f"FINAL STDOUT: {remaining_stdout}")
+                        sys.stdout.write(remaining_stdout)
+                        sys.stdout.flush()
                     if remaining_stderr:
                         logger.error(f"FINAL STDERR: {remaining_stderr}")
+                        sys.stdout.write(remaining_stderr)
+                        sys.stdout.flush()
                     break
                 
                 # Read from any ready pipes
@@ -159,6 +164,8 @@ Previously, you have been trying to implement this but failed, here are some hin
                             logger.debug(f"STDOUT: {line.strip()}")
                         else:
                             logger.error(f"STDERR: {line.strip()}")
+                        sys.stdout.write(line)
+                        sys.stdout.flush()
             
             if process.returncode != 0:
                 logger.error(f"Aider command that failed: {' '.join(command)}")
