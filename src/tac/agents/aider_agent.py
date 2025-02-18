@@ -77,8 +77,6 @@ Previously, you have been trying to implement this but failed, here are some hin
 {previous_analysis}
             """
 
-        logger.debug("Execution prompt for Aider:\n%s", prompt)
-        
         # Find all test files in the tests directory and deduplicate
         test_files = list(set(f for f in os.listdir('tests') 
                      if f.startswith('test_') and f.endswith('.py')))
