@@ -96,5 +96,28 @@ class TestGitManager(unittest.TestCase):
         active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
         self.assertEqual(active_branch, tac_id, msg="Current branch should remain same when already on a TAC branch")
         
+    def test_gitignore_missing_appended(self):
+        # Create .gitignore without '.tac_*' pattern
+        gitignore_path = os.path.join(self.repo_path, ".gitignore")
+        with open(gitignore_path, "w", encoding="utf-8") as f:
+            f.write("# Ignore logs\n*.log\n")
+        # Instantiate GitManager to trigger the gitignore check
+        gm = GitManager(repo_path=self.repo_path)
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn(".tac_*", content, msg="'.tac_*' should be appended to .gitignore when missing.")
+
+    def test_gitignore_already_present(self):
+        # Create .gitignore with '.tac_*' pattern already present
+        gitignore_path = os.path.join(self.repo_path, ".gitignore")
+        initial_content = "# Ignore logs\n.tac_*\n"
+        with open(gitignore_path, "w", encoding="utf-8") as f:
+            f.write(initial_content)
+        # Instantiate GitManager which should not modify .gitignore
+        gm = GitManager(repo_path=self.repo_path)
+        with open(gitignore_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertEqual(initial_content, content, msg="'.gitignore' should remain unchanged when '.tac_*' is already present.")
+
 if __name__ == "__main__":
     unittest.main()
