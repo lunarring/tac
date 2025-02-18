@@ -12,6 +12,7 @@ class GitManager:
             self.repo = git.Repo(repo_path)
             self.base_branch = self.get_current_branch()
             logger.debug(f"Git repository initialized successfully at {repo_path} with base branch {self.base_branch}.")
+            self.ensure_gitignore_includes_tac()
         except git.exc.InvalidGitRepositoryError:
             logger.error("Not a git repository. Please initialize git first.")
             self.repo = None
@@ -257,5 +258,26 @@ class GitManager:
         except Exception as e:
             logger.error(f"Error getting GitHub URL: {e}")
             return None
+
+    def ensure_gitignore_includes_tac(self):
+        """Ensure that the .gitignore file in the repository's working directory includes the '.tac_*' exclusion pattern.
+        If the pattern is missing, append it automatically and log a warning."""
+        if not self.repo or not self.repo.working_dir:
+            return
+        gitignore_path = os.path.join(self.repo.working_dir, ".gitignore")
+        pattern = ".tac_*"
+        try:
+            if os.path.exists(gitignore_path):
+                with open(gitignore_path, "r+", encoding="utf-8") as f:
+                    contents = f.read()
+                    if pattern not in contents:
+                        f.write("\n" + pattern + "\n")
+                        logger.warning(f"'.gitignore' was missing '{pattern}' exclusion. The pattern has been automatically appended.")
+            else:
+                with open(gitignore_path, "w", encoding="utf-8") as f:
+                    f.write(pattern + "\n")
+                logger.warning(f"'.gitignore' file did not exist. Created new file with '{pattern}' exclusion.")
+        except Exception as e:
+            logger.error(f"Error ensuring gitignore includes '{pattern}': {e}")
 
   
