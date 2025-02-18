@@ -261,11 +261,12 @@ class GitManager:
 
     def ensure_gitignore_includes_tac(self):
         """Ensure that the .gitignore file in the repository's working directory includes the '.tac_*' exclusion pattern.
-        If the pattern is missing, append it automatically and log a warning."""
+        If the pattern is missing, append it automatically and log a warning. Also commit the update if made."""
         if not self.repo or not self.repo.working_dir:
             return
         gitignore_path = os.path.join(self.repo.working_dir, ".gitignore")
         pattern = ".tac_*"
+        commit_required = False
         try:
             if os.path.exists(gitignore_path):
                 with open(gitignore_path, "r+", encoding="utf-8") as f:
@@ -273,10 +274,19 @@ class GitManager:
                     if pattern not in contents:
                         f.write("\n" + pattern + "\n")
                         logger.warning(f"'.gitignore' was missing '{pattern}' exclusion. The pattern has been automatically appended.")
+                        commit_required = True
             else:
                 with open(gitignore_path, "w", encoding="utf-8") as f:
                     f.write(pattern + "\n")
                 logger.warning(f"'.gitignore' file did not exist. Created new file with '{pattern}' exclusion.")
+                commit_required = True
+            if commit_required:
+                try:
+                    self.repo.git.add(".gitignore")
+                    self.repo.git.commit("-m", "Update .gitignore to include '.tac_*' exclusion")
+                    logger.info("Committed updated .gitignore")
+                except Exception as commit_err:
+                    logger.error(f"Failed to commit .gitignore update: {commit_err}")
         except Exception as e:
             logger.error(f"Error ensuring gitignore includes '{pattern}': {e}")
 

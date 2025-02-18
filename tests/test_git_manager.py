@@ -106,6 +106,8 @@ class TestGitManager(unittest.TestCase):
         with open(gitignore_path, "r", encoding="utf-8") as f:
             content = f.read()
         self.assertIn(".tac_*", content, msg="'.tac_*' should be appended to .gitignore when missing.")
+        status_commit = subprocess.run(["git", "log", "--pretty=format:%s"], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, encoding="utf-8").stdout
+        self.assertIn("Update .gitignore to include '.tac_*' exclusion", status_commit, msg="Commit for updating .gitignore should be present.")
 
     def test_gitignore_already_present(self):
         # Create .gitignore with '.tac_*' pattern already present
