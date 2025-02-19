@@ -48,9 +48,12 @@ class BlockRunner:
         else:
             # Create protoblock using factory
             factory = ProtoBlockFactory()
-            logger.info(f"\n🔄 Generating protoblock from task instructions: {self.task_instructions}")
-            
-            genesis_prompt = self.task_instructions
+            if error_analysis:
+                logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {self.task_instructions}")
+                genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! {error_analysis}"
+            else:
+                logger.info(f"\n🔄 Generating protoblock from task instructions: {self.task_instructions}")
+                genesis_prompt = self.task_instructions
 
             # Generate complete genesis prompt
             protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
