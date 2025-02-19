@@ -22,7 +22,7 @@ class GeneralConfig:
     max_retries_protoblock_creation: int = 4
     total_timeout: int = 600
     halt_after_fail: bool = False
-    ignore_paths: List[str] = field(default_factory=lambda: ['ignored_dir'])
+    ignore_paths: List[str] = field(default_factory=lambda: [".git", "__pycache__", "build"])
     test_path: str = "tests/"  # Add default test path
 
 
