@@ -70,7 +70,6 @@ Important Guidelines:
             'aider',
             '--yes-always',
             '--no-git',
-            '--stream',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
