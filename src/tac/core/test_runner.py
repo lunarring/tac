@@ -7,6 +7,7 @@ from _pytest.reports import TestReport
 from _pytest.terminal import TerminalReporter
 import sys
 import re
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,8 @@ class TestRunner:
         try:
             test_target = test_path or 'tests'
             full_path = test_target
+            if os.path.exists('.pytest_cache'):
+                shutil.rmtree('.pytest_cache')
 
             if not os.path.exists(full_path):
                 error_msg = f"Error: Test path not found: {full_path}"
@@ -196,3 +199,21 @@ class TestRunner:
                     except Exception as e:
                         logger.error(f"Failed to process file {filepath}: {e}")
         return modified_tests
+
+def test_pytest_cache_cleanup(tmp_path, monkeypatch):
+    work_dir = tmp_path / "work_dir"
+    work_dir.mkdir()
+    cache_dir = work_dir / ".pytest_cache"
+    cache_dir.mkdir()
+    (cache_dir / "dummy.txt").write_text("dummy")
+
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    (test_dir / "test_dummy.py").write_text("def test_dummy():\n    pass\n")
+
+    monkeypatch.setattr(os, "getcwd", lambda: str(work_dir))
+
+    from src.tac.core.test_runner import TestRunner
+    tr = TestRunner()
+    tr.run_tests(test_path=str(test_dir))
+    assert not cache_dir.exists()
