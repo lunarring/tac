@@ -111,7 +111,7 @@ PLAUSIBILITY SCORE RATING:
             # A through D are considered passing grades
             is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
             
-            return is_plausible, final_plausibility_score
+            return is_plausible, final_plausibility_score, response
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)

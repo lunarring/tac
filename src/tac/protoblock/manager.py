@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 import hashlib
 import time
-
+from tac.protoblock import ProtoBlock
 def validate_protoblock_json(json_content: Union[str, Dict]) -> tuple[bool, str]:
     """
     Validates a protoblock JSON content against the expected structure.
@@ -129,3 +129,33 @@ def save_protoblock(json_content: Union[str, Dict], template_type: str, unique_i
             json.dump(json_content, f, indent=2)
     
     return filename, unique_id 
+
+def load_protoblock_from_json(json_path: str) -> ProtoBlock:
+    """Load protoblock definition from a JSON file"""
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    
+    # Handle new versioned format
+    if isinstance(data, dict) and 'versions' in data:
+        # Get the latest version
+        version_data = data['versions'][-1]
+        block_id = data['block_id']  # Get ID from versioned format
+    else:
+        # Handle legacy format
+        version_data = data
+        # Extract block ID from filename as fallback
+        filename = os.path.basename(json_path)
+        block_id = filename.replace('.tac_protoblock_', '').replace('.json', '')
+    
+    task_data = version_data['task']
+    test_data = version_data['test']
+    
+    return ProtoBlock(
+        task_description=task_data['specification'],
+        test_specification=test_data['specification'],
+        test_data_generation=test_data['data'],
+        write_files=version_data['write_files'],
+        context_files=version_data.get('context_files', []),
+        block_id=block_id,
+        commit_message=version_data.get('commit_message')
+    )
