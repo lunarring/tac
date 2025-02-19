@@ -497,13 +497,7 @@ def main():
                 if voice_ui is not None:
                     voice_ui.inject_message("Say that the protoblock has been successfully created, now we are launching the programming agents")
 
-            print("\nProtoblock details:")
-            print(f"🎯 Task: {protoblock.task_description}")
-            print(f"🧪 Test Specification: {protoblock.test_specification}")
-            print(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
-            print(f"📚 Context Files: {', '.join(protoblock.context_files)}")
-            print(f"💬 Commit Message: {protoblock.commit_message}\n")
-            print("🚀 Starting protoblock execution...\n")
+
             
             # Create executor and run with codebase
             executor = ProtoBlockExecutor(

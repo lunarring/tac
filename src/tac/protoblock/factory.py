@@ -283,16 +283,24 @@ stick exactly to the following output_format, filling in between <>
                 
                 # Create ProtoBlock directly
                 try:
-                    return ProtoBlock(
+                    protoblock = ProtoBlock(
                         task_description=data["task"]["specification"],
                         test_specification=data["test"]["specification"],
                         test_data_generation=data["test"]["data"],
                         write_files=data["write_files"],
                         context_files=data.get("context_files", []),
                         block_id=str(uuid.uuid4())[:6],
-                        commit_message=f"TAC: {data.get('commit_message', 'Update')}",
+                        commit_message=f"tac: {data.get('commit_message', 'Update')}",
                         branch_name=data.get("branch_name")
                     )
+                    logger.info("\nProtoblock details:")
+                    logger.info(f"🎯 Task: {protoblock.task_description}")
+                    logger.info(f"🧪 Test Specification: {protoblock.test_specification}")
+                    logger.info(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
+                    logger.info(f"📚 Context Files: {', '.join(protoblock.context_files)}")
+                    logger.info(f"💬 Commit Message: {protoblock.commit_message}\n")
+                    logger.info("🚀 Starting protoblock execution...\n")
+                    return protoblock
                 except KeyError as e:
                     raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
                     
