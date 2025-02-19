@@ -118,6 +118,9 @@ class FileSummarizer:
         for root, dirs, files in os.walk(directory):
             # Exclude specified directories and optionally dot directories
             dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
+            rel_root = os.path.relpath(root, directory)
+            if rel_root != '.' and any(part in config.general.ignore_paths for part in rel_root.split(os.sep)):
+                continue
 
             # Build directory tree if not for protoblock
             if not for_protoblock:

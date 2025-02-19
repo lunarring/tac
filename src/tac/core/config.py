@@ -1,6 +1,6 @@
 from pathlib import Path
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from dataclasses import dataclass, field
 import logging
 
@@ -22,6 +22,7 @@ class GeneralConfig:
     max_retries_protoblock_creation: int = 4
     total_timeout: int = 600
     halt_after_fail: bool = False
+    ignore_paths: List[str] = field(default_factory=lambda: ['ignored_dir'])
     test_path: str = "tests/"  # Add default test path
 
 
