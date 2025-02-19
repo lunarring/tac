@@ -39,27 +39,19 @@ class AiderAgent(Agent):
             logger.warning("context_files is a string, converting to list")
             context_files = [context_files]
             
-        logger.debug("DEBUG - File Path Analysis:")
-        logger.debug(f"write_files type: {type(write_files)}")
-        logger.debug(f"write_files content: {write_files}")
-        logger.debug(f"context_files type: {type(context_files)}")
-        logger.debug(f"context_files content: {context_files}")
         
         # Ensure we have valid file paths
         write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
         context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
+        # Remove any context files that are already in context_files from write_files
+        context_files = [f for f in context_files if f not in context_files]
         
-        logger.debug("DEBUG - After cleaning:")
-        logger.debug(f"Cleaned write_files: {write_files}")
-        logger.debug(f"Cleaned context_files: {context_files}")
+        logger.debug("DEBUG - File Path Analysis:")
+        logger.debug(f"write_files content: {write_files}")
+        logger.debug(f"context_files content: {context_files}")
         
-        logger.debug("Files to be written: %s", write_files)
-        logger.debug("Context files to be read: %s", context_files)
-
         prompt = f"""Implement both the functionality AND its tests simultaneously according to these specifications:
-
 Task Description: {task_description}
-
 Test Requirements:
 - Test Specification: {test_specification}
 - Test Data Requirements: {test_data_generation}
@@ -70,23 +62,15 @@ Important Guidelines:
 - Avoid timeouts in tests
 - When dealing with longer-running processes, ensure clear exit conditions
 - Tests should be deterministic and reliable"""
-        
         if previous_analysis:
-            prompt +=f"""
-Previously, you have been trying to implement this but failed, here are some hints what went wrong::
-{previous_analysis}
-            """
-
-        # Find all test files in the tests directory and deduplicate
-        test_files = list(set(f for f in os.listdir('tests') 
-                     if f.startswith('test_') and f.endswith('.py')))
-        
-        # logger.debug("Found test files: %s", test_files)
+            prompt +=f"""Previously, you have been trying to implement this but failed, here are some hints what went wrong. Take this into consideration for the next implementation and do not repeat the same mistakes.
+{previous_analysis}"""
         
         command = [
             'aider',
             '--yes-always',
             '--no-git',
+            '--stream',
             '--model', self.agent_config.get('model'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
