@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, List, Optional
 from tac.utils.file_summarizer import FileSummarizer
+from tac.core.config import config
 import logging
 from tqdm import tqdm
 
@@ -62,8 +63,8 @@ class ProjectFiles:
         # First pass: collect all Python files
         all_files = []
         for root, dirs, files in os.walk(self.project_root):
-            # Filter directories
-            dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
+            # Filter directories: exclude specified, dot-files, and ignore_paths from config
+            dirs[:] = [d for d in dirs if d not in exclusions and d not in config.general.ignore_paths and not (exclude_dot_files and d.startswith('.'))]
             
             for file in files:
                 if (file.endswith('.py') and 
