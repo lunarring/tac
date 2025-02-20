@@ -29,6 +29,7 @@ class GeneralConfig:
 @dataclass
 class AiderConfig:
     model: str = "openai/o3-mini"
+    reasoning_effort: str = "high"
     model_settings: Dict[str, Any] = field(default_factory=lambda: {
         "edit_format": "diff",
         "verify_ssl": True,

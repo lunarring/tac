@@ -3,11 +3,19 @@ import os
 import subprocess
 from typing import Optional, Tuple
 from tac.core.log_config import setup_logging
+from tac.core.config import config
 
 logger = setup_logging('tac.core.git_manager')
 
 class GitManager:
     def __init__(self, repo_path: str = '.'):
+        # Check if git is enabled in config
+        if not config.git.enabled:
+            logger.info("Git operations are disabled in config.")
+            self.repo = None
+            self.base_branch = None
+            return
+
         try:
             self.repo = git.Repo(repo_path)
             self.base_branch = self.get_current_branch()
@@ -16,12 +24,18 @@ class GitManager:
         except git.exc.InvalidGitRepositoryError:
             logger.error("Not a git repository. Please initialize git first.")
             self.repo = None
+            self.base_branch = None
         except git.exc.GitCommandError as e:
             logger.error(f"Error initializing git repository: {e}")
             self.repo = None
+            self.base_branch = None
 
     def get_current_branch(self) -> Optional[str]:
         """Get the name of the current branch using git rev-parse --abbrev-ref HEAD"""
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return None
+            
         if not self.repo or not self.repo.working_dir:
             return None
         try:
@@ -45,6 +59,10 @@ class GitManager:
         Returns:
             str: A formatted string containing all relevant diffs and file lists
         """
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return "Git operations are disabled"
+            
         if not self.repo:
             return "Git repository not available"
             
@@ -109,6 +127,10 @@ class GitManager:
         Returns:
             tuple: (success, current_branch)
         """
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return True, ""
+            
         if not self.repo:
             logger.debug("No repository to check status.")
             return False, ""
@@ -137,6 +159,10 @@ class GitManager:
 
     def handle_post_execution(self, config: dict, commit_message: str) -> bool:
         """Handle git operations after successful block execution"""
+        if not config.get('git', {}).get('enabled', True):
+            logger.debug("Git operations are disabled.")
+            return True
+            
         if not self.repo or not config.get('git', {}).get('auto_commit_if_success', False):
             logger.debug("Git operations not required based on configuration.")
             return True
@@ -199,6 +225,10 @@ class GitManager:
 
     def revert_changes(self) -> bool:
         """Stash all changes and delete untracked files after failed execution"""
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return True
+            
         if not self.repo:
             logger.debug("No repository to revert changes.")
             return False
@@ -220,6 +250,10 @@ class GitManager:
 
     def create_or_switch_to_tac_branch(self, tac_id: str) -> bool:
         """Create or switch to a TAC branch with the given tac_id, regardless of current branch state."""
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return True
+            
         if not self.repo:
             logger.error("No git repository available")
             return False
@@ -262,6 +296,10 @@ class GitManager:
     def ensure_gitignore_includes_tac(self):
         """Ensure that the .gitignore file in the repository's working directory includes the '.tac_*' exclusion pattern.
         If the pattern is missing, append it automatically and log a warning. Also commit the update if made."""
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return
+            
         if not self.repo or not self.repo.working_dir:
             return
         gitignore_path = os.path.join(self.repo.working_dir, ".gitignore")
