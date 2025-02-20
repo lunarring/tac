@@ -35,7 +35,6 @@ class NativeAgent(Agent):
         # Filter out any files that are already in write_files from context_files using sets
         context_files = list(set(f for f in protoblock.context_files if f not in write_files))
 
-        
         # Validate and clean file paths
         if isinstance(write_files, str):
             logger.warning("write_files is a string, converting to list")
@@ -44,10 +43,20 @@ class NativeAgent(Agent):
             logger.warning("context_files is a string, converting to list")
             context_files = [context_files]
             
-        
-        # Ensure we have valid file paths
+        # Ensure we have valid file paths and they exist
         write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
         context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
+
+        # Check file existence before proceeding
+        for file_path in write_files:
+            if not os.path.exists(file_path):
+                logger.error(f"Write file does not exist: {file_path}")
+                raise FileNotFoundError(f"Write file not found: {file_path}")
+
+        for file_path in context_files:
+            if not os.path.exists(file_path):
+                logger.error(f"Context file does not exist: {file_path}")
+                raise FileNotFoundError(f"Context file not found: {file_path}")
 
         # Read contents of write files and context files
         write_file_contents = {}
@@ -55,21 +64,29 @@ class NativeAgent(Agent):
 
         for file_path in write_files:
             try:
+                if not os.path.isfile(file_path):
+                    logger.error(f"Path exists but is not a file: {file_path}")
+                    raise ValueError(f"Path is not a file: {file_path}")
+                    
                 with open(file_path, 'r') as f:
                     write_file_contents[file_path] = f.read()
                 logger.debug(f"Successfully read write file: {file_path}")
-            except Exception as e:
+            except (IOError, OSError) as e:
                 logger.error(f"Error reading write file {file_path}: {str(e)}")
-                write_file_contents[file_path] = ""
+                raise
 
         for file_path in context_files:
             try:
+                if not os.path.isfile(file_path):
+                    logger.error(f"Path exists but is not a file: {file_path}")
+                    raise ValueError(f"Path is not a file: {file_path}")
+                    
                 with open(file_path, 'r') as f:
                     context_file_contents[file_path] = f.read()
                 logger.debug(f"Successfully read context file: {file_path}")
-            except Exception as e:
+            except (IOError, OSError) as e:
                 logger.error(f"Error reading context file {file_path}: {str(e)}")
-                context_file_contents[file_path] = ""
+                raise
 
         logger.debug(f"Read {len(write_file_contents)} write files and {len(context_file_contents)} context files")
         
