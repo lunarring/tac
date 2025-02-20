@@ -25,40 +25,10 @@ from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
+from tac.protoblock.manager import load_protoblock_from_json
+from tac.core.block_runner import BlockRunner
 
 logger = setup_logging('tac.cli.main')
-
-
-
-def load_protoblock_from_json(json_path: str) -> ProtoBlock:
-    """Load protoblock definition from a JSON file"""
-    with open(json_path, 'r') as f:
-        data = json.load(f)
-    
-    # Handle new versioned format
-    if isinstance(data, dict) and 'versions' in data:
-        # Get the latest version
-        version_data = data['versions'][-1]
-        block_id = data['block_id']  # Get ID from versioned format
-    else:
-        # Handle legacy format
-        version_data = data
-        # Extract block ID from filename as fallback
-        filename = os.path.basename(json_path)
-        block_id = filename.replace('.tac_protoblock_', '').replace('.json', '')
-    
-    task_data = version_data['task']
-    test_data = version_data['test']
-    
-    return ProtoBlock(
-        task_description=task_data['specification'],
-        test_specification=test_data['specification'],
-        test_data_generation=test_data['data'],
-        write_files=version_data['write_files'],
-        context_files=version_data.get('context_files', []),
-        block_id=block_id,
-        commit_message=version_data.get('commit_message')
-    )
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -468,44 +438,15 @@ def main():
 
             # Get codebase content
             codebase = gather_python_files(args.dir)
-
-            # Load protoblock from JSON file if provided, otherwise create a new block
-            if args.json: 
-                protoblock = load_protoblock_from_json(args.json)
-                print(f"\n✨ Loaded protoblock: {args.json}")
+            # Get task instructions directly from args.instructions or voice_instructions
+            if voice_ui is not None:
+                task_instructions = voice_ui.wait_until_prompt()
             else:
-                # Create protoblock using factory
-                factory = ProtoBlockFactory()
-                
-                # Get task instructions directly from args.instructions or voice_instructions
-                if voice_ui is not None:
-                    task_instructions = voice_ui.wait_until_prompt()
-                else:
-                    task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
-                
-                print(f"\n🔄 Generating protoblock from task instructions: {task_instructions}")
-                
-                # Generate complete genesis prompt
-                protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(codebase, task_instructions)
-                
-                # Create protoblock from genesis prompt
-                protoblock = factory.create_protoblock(protoblock_genesis_prompt)
-                
-                # Save protoblock to file
-                json_file = factory.save_protoblock(protoblock)
-                print(f"\n✨ Created new protoblock: {json_file}")
-                if voice_ui is not None:
-                    voice_ui.inject_message("Say that the protoblock has been successfully created, now we are launching the programming agents")
+                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
 
+            block_runner = BlockRunner(task_instructions, codebase, args.json)
 
-            
-            # Create executor and run with codebase
-            executor = ProtoBlockExecutor(
-                protoblock=protoblock, 
-                config_override=config_override,
-                codebase=codebase  # Pass codebase to executor
-            )
-            success = executor.execute_block()
+            success = block_runner.run_loop()
             
             if success:
                 print("\n✅ Task completed successfully!")

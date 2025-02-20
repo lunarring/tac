@@ -30,15 +30,15 @@ class ProtoBlockExecutor:
     Executes a ProtoBlock by managing the implementation process through an agent,
     running tests, and handling version control operations.
     """
-    def __init__(self, protoblock: ProtoBlock, config_override: dict = None, codebase: Dict[str, str] = None):
-        self.protoblock = protoblock
+    def __init__(self, config_override: dict = None, codebase: Dict[str, str] = None):
+        self.protoblock = None
         self.codebase = codebase  # Store codebase internally
         
         # Create agent with combined config
         agent_config = config.raw_config.copy()
         if config_override:
             agent_config.update(config_override)
-        config.override_with_dict(config_override)
+            config.override_with_dict(config_override)
             
         # Create agent directly
         self.agent = AiderAgent(agent_config)
@@ -46,7 +46,7 @@ class ProtoBlockExecutor:
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
         self.git_manager = GitManager() if self.git_enabled else None
-        self.protoblock_id = protoblock.block_id  # Set ID directly from protoblock
+        self.protoblock_id = None 
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
@@ -108,34 +108,145 @@ class ProtoBlockExecutor:
             logger.error("Failed to update log file")
             return None
 
-    def _check_nested_tests(self) -> bool:
-        """
-        Check if tests/tests directory exists, which indicates a potential problem
-        from a previous run.
+    # def _check_nested_tests(self) -> bool:
+    #     """
+    #     Check if tests/tests directory exists, which indicates a potential problem
+    #     from a previous run.
         
-        Returns:
-            bool: True if nested tests directory exists, False otherwise
-        """
-        nested_tests_dir = os.path.join('tests', 'tests')
-        if os.path.exists(nested_tests_dir):
-            logger.error("="*80)
-            logger.error("Found nested tests directory (tests/tests/)!")
-            logger.error("This usually indicates a problem from a previous run.")
-            logger.error("Please move any test files from tests/tests/ to tests/ and remove the nested directory.")
-            logger.error("="*80)
-            return True
-        return False
+    #     Returns:
+    #         bool: True if nested tests directory exists, False otherwise
+    #     """
+    #     nested_tests_dir = os.path.join('tests', 'tests')
+    #     if os.path.exists(nested_tests_dir):
+    #         logger.error("="*80)
+    #         logger.error("Found nested tests directory (tests/tests/)!")
+    #         logger.error("This usually indicates a problem from a previous run.")
+    #         logger.error("Please move any test files from tests/tests/ to tests/ and remove the nested directory.")
+    #         logger.error("="*80)
+    #         return True
+    #     return False
 
-    def execute_block(self) -> bool:
+    def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> bool:
+        """
+        Executes the block with a unified test-and-implement approach.
+        Returns:
+            bool: True if execution was successful, False otherwise
+        """
+        self.protoblock = protoblock
+        self.protoblock_id = protoblock.block_id
+        try:
+            execution_success = False
+            analysis = None
+            
+            try:
+                # Write log before task execution
+                self._write_log_file(idx_attempt + 1, None, "Starting task execution")
+                
+                # Pass the previous attempt's analysis to the agent
+                self.agent.run(self.protoblock, previous_analysis=analysis)
+                # Ensure no tests/tests/ directory exists
+                self._cleanup_nested_tests()
+                
+                # Write log after task execution
+                self._write_log_file(idx_attempt + 1, None, "Task execution completed")
+                
+            except Exception as e:
+                error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
+                logger.error(error_msg)
+                
+                # Get analysis before writing log
+                error_analysis = self.error_analyzer.analyze_failure(
+                    self.protoblock, 
+                    error_msg,
+                    self.codebase
+                )
+
+                execution_success = False
+                failure_type = "Exception during agent execution"
+                
+                # Write failure log with analysis
+                self._write_log_file(idx_attempt + 1, False, error_msg, error_analysis)
+                
+                return execution_success, failure_type, error_analysis
+
+            
+            # Run tests and get results first
+            test_success = self.run_tests()
+            test_results = self.test_runner.get_test_results()
+            
+            # Extract test statistics
+            test_stats = self.test_runner.get_test_stats()
+            total_tests = sum(test_stats.values()) if test_stats else 0
+            failed_tests = test_stats.get('failed', 0) if test_stats else 0
+            
+            # Log test results
+            if failed_tests > 0:
+                logger.warning(f"{failed_tests} out of {total_tests} tests failed")
+                logger.warning("This indicates potential issues but won't stop execution")
+            else:
+                logger.info(f"All {total_tests} tests passed successfully")
+
+            # Only consider it a failure if there was an execution error
+            # Test failures are warnings but don't stop execution
+            if not test_success:
+                failure_type = "Unit tests failed"
+                execution_success = False
+                logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
+                if idx_attempt < config.general.max_retries - 1:
+                    error_analysis = self.error_analyzer.analyze_failure(
+                        self.protoblock, 
+                        test_results,
+                        self.codebase
+                    )
+                    logger.debug(f"Error Analysis: {error_analysis}")
+                else:
+                    logger.debug("Software test result: FAILURE!")
+
+                return execution_success, failure_type, error_analysis
+
+            # Only perform plausibility check if enabled in config
+            plausibility_check_enabled = config.general.plausibility_test
+            logger.debug(f"Plausibility check enabled: {plausibility_check_enabled}")
+            if plausibility_check_enabled:
+                logger.info("Running plausibility check...")
+                # Get git diff for plausibility check
+                git_diff = self.git_manager.get_complete_diff()
+                plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, git_diff)
+                if not plausibility_check_success:
+                    failure_type = "Plausibility check failed"
+                    execution_success = False
+                    return execution_success, failure_type, error_analysis
+                
+                else:
+                    # If we got here, both tests and plausibility check (if enabled) passed
+                    logger.info(f"Plausibility check passed with score: {final_plausibility_score}")
+                    execution_success = True
+                    return execution_success, None, None
+            else:
+                logger.debug("Plausibility check disabled")
+                execution_success = True
+                return execution_success, None, None
+
+            
+        except KeyboardInterrupt:
+            logger.info("\nExecution interrupted by user")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error during block execution: {e}")
+            return False
+
+
+
+    def execute_block_loop(self) -> bool:
         """
         Executes the block with a unified test-and-implement approach.
         Returns:
             bool: True if execution was successful, False otherwise
         """
         try:
-            # Check for nested tests directory first
-            if self._check_nested_tests():
-                return False
+            # # Check for nested tests directory first
+            # if self._check_nested_tests():
+            #     return False
 
             # Get max_retries from centralized config
             max_retries = config.general.max_retries
