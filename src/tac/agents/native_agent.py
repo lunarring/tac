@@ -94,7 +94,7 @@ Context Files:
 Now the file that you need to modify is:
 {write_files_section}
 
-Make sure your implementation passes the tests! You ONLY return the FULL modified code, nothing else, no further explanation, just the code of {write_files} that I can directly execute!"""
+Make sure your implementation passes the tests! You ONLY return the FULL modified code, nothing else, no further explanation, just the code of {write_files} that I can directly execute! Remember, you are only implementing PYTHON CODE!"""
         
         logger.debug(f"Native Agent Prompt: {prompt}")
         
