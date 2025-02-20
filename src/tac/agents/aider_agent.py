@@ -71,6 +71,7 @@ Important Guidelines:
             '--yes-always',
             '--no-git',
             '--model', self.agent_config.get('model'),
+            '--reasoning-effort', self.agent_config.get('reasoning_effort', 'high'),
             '--input-history-file', '/dev/null',
             '--chat-history-file', '/dev/null',
             '--llm-history-file', '/dev/null',
