@@ -38,17 +38,17 @@ class BlockRunner:
         self.task_instructions = task_instructions
         self.codebase = codebase
         self.json_file = json_file
-        self.git_manager = GitManager()
         self.protoblock = None
         self.previous_protoblock = None
         self.executor = ProtoBlockExecutor(config_override=config_override, codebase=codebase)
+        self.git_manager = GitManager()
 
 
     def generate_protoblock(self, idx_attempt, error_analysis):
         if self.json_file: 
             # in case the protoblock is fixed, we load it from the json file every time
-            protoblock = load_protoblock_from_json(json_file)
-            logger.info(f"\n✨ Loaded protoblock: {json_file}")
+            protoblock = load_protoblock_from_json(self.json_file)
+            logger.info(f"\n✨ Loaded protoblock: {self.json_file}")
         else:
             # Create protoblock using factory
             factory = ProtoBlockFactory()
