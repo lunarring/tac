@@ -44,7 +44,7 @@ class AiderAgent(Agent):
         write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
         context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
         # Remove any context files that are already in context_files from write_files
-        context_files = [f for f in context_files if f not in context_files]
+        # context_files = [f for f in context_files if f not in context_files]
         
         logger.debug("DEBUG - File Path Analysis:")
         logger.debug(f"write_files content: {write_files}")
