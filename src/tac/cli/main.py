@@ -420,9 +420,6 @@ def main():
                     print("2. Disable plausibility test using one of these methods:")
                     print("   - Use --plausibility-test false via CLI")
                     sys.exit(1)
-                
-            if config.general.type != 'aider':
-                raise ValueError(f"Unknown agent type: {config.general.type}")
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")

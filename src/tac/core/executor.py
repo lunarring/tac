@@ -10,6 +10,7 @@ from _pytest.capture import CaptureManager
 from tac.protoblock import ProtoBlock, ProtoBlockFactory
 from tac.agents.base import Agent
 from tac.agents.aider_agent import AiderAgent
+from tac.agents.native_agent import NativeAgent
 from tac.core.git_manager import GitManager
 from tac.core.test_runner import TestRunner
 import git
@@ -41,7 +42,12 @@ class ProtoBlockExecutor:
             config.override_with_dict(config_override)
             
         # Create agent directly
-        self.agent = AiderAgent(agent_config)
+        if config.general.type == "aider":
+            self.agent = AiderAgent(agent_config)
+        elif config.general.type == "native":
+            self.agent = NativeAgent(agent_config)
+        else:
+            raise ValueError(f"Invalid agent type: {config.general.type}")
         self.test_runner = TestRunner()
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
