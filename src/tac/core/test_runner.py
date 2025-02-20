@@ -59,6 +59,8 @@ class TestRunner:
             if os.path.exists('.pytest_cache'):
                 shutil.rmtree('.pytest_cache')
                 logger.debug("Removed pytest cache")
+            else:
+                logger.debug("Did not remove any pytest cache")
 
             if not os.path.exists(full_path):
                 error_msg = f"Error: Test path not found: {full_path}"
