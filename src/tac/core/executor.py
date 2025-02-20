@@ -191,7 +191,9 @@ class ProtoBlockExecutor:
             if not test_success:
                 failure_type = "Unit tests failed"
                 execution_success = False
+                error_analysis = "None"
                 logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
+
                 if idx_attempt < config.general.max_retries - 1:
                     error_analysis = self.error_analyzer.analyze_failure(
                         self.protoblock, 
