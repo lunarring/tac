@@ -171,7 +171,7 @@ class ProtoBlockExecutor:
 
             
             # Run tests and get results first
-            test_success = self.run_tests(config.general.test_path)
+            test_success = self.run_tests()
             test_results = self.test_runner.get_test_results()
             
             # Extract test statistics
