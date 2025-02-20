@@ -14,7 +14,7 @@ class GitConfig:
 
 @dataclass
 class GeneralConfig:
-    type: str = "aider"
+    type: str = "native"
     plausibility_test: bool = True
     use_file_summaries: bool = True
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
