@@ -70,7 +70,7 @@ def test_raw_config():
     assert isinstance(raw, dict)
     assert 'general' in raw
     assert 'git' in raw
-    assert 'aider' in raw
+    assert raw['general']['type'] in ['aider', 'native']
     assert 'llm_strong' in raw
     assert 'llm_weak' in raw
     assert 'logging' in raw
