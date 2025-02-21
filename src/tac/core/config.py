@@ -14,8 +14,8 @@ class GitConfig:
 
 @dataclass
 class GeneralConfig:
-    type: str = "aider"
-    reasoning_effort: str = "high"
+    type: str = "native"
+    reasoning_effort: str = "medium"
     plausibility_test: bool = True
     use_file_summaries: bool = True
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization

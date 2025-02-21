@@ -15,22 +15,12 @@ class NativeAgent(Agent):
     def __init__(self, config: dict):
         super().__init__(config)
         self.agent_config = config.get('aider', {})
-
-    def run(self, protoblock: ProtoBlock, previous_analysis: str = None) -> None:
-        """
-        Executes the native o3-mini command to implement both tests and functionality simultaneously.
-        
-        Args:
-            protoblock: The ProtoBlock instance containing task details and specifications
-        """
-        task_description = protoblock.task_description
-        test_specification = protoblock.test_specification
-        test_data_generation = protoblock.test_data_generation
-        
+        # Initialize LLM client with strong model for implementation
+        self.llm_client = LLMClient(strength="strong")
+    
+    def process_write_and_context_files(self, protoblock: ProtoBlock) -> tuple[list[str], list[str]]:
         # Deduplicate write_files using a set
         write_files = list(set(protoblock.write_files))
-        if len(write_files) > 1:
-            raise NotImplementedError("Multiple write files are not supported yet")
             
         # Filter out any files that are already in write_files from context_files using sets
         context_files = list(set(f for f in protoblock.context_files if f not in write_files))
@@ -43,15 +33,14 @@ class NativeAgent(Agent):
             logger.warning("context_files is a string, converting to list")
             context_files = [context_files]
             
-        # Ensure we have valid file paths and they exist
-        write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
-        context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
-
-        # Check file existence for context files only
+        # Filter out context files that don't exist
+        valid_context_files = []
         for file_path in context_files:
-            if not os.path.exists(file_path):
-                logger.error(f"Context file does not exist: {file_path}")
-                raise FileNotFoundError(f"Context file not found: {file_path}")
+            if os.path.exists(file_path):
+                valid_context_files.append(file_path)
+            else:
+                logger.warning(f"Context file does not exist and will be excluded: {file_path}")
+        context_files = valid_context_files
 
         # Create parent directories for write files if they don't exist
         for file_path in write_files:
@@ -65,83 +54,213 @@ class NativeAgent(Agent):
                 with open(file_path, 'a'):
                     pass
 
-        # Read contents of write files and context files
-        write_file_contents = {}
-        context_file_contents = {}
+        return write_files, context_files
 
-        for file_path in write_files:
+    def _load_file_contents(self, files: list[str], file_type: str) -> dict[str, str]:
+        """Helper method to load file contents into a dictionary.
+        
+        Args:
+            files: List of file paths to load
+            file_type: Type of files being loaded ('write' or 'context') for logging
+            
+        Returns:
+            Dictionary mapping file paths to their contents
+        """
+        file_contents = {}
+        for file_path in files:
             try:
                 if not os.path.isfile(file_path):
                     logger.error(f"Path exists but is not a file: {file_path}")
                     raise ValueError(f"Path is not a file: {file_path}")
                     
                 with open(file_path, 'r') as f:
-                    write_file_contents[file_path] = f.read()
-                logger.debug(f"Successfully read write file: {file_path}")
+                    file_contents[file_path] = f.read()
+                logger.debug(f"Successfully read {file_type} file: {file_path}")
             except (IOError, OSError) as e:
-                logger.error(f"Error reading write file {file_path}: {str(e)}")
+                logger.error(f"Error reading {file_type} file {file_path}: {str(e)}")
                 raise
+        return file_contents
 
-        for file_path in context_files:
-            try:
-                if not os.path.isfile(file_path):
-                    logger.error(f"Path exists but is not a file: {file_path}")
-                    raise ValueError(f"Path is not a file: {file_path}")
-                    
-                with open(file_path, 'r') as f:
-                    context_file_contents[file_path] = f.read()
-                logger.debug(f"Successfully read context file: {file_path}")
-            except (IOError, OSError) as e:
-                logger.error(f"Error reading context file {file_path}: {str(e)}")
-                raise
-
-        logger.debug(f"Read {len(write_file_contents)} write files and {len(context_file_contents)} context files")
+    def _format_files_for_prompt(self, file_contents: dict[str, str], is_context: bool = False) -> str:
+        """Format file contents into a prompt string.
         
-        # Create formatted context files section
-        context_files_section = "\n".join([
-            f"File: {file_path}\n{content}\n"
-            for file_path, content in context_file_contents.items()
-        ])
-
-        # Create formatted write files section
-        write_files_section = "\n".join([
-            f"File: {file_path}\n{content}\n"
-            for file_path, content in write_file_contents.items()
-        ])
+        Args:
+            file_contents: Dictionary mapping file paths to their contents
+            is_context: Whether these are context files (adds "do not edit" comment)
+            
+        Returns:
+            Formatted string with file contents in angle brackets with paths
+        """
+        sections = []
+        for file_path, content in file_contents.items():
+            section = [f"<{file_path}>"]
+            if is_context:
+                section.append("# This file is for context only, please do not edit it")
+            section.append(content)
+            section.append(f"</{file_path}>")
+            sections.append("\n".join(section))
         
+        return "\n\n".join(sections)
+
+    def _create_implementation_prompt(
+        self,
+        task_description: str,
+        context_files_section: str,
+        write_files_section: str,
+    ) -> str:
+        """Create the implementation prompt for the LLM.
+        
+        Args:
+            task_description: Description of the task to implement
+            context_files_section: Formatted string of context files
+            write_files_section: Formatted string of write files
+            write_files: List of write file paths for the instruction
+            
+        Returns:
+            Complete formatted prompt string
+        """
         prompt = f"""Implement the following functionality:
 Task Description: {task_description}
 
-Context Files:
+Context Files, please do not edit these files:
 {context_files_section}
 
-Now the file that you need to modify is:
+Write files, these are the ones you need to modify:
 {write_files_section}
 
-Make sure your implementation passes the tests! You ONLY return the FULL modified code, nothing else, no further explanation, just the code of {write_files} that I can directly execute! Remember, you are only implementing PYTHON CODE!"""
+Make sure your implementation passes the tests, listed in the context files! If there are tests listed in the write files, you also should add another test or modify the existing test to ensure it passes. 
+You edit the code in a minimally invasive way, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task.For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you.The response format is:
+
+<write_file_path>
+# insert the full code here
+</write_file_path>
+ 
+Remember, you are only implementing PYTHON CODE!"""
         
         logger.debug(f"Native Agent Prompt: {prompt}")
+
+        return prompt
+
+    def _deparse_llm_response(self, response: str, write_files: list[str]) -> dict[str, str]:
+        """Deparse the LLM response into a dictionary of file contents.
         
-        # Initialize LLM client with strong model for implementation
-        llm_client = LLMClient(strength="strong")
+        Args:
+            response: The raw response from the LLM
+            write_files: List of allowed write file paths to validate against
+            
+        Returns:
+            Dictionary mapping write file paths to their updated contents
+            
+        Raises:
+            ValueError: If response format is invalid
+        """
+        updated_write_files = {}
+        current_file = None
+        current_content = []
+        
+        # Convert write_files to set for faster lookup
+        allowed_files = set(write_files)
+        
+        for line in response.split('\n'):
+            # Check for file start tag
+            if line.startswith('<') and not line.startswith('</'):
+                if current_file is not None:
+                    # We found a new file start before closing the previous one
+                    raise ValueError(f"Invalid response format: Found new file tag '{line}' while still processing '{current_file}'")
+                
+                file_path = line.strip('<>')
+                if file_path not in allowed_files:
+                    logger.warning(f"Unauthorized file in response will be ignored: {file_path}. Only allowed to modify: {write_files}")
+                    current_file = None  # Skip this file's content
+                else:
+                    current_file = file_path
+                    current_content = []
+                
+            # Check for file end tag
+            elif line.startswith('</'):
+                file_path = line.strip('</>')
+                if file_path not in allowed_files:
+                    continue  # Skip end tags for unauthorized files
+                
+                if current_file is None:
+                    if file_path in allowed_files:
+                        raise ValueError(f"Invalid response format: Found end tag '{line}' without matching start tag")
+                    continue
+                
+                if file_path != current_file:
+                    raise ValueError(f"Mismatched tags: Expected </{current_file}>, got {line}")
+                
+                updated_write_files[current_file] = '\n'.join(current_content)
+                current_file = None
+                current_content = []
+                
+            # Content lines
+            elif current_file is not None:
+                current_content.append(line)
+        
+        # Check if we have any unclosed tags for allowed files
+        if current_file is not None and current_file in allowed_files:
+            raise ValueError(f"Invalid response format: Unclosed tag for file {current_file}")
+            
+        return updated_write_files
+
+    def run(self, protoblock: ProtoBlock, previous_analysis: str = None) -> None:
+        """
+        Executes the native o3-mini command to implement both tests and functionality simultaneously.
+        
+        Args:
+            protoblock: The ProtoBlock instance containing task details and specifications
+        """
+        task_description = protoblock.task_description
+        test_specification = protoblock.test_specification
+        test_data_generation = protoblock.test_data_generation
+        
+        # Process and validate files
+        write_files, context_files = self.process_write_and_context_files(protoblock)
+
+        # Load file contents
+        write_file_contents = self._load_file_contents(write_files, "write")
+        context_file_contents = self._load_file_contents(context_files, "context")
+
+        logger.debug(f"Read {len(write_file_contents)} write files and {len(context_file_contents)} context files")
+        
+        # Format files for prompt
+        context_files_prompt = self._format_files_for_prompt(context_file_contents, is_context=True)
+        write_files_prompt = self._format_files_for_prompt(write_file_contents)
+        
+        # Create the implementation prompt
+        prompt = self._create_implementation_prompt(
+            task_description,
+            context_files_prompt,
+            write_files_prompt,
+        )
         
         # Create message for LLM
         messages = [Message(role="user", content=prompt)]
         
         # Get completion from LLM
         try:
-            response = llm_client.chat_completion(messages)
+            logger.debug(f"Sending prompt to LLM")
+            response = self.llm_client.chat_completion(messages)
             logger.debug(f"Received response from LLM")
-            
-            # Write response to the target file
-            write_file = write_files[0]  # We already validated there's only one write file
-            with open(write_file, 'w') as f:
-                f.write(response)
-            logger.info(f"Successfully wrote implementation to {write_file}")
             
         except Exception as e:
             logger.error(f"Error during LLM completion or file writing: {str(e)}")
             raise
+        
+        # Write response to the target files
+        if not response:
+            logger.error("No response from LLM")
+            raise ValueError("No response from LLM")
+        
+        # Deparse and validate the response
+        updated_write_files = self._deparse_llm_response(response, write_files)
+        
+        # Write the updated contents to files
+        for file_path, content in updated_write_files.items():
+            with open(file_path, 'w') as f:
+                f.write(content)
+            logger.info(f"Successfully wrote implementation to {file_path}")
 
     def execute_task(self, previous_error: str = None) -> None:
         """Legacy method to maintain compatibility with base Agent class"""
