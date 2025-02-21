@@ -53,7 +53,7 @@ class BlockRunner:
             # Create protoblock using factory
             factory = ProtoBlockFactory()
             if error_analysis:
-                genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! {error_analysis}"
+                genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
             else:
                 genesis_prompt = self.task_instructions
