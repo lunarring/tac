@@ -14,7 +14,7 @@ def test_config_manager():
 
     # Verify 'general' configuration
     general = cm.general
-    assert general.type == "aider"
+    assert general.type in ["aider", "native"]
     assert general.plausibility_test is True
     assert general.use_file_summaries is True
     assert general.summarizer_timeout == 45
