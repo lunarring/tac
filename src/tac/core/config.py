@@ -18,6 +18,7 @@ class GeneralConfig:
     reasoning_effort: str = "medium"
     plausibility_test: bool = True
     use_file_summaries: bool = True
+    minimum_plausibility_score: str = "D"  # Minimum passing score for plausibility check (A, B, C, D, F)
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
     max_retries: int = 4
     max_retries_protoblock_creation: int = 4

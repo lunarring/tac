@@ -3,6 +3,7 @@ import json
 from typing import Dict, Optional
 from tac.core.llm import LLMClient, Message
 from tac.protoblock import ProtoBlock
+from tac.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,22 @@ class PlausibilityChecker:
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
         self.llm_client = LLMClient(strength="strong")
+        self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
+        self._min_score = config.general.minimum_plausibility_score
+
+    def _is_score_passing(self, score: str) -> bool:
+        """
+        Determines if a score meets the minimum passing threshold.
+        
+        Args:
+            score: The letter grade (A, B, C, D, or F)
+            
+        Returns:
+            bool: True if the score meets or exceeds the minimum passing score
+        """
+        score_value = self._score_values.get(score.upper(), -1)
+        min_score_value = self._score_values.get(self._min_score.upper(), 1)  # Default to D if invalid
+        return score_value >= min_score_value
 
     def check(self, protoblock: ProtoBlock, git_diff: str) -> str:
         """
@@ -75,7 +92,12 @@ RECOMMENDATIONS:
 (List specific suggestions for improvement if needed)
 
 PLAUSIBILITY SCORE RATING:
-(answer only with one letter with the rating, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F")
+(answer only with one letter with the rating, where:
+"A" is the best possible score
+"B" is good, but not perfect because some minor things that could have been done better
+"C" is acceptable, but there are some issues
+"D" is the minimum passing score, not a nice implementation but it will work
+"F" is failed, because the implementation is not even close to the requirements, or because it probably will not work or breaks something.)
 
 </output_format>"""
 
@@ -108,8 +130,8 @@ PLAUSIBILITY SCORE RATING:
             # Strip any whitespace and ensure uppercase
             final_plausibility_score = final_plausibility_score.strip().upper()
 
-            # A through D are considered passing grades
-            is_plausible = final_plausibility_score in ["A", "B", "C", "D"]
+            # Check if score meets minimum requirement
+            is_plausible = self._is_score_passing(final_plausibility_score)
             
             return is_plausible, final_plausibility_score, response
             
