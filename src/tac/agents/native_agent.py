@@ -47,16 +47,23 @@ class NativeAgent(Agent):
         write_files = [f for f in write_files if isinstance(f, str) and len(f) > 1]
         context_files = [f for f in context_files if isinstance(f, str) and len(f) > 1]
 
-        # Check file existence before proceeding
-        for file_path in write_files:
-            if not os.path.exists(file_path):
-                logger.error(f"Write file does not exist: {file_path}")
-                raise FileNotFoundError(f"Write file not found: {file_path}")
-
+        # Check file existence for context files only
         for file_path in context_files:
             if not os.path.exists(file_path):
                 logger.error(f"Context file does not exist: {file_path}")
                 raise FileNotFoundError(f"Context file not found: {file_path}")
+
+        # Create parent directories for write files if they don't exist
+        for file_path in write_files:
+            directory = os.path.dirname(file_path)
+            if directory and not os.path.exists(directory):
+                logger.debug(f"Creating directory for write file: {directory}")
+                os.makedirs(directory, exist_ok=True)
+            if not os.path.exists(file_path):
+                logger.debug(f"Write file does not exist, will create: {file_path}")
+                # Touch the file to create it
+                with open(file_path, 'a'):
+                    pass
 
         # Read contents of write files and context files
         write_file_contents = {}
