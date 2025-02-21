@@ -14,7 +14,7 @@ class GitConfig:
 
 @dataclass
 class GeneralConfig:
-    type: str = "native"
+    type: str = "aider"
     reasoning_effort: str = "high"
     plausibility_test: bool = True
     use_file_summaries: bool = True
