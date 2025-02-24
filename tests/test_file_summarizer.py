@@ -45,7 +45,7 @@ class MyClass:
             tmp_path = tmp.name
 
         try:
-            analysis = self.summarizer._analyze_file(tmp_path)
+            analysis = self.summarizer.analyze_file(tmp_path)
             # Ensure no error was returned
             self.assertIsNone(analysis.get("error"), f"Unexpected error: {analysis.get('error')}")
             summary = analysis.get("content")
