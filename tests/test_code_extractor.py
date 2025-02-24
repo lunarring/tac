@@ -1,5 +1,5 @@
 import unittest
-from tac.utils.code_extractor import extract_code_definitions
+from tac.utils.file_summarizer import extract_code_definitions
 
 class TestCodeExtractor(unittest.TestCase):
     def test_extract_functions_and_classes(self):
