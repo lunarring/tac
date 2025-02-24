@@ -91,13 +91,13 @@ class BlockRunner:
             tac_branch = self.protoblock.branch_name
             
             if current_git_branch.startswith("tac/"):
-                logger.info(f"Already on a TAC branch: {current_git_branch}. No branch switching necessary.")
+                logger.info(f"Already on a tac branch: {current_git_branch}. No branch switching necessary.")
                 tac_branch = current_git_branch
             else:
                 if not self.git_manager.create_or_switch_to_tac_branch(tac_branch):
-                    logger.error(f"Failed to create or switch to TAC branch {tac_branch}")
+                    logger.error(f"Failed to create or switch to tac branch {tac_branch}")
                     return False
-                logger.info(f"Switched to TAC branch: {tac_branch}")
+                logger.info(f"Switched to tac branch: {tac_branch}")
                 
             # Now check git status, but only for tracked files
             status_ok, _ = self.git_manager.check_status(ignore_untracked=True)
