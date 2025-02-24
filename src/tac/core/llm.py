@@ -79,7 +79,7 @@ class LLMClient:
         formatted_messages = []
         
         # Special handling for models that don't support system messages
-        if self.config.model in ["o1-mini", "deepseek-reasoner"]:
+        if self.config.model in ["o1-mini", "deepseek-reasoner", "o3-mini"]:
             for msg in messages:
                 if msg.role == "system":
                     # Convert system message to user message
@@ -112,7 +112,7 @@ class LLMClient:
         }
         
         # Models that don't support temperature parameter
-        if self.config.model not in ["o1-mini", "deepseek-reasoner"] and "o3-mini" not in self.config.model:
+        if self.config.model not in ["o1-mini", "deepseek-reasoner", "o3-mini"]:
             # Use settings from config if not overridden
             if temperature is None:
                 temperature = self.config.settings.temperature
