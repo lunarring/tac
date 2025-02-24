@@ -33,7 +33,7 @@ class PlausibilityChecker:
         min_score_value = self._score_values.get(self._min_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
-    def check(self, protoblock: ProtoBlock, git_diff: str) -> str:
+    def check(self, protoblock: ProtoBlock, git_diff: str, codebase: dict[str, str]) -> str:
         """
         Analyzes the implementation against the promised changes.
         

@@ -7,6 +7,7 @@ from tac.utils.file_summarizer import FileSummarizer
 from tac.core.config import config
 import logging
 from tqdm import tqdm
+import ast
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,7 @@ class ProjectFiles:
             last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
             
             # Analyze file
-            analysis = self.summarizer._analyze_file(file_path)
+            analysis = self.summarizer.analyze_file(file_path)
             if not analysis["error"]:
                 # Store the summary directly since it's now a string
                 data["files"][rel_path] = {
@@ -186,3 +187,42 @@ class ProjectFiles:
             return summary.get("summary", "No summary available")
         
         return f"No summary available for {file_path}" 
+
+    def format_summaries_as_string(self) -> str:
+        """
+        Format all file summaries into a string representation.
+        Each file's summary is formatted as:
+        <full path to file>
+        contents of summary
+        </full path to file>
+        
+        Returns:
+            str: Formatted string containing all file summaries
+        """
+        data = self._load_existing_summaries()
+        formatted_strings = []
+        
+        for rel_path, file_info in data["files"].items():
+            full_path = os.path.abspath(os.path.join(self.project_root, rel_path))
+            summary = file_info.get("summary", "No summary available")
+            if "error" in file_info:
+                summary = f"Error analyzing file: {file_info['error']}"
+                
+            formatted_strings.append(
+                f"<{full_path}>\n{summary}\n</{full_path}>"
+            )
+        
+        return "\n\n".join(formatted_strings)
+
+
+
+
+
+if __name__ == "__main__":
+    # Example usage of ProjectFiles
+    
+    # Initialize ProjectFiles with current directory
+    project_files = ProjectFiles(".")
+    print(project_files.format_summaries_as_string())
+    # import pdb; pdb.set_trace()
+

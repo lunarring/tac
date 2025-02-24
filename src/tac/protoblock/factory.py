@@ -38,7 +38,7 @@ class ProtoBlockFactory:
             logger.info("Using file summaries for seed instructions")
             codebase = gather_python_files(
                 directory=".",  # Always use project root
-                exclusions=[".git", "__pycache__"],
+                exclusions=[".git", "__pycache__", "build"],
                 use_summaries=True
             )
         

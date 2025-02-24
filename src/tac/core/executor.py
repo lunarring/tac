@@ -219,7 +219,7 @@ class ProtoBlockExecutor:
                 logger.info("Running plausibility check...")
                 # Get git diff for plausibility check
                 git_diff = self.git_manager.get_complete_diff()
-                plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, git_diff)
+                plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, git_diff, self.codebase)
                 if not plausibility_check_success:
                     failure_type = "Plausibility check failed"
                     execution_success = False

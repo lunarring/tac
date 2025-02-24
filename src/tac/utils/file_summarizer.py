@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
-from tac.utils.code_extractor import extract_code_definitions
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,10 @@ class FileSummarizer:
                 methods = ", ".join(cls.get("methods", []))
                 prompt += f"- {cls['name']}: {methods}\n"
         prompt += f"\nFull Code:\n<code>\n{code}\n</code>\n"
-        prompt += "You are a senior software engineer, and provide a concise high-level analysis of what functions and classes are doing, also talk about how they are interlinked. The output format should be the following: the first line is a short high-level summary of the entire file, then each next line is a text beginning with the function/class name and then your analysis. Then in the next line, continue with the next function/class. Add no other formatting elements!"
+        prompt += """You are a senior software engineer. Provide a concise analysis of the code's functions and classes. Format your response as follows:
+1. First line: A high-level summary of the entire file
+2. For each function/class, start a new line with the exact name of the function/class, followed by a colon and the description.
+Keep descriptions technical and focus on functionality and interactions."""
         
         messages = [
             Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
@@ -35,10 +37,57 @@ class FileSummarizer:
         ]
 
         response = self.llm_client.chat_completion(messages)
-        return response
+        
+        # Create a mapping of names to their line numbers
+        name_to_lines = {}
+        for func in functions:
+            # Extract name and line numbers from the format "name (lines start-end)"
+            name = func.split(" (lines ")[0]
+            start, end = func.split(" (lines ")[1].rstrip(")").split("-")
+            name_to_lines[name] = (start, end)
+        
+        for cls in classes:
+            name = cls["name"].split(" (lines ")[0]
+            start, end = cls["name"].split(" (lines ")[1].rstrip(")").split("-")
+            name_to_lines[name] = (start, end)
+
+        # Split response into lines
+        lines = response.strip().split("\n")
+        if not lines:
+            return response
+
+        # Keep the first line (high-level summary) as is
+        formatted_lines = [lines[0]]
+        
+        # Process remaining lines
+        for line in lines[1:]:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Find the first colon which separates name from description
+            parts = line.split(":", 1)
+            if len(parts) != 2:
+                formatted_lines.append(line)  # Keep unchanged if no colon found
+                continue
+                
+            name = parts[0].strip()
+            description = parts[1].strip()
+            
+            # Find the matching name in our definitions
+            for def_name, (start, end) in name_to_lines.items():
+                if def_name in name:  # Using 'in' to match even if LLM added some prefix
+                    formatted_line = f"{def_name} (line {start}:{end}): {description}"
+                    formatted_lines.append(formatted_line)
+                    break
+            else:
+                # If no match found, keep the line unchanged
+                formatted_lines.append(line)
+        
+        return "\n".join(formatted_lines)
 
 
-    def _analyze_file(self, file_path: str) -> Dict:
+    def analyze_file(self, file_path: str) -> Dict:
         """Analyze a single Python file and return its summary"""
         try:
             with open(file_path, 'r') as f:
@@ -83,114 +132,49 @@ class FileSummarizer:
                 "content": None
             }
 
-    def summarize_directory(self, directory: str, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True, for_protoblock: bool = False) -> str:
-        """
-        Summarize all Python files in a directory and its subdirectories.
+
+def extract_code_definitions(code: str):
+    """
+    Extracts top-level function and class definitions from Python code along with their starting and ending line numbers.
+    
+    Args:
+        code (str): Python source code.
         
-        Args:
-            directory: Path to the directory to analyze
-            exclusions: List of directory names to exclude
-            exclude_dot_files: Whether to exclude files/dirs starting with '.'
-            for_protoblock: If True, returns only summaries without metadata
-            
-        Returns:
-            A formatted string containing the directory tree and file summaries
-        """
-        if exclusions is None:
-            exclusions = [".git", "__pycache__", "build"]
+    Returns:
+        list of dict: A list of dictionaries each containing:
+            - 'type': 'function' or 'class'
+            - 'name': Name of the function or class
+            - 'start_line': The starting line number of the definition
+            - 'end_line': The ending line number of the definition
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    
+    definitions = []
+    
+    # Iterate over all top-level nodes
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # Use end_lineno which should be available in Python 3.8+
+            definitions.append({
+                'type': 'function',
+                'name': node.name,
+                'start_line': node.lineno,
+                'end_line': getattr(node, "end_lineno", node.lineno)
+            })
+        elif isinstance(node, ast.ClassDef):
+            definitions.append({
+                'type': 'class',
+                'name': node.name,
+                'start_line': node.lineno,
+                'end_line': getattr(node, "end_lineno", node.lineno)
+            })
+    
+    return definitions
 
-        # Size thresholds in bytes (100KB total)
-        MAX_FILE_SIZE = 100 * 1024
 
-        directory_tree = []
-        file_summaries = []
-        seen_files = set()  # Track unique files by their absolute path
-
-        directory = str(directory)  # Ensure directory is a string
-        abs_directory = os.path.abspath(directory)  # Get absolute path of base directory
-
-        for root, dirs, files in os.walk(directory):
-            # Exclude specified directories and optionally dot directories
-            dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
-            rel_root = os.path.relpath(root, directory)
-            if rel_root != '.' and any(part in config.general.ignore_paths for part in rel_root.split(os.sep)):
-                continue
-
-            # Build directory tree if not for protoblock
-            if not for_protoblock:
-                level = root.replace(directory, '').count(os.sep)
-                indent = ' ' * 4 * level
-                directory_tree.append(f"{indent}{os.path.basename(root)}/")
-
-            for file in files:
-                if (file.endswith('.py') and 
-                    not file.startswith('.#') and  # Skip temp files
-                    not (exclude_dot_files and file.startswith('.'))):
-                    
-                    file_path = os.path.join(root, file)
-                    abs_file_path = os.path.abspath(file_path)
-                    real_path = os.path.realpath(abs_file_path)  # Resolve any symlinks
-                    
-                    # Skip if we've seen this file before (either directly or through symlink)
-                    if real_path in seen_files:
-                        continue
-                    
-                    # Skip if file is outside the target directory
-                    if not real_path.startswith(abs_directory):
-                        continue
-                    
-                    seen_files.add(real_path)
-                    if not for_protoblock:
-                        level = root.replace(directory, '').count(os.sep)
-                        indent = ' ' * 4 * level
-                        directory_tree.append(f"{indent}    {file}")
-
-                    # Skip large files
-                    file_size = os.path.getsize(file_path)
-                    if file_size > MAX_FILE_SIZE:
-                        if not for_protoblock:
-                            file_summaries.append(
-                                f"## File: {os.path.relpath(file_path, directory)}\n"
-                                f"Size: {file_size} bytes (too large to analyze), "
-                                f"Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
-                            )
-                        continue
-
-                    # Analyze file
-                    file_info = "" if for_protoblock else f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
-                    analysis = self._analyze_file(file_path)
-
-                    if analysis["error"]:
-                        summary = f"Error analyzing file: {analysis['error']}"
-                    else:
-                        if isinstance(analysis["content"], list):
-                            # Format summaries from structured data
-                            summary_parts = []
-                            for item in analysis["content"]:
-                                if item["type"] == "function":
-                                    summary_parts.append(item["summary"])
-                                else:  # class
-                                    class_summary = item["summary"]
-                                    method_summaries = []
-                                    for method in item["methods"]:
-                                        method_summary = method["summary"].replace('\n', '\n  ')
-                                        method_summaries.append(method_summary)
-                                    if method_summaries:
-                                        class_summary += "\n\n" + "\n\n".join(method_summaries)
-                                    summary_parts.append(class_summary)
-                            summary = "\n\n".join(summary_parts)
-                        else:
-                            # Using flat string summary returned by the LLM client
-                            summary = analysis["content"]
-
-                    if for_protoblock:
-                        file_summaries.append(f"File: {os.path.relpath(file_path, directory)}\n{summary}")
-                    else:
-                        file_summaries.append(f"## File: {os.path.relpath(file_path, directory)}\n{file_info}\n\n```python\n{summary}\n```")
-
-        if not file_summaries:
-            return "No Python files found."
-
-        if for_protoblock:
-            return "\n\n---\n\n".join(file_summaries)
-        return "\n".join(directory_tree) + "\n\n---\n\n" + "\n\n---\n\n".join(file_summaries) 
+if __name__ == "__main__":
+    summarizer = FileSummarizer()
+    print(summarizer.analyze_file("src/tac/utils/file_summarizer.py"))
