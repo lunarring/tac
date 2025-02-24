@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
+from tac.utils.code_extractor import extract_code_definitions
 import logging
 
 logger = logging.getLogger(__name__)
@@ -43,33 +44,26 @@ class FileSummarizer:
             with open(file_path, 'r') as f:
                 self.current_file_content = f.read()
 
-            try:
-                tree = ast.parse(self.current_file_content)
-            except SyntaxError:
-                return {
-                    "error": "Could not parse file due to syntax error",
-                    "content": None
-                }
-
-            # Get all functions and classes at once
-            functions = []
-            classes = []
-            for node in ast.iter_child_nodes(tree):
-                if isinstance(node, ast.FunctionDef):
-                    functions.append(node.name)
-                elif isinstance(node, ast.ClassDef):
-                    class_info = {"name": node.name, "methods": []}
-                    for child in ast.iter_child_nodes(node):
-                        if isinstance(child, ast.FunctionDef):
-                            class_info["methods"].append(child.name)
-                    classes.append(class_info)
+            # Use extract_code_definitions to get functions and classes with line numbers
+            definitions = extract_code_definitions(self.current_file_content)
 
             # If no functions or classes found, return early
-            if not functions and not classes:
+            if not definitions:
                 return {
                     "error": None,
                     "content": []  # Empty content is valid for files with no functions/classes
                 }
+
+            functions = []
+            classes = []
+            for defn in definitions:
+                if defn['type'] == 'function':
+                    functions.append(f"{defn['name']} (lines {defn['start_line']}-{defn['end_line']})")
+                elif defn['type'] == 'class':
+                    classes.append({
+                        "name": f"{defn['name']} (lines {defn['start_line']}-{defn['end_line']})",
+                        "methods": []
+                    })
 
             summary = self._generate_detailed_summary(self.current_file_content, functions, classes)
             if summary.startswith("Error:"):
@@ -78,9 +72,9 @@ class FileSummarizer:
                     "content": None
                 }
             return {
-                    "error": None,
-                    "content": summary
-                }
+                "error": None,
+                "content": summary
+            }
             
         except Exception as e:
             logger.error(f"Error analyzing file {file_path}: {str(e)}")
@@ -147,6 +141,8 @@ class FileSummarizer:
                     
                     seen_files.add(real_path)
                     if not for_protoblock:
+                        level = root.replace(directory, '').count(os.sep)
+                        indent = ' ' * 4 * level
                         directory_tree.append(f"{indent}    {file}")
 
                     # Skip large files
