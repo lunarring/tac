@@ -434,7 +434,10 @@ def main():
                 sys.exit(1)
 
             # Get codebase content
-            codebase = gather_python_files(args.dir)
+            project_files = ProjectFiles()
+            project_files.update_summaries()
+            codebase = project_files.get_codebase_summary()
+            # codebase = gather_python_files(args.dir)
             # Get task instructions directly from args.instructions or voice_instructions
             if voice_ui is not None:
                 task_instructions = voice_ui.wait_until_prompt()

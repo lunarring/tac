@@ -114,24 +114,6 @@ class ProtoBlockExecutor:
             logger.error("Failed to update log file")
             return None
 
-    # def _check_nested_tests(self) -> bool:
-    #     """
-    #     Check if tests/tests directory exists, which indicates a potential problem
-    #     from a previous run.
-        
-    #     Returns:
-    #         bool: True if nested tests directory exists, False otherwise
-    #     """
-    #     nested_tests_dir = os.path.join('tests', 'tests')
-    #     if os.path.exists(nested_tests_dir):
-    #         logger.error("="*80)
-    #         logger.error("Found nested tests directory (tests/tests/)!")
-    #         logger.error("This usually indicates a problem from a previous run.")
-    #         logger.error("Please move any test files from tests/tests/ to tests/ and remove the nested directory.")
-    #         logger.error("="*80)
-    #         return True
-    #     return False
-
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> bool:
         """
         Executes the block with a unified test-and-implement approach.

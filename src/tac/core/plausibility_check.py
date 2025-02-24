@@ -33,7 +33,7 @@ class PlausibilityChecker:
         min_score_value = self._score_values.get(self._min_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
-    def check(self, protoblock: ProtoBlock, git_diff: str, codebase: dict[str, str]) -> str:
+    def check(self, protoblock: ProtoBlock, git_diff: str, codebase: str) -> str:
         """
         Analyzes the implementation against the promised changes.
         
@@ -54,6 +54,12 @@ class PlausibilityChecker:
 You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. Critically, you need to determine if the implemented changes are also actively used in the codebase and integrated properly, especially when existing functionality is replaced with new one. However keep in mind, the implementation was done by a junior developer and we don't want to scare them off.
 </purpose>
 
+Here a summary of the codebase:
+<codebase>
+{codebase}
+</codebase>
+
+And here the description of the task:
 <protoblock>
 Task Description: {protoblock.task_description}
 Test Specification: {protoblock.test_specification}
@@ -87,6 +93,9 @@ DETAILED ANALYSIS:
 
 ROOT CAUSE:
 (If implausible, explain the fundamental issues)
+
+MISSING FILES:
+(List all files that should have been included into the protoblock either for context or for writing)
 
 RECOMMENDATIONS:
 (List specific suggestions for improvement if needed)

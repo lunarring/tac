@@ -188,7 +188,7 @@ class ProjectFiles:
         
         return f"No summary available for {file_path}" 
 
-    def format_summaries_as_string(self) -> str:
+    def get_codebase_summary(self) -> str:
         """
         Format all file summaries into a string representation.
         Each file's summary is formatted as:
@@ -223,6 +223,6 @@ if __name__ == "__main__":
     
     # Initialize ProjectFiles with current directory
     project_files = ProjectFiles(".")
-    print(project_files.format_summaries_as_string())
+    print(project_files.get_codebase_summary())
     # import pdb; pdb.set_trace()
 

@@ -30,17 +30,9 @@ class ProtoBlockFactory:
         Returns:
             str: Complete protoblock genesis prompt for the LLM
         """
-        # Use centralized config
-        use_summaries = config.general.use_file_summaries
-        
-        # Get codebase content, using summaries if enabled
-        if use_summaries:
-            logger.info("Using file summaries for seed instructions")
-            codebase = gather_python_files(
-                directory=".",  # Always use project root
-                exclusions=[".git", "__pycache__", "build"],
-                use_summaries=True
-            )
+
+        codebase = self.project_files.get_codebase_summary()
+
         
         return f"""<purpose>
     You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
