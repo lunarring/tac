@@ -129,13 +129,13 @@ Write files, these are the ones you need to modify:
 {write_files_section}
 
 Make sure your implementation passes the tests, listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
-You edit the code in a minimally invasive way, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task.For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you.The response format is:
+You edit the code in a minimally invasive way, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task.For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. The response format is:
 
 <write_file_path>
 # insert the full code here
 </write_file_path>
  
-Remember, you are only implementing PYTHON CODE!"""
+REMEMBER: change as little as possible and ONLY implement functionality that is listed in the task description."""
         
         logger.debug(f"Native Agent Prompt: {prompt}")
 

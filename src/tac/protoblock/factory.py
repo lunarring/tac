@@ -47,9 +47,10 @@ class ProtoBlockFactory:
 </task_instructions>
 
 <planning_rules>
-- Create a plan how this task could be implemented, but stay on the GOAL level and do not describe the exact implementation details.
-- You need to explicity consider how the change changes affect the existing codebase and makes sure that some parts are replaced if needed.
-- Scan the codebase and review carefully and list every file that could potentially be needed for read or write access (read for context and write for making changes)
+- Examine carefully the codebase and the task instructions, and then develop a plan how this task could be implemented, but stay on the GOAL level and do not describe the exact implementation details.
+- We will need to supply two kinds of files to the junior developer:
+    - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!
+    - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test.
 - Design a test that could be used to verify if the task has been implemented correctly, particularly if the integration is correct. The test should be as close as possible to the real usage of the code. However, it is possible that we do not need a unit test for the requested task, in which case you can skip this step.
 - Bring everything into the right format and structure as outlines below.
 </planning_rules>
