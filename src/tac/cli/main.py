@@ -19,7 +19,7 @@ from tac.agents.aider_agent import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
 from tac.core.test_runner import TestRunner
 from tac.core.log_config import setup_logging
-from tac.utils.file_gatherer import gather_python_files
+#from tac.utils.file_gatherer import gather_python_files  # Removed: gather now handled in CLI scope
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
@@ -29,6 +29,89 @@ from tac.protoblock.manager import load_protoblock_from_json
 from tac.core.block_runner import BlockRunner
 
 logger = setup_logging('tac.cli.main')
+
+def cli_gather_python_files(directory, formatting_options, exclusions, exclude_dot_files=True):
+    """
+    Gather Python files from directory and load file contents without extra summarization.
+    
+    Args:
+        directory: Directory to scan.
+        formatting_options: Dictionary with formatting options.
+        exclusions: List of directories to exclude.
+        exclude_dot_files: Whether to exclude files/directories starting with a dot.
+        
+    Returns:
+        str: Formatted output of directory tree and file contents.
+    """
+    MAX_FILE_SIZE = 100 * 1024  
+    CHUNK_SIZE = 40 * 1024
+
+    directory_tree = []
+    file_contents = []
+    seen_files = set()  # Track unique files by their absolute path
+
+    directory = str(directory)  # Ensure directory is a string
+    abs_directory = os.path.abspath(directory)  # Get absolute path of base directory
+
+    for root, dirs, files in os.walk(directory):
+        # Exclude specified directories and optionally dot directories
+        dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
+        rel_root = os.path.relpath(root, directory)
+        level = root.replace(directory, '').count(os.sep)
+        indent = ' ' * 4 * level
+        # Add the root folder name only if it's not the base directory
+        if rel_root == '.':
+            directory_tree.append(f"{os.path.basename(root)}/")
+        else:
+            directory_tree.append(f"{indent}{os.path.basename(root)}/")
+
+        for file in files:
+            if file.endswith('.py') and not file.startswith('.#') and not (exclude_dot_files and file.startswith('.')):
+                file_path = os.path.join(root, file)
+                abs_file_path = os.path.abspath(file_path)
+                real_path = os.path.realpath(abs_file_path)  # Resolve any symlinks
+                
+                # Skip if we've seen this file before (either directly or through a symlink)
+                if real_path in seen_files:
+                    continue
+                
+                # Skip if file is outside the target directory
+                if not real_path.startswith(abs_directory):
+                    continue
+                
+                seen_files.add(real_path)
+                directory_tree.append(f"{indent}    {file}")
+
+                # Gather file info
+                file_size = os.path.getsize(file_path)
+                file_info = f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
+
+                # Load file content
+                if file_size > MAX_FILE_SIZE:
+                    with open(file_path, 'r') as f:
+                        content = f.read()
+                    content = (
+                        f"# First {CHUNK_SIZE//1024}KB of file:\n"
+                        f"{content[:CHUNK_SIZE]}\n\n"
+                        f"# ... [{(file_size - 2*CHUNK_SIZE)//1024}KB truncated] ...\n\n"
+                        f"# Last {CHUNK_SIZE//1024}KB of file:\n"
+                        f"{content[-CHUNK_SIZE:]}"
+                    )
+                else:
+                    with open(file_path, 'r') as f:
+                        content = f.read()
+
+                # Format content
+                header = f"{formatting_options['header']}{os.path.relpath(file_path, directory)}"
+                if formatting_options.get('use_code_fences'):
+                    content = f"```python\n{content}\n```"
+                
+                file_contents.append(f"{header}\n{file_info}\n{content}")
+
+    if not file_contents:
+        return "No Python files found."
+
+    return "\n".join(directory_tree) + formatting_options['separator'] + "\n".join(file_contents)
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -53,7 +136,7 @@ def gather_files_command(args):
                     print(f"\nError analyzing file: {summary['error']}")
                 else:
                     print(f"\n## File: {os.path.basename(args.directory)}")
-                    print(f"Size: {summary['size']} bytes, Last Modified: {summary['last_modified']}")
+                    print(f"Size: {summary['size']} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(args.directory))}")
                     print(f"\n```python\n{summary['summary']}\n```")
         else:
             # Show all summaries
@@ -90,7 +173,7 @@ def gather_files_command(args):
                 print(f"Error: {args.directory} is not a directory or Python file")
                 sys.exit(1)
             exclusions = args.exclusions.split(',') if args.exclusions else None
-            result = gather_python_files(args.directory, formatting_options, exclusions)
+            result = cli_gather_python_files(args.directory, formatting_options, exclusions)
             print(result)
 
 def run_tests_command(args):
@@ -151,8 +234,6 @@ def list_tests_command(args):
             print(f"  - {test}")
     
     print(f"\nTotal tests found: {test_count}")
-
-
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
@@ -437,7 +518,6 @@ def main():
             project_files = ProjectFiles()
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
-            # codebase = gather_python_files(args.dir)
             # Get task instructions directly from args.instructions or voice_instructions
             if voice_ui is not None:
                 task_instructions = voice_ui.wait_until_prompt()
@@ -465,4 +545,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
