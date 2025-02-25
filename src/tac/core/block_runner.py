@@ -153,7 +153,7 @@ class BlockRunner:
                 # Store the previous protoblock
                 self.store_previous_protoblock()
             else:
-                break
+                return True
             
         # Handle git operations if enabled and execution was successful
         if execution_success and config.git.enabled:
