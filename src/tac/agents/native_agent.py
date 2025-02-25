@@ -89,15 +89,15 @@ class NativeAgent(Agent):
             is_context: Whether these are context files (adds "do not edit" comment)
             
         Returns:
-            Formatted string with file contents in angle brackets with paths
+            Formatted string with file contents using ###FILE: markers
         """
         sections = []
         for file_path, content in file_contents.items():
-            section = [f"<{file_path}>"]
+            section = [f"###FILE: {file_path}"]
             if is_context:
                 section.append("# This file is for context only, please do not edit it")
             section.append(content)
-            section.append(f"</{file_path}>")
+            section.append("###END_FILE")
             sections.append("\n".join(section))
         
         return "\n\n".join(sections)
@@ -131,10 +131,25 @@ Write files, these are the ones you need to modify:
 Make sure your implementation passes the tests, listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
 You edit the code in a minimally invasive way, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task.For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. The response format is:
 
-<write_file_path>
+###FILE: /path/to/first/file.py
 # insert the full code here
-</write_file_path>
- 
+###END_FILE
+
+###FILE: /path/to/second/file.py
+# insert the full code here
+###END_FILE
+
+FOR EXAMPLE:
+###FILE: /home/users/git/project/first_file.py
+import time
+time.sleep(1)
+###END_FILE
+
+###FILE: /home/users/git/project/second_file.py
+import numpy as np
+a = np.random.randn(10, 10)
+###END_FILE
+
 REMEMBER: change as little as possible and ONLY implement functionality that is listed in the task description."""
         
         logger.debug(f"Native Agent Prompt: {prompt}")
@@ -162,13 +177,13 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         allowed_files = set(write_files)
         
         for line in response.split('\n'):
-            # Check for file start tag
-            if line.startswith('<') and not line.startswith('</'):
+            # Check for file start marker
+            if line.startswith('###FILE:'):
                 if current_file is not None:
                     # We found a new file start before closing the previous one
-                    raise ValueError(f"Invalid response format: Found new file tag '{line}' while still processing '{current_file}'")
+                    raise ValueError(f"Invalid response format: Found new file marker '{line}' while still processing '{current_file}'")
                 
-                file_path = line.strip('<>')
+                file_path = line.replace('###FILE:', '').strip()
                 if file_path not in allowed_files:
                     logger.warning(f"Unauthorized file in response will be ignored: {file_path}. Only allowed to modify: {write_files}")
                     current_file = None  # Skip this file's content
@@ -176,21 +191,13 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
                     current_file = file_path
                     current_content = []
                 
-            # Check for file end tag
-            elif line.startswith('</'):
-                file_path = line.strip('</>')
-                if file_path not in allowed_files:
-                    continue  # Skip end tags for unauthorized files
-                
+            # Check for file end marker
+            elif line.strip() == '###END_FILE':
                 if current_file is None:
-                    if file_path in allowed_files:
-                        raise ValueError(f"Invalid response format: Found end tag '{line}' without matching start tag")
-                    continue
+                    continue  # Skip end markers for unauthorized files
                 
-                if file_path != current_file:
-                    raise ValueError(f"Mismatched tags: Expected </{current_file}>, got {line}")
-                
-                updated_write_files[current_file] = '\n'.join(current_content)
+                if current_file in allowed_files:
+                    updated_write_files[current_file] = '\n'.join(current_content)
                 current_file = None
                 current_content = []
                 
@@ -198,9 +205,9 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
             elif current_file is not None:
                 current_content.append(line)
         
-        # Check if we have any unclosed tags for allowed files
+        # Check if we have any unclosed markers for allowed files
         if current_file is not None and current_file in allowed_files:
-            raise ValueError(f"Invalid response format: Unclosed tag for file {current_file}")
+            raise ValueError(f"Invalid response format: Unclosed marker for file {current_file}")
             
         return updated_write_files
 
@@ -242,7 +249,7 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         try:
             logger.debug(f"Sending prompt to LLM")
             response = self.llm_client.chat_completion(messages)
-            logger.debug(f"Received response from LLM")
+            logger.debug(f"Received response from LLM: {response}")
             
         except Exception as e:
             logger.error(f"Error during LLM completion or file writing: {str(e)}")
