@@ -19,6 +19,7 @@ class GeneralConfig:
     plausibility_test: bool = True
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
+    run_error_analysis: bool = True  # Whether to run error analysis after failures
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
     max_retries: int = 4
     max_retries_protoblock_creation: int = 4

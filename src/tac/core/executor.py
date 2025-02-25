@@ -124,7 +124,7 @@ class ProtoBlockExecutor:
         self.protoblock_id = protoblock.block_id
         try:
             execution_success = False
-            analysis = None
+            analysis = ""  # Initialize as empty string instead of None
             
             try:
                 # Write log before task execution
@@ -148,6 +148,10 @@ class ProtoBlockExecutor:
                     error_msg,
                     self.codebase
                 )
+
+                # If run_error_analysis is disabled, set error_analysis to empty string
+                if not config.general.run_error_analysis:
+                    error_analysis = ""
 
                 execution_success = False
                 failure_type = "Exception during agent execution"
@@ -179,16 +183,17 @@ class ProtoBlockExecutor:
             if not test_success:
                 failure_type = "Unit tests failed"
                 execution_success = False
-                error_analysis = "None"
+                error_analysis = ""  # Initialize as empty string instead of "None"
                 logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
 
                 if idx_attempt < config.general.max_retries - 1:
-                    error_analysis = self.error_analyzer.analyze_failure(
-                        self.protoblock, 
-                        test_results,
-                        self.codebase
-                    )
-                    logger.debug(f"Error Analysis: {error_analysis}")
+                    if config.general.run_error_analysis:
+                        error_analysis = self.error_analyzer.analyze_failure(
+                            self.protoblock, 
+                            test_results,
+                            self.codebase
+                        )
+                        logger.debug(f"Error Analysis: {error_analysis}")
                 else:
                     logger.debug("Software test result: FAILURE!")
 
@@ -202,6 +207,11 @@ class ProtoBlockExecutor:
                 # Get git diff for plausibility check
                 git_diff = self.git_manager.get_complete_diff()
                 plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, git_diff, self.codebase)
+                
+                # If run_error_analysis is disabled, set error_analysis to empty string
+                if not config.general.run_error_analysis:
+                    error_analysis = ""
+                    
                 if not plausibility_check_success:
                     failure_type = "Plausibility check failed"
                     execution_success = False
@@ -211,11 +221,11 @@ class ProtoBlockExecutor:
                     # If we got here, both tests and plausibility check (if enabled) passed
                     logger.info(f"Plausibility check passed with score: {final_plausibility_score}")
                     execution_success = True
-                    return execution_success, None, None
+                    return execution_success, None, ""  # Return empty string instead of None
             else:
                 logger.debug("Plausibility check disabled")
                 execution_success = True
-                return execution_success, None, None
+                return execution_success, None, ""  # Return empty string instead of None
 
             
         except KeyboardInterrupt:

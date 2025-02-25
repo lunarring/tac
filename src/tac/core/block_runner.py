@@ -52,7 +52,7 @@ class BlockRunner:
         else:
             # Create protoblock using factory
             factory = ProtoBlockFactory()
-            if error_analysis:
+            if error_analysis and config.general.run_error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
             else:
@@ -114,7 +114,7 @@ class BlockRunner:
         # Here we enter the loop for trying to make protoblock and executing it!
         logger.info(f"Starting execution loop, using max_retries={max_retries} from config")
 
-        error_analysis = None
+        error_analysis = ""  # Initialize as empty string instead of None
 
         for idx_attempt in range(max_retries):
             logger.info("="*60)
@@ -147,11 +147,18 @@ class BlockRunner:
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}")
                 logger.error("="*50)
-                logger.error(error_analysis)
+                
+                # Only log error analysis if run_error_analysis is enabled in config
+                if config.general.run_error_analysis and error_analysis:
+                    logger.error(error_analysis)
                 logger.error("="*50)
 
                 # Store the previous protoblock
                 self.store_previous_protoblock()
+                
+                # If run_error_analysis is disabled, set error_analysis to empty string
+                if not config.general.run_error_analysis:
+                    error_analysis = ""
             else:
                 return True
             
