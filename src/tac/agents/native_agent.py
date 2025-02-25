@@ -17,6 +17,8 @@ class NativeAgent(Agent):
         self.agent_config = config.get('aider', {})
         # Initialize LLM client with strong model for implementation
         self.llm_client = LLMClient(strength="strong")
+        # Initialize note attribute
+        self.note = ""
     
     def process_write_and_context_files(self, protoblock: ProtoBlock) -> tuple[list[str], list[str]]:
         # Deduplicate write_files using a set
@@ -150,21 +152,29 @@ import numpy as np
 a = np.random.randn(10, 10)
 ###END_FILE
 
+Additionally, below, you add a small note to the user about the changes you made, should be maximum three sentences. The format is:
+
+###NOTE:
+# insert the note here
+###END_NOTE
+
 REMEMBER: change as little as possible and ONLY implement functionality that is listed in the task description."""
         
         logger.debug(f"Native Agent Prompt: {prompt}")
 
         return prompt
 
-    def _deparse_llm_response(self, response: str, write_files: list[str]) -> dict[str, str]:
-        """Deparse the LLM response into a dictionary of file contents.
+    def _deparse_llm_response(self, response: str, write_files: list[str]) -> tuple[dict[str, str], str]:
+        """Deparse the LLM response into a dictionary of file contents and extract the note.
         
         Args:
             response: The raw response from the LLM
             write_files: List of allowed write file paths to validate against
             
         Returns:
-            Dictionary mapping write file paths to their updated contents
+            Tuple containing:
+                - Dictionary mapping write file paths to their updated contents
+                - String containing the extracted note (or empty string if no note found)
             
         Raises:
             ValueError: If response format is invalid
@@ -172,11 +182,31 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         updated_write_files = {}
         current_file = None
         current_content = []
+        note = ""
+        in_note = False
+        note_content = []
         
         # Convert write_files to set for faster lookup
         allowed_files = set(write_files)
         
         for line in response.split('\n'):
+            # Check for note start marker
+            if line.strip() == '###NOTE:':
+                in_note = True
+                continue
+                
+            # Check for note end marker
+            elif line.strip() == '###END_NOTE':
+                if in_note:
+                    note = '\n'.join(note_content)
+                    in_note = False
+                continue
+                
+            # Collect note content
+            if in_note:
+                note_content.append(line)
+                continue
+                
             # Check for file start marker
             if line.startswith('###FILE:'):
                 if current_file is not None:
@@ -209,7 +239,7 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         if current_file is not None and current_file in allowed_files:
             raise ValueError(f"Invalid response format: Unclosed marker for file {current_file}")
             
-        return updated_write_files
+        return updated_write_files, note
 
     def run(self, protoblock: ProtoBlock, previous_analysis: str = None) -> None:
         """
@@ -217,7 +247,11 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         
         Args:
             protoblock: The ProtoBlock instance containing task details and specifications
+            previous_analysis: Optional previous analysis result
         """
+        # Store the protoblock as an instance variable for use in execute_task
+        self.protoblock = protoblock
+        
         task_description = protoblock.task_description
         test_specification = protoblock.test_specification
         test_data_generation = protoblock.test_data_generation
@@ -261,14 +295,22 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
             raise ValueError("No response from LLM")
         
         # Deparse and validate the response
-        updated_write_files = self._deparse_llm_response(response, write_files)
+        updated_write_files, note = self._deparse_llm_response(response, write_files)
         
         # Write the updated contents to files
         for file_path, content in updated_write_files.items():
             with open(file_path, 'w') as f:
                 f.write(content)
             logger.info(f"Successfully wrote implementation to {file_path}")
+            
+        # Store the note as an instance variable
+        self.note = note
+        
+        # Log the note if one was provided
+        if note:
+            logger.info(f"Note from LLM: {note}")
 
     def execute_task(self, previous_error: str = None) -> None:
         """Legacy method to maintain compatibility with base Agent class"""
-        self.run(self.config) 
+        self.run(self.protoblock, previous_error)
+        # The note is now stored as an instance variable and can be accessed via self.note
