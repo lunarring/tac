@@ -192,9 +192,9 @@ class ProjectFiles:
         """
         Format all file summaries into a string representation.
         Each file's summary is formatted as:
-        <full path to file>
+        ###FILE: <full path to file>
         contents of summary
-        </full path to file>
+        ###END_FILE
         
         Returns:
             str: Formatted string containing all file summaries
@@ -209,7 +209,7 @@ class ProjectFiles:
                 summary = f"Error analyzing file: {file_info['error']}"
                 
             formatted_strings.append(
-                f"<{full_path}>\n{summary}\n</{full_path}>"
+                f"###FILE: {full_path}\n{summary}\n###END_FILE"
             )
         
         return "\n\n".join(formatted_strings)
