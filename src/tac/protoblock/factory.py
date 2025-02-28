@@ -204,6 +204,17 @@ stick exactly to the following output_format, filling in between <>
                     return False, f"All items in {key} must be strings", None
                 if not all(item.strip() for item in validated_data[key]):
                     return False, f"Empty or whitespace-only items not allowed in {key}", None
+                
+                # Ensure all paths are relative (not absolute)
+                for i, item in enumerate(validated_data[key]):
+                    if os.path.isabs(item):
+                        # Convert absolute path to relative path
+                        try:
+                            rel_path = os.path.relpath(item)
+                            validated_data[key][i] = rel_path
+                            logger.warning(f"Converted absolute path '{item}' to relative path '{rel_path}' in {key}")
+                        except ValueError:
+                            return False, f"Cannot convert absolute path '{item}' to relative path in {key}", None
 
             # Validate test file naming convention and location - only for files in tests/ directory
             for file_path in validated_data["write_files"]:
@@ -274,14 +285,18 @@ stick exactly to the following output_format, filling in between <>
                     preview = response[:200] + "..." if len(response) > 200 else response
                     raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
                 
+                # Ensure all paths are relative
+                write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in data["write_files"]]
+                context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in data.get("context_files", [])]
+                
                 # Create ProtoBlock directly
                 try:
                     protoblock = ProtoBlock(
                         task_description=data["task"]["specification"],
                         test_specification=data["test"]["specification"],
                         test_data_generation=data["test"]["data"],
-                        write_files=data["write_files"],
-                        context_files=data.get("context_files", []),
+                        write_files=write_files,
+                        context_files=context_files,
                         block_id=str(uuid.uuid4())[:6],
                         commit_message=f"tac: {data.get('commit_message', 'Update')}",
                         branch_name=data.get("branch_name")
@@ -319,6 +334,10 @@ stick exactly to the following output_format, filling in between <>
         Returns:
             Path to the saved protoblock file
         """
+        # Ensure all paths are relative
+        write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in block.write_files]
+        context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in block.context_files]
+        
         version_data = {
             "task": {
                 "specification": block.task_description
@@ -326,11 +345,11 @@ stick exactly to the following output_format, filling in between <>
             "test": {
                 "specification": block.test_specification,
                 "data": block.test_data_generation,
-                "replacements": block.write_files,
+                "replacements": write_files,
                 "results": block.test_results if block.test_results else None  # Ensure test results are included
             },
-            "write_files": block.write_files,
-            "context_files": block.context_files,
+            "write_files": write_files,
+            "context_files": context_files,
             "commit_message": block.commit_message,
             "branch_name": block.branch_name,
             "timestamp": datetime.now().isoformat()

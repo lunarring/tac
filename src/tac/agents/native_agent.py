@@ -23,10 +23,8 @@ class NativeAgent(Agent):
     def process_write_and_context_files(self, protoblock: ProtoBlock) -> tuple[list[str], list[str]]:
         # Deduplicate write_files using a set
         write_files = list(set(protoblock.write_files))
-            
-        # Filter out any files that are already in write_files from context_files using sets
-        context_files = list(set(f for f in protoblock.context_files if f not in write_files))
-
+        context_files = list(set(protoblock.context_files))
+        
         # Validate and clean file paths
         if isinstance(write_files, str):
             logger.warning("write_files is a string, converting to list")
@@ -34,6 +32,10 @@ class NativeAgent(Agent):
         if isinstance(context_files, str):
             logger.warning("context_files is a string, converting to list")
             context_files = [context_files]
+        
+        # Ensure all paths are relative
+        write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in write_files]
+        context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in context_files]
             
         # Filter out context files that don't exist
         valid_context_files = []

@@ -150,12 +150,16 @@ def load_protoblock_from_json(json_path: str) -> ProtoBlock:
     task_data = version_data['task']
     test_data = version_data['test']
     
+    # Ensure all paths are relative
+    write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in version_data['write_files']]
+    context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in version_data.get('context_files', [])]
+    
     return ProtoBlock(
         task_description=task_data['specification'],
         test_specification=test_data['specification'],
         test_data_generation=test_data['data'],
-        write_files=version_data['write_files'],
-        context_files=version_data.get('context_files', []),
+        write_files=write_files,
+        context_files=context_files,
         block_id=block_id,
         commit_message=version_data.get('commit_message')
     )
