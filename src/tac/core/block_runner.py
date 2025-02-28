@@ -161,17 +161,29 @@ class BlockRunner:
                 if not config.general.run_error_analysis:
                     error_analysis = ""
             else:
+                # Handle git operations if enabled and execution was successful
+                if config.git.enabled:
+                    commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                    if not commit_success:
+                        logger.error("Failed to commit changes")
+                        return False
                 return True
             
-        # Handle git operations if enabled and execution was successful
-        if execution_success and config.git.enabled:
-            commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
-            if not commit_success:
-                logger.error("Failed to commit changes")
-                return False
-            return True
-        else:
-            return False
+        # If we've reached here, all attempts failed
+        if config.git.enabled and self.protoblock:
+            current_branch = self.git_manager.get_current_branch()
+            base_branch = self.git_manager.base_branch if self.git_manager.base_branch else "main"
+            
+            # Print cleanup instructions
+            logger.error("="*80)
+            logger.error("❌ All execution attempts failed")
+            logger.error("="*80)
+            logger.error("📋 Git Cleanup Commands:")
+            logger.error(f"  To switch back to your main branch and clean up:")
+            logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
+            logger.error("="*80)
+            
+        return False
 
 
 
