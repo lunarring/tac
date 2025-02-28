@@ -60,6 +60,7 @@ Here are the full task instructions:
 9. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
    - This branch name should be prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication')
    - The branch name should be descriptive of the overall task, not individual chunks
+10. Each chunk should include its own tests where appropriate - no separate integration test is needed
 </chunking_rules>
 
 <output_format>
@@ -73,7 +74,7 @@ Provide your analysis in the following JSON format:
   "chunks": [
     {{
       "title": "Short descriptive title for chunk 1",
-      "description": "Detailed description of what should be implemented in this chunk",
+      "description": "Detailed description of what should be implemented in this chunk, including any necessary tests",
       "dependencies": ["Any prerequisite chunks by title, if applicable"]
     }},
     ...additional chunks...

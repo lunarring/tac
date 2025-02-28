@@ -635,6 +635,15 @@ def main():
                 if config.git.enabled and original_branch and git_manager:
                     print(f"\n🔄 Switching back to branch: {original_branch}")
                     git_manager.checkout_branch(original_branch)
+                
+                if success:
+                    print("\n✅ Task completed successfully!")
+                    print("Each chunk included its own tests, so no additional integration tests are needed.")
+                    logger.info("Task completed successfully with per-chunk tests.")
+                else:
+                    print("\n❌ Task execution failed.")
+                    logger.error("Task execution failed.")
+                    sys.exit(1)
             else:
                 # Get task instructions directly from args.instructions or voice_instructions
                 if voice_ui is not None:
