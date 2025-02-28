@@ -217,7 +217,7 @@ class TaskChunker:
         try:
             # Prepare prompt
             chunking_prompt = f"""<purpose>
-You are a senior software engineer tasked with breaking down a complex programming task into smaller, manageable chunks. Your goal is to analyze the task instructions and determine the optimal way to split them into separate sub-tasks that can be implemented independently or in sequence.
+You are a senior software engineer tasked with breaking down a complex programming task into smaller, manageable chunks. Your goal is to analyze the task instructions and determine the optimal way to split them into separate sub-tasks that can be implemented independently or in sequence. It is important that the chain of chunks is complete and that each chunk is self-contained and can be reasonably implemented.
 </purpose>
 
 Here is a summary of the codebase:
@@ -235,7 +235,7 @@ Here are the full task instructions:
 2. Identify logical boundaries where the task can be split
 3. Consider dependencies between different parts of the task
 4. Ensure each chunk is self-contained and can be reasonably implemented
-5. Prioritize chunks based on dependencies (what needs to be done first)
+5. Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
 6. Keep the number of chunks reasonable (typically 1-10 chunks, depending on complexity)
 7. For simple tasks, it's perfectly acceptable to have just 1 chunk
 8. For very complex tasks, don't exceed 10 chunks to maintain manageability

@@ -55,20 +55,20 @@ class ProtoBlockFactory:
 - Bring everything into the right format and structure as outlines below.
 </planning_rules>
 
-stick exactly to the following output_format, filling in between <>
+stick exactly to the following output_format, filling in between ...
 <output_format>
 {{
     "task": {{
-        "specification": "<>",
+        "specification": "...",
     }},
     "test": {{
-        "specification": "<>",
-        "data": "<>"
+        "specification": "...",
+        "data": "..."
     }},
-    "write_files": [<>"],
-    "context_files": ["<>"],
-    "commit_message": "<>",
-    "branch_name": "<>"
+    "write_files": ["..."],
+    "context_files": ["..."],
+    "commit_message": "...",
+    "branch_name": "..."
     
 }}
 </output_format_explained>
@@ -288,6 +288,9 @@ stick exactly to the following output_format, filling in between <>
                 # Ensure all paths are relative
                 write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in data["write_files"]]
                 context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in data.get("context_files", [])]
+
+                # Remove any context files that are also in write_files to avoid duplication
+                context_files = [file for file in context_files if file not in write_files]
                 
                 # Create ProtoBlock directly
                 try:
