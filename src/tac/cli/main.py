@@ -535,9 +535,9 @@ def main():
                 chunking_result = task_chunker.chunk(task_instructions, codebase)
                 
                 # Get the chunks from the result
-                chunked_tasks = chunking_result.chunks
+                chunks = chunking_result.chunks
                 
-                logger.info(f"Task chunked into {len(chunked_tasks)} parts")
+                logger.info(f"Task chunked into {len(chunks)} parts")
                 
                 # Get branch name directly from the result
                 branch_name = chunking_result.branch_name
@@ -549,33 +549,18 @@ def main():
                 print("\n🔍 Task Analysis Complete")
                 if chunking_result.strategy:
                     print(f"Strategy: {chunking_result.strategy}")
-                print(f"The task has been divided into {len(chunked_tasks)} parts")
+                print(f"The task has been divided into {len(chunks)} parts")
                 if branch_name:
                     print(f"🌿 Git Branch: {branch_name}\n")
                 else:
                     print()
                 
                 # Display chunks with 1-based indexing for user-friendly output
-                for i, chunk in enumerate(chunked_tasks):
+                for i, chunk in enumerate(chunks):
                     # Display chunk with commit message but without branch name
                     print(f"--- Chunk {i+1} ---")
-                    # Remove Git Branch line from display and skip the title line
-                    chunk_lines = []
-                    skip_next = False
-                    for line in chunk.split('\n'):
-                        if line.startswith("# "):
-                            # Skip the title line
-                            continue
-                        elif line.startswith("Git Branch:"):
-                            # Skip Git Branch line
-                            continue
-                        elif not line.strip() and not chunk_lines:
-                            # Skip initial empty lines after title
-                            continue
-                        else:
-                            chunk_lines.append(line)
-                    
-                    print('\n'.join(chunk_lines))
+                    # Display the chunk content without title and branch name
+                    print(chunk.get_display_content())
                     print(f"📝 Commit: {commit_messages[i]}")
                     print()
                 
@@ -598,11 +583,14 @@ def main():
                 
                 # Execute each chunk sequentially with 0-based indexing
                 success = True
-                for i, chunk in enumerate(chunked_tasks):
-                    print(f"\n🚀 Executing Chunk {i+1}/{len(chunked_tasks)}...")
+                for i, chunk in enumerate(chunks):
+                    print(f"\n🚀 Executing Chunk {i+1}/{len(chunks)}...")
+                    
+                    # Convert the chunk to text for the BlockRunner
+                    chunk_text = chunk.to_text()
                     
                     # Execute the chunk
-                    block_runner = BlockRunner(chunk, codebase, args.json)
+                    block_runner = BlockRunner(chunk_text, codebase, args.json)
                     chunk_success = block_runner.run_loop()
                     
                     if not chunk_success:

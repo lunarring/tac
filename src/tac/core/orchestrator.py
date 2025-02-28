@@ -7,12 +7,147 @@ from tac.core.config import config
 logger = logging.getLogger(__name__)
 
 
+class Chunk:
+    """
+    Represents a single chunk of a task to be implemented.
+    """
+    def __init__(self, 
+                 title: str, 
+                 description: str, 
+                 branch_name: str,
+                 dependencies: List[str] = None):
+        self.title = title
+        self.description = description
+        self.branch_name = branch_name
+        self.dependencies = dependencies or []
+        
+    @classmethod
+    def from_text(cls, text: str) -> 'Chunk':
+        """
+        Create a Chunk object from a text representation.
+        
+        Args:
+            text: The text representation of the chunk
+            
+        Returns:
+            Chunk: A new Chunk object
+        """
+        title = "Untitled Chunk"
+        description_lines = []
+        branch_name = None
+        dependencies = []
+        
+        # Parse the text to extract title, description, and branch name
+        lines = text.split('\n')
+        in_description = False
+        skip_empty_lines = True
+        
+        for line in lines:
+            if line.startswith("# "):
+                title = line[2:].strip()
+                skip_empty_lines = True  # Skip empty lines after title
+            elif line.startswith("Git Branch:"):
+                branch_name = line.replace("Git Branch:", "").strip()
+            elif line.startswith("Dependencies:"):
+                deps = line.replace("Dependencies:", "").strip()
+                dependencies = [d.strip() for d in deps.split(",")]
+            elif not line.strip() and skip_empty_lines:
+                # Skip empty lines after title or at the beginning
+                continue
+            else:
+                skip_empty_lines = False  # Stop skipping empty lines once we have content
+                description_lines.append(line)
+        
+        # Join the description lines
+        description = '\n'.join(description_lines)
+        
+        return cls(
+            title=title,
+            description=description,
+            branch_name=branch_name,
+            dependencies=dependencies
+        )
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], branch_name: str = None) -> 'Chunk':
+        """
+        Create a Chunk object from a dictionary.
+        
+        Args:
+            data: The dictionary containing chunk data
+            branch_name: Optional branch name to use if not in the data
+            
+        Returns:
+            Chunk: A new Chunk object
+        """
+        title = data.get("title", "Untitled Chunk")
+        description = data.get("description", "")
+        chunk_branch_name = data.get("branch_name", branch_name)
+        dependencies = data.get("dependencies", [])
+        
+        return cls(
+            title=title,
+            description=description,
+            branch_name=chunk_branch_name,
+            dependencies=dependencies
+        )
+    
+    def to_text(self) -> str:
+        """
+        Convert the chunk to a text representation.
+        
+        Returns:
+            str: The text representation of the chunk
+        """
+        text = f"# {self.title}\n\n{self.description}"
+        
+        if self.dependencies:
+            text += f"\n\nDependencies: {', '.join(self.dependencies)}"
+        
+        if self.branch_name:
+            text += f"\n\nGit Branch: {self.branch_name}"
+            
+        return text
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the chunk to a dictionary representation.
+        
+        Returns:
+            Dict[str, Any]: The dictionary representation of the chunk
+        """
+        return {
+            "title": self.title,
+            "description": self.description,
+            "branch_name": self.branch_name,
+            "dependencies": self.dependencies
+        }
+    
+    def get_commit_message(self) -> str:
+        """
+        Generate a commit message for this chunk.
+        
+        Returns:
+            str: The commit message
+        """
+        return f"Implement {self.title}"
+    
+    def get_display_content(self) -> str:
+        """
+        Get the content to display to the user, without title and branch name.
+        
+        Returns:
+            str: The content to display
+        """
+        return self.description
+
+
 class ChunkingResult:
     """
     Represents the complete result of a task chunking operation.
     """
     def __init__(self, 
-                 chunks: List[str], 
+                 chunks: List[Chunk], 
                  branch_name: str, 
                  analysis: str = None,
                  strategy: str = None,
@@ -25,6 +160,16 @@ class ChunkingResult:
         self.num_chunks = num_chunks or len(chunks)
         self.raw_data = raw_data or {}
         
+    @property
+    def text_chunks(self) -> List[str]:
+        """
+        Get the chunks as text representations for backward compatibility.
+        
+        Returns:
+            List[str]: The chunks as text
+        """
+        return [chunk.to_text() for chunk in self.chunks]
+        
     def to_dict(self) -> Dict[str, Any]:
         """Convert the chunking result to a dictionary representation."""
         return {
@@ -32,26 +177,17 @@ class ChunkingResult:
             "analysis": self.analysis,
             "strategy": self.strategy,
             "num_chunks": self.num_chunks,
-            "chunks": self.chunks,
+            "chunks": [chunk.to_dict() for chunk in self.chunks],
             "raw_data": self.raw_data
         }
     
     def get_chunk_titles(self) -> List[str]:
         """Extract titles from chunks."""
-        titles = []
-        for chunk in self.chunks:
-            for line in chunk.split('\n'):
-                if line.startswith("# "):
-                    titles.append(line[2:])
-                    break
-            else:
-                titles.append(f"Chunk {len(titles)+1}")
-        return titles
+        return [chunk.title for chunk in self.chunks]
         
     def get_commit_messages(self) -> List[str]:
         """Generate commit messages for each chunk."""
-        titles = self.get_chunk_titles()
-        return [f"Implement {title}" for title in titles]
+        return [chunk.get_commit_message() for chunk in self.chunks]
 
 
 class TaskChunker:
@@ -175,21 +311,13 @@ Provide your analysis in the following JSON format:
                 
                 logger.info(f"Using branch name for all chunks: {branch_name}")
                 
-                # Extract the chunk descriptions
+                # Extract the chunk descriptions and create Chunk objects
                 chunks = []
-                for chunk in chunk_data["chunks"]:
-                    if "title" in chunk and "description" in chunk:
-                        chunk_text = f"# {chunk['title']}\n\n{chunk['description']}"
-                        
-                        # Add dependencies if present
-                        if "dependencies" in chunk and chunk["dependencies"]:
-                            dependencies = ", ".join(chunk["dependencies"])
-                            chunk_text += f"\n\nDependencies: {dependencies}"
-                        
-                        # Add the same branch name to all chunks
-                        chunk_text += f"\n\nGit Branch: {branch_name}"
-                            
-                        chunks.append(chunk_text)
+                for chunk_dict in chunk_data["chunks"]:
+                    if "title" in chunk_dict and "description" in chunk_dict:
+                        # Create a Chunk object using from_dict
+                        chunk = Chunk.from_dict(chunk_dict, branch_name=branch_name)
+                        chunks.append(chunk)
                 
                 if not chunks:
                     logger.warning("No valid chunks found, returning original as single chunk")
@@ -238,11 +366,15 @@ Provide your analysis in the following JSON format:
         branch_name = f"tac/feature/{feature_name}"
         
         # Create a single chunk with the original task
-        chunk_text = f"# Complete Task Implementation\n\n{task_instructions}\n\nGit Branch: {branch_name}"
+        chunk = Chunk(
+            title="Complete Task Implementation",
+            description=task_instructions,
+            branch_name=branch_name
+        )
         
         # Create and return the result
         return ChunkingResult(
-            chunks=[chunk_text],
+            chunks=[chunk],
             branch_name=branch_name,
             analysis="Task was not chunked due to processing error or invalid response",
             strategy="Task was not chunked due to processing error or invalid response",
