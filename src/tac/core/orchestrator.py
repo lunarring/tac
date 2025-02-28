@@ -1,11 +1,57 @@
 import logging
 import json
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
 
 logger = logging.getLogger(__name__)
 
+
+class ChunkingResult:
+    """
+    Represents the complete result of a task chunking operation.
+    """
+    def __init__(self, 
+                 chunks: List[str], 
+                 branch_name: str, 
+                 analysis: str = None,
+                 strategy: str = None,
+                 num_chunks: int = None,
+                 raw_data: Dict[str, Any] = None):
+        self.chunks = chunks
+        self.branch_name = branch_name
+        self.analysis = analysis
+        self.strategy = strategy or analysis  # Use strategy if provided, otherwise fall back to analysis
+        self.num_chunks = num_chunks or len(chunks)
+        self.raw_data = raw_data or {}
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the chunking result to a dictionary representation."""
+        return {
+            "branch_name": self.branch_name,
+            "analysis": self.analysis,
+            "strategy": self.strategy,
+            "num_chunks": self.num_chunks,
+            "chunks": self.chunks,
+            "raw_data": self.raw_data
+        }
+    
+    def get_chunk_titles(self) -> List[str]:
+        """Extract titles from chunks."""
+        titles = []
+        for chunk in self.chunks:
+            for line in chunk.split('\n'):
+                if line.startswith("# "):
+                    titles.append(line[2:])
+                    break
+            else:
+                titles.append(f"Chunk {len(titles)+1}")
+        return titles
+        
+    def get_commit_messages(self) -> List[str]:
+        """Generate commit messages for each chunk."""
+        titles = self.get_chunk_titles()
+        return [f"Implement {title}" for title in titles]
 
 
 class TaskChunker:
@@ -18,7 +64,7 @@ class TaskChunker:
         logger.info("Initializing TaskChunker")
         self.llm_client = LLMClient(strength="strong")
     
-    def chunk(self, task_instructions: str, codebase: str) -> List[str]:
+    def chunk(self, task_instructions: str, codebase: str) -> ChunkingResult:
         """
         Analyzes the task instructions and splits them into appropriate chunks.
         
@@ -27,7 +73,7 @@ class TaskChunker:
             codebase: A summary of the codebase for context
             
         Returns:
-            List[str]: A list of chunked task instructions
+            ChunkingResult: A structured result containing all chunks and metadata
         """
         logger.info("Starting LLM-based task chunking")
         logger.debug(f"Task instructions length: {len(task_instructions)}")
@@ -54,9 +100,9 @@ Here are the full task instructions:
 3. Consider dependencies between different parts of the task
 4. Ensure each chunk is self-contained and can be reasonably implemented
 5. Prioritize chunks based on dependencies (what needs to be done first)
-6. Keep the number of chunks reasonable (typically 1-5 chunks, depending on complexity)
+6. Keep the number of chunks reasonable (typically 1-10 chunks, depending on complexity)
 7. For simple tasks, it's perfectly acceptable to have just 1 chunk
-8. For very complex tasks, don't exceed 5 chunks to maintain manageability
+8. For very complex tasks, don't exceed 10 chunks to maintain manageability
 9. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
    - This branch name should be prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication')
    - The branch name should be descriptive of the overall task, not individual chunks
@@ -68,14 +114,12 @@ Provide your analysis in the following JSON format:
 
 ```json
 {{
-  "analysis": "Brief explanation of your chunking strategy and reasoning",
-  "num_chunks": n,
+  "strategy": "Explain briefly what you did, and why you go for this chunking strategy",
   "branch_name": "tac/feature/descriptive-git-branch-name-for-entire-task",
   "chunks": [
     {{
       "title": "Short descriptive title for chunk 1",
-      "description": "Detailed description of what should be implemented in this chunk, including any necessary tests",
-      "dependencies": ["Any prerequisite chunks by title, if applicable"]
+      "description": "Detailed description of what should be implemented in this chunk, including any necessary tests, write one long description text without any formatting or line breaks."
     }},
     ...additional chunks...
   ]
@@ -95,7 +139,7 @@ Provide your analysis in the following JSON format:
             
             if not response or not response.strip():
                 logger.error("Received empty response from LLM")
-                return [task_instructions]  # Return original as single chunk if failed
+                return self._create_default_result(task_instructions)
             
             logger.info("Successfully received LLM response")
             logger.debug(f"LLM response:\n{response}")
@@ -104,7 +148,7 @@ Provide your analysis in the following JSON format:
             json_content = self._extract_json(response)
             if not json_content:
                 logger.warning("Could not extract valid JSON from LLM response, returning original as single chunk")
-                return [task_instructions]
+                return self._create_default_result(task_instructions)
                 
             try:
                 chunk_data = json.loads(json_content)
@@ -112,7 +156,7 @@ Provide your analysis in the following JSON format:
                 # Validate the structure
                 if not isinstance(chunk_data, dict) or "chunks" not in chunk_data or not isinstance(chunk_data["chunks"], list):
                     logger.warning("Invalid chunk data structure, returning original as single chunk")
-                    return [task_instructions]
+                    return self._create_default_result(task_instructions)
                 
                 # Get the branch name for the entire task
                 branch_name = None
@@ -149,18 +193,62 @@ Provide your analysis in the following JSON format:
                 
                 if not chunks:
                     logger.warning("No valid chunks found, returning original as single chunk")
-                    return [task_instructions]
+                    return self._create_default_result(task_instructions)
+                
+                # Create and return the ChunkingResult
+                analysis = chunk_data.get("analysis", "Task chunked successfully")
+                strategy = chunk_data.get("strategy", analysis)
+                num_chunks = chunk_data.get("num_chunks", len(chunks))
+                
+                result = ChunkingResult(
+                    chunks=chunks,
+                    branch_name=branch_name,
+                    analysis=analysis,
+                    strategy=strategy,
+                    num_chunks=num_chunks,
+                    raw_data=chunk_data
+                )
                     
                 logger.info(f"Successfully chunked task into {len(chunks)} parts")
-                return chunks
+                return result
                 
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding JSON from LLM response: {str(e)}")
-                return [task_instructions]
+                return self._create_default_result(task_instructions)
                 
         except Exception as e:
             logger.error(f"Error during task chunking: {str(e)}", exc_info=True)
-            return [task_instructions]  # Return original as single chunk if failed
+            return self._create_default_result(task_instructions)
+    
+    def _create_default_result(self, task_instructions: str) -> ChunkingResult:
+        """
+        Creates a default ChunkingResult with a single chunk containing the original task.
+        
+        Args:
+            task_instructions: The original task instructions
+            
+        Returns:
+            ChunkingResult: A default chunking result with one chunk
+        """
+        # Create a default branch name
+        words = task_instructions.split()[:5]
+        feature_name = "-".join([w.lower() for w in words if w.isalnum()])
+        if not feature_name:
+            feature_name = "task-implementation"
+        branch_name = f"tac/feature/{feature_name}"
+        
+        # Create a single chunk with the original task
+        chunk_text = f"# Complete Task Implementation\n\n{task_instructions}\n\nGit Branch: {branch_name}"
+        
+        # Create and return the result
+        return ChunkingResult(
+            chunks=[chunk_text],
+            branch_name=branch_name,
+            analysis="Task was not chunked due to processing error or invalid response",
+            strategy="Task was not chunked due to processing error or invalid response",
+            num_chunks=1,
+            raw_data={"error": "Failed to process task chunking"}
+        )
     
     def _extract_json(self, text: str) -> Optional[str]:
         """

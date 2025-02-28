@@ -532,33 +532,23 @@ def main():
                 logger.info("Using orchestrator to chunk task instructions")
                 # Instantiate the TaskChunker directly
                 task_chunker = TaskChunker()
-                chunked_tasks = task_chunker.chunk(task_instructions, codebase)
+                chunking_result = task_chunker.chunk(task_instructions, codebase)
+                
+                # Get the chunks from the result
+                chunked_tasks = chunking_result.chunks
                 
                 logger.info(f"Task chunked into {len(chunked_tasks)} parts")
                 
-                # Create a single branch name for the entire task
-                branch_name = None
+                # Get branch name directly from the result
+                branch_name = chunking_result.branch_name
                 
-                # Extract branch name from the first chunk (all chunks now have the same branch name)
-                if chunked_tasks and config.git.enabled:
-                    for line in chunked_tasks[0].split('\n'):
-                        if line.startswith("Git Branch:"):
-                            branch_name = line.replace("Git Branch:", "").strip()
-                            break
-                    
-                    # If no branch name found, generate a default one
-                    if not branch_name:
-                        # Create a branch name based on the first few words of the task
-                        words = task_instructions.split()[:5]
-                        feature_name = "-".join([w.lower() for w in words if w.isalnum()])
-                        if not feature_name:
-                            feature_name = "task-implementation"
-                        
-                        # Add the tac/feature/ prefix
-                        branch_name = f"tac/feature/{feature_name}"
+                # Get commit messages for each chunk
+                commit_messages = chunking_result.get_commit_messages()
                 
                 # Display the chunked tasks with commit messages
                 print("\n🔍 Task Analysis Complete")
+                if chunking_result.strategy:
+                    print(f"Strategy: {chunking_result.strategy}")
                 print(f"The task has been divided into {len(chunked_tasks)} parts")
                 if branch_name:
                     print(f"🌿 Git Branch: {branch_name}\n")
@@ -567,22 +557,26 @@ def main():
                 
                 # Display chunks with 1-based indexing for user-friendly output
                 for i, chunk in enumerate(chunked_tasks):
-                    # Extract chunk title for display
-                    chunk_title = f"Chunk {i+1}"
-                    for line in chunk.split('\n'):
-                        if line.startswith("# "):
-                            chunk_title = line[2:]
-                            break
-                    
-                    # Create commit message
-                    commit_message = f"Implement {chunk_title}"
-                    
                     # Display chunk with commit message but without branch name
                     print(f"--- Chunk {i+1} ---")
-                    # Remove Git Branch line from display
-                    chunk_lines = [line for line in chunk.split('\n') if not line.startswith("Git Branch:")]
+                    # Remove Git Branch line from display and skip the title line
+                    chunk_lines = []
+                    skip_next = False
+                    for line in chunk.split('\n'):
+                        if line.startswith("# "):
+                            # Skip the title line
+                            continue
+                        elif line.startswith("Git Branch:"):
+                            # Skip Git Branch line
+                            continue
+                        elif not line.strip() and not chunk_lines:
+                            # Skip initial empty lines after title
+                            continue
+                        else:
+                            chunk_lines.append(line)
+                    
                     print('\n'.join(chunk_lines))
-                    print(f"📝 Commit: {commit_message}")
+                    print(f"📝 Commit: {commit_messages[i]}")
                     print()
                 
                 # Ask user if they want to proceed with execution
@@ -607,13 +601,6 @@ def main():
                 for i, chunk in enumerate(chunked_tasks):
                     print(f"\n🚀 Executing Chunk {i+1}/{len(chunked_tasks)}...")
                     
-                    # Extract chunk title for commit message
-                    chunk_title = f"Chunk {i+1}"
-                    for line in chunk.split('\n'):
-                        if line.startswith("# "):
-                            chunk_title = line[2:]
-                            break
-                    
                     # Execute the chunk
                     block_runner = BlockRunner(chunk, codebase, args.json)
                     chunk_success = block_runner.run_loop()
@@ -627,7 +614,7 @@ def main():
                         
                         # Create a commit for this chunk if git is enabled
                         if config.git.enabled and git_manager:
-                            commit_message = f"Implement {chunk_title}"
+                            commit_message = commit_messages[i]
                             print(f"\n📝 Creating commit: {commit_message}")
                             git_manager.commit(commit_message)
                 
