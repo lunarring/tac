@@ -77,7 +77,20 @@ class TestRunner:
                 sys.path.insert(0, os.getcwd())
             
             # Run pytest with captured output
-            args = ['-v', '--disable-warnings', test_target]
+            args = ['-v', '--disable-warnings']
+            
+            # If test_path is a file, use it directly
+            # If it's a directory, use a pattern to find all test files
+            if os.path.isfile(test_target):
+                args.append(test_target)
+            else:
+                # Use a more explicit pattern to find all test files
+                args.extend([test_target, '--collect-only'])
+                # First collect all tests to ensure we're finding everything
+                collection_exit_code = pytest.main(args, plugins=[])
+                # Then run the actual tests
+                args = ['-v', '--disable-warnings', test_target]
+            
             exit_code = pytest.main(args, plugins=plugins)
             
             # Process results
