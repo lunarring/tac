@@ -537,7 +537,7 @@ def main():
                 # Get the chunks from the result
                 chunks = chunking_result.chunks
                 
-                logger.info(f"Task chunked into {len(chunks)} parts")
+                logger.info(f"Task chunked into {len(chunks)} potential blocks (chunks)")
                 
                 # Get branch name directly from the result
                 branch_name = chunking_result.branch_name
@@ -564,27 +564,43 @@ def main():
                     print(f"📝 Commit: {commit_messages[i]}")
                     print()
                 
-                # Ask user if they want to proceed with execution
-                proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+                # # Ask user if they want to proceed with execution
+                # proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
                 
-                if proceed != 'y':
-                    print("Execution cancelled by user.")
-                    sys.exit(0)
+                # if proceed != 'y':
+                #     print("Execution cancelled by user.")
+                #     sys.exit(0)
                 
                 logger.info(f"Using branch name: {branch_name}")
                 
                 # Switch to branch if git is enabled and branch name is available
                 original_branch = None
                 if config.git.enabled and branch_name and git_manager:
-                    original_branch = git_manager.current_branch()
+                    original_branch = git_manager.get_current_branch()
                     print(f"\n🔄 Switching to branch: {branch_name}")
                     if not git_manager.checkout_branch(branch_name, create=True):
                         print(f"Failed to switch to branch {branch_name}, continuing in current branch")
+                    
+                    # Inform user about commit behavior
+                    print("\n📝 Git behavior: Changes will be committed after each chunk but NOT pushed")
+                    print("   You can push changes manually after execution completes")
+                    print("   You will remain on the feature branch after execution completes")
                 
                 # Execute each chunk sequentially with 0-based indexing
                 success = True
+                
+                # Disable auto-push for orchestrator mode
+                if config.git.enabled:
+                    config.override_with_dict({'git': {'auto_push_if_success': False}})
+                    logger.info("Auto-push disabled for orchestrator mode (commits will be created but not pushed)")
+                
                 for i, chunk in enumerate(chunks):
                     print(f"\n🚀 Executing Chunk {i+1}/{len(chunks)}...")
+
+                    # Update codebase if it's not the first chunk
+                    if i > 0:
+                        project_files.update_summaries()
+                        codebase = project_files.get_codebase_summary()
                     
                     # Convert the chunk to text for the BlockRunner
                     chunk_text = chunk.to_text()
@@ -606,14 +622,22 @@ def main():
                             print(f"\n📝 Creating commit: {commit_message}")
                             git_manager.commit(commit_message)
                 
-                # Switch back to original branch if needed
-                if config.git.enabled and original_branch and git_manager:
-                    print(f"\n🔄 Switching back to branch: {original_branch}")
-                    git_manager.checkout_branch(original_branch)
+                # Don't switch back to original branch - stay on feature branch
+                # if config.git.enabled and original_branch and git_manager:
+                #     print(f"\n🔄 Switching back to branch: {original_branch}")
+                #     git_manager.checkout_branch(original_branch)
                 
                 if success:
                     print("\n✅ Task completed successfully!")
                     print("Each chunk included its own tests, so no additional integration tests are needed.")
+                    
+                    # Add instructions for pushing changes if git is enabled
+                    if config.git.enabled and branch_name and git_manager:
+                        print(f"\n📝 Git status: All changes have been committed to branch '{branch_name}'")
+                        print(f"   You are now on the feature branch '{branch_name}' with all changes")
+                        print(f"   To push changes manually, run: git push origin {branch_name}")
+                        print(f"   To switch back to your original branch, run: git checkout {original_branch}")
+                    
                     logger.info("Task completed successfully with per-chunk tests.")
                 else:
                     print("\n❌ Task execution failed.")

@@ -315,6 +315,79 @@ class GitManager:
             logger.error(f"Failed to create or switch to TAC branch {tac_id}: {e}")
             return False
 
+    def checkout_branch(self, branch_name: str, create: bool = False) -> bool:
+        """Checkout an existing branch or create a new one if it doesn't exist.
+        
+        Args:
+            branch_name: Name of the branch to checkout
+            create: If True, create the branch if it doesn't exist
+            
+        Returns:
+            bool: True if checkout was successful, False otherwise
+        """
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return True
+            
+        if not self.repo:
+            logger.error("No git repository available")
+            return False
+            
+        try:
+            # Check if branch exists
+            branches = [b.name for b in self.repo.branches]
+            if branch_name in branches:
+                self.repo.git.checkout(branch_name)
+                logger.info(f"Switched to existing branch: {branch_name}")
+            elif create:
+                self.repo.git.checkout('-b', branch_name)
+                logger.info(f"Created and checked out new branch: {branch_name}")
+            else:
+                logger.error(f"Branch {branch_name} does not exist and create=False")
+                return False
+            return True
+        except git.exc.GitCommandError as e:
+            logger.error(f"Failed to checkout branch {branch_name}: {e}")
+            return False
+
+    def commit(self, commit_message: str) -> bool:
+        """Commit all changes with the given message.
+        
+        Args:
+            commit_message: Message for the commit
+            
+        Returns:
+            bool: True if commit was successful, False otherwise
+        """
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return True
+            
+        if not self.repo:
+            logger.error("No git repository available")
+            return False
+            
+        try:
+            # Stage all changes
+            self.repo.git.add('--all')
+            logger.debug("Staged all changes")
+            
+            # Commit changes
+            try:
+                self.repo.git.commit('-m', commit_message)
+                logger.info(f"Committed changes with message: {commit_message}")
+                return True
+            except git.exc.GitCommandError as commit_error:
+                # Check if the error is actually indicating success
+                if "nothing to commit" in str(commit_error):
+                    logger.info("Nothing to commit - working tree clean")
+                    return True
+                else:
+                    raise commit_error
+        except Exception as e:
+            logger.error(f"Failed to commit changes: {e}")
+            return False
+
     def get_github_web_url(self) -> str:
         """Get the GitHub web URL for the repository"""
         try:
