@@ -192,7 +192,7 @@ class ProjectFiles:
         """
         Format all file summaries into a string representation.
         Each file's summary is formatted as:
-        ###FILE: full path to file
+        ###FILE: relative path to file
         contents of summary
         ###END_FILE
         
@@ -203,13 +203,12 @@ class ProjectFiles:
         formatted_strings = []
         
         for rel_path, file_info in data["files"].items():
-            full_path = os.path.abspath(os.path.join(self.project_root, rel_path))
             summary = file_info.get("summary", "No summary available")
             if "error" in file_info:
                 summary = f"Error analyzing file: {file_info['error']}"
                 
             formatted_strings.append(
-                f"###FILE: {full_path}\n{summary}\n###END_FILE"
+                f"###FILE: {rel_path}\n{summary}\n###END_FILE"
             )
         
         return "\n\n".join(formatted_strings)
