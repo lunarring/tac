@@ -105,6 +105,9 @@ Keep descriptions technical and focus on functionality and interactions."""
 
             functions = []
             classes = []
+            methods_by_class = {}
+            
+            # First pass: collect classes and functions
             for defn in definitions:
                 if defn['type'] == 'function':
                     functions.append(f"{defn['name']} (lines {defn['start_line']}-{defn['end_line']})")
@@ -113,6 +116,20 @@ Keep descriptions technical and focus on functionality and interactions."""
                         "name": f"{defn['name']} (lines {defn['start_line']}-{defn['end_line']})",
                         "methods": []
                     })
+                    methods_by_class[defn['name']] = []
+                elif defn['type'] == 'method':
+                    class_name, method_name = defn['name'].split('.')
+                    method_str = f"{defn['name']} (lines {defn['start_line']}-{defn['end_line']})"
+                    if class_name in methods_by_class:
+                        methods_by_class[class_name].append(method_str)
+            
+            # Second pass: add methods to their classes
+            for cls in classes:
+                class_name = cls["name"].split(" (lines ")[0]
+                if class_name in methods_by_class:
+                    cls["methods"] = methods_by_class[class_name]
+                    # Also add methods to functions list so they get their own descriptions
+                    functions.extend(methods_by_class[class_name])
 
             summary = self._generate_detailed_summary(self.current_file_content, functions, classes)
             if summary.startswith("Error:"):
@@ -165,16 +182,28 @@ def extract_code_definitions(code: str):
                 'end_line': getattr(node, "end_lineno", node.lineno)
             })
         elif isinstance(node, ast.ClassDef):
-            definitions.append({
+            class_def = {
                 'type': 'class',
                 'name': node.name,
                 'start_line': node.lineno,
                 'end_line': getattr(node, "end_lineno", node.lineno)
-            })
+            }
+            definitions.append(class_def)
+            
+            # Extract methods within the class
+            for class_node in ast.iter_child_nodes(node):
+                if isinstance(class_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    method_name = f"{node.name}.{class_node.name}"
+                    definitions.append({
+                        'type': 'method',
+                        'name': method_name,
+                        'start_line': class_node.lineno,
+                        'end_line': getattr(class_node, "end_lineno", class_node.lineno)
+                    })
     
     return definitions
 
 
 if __name__ == "__main__":
     summarizer = FileSummarizer()
-    print(summarizer.analyze_file("src/tac/utils/file_summarizer.py"))
+    print(summarizer.analyze_file("tac/utils/file_summarizer.py"))
