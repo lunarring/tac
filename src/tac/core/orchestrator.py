@@ -159,6 +159,8 @@ class ChunkingResult:
         self.strategy = strategy or analysis  # Use strategy if provided, otherwise fall back to analysis
         self.num_chunks = num_chunks or len(chunks)
         self.raw_data = raw_data or {}
+        # Extract violated tests from raw_data if available
+        self.violated_tests = self.raw_data.get("list_of_violated_tests", []) if self.raw_data else []
         
     @property
     def text_chunks(self) -> List[str]:
@@ -178,6 +180,7 @@ class ChunkingResult:
             "strategy": self.strategy,
             "num_chunks": self.num_chunks,
             "chunks": [chunk.to_dict() for chunk in self.chunks],
+            "violated_tests": self.violated_tests,
             "raw_data": self.raw_data
         }
     
@@ -243,6 +246,7 @@ Here are the full task instructions:
    - This branch name should be prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication')
    - The branch name should be descriptive of the overall task, not individual chunks
 10. Each chunk should include its own tests where appropriate - no separate integration test is needed
+11. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
 </chunking_rules>
 
 <output_format>
@@ -252,6 +256,7 @@ Provide your analysis in the following JSON format:
 {{
   "strategy": "Explain briefly what you did, and why you go for this chunking strategy",
   "branch_name": "tac/feature/descriptive-git-branch-name-for-entire-task",
+  "list_of_violated_tests": ["tests/test_file1.py:test_name1", "tests/test_file2.py:test_name2"],
   "chunks": [
     {{
       "title": "Short descriptive title for chunk 1",
@@ -328,6 +333,10 @@ Provide your analysis in the following JSON format:
                 strategy = chunk_data.get("strategy", analysis)
                 num_chunks = chunk_data.get("num_chunks", len(chunks))
                 
+                # Ensure raw_data contains list_of_violated_tests if present in the response
+                if "list_of_violated_tests" not in chunk_data:
+                    chunk_data["list_of_violated_tests"] = []
+                
                 result = ChunkingResult(
                     chunks=chunks,
                     branch_name=branch_name,
@@ -379,7 +388,7 @@ Provide your analysis in the following JSON format:
             analysis="Task was not chunked due to processing error or invalid response",
             strategy="Task was not chunked due to processing error or invalid response",
             num_chunks=1,
-            raw_data={"error": "Failed to process task chunking"}
+            raw_data={"error": "Failed to process task chunking", "list_of_violated_tests": []}
         )
     
     def _extract_json(self, text: str) -> Optional[str]:

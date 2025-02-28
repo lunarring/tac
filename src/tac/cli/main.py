@@ -551,9 +551,16 @@ def main():
                     print(f"Strategy: {chunking_result.strategy}")
                 print(f"The task has been divided into {len(chunks)} parts")
                 if branch_name:
-                    print(f"🌿 Git Branch: {branch_name}\n")
+                    print(f"🌿 Git Branch: {branch_name}")
+                
+                # Display violated tests if any
+                if hasattr(chunking_result, 'violated_tests') and chunking_result.violated_tests:
+                    print("\n⚠️ Tests that may be violated by this chunking:")
+                    for test in chunking_result.violated_tests:
+                        print(f"  - {test}")
                 else:
-                    print()
+                    print("\n✅ No tests will be violated by this chunking")
+                
                 
                 # Display chunks with 1-based indexing for user-friendly output
                 for i, chunk in enumerate(chunks):
@@ -564,12 +571,12 @@ def main():
                     print(f"📝 Commit: {commit_messages[i]}")
                     print()
                 
-                # # Ask user if they want to proceed with execution
-                # proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+                # Ask user if they want to proceed with execution
+                proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
                 
-                # if proceed != 'y':
-                #     print("Execution cancelled by user.")
-                #     sys.exit(0)
+                if proceed != 'y':
+                    print("Execution cancelled by user.")
+                    sys.exit(0)
                 
                 logger.info(f"Using branch name: {branch_name}")
                 
