@@ -518,14 +518,131 @@ def main():
             project_files = ProjectFiles()
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
-            # Get task instructions directly from args.instructions or voice_instructions
-            if voice_ui is not None:
-                task_instructions = voice_ui.wait_until_prompt()
-            else:
-                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
 
-            block_runner = BlockRunner(task_instructions, codebase, args.json)
-            success = block_runner.run_loop()
+            
+            if config.general.use_orchestrator:
+                if voice_ui is not None:
+                    raise NotImplementedError("Voice UI is not supported with orchestrator")
+                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
+                
+                
+                # Implement orchestrator
+                from tac.core.orchestrator import TaskChunker
+                
+                logger.info("Using orchestrator to chunk task instructions")
+                # Instantiate the TaskChunker directly
+                task_chunker = TaskChunker()
+                chunked_tasks = task_chunker.chunk(task_instructions, codebase)
+                
+                logger.info(f"Task chunked into {len(chunked_tasks)} parts")
+                
+                # Create a single branch name for the entire task
+                branch_name = None
+                
+                # Extract branch name from the first chunk (all chunks now have the same branch name)
+                if chunked_tasks and config.git.enabled:
+                    for line in chunked_tasks[0].split('\n'):
+                        if line.startswith("Git Branch:"):
+                            branch_name = line.replace("Git Branch:", "").strip()
+                            break
+                    
+                    # If no branch name found, generate a default one
+                    if not branch_name:
+                        # Create a branch name based on the first few words of the task
+                        words = task_instructions.split()[:5]
+                        feature_name = "-".join([w.lower() for w in words if w.isalnum()])
+                        if not feature_name:
+                            feature_name = "task-implementation"
+                        
+                        # Add the tac/feature/ prefix
+                        branch_name = f"tac/feature/{feature_name}"
+                
+                # Display the chunked tasks with commit messages
+                print("\n🔍 Task Analysis Complete")
+                print(f"The task has been divided into {len(chunked_tasks)} parts")
+                if branch_name:
+                    print(f"🌿 Git Branch: {branch_name}\n")
+                else:
+                    print()
+                
+                # Display chunks with 1-based indexing for user-friendly output
+                for i, chunk in enumerate(chunked_tasks):
+                    # Extract chunk title for display
+                    chunk_title = f"Chunk {i+1}"
+                    for line in chunk.split('\n'):
+                        if line.startswith("# "):
+                            chunk_title = line[2:]
+                            break
+                    
+                    # Create commit message
+                    commit_message = f"Implement {chunk_title}"
+                    
+                    # Display chunk with commit message but without branch name
+                    print(f"--- Chunk {i+1} ---")
+                    # Remove Git Branch line from display
+                    chunk_lines = [line for line in chunk.split('\n') if not line.startswith("Git Branch:")]
+                    print('\n'.join(chunk_lines))
+                    print(f"📝 Commit: {commit_message}")
+                    print()
+                
+                # Ask user if they want to proceed with execution
+                proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+                
+                if proceed != 'y':
+                    print("Execution cancelled by user.")
+                    sys.exit(0)
+                
+                logger.info(f"Using branch name: {branch_name}")
+                
+                # Switch to branch if git is enabled and branch name is available
+                original_branch = None
+                if config.git.enabled and branch_name and git_manager:
+                    original_branch = git_manager.current_branch()
+                    print(f"\n🔄 Switching to branch: {branch_name}")
+                    if not git_manager.checkout_branch(branch_name, create=True):
+                        print(f"Failed to switch to branch {branch_name}, continuing in current branch")
+                
+                # Execute each chunk sequentially with 0-based indexing
+                success = True
+                for i, chunk in enumerate(chunked_tasks):
+                    print(f"\n🚀 Executing Chunk {i+1}/{len(chunked_tasks)}...")
+                    
+                    # Extract chunk title for commit message
+                    chunk_title = f"Chunk {i+1}"
+                    for line in chunk.split('\n'):
+                        if line.startswith("# "):
+                            chunk_title = line[2:]
+                            break
+                    
+                    # Execute the chunk
+                    block_runner = BlockRunner(chunk, codebase, args.json)
+                    chunk_success = block_runner.run_loop()
+                    
+                    if not chunk_success:
+                        print(f"\n❌ Chunk {i+1} execution failed.")
+                        success = False
+                        break
+                    else:
+                        print(f"\n✅ Chunk {i+1} completed successfully!")
+                        
+                        # Create a commit for this chunk if git is enabled
+                        if config.git.enabled and git_manager:
+                            commit_message = f"Implement {chunk_title}"
+                            print(f"\n📝 Creating commit: {commit_message}")
+                            git_manager.commit(commit_message)
+                
+                # Switch back to original branch if needed
+                if config.git.enabled and original_branch and git_manager:
+                    print(f"\n🔄 Switching back to branch: {original_branch}")
+                    git_manager.checkout_branch(original_branch)
+            else:
+                # Get task instructions directly from args.instructions or voice_instructions
+                if voice_ui is not None:
+                    task_instructions = voice_ui.wait_until_prompt()
+                else:
+                    task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
+                block_runner = BlockRunner(task_instructions, codebase, args.json)
+                success = block_runner.run_loop()
             
             if success:
                 print("\n✅ Task completed successfully!")
