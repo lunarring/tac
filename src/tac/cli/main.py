@@ -525,7 +525,6 @@ def main():
                 task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
 
             block_runner = BlockRunner(task_instructions, codebase, args.json)
-
             success = block_runner.run_loop()
             
             if success:
