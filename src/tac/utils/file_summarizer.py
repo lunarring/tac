@@ -34,10 +34,12 @@ Here is a an example of the output format. Don't use any other formatting.
 High-level summary: (insert high level summary here, say what this file contains, e.g. if there are classes, functions, tests, etc.)
 Function/Class 1 (line begin:line end): (insert description here, with above guidelines in mind)
 Function/Class 2 (line begin:line end): (insert description here, with above guidelines in mind)
+
+IMPORTANT: Make sure to include ALL classes and functions in your analysis, not just the first few. The file may contain multiple classes and functions that all need to be described.
 """
         
         messages = [
-            Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
+            Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures. Make sure to analyze ALL classes and functions in the code, not just the first few."),
             Message(role="user", content=prompt)
         ]
 
@@ -123,7 +125,7 @@ Function/Class 2 (line begin:line end): (insert description here, with above gui
                     })
                     methods_by_class[defn['name']] = []
                 elif defn['type'] == 'method':
-                    class_name, method_name = defn['name'].split('.')
+                    class_name = defn['name'].split('.')[0]  # Get the first part before the dot
                     method_str = f"{defn['name']} (lines {defn['start_line']}-{defn['end_line']})"
                     if class_name in methods_by_class:
                         methods_by_class[class_name].append(method_str)
@@ -157,7 +159,7 @@ Function/Class 2 (line begin:line end): (insert description here, with above gui
 
 def extract_code_definitions(code: str):
     """
-    Extracts top-level function and class definitions from Python code along with their starting and ending line numbers.
+    Extracts all function and class definitions from Python code along with their starting and ending line numbers.
     
     Args:
         code (str): Python source code.
@@ -176,39 +178,48 @@ def extract_code_definitions(code: str):
     
     definitions = []
     
-    # Iterate over all top-level nodes
-    for node in ast.iter_child_nodes(tree):
+    # Helper function to recursively process nodes
+    def process_node(node, parent_name=None):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            # Use end_lineno which should be available in Python 3.8+
+            name = node.name
+            if parent_name:
+                name = f"{parent_name}.{name}"
+                node_type = 'method'
+            else:
+                node_type = 'function'
+                
             definitions.append({
-                'type': 'function',
-                'name': node.name,
+                'type': node_type,
+                'name': name,
                 'start_line': node.lineno,
                 'end_line': getattr(node, "end_lineno", node.lineno)
             })
+            
         elif isinstance(node, ast.ClassDef):
+            name = node.name
+            if parent_name:
+                name = f"{parent_name}.{name}"
+                
             class_def = {
                 'type': 'class',
-                'name': node.name,
+                'name': name,
                 'start_line': node.lineno,
                 'end_line': getattr(node, "end_lineno", node.lineno)
             }
             definitions.append(class_def)
             
-            # Extract methods within the class
-            for class_node in ast.iter_child_nodes(node):
-                if isinstance(class_node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    method_name = f"{node.name}.{class_node.name}"
-                    definitions.append({
-                        'type': 'method',
-                        'name': method_name,
-                        'start_line': class_node.lineno,
-                        'end_line': getattr(class_node, "end_lineno", class_node.lineno)
-                    })
+            # Process all nodes within the class
+            for child_node in ast.iter_child_nodes(node):
+                process_node(child_node, name)
+    
+    # Process all top-level nodes
+    for node in ast.iter_child_nodes(tree):
+        process_node(node)
     
     return definitions
 
 
 if __name__ == "__main__":
     summarizer = FileSummarizer()
-    print(summarizer.analyze_file("tac/utils/file_summarizer.py"))
+    print(summarizer.analyze_file("/Users/jjj/git/piano_trainer/src/piano_trainer.py"))
+    # print(summarizer.analyze_file("tac/utils/file_summarizer.py"))
