@@ -192,7 +192,7 @@ class ProjectFiles:
         """
         Format all file summaries into a string representation.
         Each file's summary is formatted as:
-        ###FILE: <full path to file>
+        ###FILE: full path to file
         contents of summary
         ###END_FILE
         

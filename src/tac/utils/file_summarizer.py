@@ -27,9 +27,14 @@ class FileSummarizer:
                 prompt += f"- {cls['name']}: {methods}\n"
         prompt += f"\nFull Code:\n<code>\n{code}\n</code>\n"
         prompt += """You are a senior software engineer. Provide a concise analysis of the code's functions and classes. Format your response as follows:
-1. First line: A high-level summary of the entire file
-2. For each function/class, start a new line with the exact name of the function/class, followed by a colon and the description.
-Keep descriptions technical and focus on functionality and interactions, particularly tell which methods or functions call which other ones and how they are used together"""
+In the beginning, a high-level summary of the entire file
+Then for each function/class, start a new line with the exact name of the function/class, followed by a colon and the description.
+Keep descriptions technical and focus on functionality and interactions, particularly tell which methods or functions call which other ones and how they are used together. You are using strict formatting. Here is an example of the output format:
+Here is a an example of the output format. Don't use any other formatting.
+High-level summary: (insert high level summary here, say what this file contains, e.g. if there are classes, functions, tests, etc.)
+Function/Class 1 (line begin:line end): (insert description here, with above guidelines in mind)
+Function/Class 2 (line begin:line end): (insert description here, with above guidelines in mind)
+"""
         
         messages = [
             Message(role="system", content="You are a Python code analysis expert. Provide clear, detailed technical summaries of code structures."),
