@@ -42,12 +42,12 @@ class ProtoBlockExecutor:
             config.override_with_dict(config_override)
             
         # Create agent directly
-        if config.general.type == "aider":
+        if config.general.agent_type == "aider":
             self.agent = AiderAgent(agent_config)
-        elif config.general.type == "native":
+        elif config.general.agent_type == "native":
             self.agent = NativeAgent(agent_config)
         else:
-            raise ValueError(f"Invalid agent type: {config.general.type}")
+            raise ValueError(f"Invalid agent type: {config.general.agent_type}")
         self.test_runner = TestRunner()
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
@@ -186,7 +186,7 @@ class ProtoBlockExecutor:
                 error_analysis = ""  # Initialize as empty string instead of "None"
                 logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
 
-                if idx_attempt < config.general.max_retries - 1:
+                if idx_attempt < config.general.max_retries_block - 1:
                     if config.general.run_error_analysis:
                         error_analysis = self.error_analyzer.analyze_failure(
                             self.protoblock, 

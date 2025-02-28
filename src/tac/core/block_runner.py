@@ -110,7 +110,7 @@ class BlockRunner:
     def run_loop(self):
 
         # Preliminary tests before we start.
-        max_retries = config.general.max_retries
+        max_retries = config.general.max_retries_block
 
         # Here we enter the loop for trying to make protoblock and executing it!
         logger.info(f"Starting execution loop, using max_retries={max_retries} from config")

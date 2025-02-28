@@ -14,12 +14,12 @@ def test_config_manager():
 
     # Verify 'general' configuration
     general = cm.general
-    assert general.type in ["aider", "native"]
+    assert general.agent_type in ["aider", "native"]
     assert general.plausibility_test is True
     assert general.use_file_summaries is True
     assert general.summarizer_timeout == 45
-    assert general.max_retries == 4
-    assert general.max_retries_protoblock_creation == 4
+    assert general.max_retries_block == 4
+    assert general.max_retries_protoblock == 4
     assert general.total_timeout == 600
     assert general.halt_after_fail is False
 
@@ -45,13 +45,13 @@ def test_config_override():
     
     # Test overriding general config
     cm.override_with_args({
-        "general_type": "custom",
-        "general_max_retries": 10,
+        "general_agent_type": "custom",
+        "general_max_retries_block": 10,
         "plausibility_test": False  # Test unprefixed general config override
     })
     
-    assert cm.general.type == "custom"
-    assert cm.general.max_retries == 10
+    assert cm.general.agent_type == "custom"
+    assert cm.general.max_retries_block == 10
     assert cm.general.plausibility_test is False
     
     # Test overriding git config
@@ -70,7 +70,7 @@ def test_raw_config():
     assert isinstance(raw, dict)
     assert 'general' in raw
     assert 'git' in raw
-    assert raw['general']['type'] in ['aider', 'native']
+    assert raw['general']['agent_type'] in ['aider', 'native']
     assert 'llm_strong' in raw
     assert 'llm_weak' in raw
     assert 'logging' in raw

@@ -234,7 +234,7 @@ stick exactly to the following output_format, filling in between <>
     def create_protoblock(self, protoblock_genesis_prompt: str) -> ProtoBlock:
         """
         Create a protoblock from genesis prompt that contain all necessary information.
-        Will retry creation based on max_retries_protoblock_creation from config.
+        Will retry creation based on max_retries_protoblock from config.
         
         Args:
             protoblock_genesis_prompt: Complete instructions for the LLM to generate the protoblock
@@ -247,7 +247,7 @@ stick exactly to the following output_format, filling in between <>
         """
         # Use centralized config
         use_summaries = config.general.use_file_summaries
-        max_retries = config.general.max_retries_protoblock_creation
+        max_retries = config.general.max_retries_protoblock
         
         if use_summaries:
             logger.info("Using file summaries for protoblock creation")
