@@ -248,8 +248,6 @@ Here are the full task instructions:
 10. Each chunk should include its own tests where appropriate - no separate integration test is needed
 11. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
 </chunking_rules>
-12. A single chunk should not be too big and just focus on one thing
-13. Don't create chunks that only contain tests
 
 <output_format>
 Provide your analysis in the following JSON format:
