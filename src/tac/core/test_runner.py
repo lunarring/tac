@@ -106,6 +106,9 @@ class TestRunner:
             summary = self._generate_summary(self._test_stats, exit_code)
             self.test_results += summary
             
+            # Log all test results to logger.debug
+            logger.debug(f"Test Results:\n{self.test_results}")
+            
             # Determine test success:
             # - exit_code 0: all tests passed
             # - exit_code 5: no tests found (considered ok)
