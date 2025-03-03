@@ -386,3 +386,35 @@ stick exactly to the following output_format, filling in between ...
             
         return filename
 
+    def to_dict(self, block: ProtoBlock) -> dict:
+        """
+        Convert a ProtoBlock object to a dictionary representation.
+        
+        Args:
+            block: ProtoBlock object to convert
+            
+        Returns:
+            dict: Dictionary representation of the ProtoBlock
+        """
+        # Ensure all paths are relative
+        write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in block.write_files]
+        context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in block.context_files]
+        
+        return {
+            "task": {
+                "specification": block.task_description
+            },
+            "test": {
+                "specification": block.test_specification,
+                "data": block.test_data_generation,
+                "replacements": write_files,
+                "results": block.test_results if block.test_results else None
+            },
+            "write_files": write_files,
+            "context_files": context_files,
+            "commit_message": block.commit_message,
+            "branch_name": block.branch_name,
+            "block_id": block.block_id,
+            "timestamp": datetime.now().isoformat()
+        }
+

@@ -85,8 +85,8 @@ class ProtoBlockExecutor:
             'attempt': attempt,
             'success': success,
             'message': message,
-            'protoblock': self.protoblock_factory.to_dict(self.protoblock_id),
-            'git_diff': self.git_manager.get_diff() if self.git_enabled else "",
+            'protoblock': self.protoblock_factory.to_dict(self.protoblock),
+            'git_diff': self.git_manager.get_complete_diff() if self.git_enabled else "",
             'test_results': self.get_test_results() or "",
         }
         
