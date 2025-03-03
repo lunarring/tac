@@ -76,43 +76,27 @@ class ProtoBlockExecutor:
             logger.warning("No protoblock ID available for logging")
             return None
 
-        log_filename = f".tac_log_{self.protoblock_id}"
+        # With the new logging system, we don't need to write a separate log file
+        # The logging is handled by the log_config.py module
         
-        # Set the log file path in the log manager
-        self.log_manager.current_log_path = log_filename
-        
-        # Get git diff using GitManager's new method if git is enabled
-        git_diff = self.git_manager.get_complete_diff() if self.git_manager else ""
-
-        # Prepare execution data for this attempt
+        # Create execution data for reference
         execution_data = {
-            'protoblock': {
-                'task_description': self.protoblock.task_description,
-                'test_specification': self.protoblock.test_specification,
-                'test_data_generation': self.protoblock.test_data_generation,
-                'write_files': self.protoblock.write_files,
-                'context_files': self.protoblock.context_files,
-                'commit_message': self.protoblock.commit_message,
-                'branch_name': self.protoblock.branch_name
-            },
             'timestamp': datetime.now().isoformat(),
             'attempt': attempt,
             'success': success,
-            'git_diff': git_diff,
-            'test_results': self.test_results or "",
-            'message': message
+            'message': message,
+            'protoblock': self.protoblock_factory.to_dict(self.protoblock_id),
+            'git_diff': self.git_manager.get_diff() if self.git_enabled else "",
+            'test_results': self.get_test_results() or "",
         }
-
-        # Add failure analysis if provided
+        
         if analysis:
             execution_data['failure_analysis'] = analysis
-
-        # Use the log manager to safely update the log file
-        if self.log_manager.safe_update_log(execution_data, config=config.raw_config):
-            return execution_data
-        else:
-            logger.error("Failed to update log file")
-            return None
+            
+        # Log the execution data
+        logger.info(f"Execution {attempt}: {'SUCCESS' if success else 'FAILURE'} - {message}")
+        
+        return execution_data
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> bool:
         """
