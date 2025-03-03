@@ -2,18 +2,23 @@
 import os
 import sys
 from rich.console import Console
-from tac.utils.log_manager import LogManager
 from rich.panel import Panel
 from rich.text import Text
 from datetime import datetime
 import re
+import glob
+import logging
+from tac.core.log_config import setup_console_logging
+
+# Use our console-only logging setup
+logger = setup_console_logging('tac.cli.viewer')
 
 class TACViewer:
     def __init__(self):
         self.console = Console()
-        self.log_manager = LogManager()
         self.history = []  # Stack to track menu history and their arguments
         self.items_per_page = 10  # Number of items to show per page
+        self.lines_per_page = 25  # Increased number of lines per page for log viewing
         self.current_log_path = None
         self.current_log_content = []
 
@@ -99,11 +104,20 @@ class TACViewer:
             if choice == 1:
                 self.logs_menu()
                 
+    def list_logs(self):
+        """List all available log files in the logs directory."""
+        logs_dir = '.tac_logs'
+        if not os.path.exists(logs_dir):
+            return []
+        
+        log_files = glob.glob(os.path.join(logs_dir, '*_log.txt'))
+        return sorted(log_files, key=os.path.getmtime, reverse=True)
+                
     def logs_menu(self) -> None:
         """Show menu with available log files."""
         page = 0  # Start at first page
         while True:
-            logs = self.log_manager.list_logs()
+            logs = self.list_logs()
             if not logs:
                 self.console.print("[yellow]No log files found.[/yellow]")
                 input("Press Enter to continue...")
@@ -152,8 +166,19 @@ class TACViewer:
             if 1 <= choice <= len(current_logs):
                 self.add_to_history(self.logs_menu)
                 self.current_log_path = current_logs[choice - 1]
-                self.current_log_content = self.log_manager.read_log(self.current_log_path)
+                self.read_log(self.current_log_path)
                 self.log_menu()
+    
+    def read_log(self, log_path):
+        """Read a log file and store its contents."""
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                self.current_log_content = f.readlines()
+            return True
+        except Exception as e:
+            logger.error(f"Error reading log file {log_path}: {str(e)}")
+            self.current_log_content = []
+            return False
     
     def log_menu(self) -> None:
         """Show menu for a specific log file."""
@@ -164,7 +189,10 @@ class TACViewer:
                 "View INFO logs only",
                 "View WARNING logs only",
                 "View ERROR logs only",
-                "Search logs"
+                "View CRITICAL logs only",
+                "Filter out DEBUG logs",
+                "Search logs",
+                "Show log statistics"
             ]
             
             log_name = os.path.basename(self.current_log_path)
@@ -188,17 +216,57 @@ class TACViewer:
                 self.display_filtered_logs("WARNING")
             elif choice == 5:  # ERROR logs
                 self.display_filtered_logs("ERROR")
-            elif choice == 6:  # Search logs
+            elif choice == 6:  # CRITICAL logs
+                self.display_filtered_logs("CRITICAL")
+            elif choice == 7:  # Filter out DEBUG logs
+                filtered_logs = [line for line in self.current_log_content if "DEBUG" not in line]
+                self.display_log_content(filtered_logs, "Logs (excluding DEBUG)")
+            elif choice == 8:  # Search logs
                 self.search_logs()
+            elif choice == 9:  # Show log statistics
+                self.show_log_statistics()
+    
+    def show_log_statistics(self):
+        """Show statistics about the current log file."""
+        if not self.current_log_content:
+            self.console.print("[yellow]No log content to analyze.[/yellow]")
+            input("Press Enter to continue...")
+            return
+            
+        total_lines = len(self.current_log_content)
+        debug_count = sum(1 for line in self.current_log_content if "DEBUG" in line)
+        info_count = sum(1 for line in self.current_log_content if "INFO" in line)
+        warning_count = sum(1 for line in self.current_log_content if "WARNING" in line)
+        error_count = sum(1 for line in self.current_log_content if "ERROR" in line)
+        critical_count = sum(1 for line in self.current_log_content if "CRITICAL" in line)
+        
+        self.console.print("\n[bold cyan]Log Statistics[/bold cyan]")
+        self.console.print(f"Total lines: {total_lines}")
+        self.console.print(f"DEBUG: {debug_count} ({debug_count/total_lines*100:.1f}%)")
+        self.console.print(f"INFO: {info_count} ({info_count/total_lines*100:.1f}%)")
+        self.console.print(f"WARNING: {warning_count} ({warning_count/total_lines*100:.1f}%)")
+        self.console.print(f"ERROR: {error_count} ({error_count/total_lines*100:.1f}%)")
+        self.console.print(f"CRITICAL: {critical_count} ({critical_count/total_lines*100:.1f}%)")
+        
+        input("\nPress Enter to continue...")
     
     def display_log_content(self, log_content, title="Log Contents"):
-        """Display log content in a paged view."""
+        """Display log content in a paged view with single-key navigation."""
         page = 0
-        lines_per_page = 20
+        
+        # Try to import getch for single-key input if available
+        try:
+            import getch
+            get_key = getch.getch
+            single_key_mode = True
+        except ImportError:
+            # Fall back to regular input if getch is not available
+            get_key = lambda: input("\nEnter command (n=next, b=back, q=quit): ").lower()
+            single_key_mode = False
         
         while True:
-            start_idx = page * lines_per_page
-            end_idx = start_idx + lines_per_page
+            start_idx = page * self.lines_per_page
+            end_idx = start_idx + self.lines_per_page
             current_lines = log_content[start_idx:end_idx]
             
             if not current_lines:
@@ -206,47 +274,71 @@ class TACViewer:
                 input("Press Enter to continue...")
                 return
                 
-            total_pages = (len(log_content) + lines_per_page - 1) // lines_per_page
+            total_pages = (len(log_content) + self.lines_per_page - 1) // self.lines_per_page
+            
+            # Clear screen for better readability
+            os.system('cls' if os.name == 'nt' else 'clear')
             
             self.console.print(f"\n[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
+            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)}")
             
             # Display log lines with syntax highlighting based on log level
             for line in current_lines:
-                if line.startswith("DEBUG"):
+                if "DEBUG" in line:
                     self.console.print(line.strip(), style="blue")
-                elif line.startswith("INFO"):
+                elif "INFO" in line:
                     self.console.print(line.strip(), style="green")
-                elif line.startswith("WARNING"):
+                elif "WARNING" in line:
                     self.console.print(line.strip(), style="yellow")
-                elif line.startswith("ERROR") or line.startswith("CRITICAL"):
+                elif "ERROR" in line:
                     self.console.print(line.strip(), style="red")
+                elif "CRITICAL" in line:
+                    self.console.print(line.strip(), style="red bold")
                 else:
                     self.console.print(line.strip())
             
             # Navigation options
             self.console.print("\nNavigation:")
-            if page > 0:
-                self.console.print("p. Previous page")
-            if end_idx < len(log_content):
-                self.console.print("n. Next page")
-            self.console.print("b. Back")
-            self.console.print("q. Quit")
+            self.console.print("n: Next page")
+            self.console.print("b: Previous page")
+            self.console.print("f: First page")
+            self.console.print("l: Last page")
+            self.console.print("j: Jump to page")
+            self.console.print("r: Return to menu")
+            self.console.print("q: Quit")
             
-            choice = input("\nEnter your choice: ").lower()
+            if single_key_mode:
+                self.console.print("\nPress any key to navigate...")
+                choice = get_key()
+            else:
+                choice = get_key()
             
             if choice == 'q':
                 sys.exit(0)
-            elif choice == 'b':
+            elif choice == 'r':
                 return
-            elif choice == 'p' and page > 0:
+            elif choice == 'b' and page > 0:
                 page -= 1
             elif choice == 'n' and end_idx < len(log_content):
                 page += 1
+            elif choice == 'f':
+                page = 0
+            elif choice == 'l':
+                page = total_pages - 1
+            elif choice == 'j':
+                try:
+                    jump_page = int(input(f"Enter page number (1-{total_pages}): "))
+                    if 1 <= jump_page <= total_pages:
+                        page = jump_page - 1
+                    else:
+                        self.console.print(f"[red]Invalid page number. Please enter a number between 1 and {total_pages}.[/red]")
+                except ValueError:
+                    self.console.print("[red]Invalid input. Please enter a number.[/red]")
     
     def display_filtered_logs(self, level):
         """Display logs filtered by level."""
-        filtered_logs = [line for line in self.current_log_content if line.startswith(level)]
-        self.display_log_content(filtered_logs, f"{level} Log Entries")
+        filtered_logs = [line for line in self.current_log_content if level in line]
+        self.display_log_content(filtered_logs, f"{level} Log Entries ({len(filtered_logs)} entries)")
     
     def search_logs(self):
         """Search logs for a specific term."""
@@ -254,14 +346,10 @@ class TACViewer:
         if not search_term:
             return
             
-        # Case-insensitive search
-        pattern = re.compile(search_term, re.IGNORECASE)
-        matching_logs = [line for line in self.current_log_content if pattern.search(line)]
-        
-        self.display_log_content(matching_logs, f"Search Results for '{search_term}'")
+        filtered_logs = [line for line in self.current_log_content if search_term.lower() in line.lower()]
+        self.display_log_content(filtered_logs, f"Search Results for '{search_term}' ({len(filtered_logs)} matches)")
 
 def main():
-    """Main entry point for the TAC viewer."""
     viewer = TACViewer()
     viewer.main_menu()
 

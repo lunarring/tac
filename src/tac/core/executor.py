@@ -19,10 +19,9 @@ from tac.core.error_analyzer import ErrorAnalyzer
 from tac.core.plausibility_check import PlausibilityChecker
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
-from tac.core.log_config import setup_logging
+from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
-from tac.utils.log_manager import LogManager
 
 logger = setup_logging('tac.core.executor')
 
@@ -60,11 +59,10 @@ class ProtoBlockExecutor:
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
         self.test_results = None
-        self.log_manager = LogManager()  # Initialize log manager
 
     def _write_log_file(self, attempt: int, success: bool, message: str, analysis: str = None) -> dict:
         """
-        Write a log file containing the config and executions data.
+        Write log information using the logging system.
         
         Args:
             attempt: The current attempt number
@@ -75,9 +73,6 @@ class ProtoBlockExecutor:
         if not self.protoblock_id:
             logger.warning("No protoblock ID available for logging")
             return None
-
-        # With the new logging system, we don't need to write a separate log file
-        # The logging is handled by the log_config.py module
         
         # Create execution data for reference
         execution_data = {

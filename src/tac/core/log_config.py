@@ -56,6 +56,64 @@ def get_log_level(name: str = None) -> str:
     except Exception:
         return 'INFO'
 
+def setup_console_logging(name: str = None) -> logging.Logger:
+    """
+    Setup logging configuration for console only (no log files)
+    
+    Args:
+        name: Logger name
+    """
+    # Create a new logger
+    logger = logging.getLogger(name if name else 'tac')
+    
+    # Remove any existing handlers
+    if logger.handlers:
+        logger.handlers.clear()
+    
+    # Prevent propagation to root logger
+    logger.propagate = False
+    
+    # Set logger level
+    logger.setLevel(logging.INFO)
+
+    # Create console handler
+    console_handler = logging.StreamHandler(sys.__stdout__)
+    console_handler.setLevel(logging.INFO)
+
+    # Create formatter and add it to the handler
+    log_format = '%(levelname)s - %(message)s [%(name)s]'
+    
+    # Create custom formatter
+    class ColoredFormatter(logging.Formatter):
+        """Custom formatter class to add colors to log levels"""
+        
+        COLORS = {
+            'DEBUG': Fore.BLUE,
+            'INFO': Fore.GREEN,
+            'WARNING': Fore.YELLOW,
+            'ERROR': Fore.RED,
+            'CRITICAL': Fore.RED + Style.BRIGHT,
+        }
+
+        def format(self, record):
+            # Save original levelname
+            orig_levelname = record.levelname
+            # Add color to the level name
+            if orig_levelname in self.COLORS:
+                record.levelname = f"{self.COLORS[orig_levelname]}{orig_levelname}{Style.RESET_ALL}"
+            formatted_msg = super().format(record)
+            # Restore original levelname
+            record.levelname = orig_levelname
+            return formatted_msg
+    
+    colored_formatter = ColoredFormatter(log_format)
+    console_handler.setFormatter(colored_formatter)
+
+    # Add the handler to the logger
+    logger.addHandler(console_handler)
+    
+    return logger
+
 def setup_logging(name: str = None, execution_id: int = None) -> logging.Logger:
     """
     Setup logging configuration

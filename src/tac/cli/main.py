@@ -18,7 +18,7 @@ from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock
 from tac.agents.aider_agent import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
 from tac.core.test_runner import TestRunner
-from tac.core.log_config import setup_logging
+from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging
 #from tac.utils.file_gatherer import gather_python_files  # Removed: gather now handled in CLI scope
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
@@ -406,17 +406,37 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     return parser, args
 
 def main():
-    # Configure logging
+    # Configure basic logging without file output
     logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)]  # Only log to console
     )
     
     parser, args = parse_args()
-    logger = logging.getLogger(__name__)
-    logger.debug(f"Parsed args: {vars(args)}")
+    basic_logger = logging.getLogger(__name__)
+    basic_logger.debug(f"Parsed args: {vars(args)}")
+    
+    # For the 'view' command, don't set up the full logging system
+    if args.command == 'view':
+        # Set up console-only logging
+        console_logger = setup_console_logging('tac.cli.main')
+        console_logger.info("Starting log viewer (console logging only)")
+        
+        # Import and run the viewer without creating log files
+        from tac.cli.viewer import TACViewer
+        try:
+            TACViewer().main_menu()
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            sys.exit(0)
+        return
+    
+    # Only set up full logging for commands other than 'view'
+    logger = setup_logging('tac.cli.main')
     config.override_with_args(vars(args))
-    logger.debug(f"Config after override: {config._config}")
+    logger.debug(f"Overriding config with args: {vars(args)}")
+    logger.debug(f"Config after override: {config}")
     
     if args.command == 'gather':
         gather_files_command(args)
@@ -430,16 +450,7 @@ def main():
         else:
             parser.error("Please specify a test command (run or list)")
         return
-        
-    if args.command == 'view':
-        from tac.cli.viewer import TACViewer
-        try:
-            TACViewer().main_menu()
-        except KeyboardInterrupt:
-            print("\nGoodbye!")
-            sys.exit(0)
-        return
-
+    
     voice_ui = None
     if args.command == 'voice':
         from tac.cli.voice import VoiceUI
