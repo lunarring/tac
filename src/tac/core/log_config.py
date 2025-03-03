@@ -157,7 +157,7 @@ def setup_logging(name: str = None, execution_id: int = None) -> logging.Logger:
         log_filename = os.path.join(logs_dir, f"{timestamp}_log.txt")
         
         # Create file handler
-        file_handler = logging.FileHandler(log_filename, mode='w')
+        file_handler = logging.FileHandler(log_filename, mode='a')
         
         # Set file handler level to DEBUG to capture all logs
         file_handler.setLevel(logging.DEBUG)
@@ -171,7 +171,7 @@ def setup_logging(name: str = None, execution_id: int = None) -> logging.Logger:
                 timestamp_str = timestamp.strftime("%y%m%d %H:%M %S.%f")[:-4]
                 
                 # Format the log message
-                return f"{record.levelname} - {record.getMessage()} [{record.name}] {timestamp_str}"
+                return f"{record.levelname} - {record.getMessage()} [{record.name} {timestamp_str}]"
         
         file_formatter = FileFormatter()
         file_handler.setFormatter(file_formatter)
