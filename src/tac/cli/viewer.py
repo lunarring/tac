@@ -216,29 +216,41 @@ class TACViewer:
     
     def search_logs(self):
         """Search logs for a specific term."""
-        self.console.print("\nEnter search term (press any non-letter key when done):")
+        self.console.print("\nEnter search term (press Enter to confirm, Esc to cancel):")
         search_term = ""
         while True:
             key = get_single_key()
-            if key.isalpha() or key.isspace():
+            # Check for Enter (confirmation)
+            if ord(key) in (10, 13):  # Enter key
+                break
+            # Check for Escape (cancel)
+            elif ord(key) == 27:  # Escape key
+                return
+            # Check for backspace
+            elif ord(key) in (8, 127):  # Backspace keys
+                if search_term:
+                    search_term = search_term[:-1]
+                    # Move cursor back and clear the character
+                    self.console.print("\b \b", end="")
+            # Accept letters, numbers, and spaces
+            elif key.isalnum() or key.isspace():
                 search_term += key
                 self.console.print(key, end="")
-            else:
-                break
                 
         if not search_term:
             return
             
-        filtered_logs = [line for line in self.current_log_content if search_term.lower() in line.lower()]
-        self.display_log_content(filtered_logs, f"Search Results for '{search_term}' ({len(filtered_logs)} matches)")
+        filtered_logs = [(line, search_term) for line in self.current_log_content if search_term.lower() in line.lower()]
+        self.display_log_content(filtered_logs, f"Search Results for '{search_term}' ({len(filtered_logs)} matches)", is_search_result=True)
     
-    def display_log_content(self, log_content, title="Log Contents"):
+    def display_log_content(self, log_content, title="Log Contents", is_search_result=False):
         """Display log content in a paged view with single-key navigation."""
         page = 0
         
         while True:
             # Get terminal size and calculate available lines
             terminal_height = os.get_terminal_size().lines
+            terminal_width = os.get_terminal_size().columns
             # Account for title (2 lines), navigation (2 lines), and spacing (1 line)
             lines_per_page = terminal_height - 5
             
@@ -264,7 +276,13 @@ class TACViewer:
             content_height = 0
             current_style = None
             
-            for line in current_lines:
+            for item in current_lines:
+                # Handle search results differently
+                if is_search_result:
+                    line, search_term = item
+                else:
+                    line = item
+                
                 # Check for the start of a new log entry
                 if line.startswith(("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")):
                     if line.startswith("DEBUG"):
@@ -278,11 +296,33 @@ class TACViewer:
                     elif line.startswith("CRITICAL"):
                         current_style = "red bold"
                 
-                # Print with current style if set, otherwise plain
-                if current_style:
-                    self.console.print(line.strip(), style=current_style)
+                # For search results, highlight the search term while maintaining the log level color
+                if is_search_result:
+                    # Create a text object for the line
+                    text = Text(line.strip())
+                    if current_style:
+                        text.stylize(current_style)
+                    
+                    # Find all occurrences of the search term (case insensitive)
+                    line_lower = line.lower()
+                    term_lower = search_term.lower()
+                    start = 0
+                    while True:
+                        pos = line_lower.find(term_lower, start)
+                        if pos == -1:
+                            break
+                        # Add reverse video style to the search term
+                        text.stylize("reverse", pos, pos + len(search_term))
+                        start = pos + 1
+                    
+                    self.console.print(text)
                 else:
-                    self.console.print(line.strip())
+                    # Print normal line with current style if set
+                    if current_style:
+                        self.console.print(line.strip(), style=current_style)
+                    else:
+                        self.console.print(line.strip())
+                
                 content_height += 1
             
             # Add padding to push navigation to bottom, plus one extra line for spacing
@@ -293,7 +333,7 @@ class TACViewer:
             # Add extra line of spacing before navigation
             self.console.print("")
             
-            # Single line navigation at the bottom with background
+            # Create navigation text with search option and page counter
             nav_text = Text()
             nav_text.append("Navigate: ", style="bold")
             nav_text.append("[n]ext ", style="cyan" if end_idx < len(log_content) else "dim")
@@ -301,8 +341,16 @@ class TACViewer:
             nav_text.append("[f]irst ", style="cyan")
             nav_text.append("[l]ast ", style="cyan")
             nav_text.append("[j]ump ", style="cyan")
+            nav_text.append("[s]earch ", style="cyan")
             nav_text.append("[r]eturn ", style="cyan")
             nav_text.append("[q]uit", style="red")
+            
+            # Add page counter with right alignment
+            page_counter = f"Page {page + 1}/{total_pages}"
+            padding = terminal_width - len(nav_text.plain) - len(page_counter) - 2  # -2 for safety margin
+            if padding > 0:
+                nav_text.append(" " * padding)
+                nav_text.append(page_counter, style="bold")
             
             # Print navigation with dark background
             self.console.print(nav_text, style="on grey11")
@@ -321,6 +369,13 @@ class TACViewer:
                 page = 0
             elif choice == 'l':
                 page = total_pages - 1
+            elif choice == 's':
+                # Store current page
+                current_page = page
+                # Perform search
+                self.search_logs()
+                # Restore page when returning from search
+                page = current_page
             elif choice == 'j':
                 self.console.print("\nEnter page number and press any key when done:")
                 page_str = ""
