@@ -2,13 +2,15 @@ import os
 import ast
 import logging
 from typing import Tuple, Optional
-
+from tac.protoblock import ProtoBlock
 from tac.core.block_runner import BlockRunner
 from tac.utils.project_files import ProjectFiles
+from tac.protoblock.factory import ProtoBlockFactory
+from tac.core.log_config import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.trusty_agents.performance')
 
-class OptimizationTestingAgent:
+class PerformanceTestingAgent:
     """Class responsible for optimizing Python code functions."""
     
     def __init__(self, function_name: str, config):
@@ -19,6 +21,7 @@ class OptimizationTestingAgent:
             config: Configuration object
         """
         self.function_name = self.clean_function_name(function_name)
+        self.factory = ProtoBlockFactory()
         self.config = config
         self.project_files = ProjectFiles()
         self.project_files.update_summaries()
@@ -83,3 +86,47 @@ class OptimizationTestingAgent:
 
     def create_test_function(self):
         logger.debug('test function not found, creating it...') 
+        task_description = task_description
+        test_specification = ""
+        test_data_generation = ""
+        write_files = [self.fp_func]
+        context_files = []
+        commit_message = "None"
+        test_results = None
+
+        protoblock = ProtoBlock(
+            task_description,
+            test_specification,
+            test_data_generation,
+            write_files,
+            context_files,
+            commit_message,
+            test_results,
+        )
+        self.factory.save_protoblock(protoblock, self.fp_proto)
+        self.protoblock = protoblock
+
+
+    """
+all the things for tomorrow:
+we wanna make a snapshottest and use the right marker!
+
+from snapshottest import TestCase
+
+@pytest.mark.performance
+class TestBubu(TestCase):
+    def test_bubu_output_snapshot(self):
+        input_arr = np.array([[0, np.pi/4], [np.pi/2, np.pi]])
+        output = bubu(input_arr)
+        # Assert that the output matches the stored snapshot
+        self.assertMatchSnapshot(output.tolist())
+
+------
+figure out how does it work with snapshotting
+figure out how to combine with benchmarking
+
+then move on to make another protoblock for performance optimization.
+then run benchmark again and again
+
+    
+""" 

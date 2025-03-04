@@ -1,5 +1,5 @@
 import pytest
-from tac.core.test_runner import ErrorAnalyzer
+from tac.trusty_agents.pytest import ErrorAnalyzer
 
 class DummyProtoBlock:
     block_id = "dummy_id"

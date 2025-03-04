@@ -26,7 +26,7 @@ from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.protoblock.manager import load_protoblock_from_json
 from typing import Dict
-from tac.testing_agents.pytest import PytestTestingAgent as TestRunner
+from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 
 logger = setup_logging('tac.core.block_runner')
 

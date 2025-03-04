@@ -3,7 +3,7 @@
 
 ## Overview
 
-**Test-linked Agentic Chains (tac)** is a framework to fully automate AI-driven software creation. The core idea is to create *blocks* that can be attached to any existing codebase. A block consists of a *code diff* plus *hope*. We define hope as some form of empiric testing that the code changes a) do not break the existing codebase b) fulfil the promised function. Empirical tests can for instance be unit tests that have to be passed, or a code review by a simulated senior software engineer. 
+**Trusty Agentic Chains (tac)** is a framework to fully automate AI-driven software creation. The core idea is to create *blocks* that can be attached to any existing codebase. A block consists of a *code diff* plus *hope*. We define hope as some form of empiric testing that the code changes a) do not break the existing codebase b) fulfil the promised function. Empirical tests can for instance be unit tests that have to be passed, or a code review by a simulated senior software engineer. 
 
 To create a block, we need a protoblock which carries a standardized set of instructions and files that have read or write access. The block executor then turns this protoblock into a block and runs all required tests. Under the hood, tac allows to use modular coding agents, at the moment we support aider and a native agent. 
 

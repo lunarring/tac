@@ -12,8 +12,8 @@ from typing import Dict
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
-from tac.testing_agents.pytest import PytestTestingAgent, ErrorAnalyzer
-from tac.testing_agents.plausibility import PlausibilityTestingAgent
+from tac.trusty_agents.pytest import PytestTestingAgent, ErrorAnalyzer
+from tac.trusty_agents.plausibility import PlausibilityTestingAgent
 
 logger = setup_logging('tac.core.executor')
 

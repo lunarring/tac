@@ -1,6 +1,6 @@
 import pytest
 from tac.core.test_runner import TestRunner
-from tac.testing_agents.pytest import PytestTestingAgent as TestRunner
+from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 
 def test_get_test_functions():
     # Dummy output simulating pytest output with file and function names
