@@ -8,7 +8,7 @@ from tac.utils.project_files import ProjectFiles
 
 logger = logging.getLogger(__name__)
 
-class CodeOptimizer:
+class OptimizationTestingAgent:
     """Class responsible for optimizing Python code functions."""
     
     def __init__(self, function_name: str, config):
@@ -82,5 +82,4 @@ class CodeOptimizer:
 
 
     def create_test_function(self):
-        logger.debug('test function not found, creating it...')
-        
+        logger.debug('test function not found, creating it...') 

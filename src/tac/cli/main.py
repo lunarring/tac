@@ -34,7 +34,7 @@ from tac.core.config import config, ConfigManager
 from tac.protoblock.manager import load_protoblock_from_json
 from tac.core.block_runner import BlockRunner
 from tac.testing_agents.pytest import PytestTestingAgent as TestRunner
-from tac.core.optimizer import CodeOptimizer
+from tac.testing_agents.optimizing import OptimizationTestingAgent
 
 logger = setup_logging('tac.cli.main')
 
@@ -470,7 +470,7 @@ def main():
     
     if args.command == 'optimize':
         logger.debug(f"Optimizing function: {args.function_name}")
-        optimizer = CodeOptimizer(args.function_name, config)
+        optimizer = OptimizationTestingAgent(args.function_name, config)
         optimizer.optimize() 
         print("\nGoodbye!")
         sys.exit(0) # Call the optimize method
