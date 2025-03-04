@@ -15,7 +15,7 @@ from tac.core.git_manager import GitManager
 from tac.core.test_runner import TestRunner
 import git
 import sys
-from tac.core.error_analyzer import ErrorAnalyzer
+from tac.core.test_runner import ErrorAnalyzer
 from tac.core.plausibility_check import PlausibilityChecker
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
