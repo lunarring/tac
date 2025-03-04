@@ -124,7 +124,9 @@ class LLMClient:
             params["max_tokens"] = max_tokens
             
         try:
+            logger.debug(f"LLM pre: Params: {params}")
             response = self.client.chat.completions.create(**params)
+            logger.debug(f"LLM post: {response}")
             if not response or not response.choices:
                 raise ValueError("Empty response received from API")
             return response.choices[0].message.content
