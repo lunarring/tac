@@ -162,8 +162,6 @@ Additionally, below, you add a small note to the user about the changes you made
 
 REMEMBER: change as little as possible and ONLY implement functionality that is listed in the task description."""
         
-        logger.debug(f"Native Agent Prompt: {prompt}")
-
         return prompt
 
     def _deparse_llm_response(self, response: str, write_files: list[str]) -> tuple[dict[str, str], str]:
@@ -283,9 +281,7 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         
         # Get completion from LLM
         try:
-            logger.debug(f"Sending prompt to LLM")
             response = self.llm_client.chat_completion(messages)
-            logger.debug(f"Received response from LLM: {response}")
             
         except Exception as e:
             logger.error(f"Error during LLM completion or file writing: {str(e)}")

@@ -64,7 +64,6 @@ class ErrorAnalyzer:
             logger.debug(f"Formatted codebase length: {len(codebase_str)} characters")
             
             # Prepare prompt
-            logger.info("Preparing LLM prompt")
             analysis_prompt = f"""<purpose>
 You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements. The information for the junior software engineer who failed at their attempt is given in the <protoblock> section, the codebase in <codebase_str>, the test results in <test_results>. Your concrete analysis rules are given in <analysis_rules>.
 </purpose>
@@ -103,24 +102,17 @@ MISSING WRITE FILES:
 (so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If there are files missing, directly mention them here in a list, without any additional text e.g. your reply is ["tests/test_piano_trainer_main.py"])
 </output_format>"""
 
-            logger.debug(f"Prompt length: {len(analysis_prompt)} characters")
-            
             messages = [
                 Message(role="system", content="You are a coding assistant specialized in analyzing test failures and implementation errors. Provide clear, actionable analysis."),
                 Message(role="user", content=analysis_prompt)
             ]
             
-            logger.info("Sending request to LLM")
             response = self.llm_client.chat_completion(messages)
             
             if not response or not response.strip():
                 logger.error("Received empty response from LLM")
                 return "Error: Unable to generate analysis"
                 
-            logger.info("Successfully received LLM response")
-            logger.debug(f"LLM response length: {len(response)} characters")
-            logger.debug(f"Analysis response:\n{response}")
-            
             return response
             
         except Exception as e:

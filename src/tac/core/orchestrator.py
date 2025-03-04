@@ -285,7 +285,6 @@ Provide your analysis in the following JSON format:
                 return self._create_default_result(task_instructions)
             
             logger.info("Successfully received LLM response")
-            logger.debug(f"LLM response:\n{response}")
 
             # Extract JSON from response
             json_content = self._extract_json(response)

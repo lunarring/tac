@@ -275,9 +275,6 @@ stick exactly to the following output_format, filling in between ...
                 # Clean code fences from response
                 response = self.llm_client._clean_code_fences(response)
                     
-                # Log the raw response for debugging
-                logger.debug(f"Raw LLM Response for protoblock:\n{response}")
-                
                 # Verify and parse the response
                 is_valid, error_msg, data = self.verify_protoblock(response)
                 if not is_valid:
