@@ -35,7 +35,8 @@ def log_error(msg):
 
 class TACViewer:
     def __init__(self):
-        self.console = Console()
+        # Disable syntax highlighting by setting highlight=False
+        self.console = Console(highlight=False)
         self.history = []  # Stack to track menu history and their arguments
         self.items_per_page = 10  # Number of items to show per page
         self.lines_per_page = 25  # Increased number of lines per page for log viewing
