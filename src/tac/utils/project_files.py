@@ -2,7 +2,7 @@ import os
 import json
 import hashlib
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.config import config
 from tac.core.log_config import setup_logging
@@ -212,6 +212,43 @@ class ProjectFiles:
             )
         
         return "\n\n".join(formatted_strings)
+        
+    def get_function_exists(self, function_name: str) -> Tuple[bool, Optional[str]]:
+        """
+        Check if a function with the given name exists in the codebase.
+        
+        Args:
+            function_name: Name of the function to find
+            
+        Returns:
+            Tuple[bool, Optional[str]]: 
+                - First element is True if the function exists, False otherwise
+                - Second element is an error message if the function exists in multiple files, None otherwise
+        """
+        found_locations = []
+        
+        for root, _, files in os.walk(self.project_root):
+            for file in files:
+                if file.endswith('.py'):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            tree = ast.parse(f.read(), filename=file_path)
+                            for node in ast.walk(tree):
+                                if isinstance(node, ast.FunctionDef) and node.name == function_name:
+                                    rel_path = os.path.relpath(file_path, self.project_root)
+                                    found_locations.append(rel_path)
+                    except Exception as e:
+                        logger.warning(f"Error parsing {file_path}: {str(e)}")
+                        continue
+        
+        if len(found_locations) == 1:
+            return True, None
+        elif len(found_locations) > 1:
+            locations_str = ", ".join(found_locations)
+            return True, f"Function '{function_name}' exists in multiple files: {locations_str}"
+        else:
+            return False, None
 
 
 

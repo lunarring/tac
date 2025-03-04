@@ -243,16 +243,7 @@ def list_tests_command(args):
     
     print(f"\nTotal tests found: {test_count}")
 
-def optimize_function_command(args):
-    """Handle the optimize function command"""
-    optimizer = CodeOptimizer()
-    success = optimizer.optimize_function(args.function_name)
-    
-    if success:
-        print(f"\n✅ Successfully optimized function '{args.function_name}'")
-    else:
-        print(f"\n❌ Failed to optimize function '{args.function_name}'")
-        sys.exit(1)
+
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
@@ -478,9 +469,12 @@ def main():
         return
     
     if args.command == 'optimize':
-        optimize_function_command(args)
-        return
-    
+        logger.debug(f"Optimizing function: {args.function_name}")
+        optimizer = CodeOptimizer(args.function_name, config)
+        optimizer.optimize() 
+        print("\nGoodbye!")
+        sys.exit(0) # Call the optimize method
+
     voice_ui = None
     if args.command == 'voice':
         from tac.cli.voice import VoiceUI
