@@ -112,6 +112,9 @@ def setup_console_logging(name: str = None) -> logging.Logger:
     # Add the handler to the logger
     logger.addHandler(console_handler)
     
+    # Store the configured logger to prevent duplicate setup
+    _configured_loggers[name] = logger
+    
     return logger
 
 def setup_logging(name: str = None, execution_id: int = None) -> logging.Logger:
@@ -122,6 +125,13 @@ def setup_logging(name: str = None, execution_id: int = None) -> logging.Logger:
         name: Logger name
         execution_id: Optional execution ID to use for log files
     """
+    # If logging is disabled (level set to CRITICAL), just return a disabled logger
+    if logging.getLogger().getEffectiveLevel() >= logging.CRITICAL:
+        logger = logging.getLogger(name if name else 'tac')
+        logger.setLevel(logging.CRITICAL)
+        logger.propagate = False
+        return logger
+        
     # If execution_id is provided, set it in the context
     if execution_id is not None:
         execution_context.execution_id = execution_id

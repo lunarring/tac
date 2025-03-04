@@ -7,11 +7,10 @@ from rich.text import Text
 from datetime import datetime
 import re
 import glob
-import logging
-from tac.core.log_config import setup_console_logging
 
-# Use our console-only logging setup
-logger = setup_console_logging('tac.cli.viewer')
+# Simple print function for errors
+def log_error(msg):
+    print(f"ERROR - {msg} [tac.cli.viewer]", file=sys.stderr)
 
 class TACViewer:
     def __init__(self):
@@ -176,7 +175,7 @@ class TACViewer:
                 self.current_log_content = f.readlines()
             return True
         except Exception as e:
-            logger.error(f"Error reading log file {log_path}: {str(e)}")
+            log_error(f"Error reading log file {log_path}: {str(e)}")
             self.current_log_content = []
             return False
     

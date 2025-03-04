@@ -1,10 +1,18 @@
 #!/usr/bin/env python
 import os
 import sys
+import logging
+
+# Disable all logging at the very start before any other imports
+if len(sys.argv) > 1 and sys.argv[1] == 'view':
+    logging.getLogger().setLevel(logging.CRITICAL)
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
 import yaml
 import argparse
 import ast
-import logging
 import json
 from datetime import datetime
 import git
@@ -406,23 +414,10 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     return parser, args
 
 def main():
-    # Configure basic logging without file output
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]  # Only log to console
-    )
-    
     parser, args = parse_args()
-    basic_logger = logging.getLogger(__name__)
-    basic_logger.debug(f"Parsed args: {vars(args)}")
     
-    # For the 'view' command, don't set up the full logging system
+    # For the 'view' command, don't set up any logging system
     if args.command == 'view':
-        # Set up console-only logging
-        console_logger = setup_console_logging('tac.cli.main')
-        console_logger.info("Starting log viewer (console logging only)")
-        
         # Import and run the viewer without creating log files
         from tac.cli.viewer import TACViewer
         try:
@@ -432,7 +427,7 @@ def main():
             sys.exit(0)
         return
     
-    # Only set up full logging for commands other than 'view'
+    # Configure logging for all other commands
     logger = setup_logging('tac.cli.main')
     config.override_with_args(vars(args))
     logger.debug(f"Overriding config with args: {vars(args)}")
