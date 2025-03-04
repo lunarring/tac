@@ -281,8 +281,13 @@ class TACViewer:
         page = 0
         
         while True:
-            start_idx = page * self.lines_per_page
-            end_idx = start_idx + self.lines_per_page
+            # Get terminal size and calculate available lines
+            terminal_height = os.get_terminal_size().lines
+            # Account for title (2 lines) and navigation (2 lines)
+            lines_per_page = terminal_height - 4
+            
+            start_idx = page * lines_per_page
+            end_idx = start_idx + lines_per_page
             current_lines = log_content[start_idx:end_idx]
             
             if not current_lines:
@@ -291,22 +296,17 @@ class TACViewer:
                 get_single_key()
                 return
                 
-            total_pages = (len(log_content) + self.lines_per_page - 1) // self.lines_per_page
+            total_pages = (len(log_content) + lines_per_page - 1) // lines_per_page
             
             # Clear screen for better readability
             os.system('cls' if os.name == 'nt' else 'clear')
-            
-            # Get terminal size
-            terminal_height = os.get_terminal_size().lines
             
             self.console.print(f"\n[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
             self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)}")
             
             # Display log lines with syntax highlighting based on log level
-            content_height = 0  # Track content height
+            content_height = 0
             for line in current_lines:
-                if content_height >= terminal_height - 4:  # Reserve space for header and navigation
-                    break
                 if "DEBUG" in line:
                     self.console.print(line.strip(), style="bright_blue")
                 elif "INFO" in line:
