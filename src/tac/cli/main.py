@@ -34,6 +34,7 @@ from tac.core.config import config, ConfigManager
 from tac.protoblock.manager import load_protoblock_from_json
 from tac.core.block_runner import BlockRunner
 from tac.testing_agents.pytest import PytestTestingAgent as TestRunner
+from tac.core.optimizer import CodeOptimizer
 
 logger = setup_logging('tac.cli.main')
 
@@ -242,6 +243,17 @@ def list_tests_command(args):
     
     print(f"\nTotal tests found: {test_count}")
 
+def optimize_function_command(args):
+    """Handle the optimize function command"""
+    optimizer = CodeOptimizer()
+    success = optimizer.optimize_function(args.function_name)
+    
+    if success:
+        print(f"\n✅ Successfully optimized function '{args.function_name}'")
+    else:
+        print(f"\n❌ Failed to optimize function '{args.function_name}'")
+        sys.exit(1)
+
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
@@ -373,6 +385,19 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Directory containing tests (default: tests)'
     )
     
+    # Optimize command
+    optimize_parser = subparsers.add_parser('optimize',
+        help='Optimize a specific function in the codebase'
+    )
+    optimize_parser.add_argument(
+        'function_name',
+        help='Name of the function to optimize'
+    )
+    optimize_parser.add_argument(
+        '--no-git',
+        action='store_true',
+        help='Disable all git operations (branch checks, commits, etc.)'
+    )
     
     # View command
     view_parser = subparsers.add_parser('view',
@@ -450,6 +475,10 @@ def main():
             list_tests_command(args)
         else:
             parser.error("Please specify a test command (run or list)")
+        return
+    
+    if args.command == 'optimize':
+        optimize_function_command(args)
         return
     
     voice_ui = None

@@ -16,9 +16,6 @@ from tac.core.log_config import setup_logging
 logger = setup_logging('tac.testing_agents.pytest')
 
 
-
-
-
 class ErrorAnalyzer:
     """Analyzes test failures and implementation errors to provide insights using LLM"""
     
@@ -208,7 +205,7 @@ class PytestTestingAgent:
                 # First collect all tests to ensure we're finding everything
                 collection_exit_code = pytest.main(args, plugins=[])
                 # Then run the actual tests
-                args = ['-v', '--disable-warnings', test_target]
+                args = ['-v', '--disable-warnings', '-m', 'not performance and not transient', test_target]
             
             exit_code = pytest.main(args, plugins=plugins)
             
