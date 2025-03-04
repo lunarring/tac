@@ -188,10 +188,10 @@ class TACViewer:
 
             # Handle log selection
             if 1 <= choice <= len(current_logs):
-                self.add_to_history(self.logs_menu)
                 self.current_log_path = current_logs[choice - 1]
-                self.read_log(self.current_log_path)
-                self.log_menu()
+                if self.read_log(self.current_log_path):
+                    self.display_log_content(self.current_log_content, f"Log File: {os.path.basename(self.current_log_path)}")
+                    page = 0  # Reset page when returning to log list
     
     def read_log(self, log_path):
         """Read a log file and store its contents."""
@@ -205,76 +205,31 @@ class TACViewer:
             return False
     
     def log_menu(self) -> None:
-        """Show menu for a specific log file."""
-        while True:
-            options = [
-                "View entire log",
-                "View DEBUG logs only",
-                "View INFO logs only",
-                "View WARNING logs only",
-                "View ERROR logs only",
-                "View CRITICAL logs only",
-                "Filter out DEBUG logs",
-                "Search logs",
-                "Show log statistics"
-            ]
-            
-            log_name = os.path.basename(self.current_log_path)
-            self.show_menu(options, f"Log File: {log_name}")
-            choice = self.get_choice(len(options))
-            
-            if choice == 'b':
-                if self.go_back():
-                    break
-                continue
-                
-            self.add_to_history(self.log_menu)
-            
-            if choice == 1:  # View entire log
-                self.display_log_content(self.current_log_content)
-            elif choice == 2:  # DEBUG logs
-                self.display_filtered_logs("DEBUG")
-            elif choice == 3:  # INFO logs
-                self.display_filtered_logs("INFO")
-            elif choice == 4:  # WARNING logs
-                self.display_filtered_logs("WARNING")
-            elif choice == 5:  # ERROR logs
-                self.display_filtered_logs("ERROR")
-            elif choice == 6:  # CRITICAL logs
-                self.display_filtered_logs("CRITICAL")
-            elif choice == 7:  # Filter out DEBUG logs
-                filtered_logs = [line for line in self.current_log_content if "DEBUG" not in line]
-                self.display_log_content(filtered_logs, "Logs (excluding DEBUG)")
-            elif choice == 8:  # Search logs
-                self.search_logs()
-            elif choice == 9:  # Show log statistics
-                self.show_log_statistics()
+        """Show log file contents."""
+        self.display_log_content(self.current_log_content)
+        
+    def display_filtered_logs(self, level):
+        """Display logs filtered by level."""
+        filtered_logs = [line for line in self.current_log_content if level in line]
+        self.display_log_content(filtered_logs, f"{level} Log Entries ({len(filtered_logs)} entries)")
     
-    def show_log_statistics(self):
-        """Show statistics about the current log file."""
-        if not self.current_log_content:
-            self.console.print("[yellow]No log content to analyze.[/yellow]")
-            self.console.print("\nPress any key to continue...")
-            get_single_key()
+    def search_logs(self):
+        """Search logs for a specific term."""
+        self.console.print("\nEnter search term (press any non-letter key when done):")
+        search_term = ""
+        while True:
+            key = get_single_key()
+            if key.isalpha() or key.isspace():
+                search_term += key
+                self.console.print(key, end="")
+            else:
+                break
+                
+        if not search_term:
             return
             
-        total_lines = len(self.current_log_content)
-        debug_count = sum(1 for line in self.current_log_content if "DEBUG" in line)
-        info_count = sum(1 for line in self.current_log_content if "INFO" in line)
-        warning_count = sum(1 for line in self.current_log_content if "WARNING" in line)
-        error_count = sum(1 for line in self.current_log_content if "ERROR" in line)
-        critical_count = sum(1 for line in self.current_log_content if "CRITICAL" in line)
-        
-        self.console.print("\n[bold cyan]Log Statistics[/bold cyan]")
-        self.console.print(f"Total lines: {total_lines}")
-        self.console.print(f"DEBUG: {debug_count} ({debug_count/total_lines*100:.1f}%)")
-        self.console.print(f"INFO: {info_count} ({info_count/total_lines*100:.1f}%)")
-        self.console.print(f"WARNING: {warning_count} ({warning_count/total_lines*100:.1f}%)")
-        self.console.print(f"ERROR: {error_count} ({error_count/total_lines*100:.1f}%)")
-        self.console.print(f"CRITICAL: {critical_count} ({critical_count/total_lines*100:.1f}%)")
-        
-        self.console.print("\nPress any key to continue...")
-        get_single_key()
+        filtered_logs = [line for line in self.current_log_content if search_term.lower() in line.lower()]
+        self.display_log_content(filtered_logs, f"Search Results for '{search_term}' ({len(filtered_logs)} matches)")
     
     def display_log_content(self, log_content, title="Log Contents"):
         """Display log content in a paged view with single-key navigation."""
@@ -370,29 +325,6 @@ class TACViewer:
                         self.console.print(f"\n[red]Invalid page number. Please enter a number between 1 and {total_pages}.[/red]")
                 except ValueError:
                     self.console.print("\n[red]Invalid input. Please enter a number.[/red]")
-    
-    def display_filtered_logs(self, level):
-        """Display logs filtered by level."""
-        filtered_logs = [line for line in self.current_log_content if level in line]
-        self.display_log_content(filtered_logs, f"{level} Log Entries ({len(filtered_logs)} entries)")
-    
-    def search_logs(self):
-        """Search logs for a specific term."""
-        self.console.print("\nEnter search term (press any non-letter key when done):")
-        search_term = ""
-        while True:
-            key = get_single_key()
-            if key.isalpha() or key.isspace():
-                search_term += key
-                self.console.print(key, end="")
-            else:
-                break
-                
-        if not search_term:
-            return
-            
-        filtered_logs = [line for line in self.current_log_content if search_term.lower() in line.lower()]
-        self.display_log_content(filtered_logs, f"Search Results for '{search_term}' ({len(filtered_logs)} matches)")
 
 def main():
     viewer = TACViewer()
