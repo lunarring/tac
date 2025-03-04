@@ -296,11 +296,17 @@ class TACViewer:
             # Clear screen for better readability
             os.system('cls' if os.name == 'nt' else 'clear')
             
+            # Get terminal size
+            terminal_height = os.get_terminal_size().lines
+            
             self.console.print(f"\n[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
             self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)}")
             
             # Display log lines with syntax highlighting based on log level
+            content_height = 0  # Track content height
             for line in current_lines:
+                if content_height >= terminal_height - 4:  # Reserve space for header and navigation
+                    break
                 if "DEBUG" in line:
                     self.console.print(line.strip(), style="bright_blue")
                 elif "INFO" in line:
@@ -313,18 +319,25 @@ class TACViewer:
                     self.console.print(line.strip(), style="bold red")
                 else:
                     self.console.print(line.strip())
+                content_height += 1
             
-            # Navigation options
-            self.console.print("\nNavigation:")
-            self.console.print("n: Next page")
-            self.console.print("b: Previous page")
-            self.console.print("f: First page")
-            self.console.print("l: Last page")
-            self.console.print("j: Jump to page")
-            self.console.print("r: Return to menu")
-            self.console.print("q: Quit")
+            # Add padding to push navigation to bottom
+            padding_needed = terminal_height - content_height - 4  # Account for header and nav
+            if padding_needed > 0:
+                self.console.print("\n" * (padding_needed - 1))
             
-            self.console.print("\nPress a key to navigate...")
+            # Single line navigation at the bottom
+            nav_text = Text()
+            nav_text.append("Navigate: ", style="bold")
+            nav_text.append("[n]ext ", style="cyan" if end_idx < len(log_content) else "dim")
+            nav_text.append("[b]ack ", style="cyan" if page > 0 else "dim")
+            nav_text.append("[f]irst ", style="cyan")
+            nav_text.append("[l]ast ", style="cyan")
+            nav_text.append("[j]ump ", style="cyan")
+            nav_text.append("[r]eturn ", style="cyan")
+            nav_text.append("[q]uit", style="red")
+            self.console.print(nav_text)
+            
             choice = get_single_key().lower()
             
             if choice == 'q':
