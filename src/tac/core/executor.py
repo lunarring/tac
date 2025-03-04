@@ -5,13 +5,15 @@ from tac.coding_agents.native_agent import NativeAgent
 from tac.core.git_manager import GitManager
 import git
 import sys
+import os
+from datetime import datetime
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
-from tac.testing_agents.pytest import PytestTestingAgent as TestRunner, ErrorAnalyzer
-from tac.testing_agents.plausibility import PlausibilityTestingAgent as PlausibilityChecker
+from tac.testing_agents.pytest import PytestTestingAgent, ErrorAnalyzer
+from tac.testing_agents.plausibility import PlausibilityTestingAgent
 
 logger = setup_logging('tac.core.executor')
 
@@ -37,7 +39,7 @@ class ProtoBlockExecutor:
             self.agent = NativeAgent(agent_config)
         else:
             raise ValueError(f"Invalid agent type: {config.general.agent_type}")
-        self.test_runner = TestRunner()
+        self.test_runner = PytestTestingAgent()
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
         self.git_manager = GitManager() if self.git_enabled else None
@@ -45,7 +47,7 @@ class ProtoBlockExecutor:
         self.protoblock_factory = ProtoBlockFactory()  # Initialize factory
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
-        self.plausibility_checker = PlausibilityChecker()  # Initialize plausibility checker
+        self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
         self.test_results = None
