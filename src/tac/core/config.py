@@ -21,7 +21,7 @@ class GitConfig:
 class GeneralConfig:
     agent_type: str = "native"
     reasoning_effort: str = "medium"
-    use_orchestrator: bool = False
+    use_orchestrator: bool = True
     plausibility_test: bool = True
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
