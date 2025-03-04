@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Any
-from tac.agents.base import Agent
-from tac.agents.aider_agent import AiderAgent
+from tac.coding_agents.base import Agent
+from tac.coding_agents.aider import AiderAgent
 
 class ProtoBlock:
     """
@@ -21,7 +21,7 @@ class ProtoBlock:
 
     def create_agent(self, config: dict):
         """Create a unified agent for this block based on the config"""
-        from tac.agents.aider_agent import AiderAgent
+        from tac.coding_agents.aider import AiderAgent
         
         # Add block-specific parameters to config
         config.update({

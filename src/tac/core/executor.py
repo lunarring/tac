@@ -8,9 +8,9 @@ from _pytest.config import Config
 from _pytest.terminal import TerminalReporter
 from _pytest.capture import CaptureManager
 from tac.protoblock import ProtoBlock, ProtoBlockFactory
-from tac.agents.base import Agent
-from tac.agents.aider_agent import AiderAgent
-from tac.agents.native_agent import NativeAgent
+from tac.coding_agents.base import Agent
+from tac.coding_agents.aider import AiderAgent
+from tac.coding_agents.native_agent import NativeAgent
 from tac.core.git_manager import GitManager
 from tac.core.test_runner import TestRunner
 import git

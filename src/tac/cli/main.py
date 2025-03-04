@@ -23,7 +23,7 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
-from tac.agents.aider_agent import AiderAgent
+from tac.coding_agents.aider import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
 from tac.core.test_runner import TestRunner
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging
