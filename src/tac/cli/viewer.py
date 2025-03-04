@@ -302,7 +302,7 @@ class TACViewer:
             # Display log lines with syntax highlighting based on log level
             for line in current_lines:
                 if "DEBUG" in line:
-                    self.console.print(line.strip(), style="blue")
+                    self.console.print(line.strip(), style="bright_blue")
                 elif "INFO" in line:
                     self.console.print(line.strip(), style="green")
                 elif "WARNING" in line:
@@ -310,7 +310,7 @@ class TACViewer:
                 elif "ERROR" in line:
                     self.console.print(line.strip(), style="red")
                 elif "CRITICAL" in line:
-                    self.console.print(line.strip(), style="red bold")
+                    self.console.print(line.strip(), style="bold red")
                 else:
                     self.console.print(line.strip())
             
