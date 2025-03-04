@@ -239,8 +239,8 @@ class TACViewer:
         while True:
             # Get terminal size and calculate available lines
             terminal_height = os.get_terminal_size().lines
-            # Account for title (2 lines) and navigation (2 lines)
-            lines_per_page = terminal_height - 4
+            # Account for title (2 lines), navigation (2 lines), and spacing (1 line)
+            lines_per_page = terminal_height - 5
             
             start_idx = page * lines_per_page
             end_idx = start_idx + lines_per_page
@@ -285,12 +285,15 @@ class TACViewer:
                     self.console.print(line.strip())
                 content_height += 1
             
-            # Add padding to push navigation to bottom
-            padding_needed = terminal_height - content_height - 4  # Account for header and nav
+            # Add padding to push navigation to bottom, plus one extra line for spacing
+            padding_needed = terminal_height - content_height - 5  # Account for header, nav, and spacing
             if padding_needed > 0:
                 self.console.print("\n" * (padding_needed - 1))
             
-            # Single line navigation at the bottom
+            # Add extra line of spacing before navigation
+            self.console.print("")
+            
+            # Single line navigation at the bottom with background
             nav_text = Text()
             nav_text.append("Navigate: ", style="bold")
             nav_text.append("[n]ext ", style="cyan" if end_idx < len(log_content) else "dim")
@@ -300,7 +303,9 @@ class TACViewer:
             nav_text.append("[j]ump ", style="cyan")
             nav_text.append("[r]eturn ", style="cyan")
             nav_text.append("[q]uit", style="red")
-            self.console.print(nav_text)
+            
+            # Print navigation with dark background
+            self.console.print(nav_text, style="on grey11")
             
             choice = get_single_key().lower()
             
