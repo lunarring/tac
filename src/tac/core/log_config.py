@@ -6,13 +6,30 @@ from colorama import Fore, Style, init
 import sys
 import time
 import datetime
-from tac.core.config import config
 
 # Initialize colorama
 init()
 
 # Store configured loggers to prevent duplicate setup
 _configured_loggers = {}
+
+# Default configuration values
+_default_config = {
+    'level': 'INFO',
+    'color': 'green'
+}
+
+def update_config(config_obj):
+    """Update logging configuration from config object."""
+    global _default_config
+    try:
+        if hasattr(config_obj, 'logging'):
+            _default_config = {
+                'level': config_obj.logging.get_tac('level', 'INFO'),
+                'color': config_obj.logging.get_tac('color', 'green')
+            }
+    except Exception:
+        pass  # Keep default values if update fails
 
 class ExecutionContext:
     """
@@ -49,12 +66,7 @@ execution_context = ExecutionContext()
 
 def get_log_level(name: str = None) -> str:
     """Get the log level from config, with fallback to default values."""
-    try:
-        if hasattr(config, 'logging'):
-            return config.logging.get_tac('level', 'INFO')
-        return 'INFO'
-    except Exception:
-        return 'INFO'
+    return _default_config.get('level', 'INFO')
 
 def setup_console_logging(name: str = None) -> logging.Logger:
     """

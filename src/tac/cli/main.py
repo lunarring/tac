@@ -25,12 +25,12 @@ if src_dir not in sys.path:
 from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
 from tac.coding_agents.aider import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
-from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging
+from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_config
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
-from tac.core.config import config
+from tac.core.config import config, ConfigManager
 from tac.protoblock.manager import load_protoblock_from_json
 from tac.core.block_runner import BlockRunner
 from tac.testing_agents.pytest import PytestTestingAgent as TestRunner
@@ -415,6 +415,10 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
 def main():
     parser, args = parse_args()
     
+    # Initialize config before any logging
+    config.override_with_args(vars(args))
+    update_config(config)
+    
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
         # Import and run the viewer without creating log files
@@ -428,7 +432,6 @@ def main():
     
     # Configure logging for all other commands
     logger = setup_logging('tac.cli.main')
-    config.override_with_args(vars(args))
     logger.debug(f"Overriding config with args: {vars(args)}")
     logger.debug(f"Config after override: {config}")
     

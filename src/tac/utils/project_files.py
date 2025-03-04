@@ -5,11 +5,11 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.config import config
-import logging
+from tac.core.log_config import setup_logging
 from tqdm import tqdm
 import ast
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.utils.project_files')
 
 class ProjectFiles:
     """Manages project-wide file summaries and tracking"""
@@ -222,6 +222,6 @@ if __name__ == "__main__":
     
     # Initialize ProjectFiles with current directory
     project_files = ProjectFiles(".")
-    print(project_files.get_codebase_summary())
+    logger.info(project_files.get_codebase_summary())
     # import pdb; pdb.set_trace()
 

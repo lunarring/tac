@@ -11,8 +11,9 @@ from tac.core.llm import LLMClient, Message
 from tac.protoblock import ProtoBlock
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
+from tac.core.log_config import setup_logging
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.testing_agents.pytest')
 
 
 
@@ -267,35 +268,25 @@ class PytestTestingAgent:
         return summary
 
     def _print_test_summary(self, results: dict):
-        """Print a colored test summary"""
+        """Print a colored summary of test results"""
         total = sum(results.values())
-        if total == 0:
-            return
-
-        # Determine overall color
-        if results['failed'] > 0 or results['error'] > 0:
-            color = Fore.RED
-        elif results['passed'] == total:
-            color = Fore.GREEN
-        else:
-            color = Fore.YELLOW
-
-        # Print summary
-        print("\n" + "="*50)
-        print(f"{color}Test Summary:{Style.RESET_ALL}")
+        color = Fore.RED if results['failed'] > 0 or results['error'] > 0 else Fore.GREEN
+        
+        logger.info("="*50)
+        logger.info(f"{color}Test Summary:{Style.RESET_ALL}")
         
         if results['failed'] > 0 or results['error'] > 0:
-            print(f"{Fore.RED}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
+            logger.info(f"{Fore.RED}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
             if results['failed'] > 0:
-                print(f"{Fore.RED}Failed: {results['failed']}{Style.RESET_ALL}")
+                logger.info(f"{Fore.RED}Failed: {results['failed']}{Style.RESET_ALL}")
             if results['error'] > 0:
-                print(f"{Fore.RED}Errors: {results['error']}{Style.RESET_ALL}")
+                logger.info(f"{Fore.RED}Errors: {results['error']}{Style.RESET_ALL}")
         else:
-            print(f"{Fore.GREEN}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
+            logger.info(f"{Fore.GREEN}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
         
         if results['skipped'] > 0:
-            print(f"{Fore.YELLOW}Skipped: {results['skipped']}{Style.RESET_ALL}")
-        print("="*50)
+            logger.info(f"{Fore.YELLOW}Skipped: {results['skipped']}{Style.RESET_ALL}")
+        logger.info("="*50)
 
     def get_test_results(self) -> str:
         """Get the full test results including output and summary"""

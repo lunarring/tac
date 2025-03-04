@@ -2,7 +2,11 @@ from pathlib import Path
 import os
 from typing import Any, Dict, Optional, List
 from dataclasses import dataclass, field
-import logging
+import json
+import argparse
+from tac.core.log_config import setup_logging, update_config
+
+logger = setup_logging('tac.core.config')
 
 
 @dataclass
@@ -120,11 +124,13 @@ class ConfigManager:
     def _initialize(self) -> None:
         """Initialize the config manager with default values."""
         self._config = Config()
+        # Update logging configuration
+        update_config(self._config)
 
     def _setup_logger(self):
         """Setup logger for config manager - called after initial setup to avoid circular deps."""
         if self._logger is None:
-            self._logger = logging.getLogger(__name__)
+            self._logger = setup_logging('tac.core.config')
 
     @property
     def raw_config(self) -> Dict[str, Any]:

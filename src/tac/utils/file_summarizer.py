@@ -5,8 +5,8 @@ from typing import Dict, List, Optional
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
 import logging
-
-logger = logging.getLogger(__name__)
+from tac.core.log_config import setup_logging
+logger = setup_logging('tac.utils.file_summarizer')
 
 class FileSummarizer:
     """Class for summarizing Python files using LLM analysis"""
@@ -221,5 +221,5 @@ def extract_code_definitions(code: str):
 
 if __name__ == "__main__":
     summarizer = FileSummarizer()
-    print(summarizer.analyze_file("/Users/jjj/git/piano_trainer/src/piano_trainer.py"))
-    # print(summarizer.analyze_file("tac/utils/file_summarizer.py"))
+    logger.info(summarizer.analyze_file("/Users/jjj/git/piano_trainer/src/piano_trainer.py"))
+    # logger.info(summarizer.analyze_file("tac/utils/file_summarizer.py"))
