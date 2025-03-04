@@ -8,6 +8,27 @@ from datetime import datetime
 import re
 import glob
 
+# Import getch at the top level since we'll use it throughout
+try:
+    import getch
+    def get_single_key():
+        return getch.getch().decode('utf-8')
+except ImportError:
+    # Fallback if getch is not available
+    import sys
+    import tty
+    import termios
+    
+    def get_single_key():
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch.lower()
+
 # Simple print function for errors
 def log_error(msg):
     print(f"ERROR - {msg} [tac.cli.viewer]", file=sys.stderr)
@@ -55,9 +76,11 @@ class TACViewer:
         self.console.print("q. Quit")
         
     def get_choice(self, max_choice: int, allow_nav: bool = False, has_next: bool = False, has_prev: bool = False) -> str:
-        """Get user choice with validation."""
+        """Get user choice with single-key input."""
         while True:
-            choice = input("\nEnter your choice: ").lower()
+            self.console.print("\nPress a key to choose...")
+            choice = get_single_key()
+            
             if choice == 'q':
                 sys.exit(0)
             if choice == 'b' and self.history:
@@ -68,9 +91,11 @@ class TACViewer:
                 if choice == 'p' and has_prev:
                     return 'p'
             try:
-                num = int(choice)
-                if 1 <= num <= max_choice:
-                    return num
+                # For number choices, collect digits until a non-digit is pressed
+                if choice.isdigit():
+                    num = int(choice)
+                    if 1 <= num <= max_choice:
+                        return num
             except ValueError:
                 pass
             self.console.print("[red]Invalid choice. Please try again.[/red]")
@@ -229,7 +254,8 @@ class TACViewer:
         """Show statistics about the current log file."""
         if not self.current_log_content:
             self.console.print("[yellow]No log content to analyze.[/yellow]")
-            input("Press Enter to continue...")
+            self.console.print("\nPress any key to continue...")
+            get_single_key()
             return
             
         total_lines = len(self.current_log_content)
@@ -247,21 +273,12 @@ class TACViewer:
         self.console.print(f"ERROR: {error_count} ({error_count/total_lines*100:.1f}%)")
         self.console.print(f"CRITICAL: {critical_count} ({critical_count/total_lines*100:.1f}%)")
         
-        input("\nPress Enter to continue...")
+        self.console.print("\nPress any key to continue...")
+        get_single_key()
     
     def display_log_content(self, log_content, title="Log Contents"):
         """Display log content in a paged view with single-key navigation."""
         page = 0
-        
-        # Try to import getch for single-key input if available
-        try:
-            import getch
-            get_key = getch.getch
-            single_key_mode = True
-        except ImportError:
-            # Fall back to regular input if getch is not available
-            get_key = lambda: input("\nEnter command (n=next, b=back, q=quit): ").lower()
-            single_key_mode = False
         
         while True:
             start_idx = page * self.lines_per_page
@@ -270,7 +287,8 @@ class TACViewer:
             
             if not current_lines:
                 self.console.print("[yellow]No log entries to display.[/yellow]")
-                input("Press Enter to continue...")
+                self.console.print("\nPress any key to continue...")
+                get_single_key()
                 return
                 
             total_pages = (len(log_content) + self.lines_per_page - 1) // self.lines_per_page
@@ -306,11 +324,8 @@ class TACViewer:
             self.console.print("r: Return to menu")
             self.console.print("q: Quit")
             
-            if single_key_mode:
-                self.console.print("\nPress any key to navigate...")
-                choice = get_key()
-            else:
-                choice = get_key()
+            self.console.print("\nPress a key to navigate...")
+            choice = get_single_key().lower()
             
             if choice == 'q':
                 sys.exit(0)
@@ -325,14 +340,23 @@ class TACViewer:
             elif choice == 'l':
                 page = total_pages - 1
             elif choice == 'j':
+                self.console.print("\nEnter page number and press any key when done:")
+                page_str = ""
+                while True:
+                    key = get_single_key()
+                    if key.isdigit():
+                        page_str += key
+                        self.console.print(key, end="")
+                    else:
+                        break
                 try:
-                    jump_page = int(input(f"Enter page number (1-{total_pages}): "))
+                    jump_page = int(page_str)
                     if 1 <= jump_page <= total_pages:
                         page = jump_page - 1
                     else:
-                        self.console.print(f"[red]Invalid page number. Please enter a number between 1 and {total_pages}.[/red]")
+                        self.console.print(f"\n[red]Invalid page number. Please enter a number between 1 and {total_pages}.[/red]")
                 except ValueError:
-                    self.console.print("[red]Invalid input. Please enter a number.[/red]")
+                    self.console.print("\n[red]Invalid input. Please enter a number.[/red]")
     
     def display_filtered_logs(self, level):
         """Display logs filtered by level."""
@@ -341,7 +365,16 @@ class TACViewer:
     
     def search_logs(self):
         """Search logs for a specific term."""
-        search_term = input("\nEnter search term: ")
+        self.console.print("\nEnter search term (press any non-letter key when done):")
+        search_term = ""
+        while True:
+            key = get_single_key()
+            if key.isalpha() or key.isspace():
+                search_term += key
+                self.console.print(key, end="")
+            else:
+                break
+                
         if not search_term:
             return
             
