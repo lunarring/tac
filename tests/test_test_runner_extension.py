@@ -1,7 +1,7 @@
 import os
 import time
 import pytest
-from src.tac.core.test_runner import TestRunner
+from tac.testing_agents.pytest import PytestTestingAgent as TestRunner
 
 @pytest.fixture
 def dummy_tests(tmp_path):

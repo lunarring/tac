@@ -148,7 +148,7 @@ class CustomReporter:
             if report.longrepr:
                 self.output_lines.append(str(report.longrepr))
 
-class TestRunner:
+class PytestTestingAgent:
     """
     A dedicated class for handling test execution and reporting using pytest.
     """

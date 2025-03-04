@@ -1,27 +1,17 @@
-import os
-import subprocess
-import logging
-import json
-from datetime import datetime
-import pytest
-from _pytest.config import Config
-from _pytest.terminal import TerminalReporter
-from _pytest.capture import CaptureManager
 from tac.protoblock import ProtoBlock, ProtoBlockFactory
 from tac.coding_agents.base import Agent
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
 from tac.core.git_manager import GitManager
-from tac.core.test_runner import TestRunner
 import git
 import sys
-from tac.core.test_runner import ErrorAnalyzer
-from tac.core.plausibility_check import PlausibilityChecker
 from tac.utils.file_gatherer import gather_python_files
 from typing import Dict
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
+from tac.testing_agents.pytest import PytestTestingAgent as TestRunner, ErrorAnalyzer
+from tac.testing_agents.plausibility import PlausibilityTestingAgent as PlausibilityChecker
 
 logger = setup_logging('tac.core.executor')
 

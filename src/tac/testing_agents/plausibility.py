@@ -7,7 +7,7 @@ from tac.core.config import config
 
 logger = logging.getLogger(__name__)
 
-class PlausibilityChecker:
+class PlausibilityTestingAgent:
     """
     Checks if the implemented changes match the promised functionality by analyzing
     git diff and protoblock specifications using LLM.
@@ -18,6 +18,8 @@ class PlausibilityChecker:
         self.llm_client = LLMClient(strength="strong")
         self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
         self._min_score = config.general.minimum_plausibility_score
+
+        logger.info("Initializing PlausibilityTestingAgent")
 
     def _is_score_passing(self, score: str) -> bool:
         """
