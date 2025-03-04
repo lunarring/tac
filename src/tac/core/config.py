@@ -4,9 +4,10 @@ from typing import Any, Dict, Optional, List
 from dataclasses import dataclass, field
 import json
 import argparse
-from tac.core.log_config import setup_logging, update_config
+from tac.core.log_config import setup_logging
 
-logger = setup_logging('tac.core.config')
+# Initialize logger with default values - will be reconfigured later if needed
+logger = setup_logging('tac.core.config', log_level='INFO', log_color='green')
 
 
 @dataclass
@@ -125,12 +126,14 @@ class ConfigManager:
         """Initialize the config manager with default values."""
         self._config = Config()
         # Update logging configuration
-        update_config(self._config)
+        self._setup_logger()
 
     def _setup_logger(self):
         """Setup logger for config manager - called after initial setup to avoid circular deps."""
         if self._logger is None:
-            self._logger = setup_logging('tac.core.config')
+            log_level = self._config.logging.get_tac('level', 'INFO')
+            log_color = self._config.logging.get_tac('color', 'green')
+            self._logger = setup_logging('tac.core.config', log_level=log_level, log_color=log_color)
 
     @property
     def raw_config(self) -> Dict[str, Any]:

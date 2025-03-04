@@ -13,23 +13,9 @@ init()
 # Store configured loggers to prevent duplicate setup
 _configured_loggers = {}
 
-# Default configuration values
-_default_config = {
-    'level': 'INFO',
-    'color': 'green'
-}
-
-def update_config(config_obj):
-    """Update logging configuration from config object."""
-    global _default_config
-    try:
-        if hasattr(config_obj, 'logging'):
-            _default_config = {
-                'level': config_obj.logging.get_tac('level', 'INFO'),
-                'color': config_obj.logging.get_tac('color', 'green')
-            }
-    except Exception:
-        pass  # Keep default values if update fails
+def get_log_level(name: str = None, default_level: str = 'INFO') -> str:
+    """Get the log level, with fallback to default value."""
+    return default_level
 
 class ExecutionContext:
     """
@@ -63,10 +49,6 @@ class ExecutionContext:
 
 # Create a singleton instance
 execution_context = ExecutionContext()
-
-def get_log_level(name: str = None) -> str:
-    """Get the log level from config, with fallback to default values."""
-    return _default_config.get('level', 'INFO')
 
 def setup_console_logging(name: str = None) -> logging.Logger:
     """
@@ -129,13 +111,15 @@ def setup_console_logging(name: str = None) -> logging.Logger:
     
     return logger
 
-def setup_logging(name: str = None, execution_id: int = None) -> logging.Logger:
+def setup_logging(name: str = None, execution_id: int = None, log_level: str = 'INFO', log_color: str = 'green') -> logging.Logger:
     """
     Setup logging configuration
     
     Args:
         name: Logger name
         execution_id: Optional execution ID to use for log files
+        log_level: Logging level to use (default: INFO)
+        log_color: Color to use for logging (default: green)
     """
     # If logging is disabled (level set to CRITICAL), just return a disabled logger
     if logging.getLogger().getEffectiveLevel() >= logging.CRITICAL:

@@ -25,7 +25,7 @@ if src_dir not in sys.path:
 from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
 from tac.coding_agents.aider import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
-from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_config
+from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
@@ -417,7 +417,12 @@ def main():
     
     # Initialize config before any logging
     config.override_with_args(vars(args))
-    update_config(config)
+    
+    # Set up logging with config values
+    log_level = config.logging.get_tac('level', 'INFO')
+    log_color = config.logging.get_tac('color', 'green')
+    global logger
+    logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
     
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
@@ -431,7 +436,6 @@ def main():
         return
     
     # Configure logging for all other commands
-    logger = setup_logging('tac.cli.main')
     logger.debug(f"Overriding config with args: {vars(args)}")
     logger.debug(f"Config after override: {config}")
     
