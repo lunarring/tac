@@ -262,18 +262,25 @@ class TACViewer:
             
             # Display log lines with syntax highlighting based on log level
             content_height = 0
+            current_style = None
+            
             for line in current_lines:
-                # Match exact log format: "LEVEL - message [source timestamp]"
-                if line.startswith("DEBUG"):
-                    self.console.print(line.strip(), style="blue")
-                elif line.startswith("INFO"):
-                    self.console.print(line.strip(), style="green")
-                elif line.startswith("WARNING"):
-                    self.console.print(line.strip(), style="yellow")
-                elif line.startswith("ERROR"):
-                    self.console.print(line.strip(), style="red")
-                elif line.startswith("CRITICAL"):
-                    self.console.print(line.strip(), style="red bold")
+                # Check for the start of a new log entry
+                if line.startswith(("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")):
+                    if line.startswith("DEBUG"):
+                        current_style = "blue"
+                    elif line.startswith("INFO"):
+                        current_style = "green"
+                    elif line.startswith("WARNING"):
+                        current_style = "yellow"
+                    elif line.startswith("ERROR"):
+                        current_style = "red"
+                    elif line.startswith("CRITICAL"):
+                        current_style = "red bold"
+                
+                # Print with current style if set, otherwise plain
+                if current_style:
+                    self.console.print(line.strip(), style=current_style)
                 else:
                     self.console.print(line.strip())
                 content_height += 1
