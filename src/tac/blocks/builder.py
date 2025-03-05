@@ -1,15 +1,13 @@
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
-from tac.coding_agents.base import Agent
-from tac.coding_agents.aider import AiderAgent
-from tac.coding_agents.native_agent import NativeAgent
+from tac.coding_agents import AgentConstructor
 from tac.utils.git_manager import GitManager
 import git
 import sys
 import os
 from datetime import datetime
 from tac.utils.file_gatherer import gather_python_files
-from typing import Dict
+from typing import Dict, Optional, Tuple
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
@@ -23,23 +21,13 @@ class BlockBuilder:
     Builds a Block from a ProtoBlock by managing the implementation process through an agent,
     running tests, and handling version control operations.
     """
-    def __init__(self, config_override: dict = None, codebase: Dict[str, str] = None):
+    def __init__(self, config_override: Optional[Dict] = None, codebase: Optional[Dict[str, str]] = None):
         self.protoblock = None
         self.codebase = codebase  # Store codebase internally
         
-        # Create agent with combined config
-        agent_config = config.raw_config.copy()
-        if config_override:
-            agent_config.update(config_override)
-            config.override_with_dict(config_override)
-            
-        # Create agent directly
-        if config.general.agent_type == "aider":
-            self.agent = AiderAgent(agent_config)
-        elif config.general.agent_type == "native":
-            self.agent = NativeAgent(agent_config)
-        else:
-            raise ValueError(f"Invalid agent type: {config.general.agent_type}")
+        # Use the AgentConstructor to create the appropriate agent
+        self.agent = AgentConstructor.create_agent(config_override=config_override)
+        
         self.test_runner = PytestTestingAgent()
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
@@ -53,11 +41,19 @@ class BlockBuilder:
         self.initial_test_count = 0  # Store initial test count
         self.test_results = None
 
-    def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> bool:
+    def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
         """
         Executes the block with a unified test-and-implement approach.
+        
+        Args:
+            protoblock: The ProtoBlock to implement
+            idx_attempt: The attempt index (0-based)
+            
         Returns:
-            bool: True if execution was successful, False otherwise
+            Tuple containing:
+                - bool: True if execution was successful, False otherwise
+                - Optional[str]: Failure type description if execution failed, None otherwise
+                - str: Error analysis if available, empty string otherwise
         """
         self.protoblock = protoblock
         self.protoblock_id = protoblock.block_id
@@ -171,10 +167,10 @@ class BlockBuilder:
             
         except KeyboardInterrupt:
             logger.info("\nExecution interrupted by user")
-            return False
+            return False, "Execution interrupted", ""
         except Exception as e:
             logger.error(f"Unexpected error during block execution: {e}")
-            return False
+            return False, "Unexpected error", str(e)
 
     def run_tests(self, test_path: str = None) -> bool:
         """
