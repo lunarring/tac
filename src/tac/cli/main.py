@@ -447,12 +447,21 @@ def main():
     config.override_with_args(vars(args))
     
     # Set up logging with config values
-    log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else config.logging.get_tac('level', 'INFO')
+    # Check environment variable first (highest priority)
+    env_log_level = os.environ.get('TAC_LOG_LEVEL')
+    
+    # Command line args have second highest priority
+    cmd_log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else None
+    
+    # Config has lowest priority
+    config_log_level = config.logging.get_tac('level', 'INFO')
+    
+    # Determine final log level
+    log_level = env_log_level or cmd_log_level or config_log_level
     log_color = config.logging.get_tac('color', 'green')
     
-    # Override the logging config with the command-line log level if provided
-    if hasattr(args, 'log_level') and args.log_level:
-        config.override_with_dict({'logging': {'tac': {'level': log_level}}})
+    # Override the logging config with the final log level
+    config.override_with_dict({'logging': {'tac': {'level': log_level}}})
     
     # Create a logger for this function instead of using a global
     logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
