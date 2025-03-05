@@ -36,7 +36,8 @@ from tac.core.block_runner import BlockRunner
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
 
-logger = setup_logging('tac.cli.main')
+# Initialize logger at module level but don't use it as a global in functions
+_module_logger = setup_logging('tac.cli.main')
 
 def cli_gather_python_files(directory, formatting_options, exclusions, exclude_dot_files=True):
     """
@@ -49,7 +50,7 @@ def cli_gather_python_files(directory, formatting_options, exclusions, exclude_d
         exclude_dot_files: Whether to exclude files/directories starting with a dot.
         
     Returns:
-        str: Formatted output of directory tree and file contents.
+        Dictionary with file paths as keys and file contents as values.
     """
     MAX_FILE_SIZE = 100 * 1024  
     CHUNK_SIZE = 40 * 1024
@@ -186,6 +187,7 @@ def gather_files_command(args):
 
 def run_tests_command(args):
     """Handle the test run command"""
+    logger = setup_logging('tac.cli.main')
     test_path = args.directory
     if not os.path.exists(test_path):
         logger.error(f"Test path not found: {test_path}")
@@ -200,6 +202,7 @@ def run_tests_command(args):
 
 def list_tests_command(args):
     """Handle the test list command"""
+    logger = setup_logging('tac.cli.main')
     test_dir = args.directory
     if not os.path.exists(test_dir):
         logger.error(f"Test directory not found: {test_dir}")
@@ -242,8 +245,6 @@ def list_tests_command(args):
             print(f"  - {test}")
     
     print(f"\nTotal tests found: {test_count}")
-
-
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
@@ -454,7 +455,7 @@ def main():
     if hasattr(args, 'log_level') and args.log_level:
         config.override_with_dict({'logging': {'tac': {'level': log_level}}})
     
-    global logger
+    # Create a logger for this function instead of using a global
     logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
     
     # Update all existing loggers with the new log level
