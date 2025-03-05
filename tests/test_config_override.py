@@ -10,12 +10,12 @@ def test_override_with_args():
     cm._config = Config(
         general=GeneralConfig(
             agent_type="aider",
-            plausibility_test=False,
             use_file_summaries=False,
             summarizer_timeout=30,
             max_retries_block=3,
             max_retries_protoblock=4,
-            halt_after_fail=False
+            halt_after_fail=False,
+            default_trusty_agents=["pytest"]
         ),
         git=GitConfig(
             enabled=True,
@@ -33,7 +33,7 @@ def test_override_with_args():
     assert cm.general.agent_type == "new_aider"
     assert cm.git.enabled is False
     # Verify unchanged values
-    assert cm.general.plausibility_test is False
+    assert cm.general.default_trusty_agents == ["pytest"]
     assert cm.general.use_file_summaries is False
     assert cm.general.summarizer_timeout == 30
     assert cm.general.max_retries_block == 3

@@ -99,48 +99,53 @@ class BlockBuilder:
                 return execution_success, failure_type, error_analysis
 
             
-            # Run tests and get results first
-            test_success = self.run_tests()
-            test_results = self.test_runner.get_test_results()
-            
-            # Extract test statistics
-            test_stats = self.test_runner.get_test_stats()
-            total_tests = sum(test_stats.values()) if test_stats else 0
-            failed_tests = test_stats.get('failed', 0) if test_stats else 0
-            
-            # Log test results
-            if failed_tests > 0:
-                logger.warning(f"{failed_tests} out of {total_tests} tests failed")
-                logger.warning("This indicates potential issues but won't stop execution")
-            else:
-                logger.info(f"All {total_tests} tests passed successfully")
-
-            # Only consider it a failure if there was an execution error
-            # Test failures are warnings but don't stop execution
-            if not test_success:
-                failure_type = "Unit tests failed"
-                execution_success = False
-                error_analysis = ""  # Initialize as empty string instead of "None"
-                logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
-
-                if idx_attempt < config.general.max_retries_block - 1:
-                    if config.general.run_error_analysis:
-                        error_analysis = self.error_analyzer.analyze_failure(
-                            self.protoblock, 
-                            test_results,
-                            self.codebase
-                        )
-                        logger.debug(f"Error Analysis: {error_analysis}")
+            # Run tests if pytest is in trusty_agents
+            if "pytest" in self.protoblock.trusty_agents:
+                logger.info("Running pytest tests (included in trusty_agents)...")
+                test_success = self.run_tests()
+                test_results = self.test_runner.get_test_results()
+                
+                # Extract test statistics
+                test_stats = self.test_runner.get_test_stats()
+                total_tests = sum(test_stats.values()) if test_stats else 0
+                failed_tests = test_stats.get('failed', 0) if test_stats else 0
+                
+                # Log test results
+                if failed_tests > 0:
+                    logger.warning(f"{failed_tests} out of {total_tests} tests failed")
+                    logger.warning("This indicates potential issues but won't stop execution")
                 else:
-                    logger.debug("Software test result: FAILURE!")
+                    logger.info(f"All {total_tests} tests passed successfully")
 
-                return execution_success, failure_type, error_analysis
+                # Only return early if tests failed
+                if not test_success:
+                    failure_type = "Unit tests failed"
+                    execution_success = False
+                    error_analysis = ""  # Initialize as empty string instead of "None"
+                    logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
 
-            # Only perform plausibility check if enabled in config
-            plausibility_check_enabled = config.general.plausibility_test
-            logger.debug(f"Plausibility check enabled: {plausibility_check_enabled}")
-            if plausibility_check_enabled:
-                logger.info("Running plausibility check...")
+                    if idx_attempt < config.general.max_retries_block - 1:
+                        if config.general.run_error_analysis:
+                            error_analysis = self.error_analyzer.analyze_failure(
+                                self.protoblock, 
+                                test_results,
+                                self.codebase
+                            )
+                            logger.debug(f"Error Analysis: {error_analysis}")
+                    else:
+                        logger.debug("Software test result: FAILURE!")
+
+                    logger.info("Returning early due to test failure, skipping any remaining trusty agents")
+                    return execution_success, failure_type, error_analysis
+                
+                # If we get here, tests passed - continue with other trusty agents
+                logger.info("Tests passed, continuing with remaining trusty agents if any")
+            else:
+                logger.info("Pytest tests skipped (not included in trusty_agents)")
+
+            # Check if plausibility test is in trusty_agents
+            if "plausibility" in self.protoblock.trusty_agents:
+                logger.info("Running plausibility check (included in trusty_agents)...")
                 # Get git diff for plausibility check
                 git_diff = self.git_manager.get_complete_diff()
                 plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, git_diff, self.codebase)
@@ -157,12 +162,13 @@ class BlockBuilder:
                 else:
                     # If we got here, both tests and plausibility check (if enabled) passed
                     logger.info(f"Plausibility check passed with score: {final_plausibility_score}")
-                    execution_success = True
-                    return execution_success, None, ""  # Return empty string instead of None
             else:
-                logger.debug("Plausibility check disabled")
-                execution_success = True
-                return execution_success, None, ""  # Return empty string instead of None
+                logger.info("Plausibility check skipped (not included in trusty_agents)")
+            
+            # If we got here, all required tests passed
+            execution_success = True
+            logger.info("All trusty agents completed successfully")
+            return execution_success, None, ""  # Return empty string instead of None
 
             
         except KeyboardInterrupt:

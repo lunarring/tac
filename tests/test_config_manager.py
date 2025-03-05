@@ -15,7 +15,8 @@ def test_config_manager():
     # Verify 'general' configuration
     general = cm.general
     assert general.agent_type in ["aider", "native"]
-    assert general.plausibility_test is True
+    assert "pytest" in general.default_trusty_agents
+    assert "plausibility" in general.default_trusty_agents
     assert general.use_file_summaries is True
     assert general.summarizer_timeout == 45
     assert general.max_retries_block == 4
@@ -47,12 +48,12 @@ def test_config_override():
     cm.override_with_args({
         "general_agent_type": "custom",
         "general_max_retries_block": 10,
-        "plausibility_test": False  # Test unprefixed general config override
+        "general_default_trusty_agents": ["pytest"]  # Test overriding trusty agents
     })
     
     assert cm.general.agent_type == "custom"
     assert cm.general.max_retries_block == 10
-    assert cm.general.plausibility_test is False
+    assert cm.general.default_trusty_agents == ["pytest"]
     
     # Test overriding git config
     cm.override_with_args({

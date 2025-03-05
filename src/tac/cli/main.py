@@ -566,14 +566,20 @@ def main():
                 if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                     sys.exit(1)
             else:
-                # Check if plausibility test is enabled but git is disabled
-                if config.general.plausibility_test:
-                    print("\nError: Plausibility test requires git to be enabled.")
+                # Check if any generated protoblocks will have plausibility checks but git is disabled
+                if "plausibility" in config.general.default_trusty_agents:
+                    print("\nWarning: Default trusty agents include plausibility checks, but git is disabled.")
+                    print("Plausibility checks require git to be enabled.")
                     print("To proceed, either:")
                     print("1. Enable git by removing --no-git flag")
-                    print("2. Disable plausibility test using one of these methods:")
-                    print("   - Use --plausibility-test false via CLI")
-                    sys.exit(1)
+                    print("2. Remove 'plausibility' from default_trusty_agents in your configuration")
+                    print("Continuing without plausibility checks...")
+                    
+                    # Remove plausibility from default trusty agents if git is disabled
+                    config.general.default_trusty_agents = [
+                        agent for agent in config.general.default_trusty_agents 
+                        if agent != "plausibility"
+                    ]
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")

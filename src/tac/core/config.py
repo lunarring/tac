@@ -22,7 +22,6 @@ class GeneralConfig:
     agent_type: str = "native"
     reasoning_effort: str = "medium"
     use_orchestrator: bool = False
-    plausibility_test: bool = True
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
     run_error_analysis: bool = True  # Whether to run error analysis after failures
@@ -226,7 +225,7 @@ class ConfigManager:
         
         Example:
             {
-                'general': {'plausibility_test': False},
+                'general': {'default_trusty_agents': ['pytest']},
                 'git': {'auto_commit_if_success': False}
             }
         """
