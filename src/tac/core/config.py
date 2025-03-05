@@ -21,7 +21,7 @@ class GitConfig:
 class GeneralConfig:
     agent_type: str = "native"
     reasoning_effort: str = "medium"
-    use_orchestrator: bool = True
+    use_orchestrator: bool = False
     plausibility_test: bool = True
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
@@ -67,7 +67,7 @@ class LLMConfig:
 @dataclass
 class LoggingConfig:
     tac: Dict[str, Any] = field(default_factory=lambda: {
-        "level": "INFO",
+        "level": "DEBUG",
         "color": "green"
     })
     other_packages: Dict[str, Any] = field(default_factory=lambda: {

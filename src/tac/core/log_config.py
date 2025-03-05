@@ -50,12 +50,13 @@ class ExecutionContext:
 # Create a singleton instance
 execution_context = ExecutionContext()
 
-def setup_console_logging(name: str = None) -> logging.Logger:
+def setup_console_logging(name: str = None, log_level: str = 'INFO') -> logging.Logger:
     """
     Setup logging configuration for console only (no log files)
     
     Args:
         name: Logger name
+        log_level: Logging level to use (default: INFO)
     """
     # Create a new logger
     logger = logging.getLogger(name if name else 'tac')
@@ -68,11 +69,11 @@ def setup_console_logging(name: str = None) -> logging.Logger:
     logger.propagate = False
     
     # Set logger level
-    logger.setLevel(logging.INFO)
+    logger.setLevel(getattr(logging, log_level))
 
     # Create console handler
     console_handler = logging.StreamHandler(sys.__stdout__)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(getattr(logging, log_level))
 
     # Create formatter and add it to the handler
     log_format = '%(levelname)s - %(message)s [%(name)s]'
@@ -121,6 +122,9 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
         log_level: Logging level to use (default: INFO)
         log_color: Color to use for logging (default: green)
     """
+    # Convert log_level string to logging level
+    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    
     # If logging is disabled (level set to CRITICAL), just return a disabled logger
     if logging.getLogger().getEffectiveLevel() >= logging.CRITICAL:
         logger = logging.getLogger(name if name else 'tac')
@@ -132,9 +136,15 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     if execution_id is not None:
         execution_context.execution_id = execution_id
     
-    # If this logger was already configured, return it
+    # If this logger was already configured, update its level and return it
     if name in _configured_loggers:
-        return _configured_loggers[name]
+        logger = _configured_loggers[name]
+        logger.setLevel(numeric_level)
+        # Update console handler level
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
+                handler.setLevel(numeric_level)
+        return logger
 
     # Create custom formatter
     class ColoredFormatter(logging.Formatter):
@@ -163,7 +173,8 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     root = logging.getLogger()
     if not root.handlers:  # Only configure root once
         root_handler = logging.StreamHandler(sys.__stdout__)
-        root_handler.setLevel(logging.WARNING)  # Set root to WARNING level
+        # Set root to WARNING level by default
+        root_handler.setLevel(logging.WARNING)
         root_handler.setFormatter(ColoredFormatter('%(levelname)s - %(message)s [%(name)s]'))
         root.addHandler(root_handler)
         root.setLevel(logging.WARNING)
@@ -178,20 +189,12 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     if logger.handlers:
         logger.handlers.clear()
     
-    # Get console and file log levels from config
-    console_log_level = get_log_level(name)
-    file_log_level = 'DEBUG'  # Always save all logs including DEBUG to file
-    
-    # Set logger level to the minimum of console and file log levels to ensure all messages are processed
-    logger_level = min(
-        getattr(logging, console_log_level),
-        getattr(logging, file_log_level)
-    )
-    logger.setLevel(logger_level)
+    # Set logger level directly from the provided log_level
+    logger.setLevel(numeric_level)
 
-    # Create console handler
+    # Create console handler with the same level
     console_handler = logging.StreamHandler(sys.__stdout__)
-    console_handler.setLevel(getattr(logging, console_log_level))
+    console_handler.setLevel(numeric_level)
 
     # Create formatter and add it to the handler
     log_format = '%(levelname)s - %(message)s [%(name)s]'
@@ -263,6 +266,29 @@ def reset_execution_context():
     execution_context.reset()
     # Also clear configured loggers to force recreation
     _configured_loggers.clear()
+
+def update_all_loggers(log_level: str = 'INFO'):
+    """Update all existing loggers with a new log level.
+    
+    Args:
+        log_level: The new log level to set for all loggers
+    """
+    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    
+    # Update all configured loggers
+    for name, logger in _configured_loggers.items():
+        logger.setLevel(numeric_level)
+        # Update console handler level
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
+                handler.setLevel(numeric_level)
+                
+    # Also update the root logger for good measure
+    root = logging.getLogger()
+    if root.handlers:
+        for handler in root.handlers:
+            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
+                handler.setLevel(numeric_level)
 
 # Create and expose the default logger
 logger = setup_logging() 

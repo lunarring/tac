@@ -25,7 +25,7 @@ if src_dir not in sys.path:
 from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
 from tac.coding_agents.aider import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
-from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging
+from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
@@ -251,6 +251,13 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
+    # Add global arguments
+    parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
+    
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
     # Block command
@@ -389,6 +396,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         action='store_true',
         help='Disable all git operations (branch checks, commits, etc.)'
     )
+    optimize_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level for this command'
+    )
     
     # View command
     view_parser = subparsers.add_parser('view',
@@ -435,10 +447,21 @@ def main():
     config.override_with_args(vars(args))
     
     # Set up logging with config values
-    log_level = config.logging.get_tac('level', 'INFO')
+    log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else config.logging.get_tac('level', 'INFO')
     log_color = config.logging.get_tac('color', 'green')
+    
+    # Override the logging config with the command-line log level if provided
+    if hasattr(args, 'log_level') and args.log_level:
+        config.override_with_dict({'logging': {'tac': {'level': log_level}}})
+    
     global logger
     logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
+    
+    # Update all existing loggers with the new log level
+    update_all_loggers(log_level)
+    
+    # Add a debug message to verify logging is working
+    logger.debug(f"Starting TAC with log level: {log_level}")
     
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
@@ -469,9 +492,19 @@ def main():
         return
     
     if args.command == 'optimize':
+        # Set log level explicitly for the optimize command
+        if hasattr(args, 'log_level') and args.log_level:
+            log_level = args.log_level
+            # Update the logger with the new log level
+            logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
+            # Also update the config
+            config.override_with_dict({'logging': {'tac': {'level': log_level}}})
+            # Update all existing loggers
+            update_all_loggers(log_level)
+            
         logger.debug(f"Optimizing function: {args.function_name}")
         optimizer = PerformanceTestingAgent(args.function_name, config)
-        optimizer.optimize() 
+        optimizer.pre_run() 
         print("\nGoodbye!")
         sys.exit(0) # Call the optimize method
 
