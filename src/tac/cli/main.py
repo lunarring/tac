@@ -274,19 +274,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default='.',
         help='Directory to analyze and create block from (default: current directory)'
     )
-    run_parser.add_argument(
-        '--save-protoblock',
-        action='store_true',
-        dest='save_protoblock',
-        help='Save the protoblock to disk (disabled by default)'
-    )
+
     
     # Dynamically add arguments from general config
     general_config = config.general
     for key, value in vars(general_config).items():
-        # Skip save_protoblock as it's already added explicitly
-        if key == 'save_protoblock':
-            continue
             
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
