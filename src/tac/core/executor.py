@@ -52,39 +52,6 @@ class ProtoBlockExecutor:
         self.initial_test_count = 0  # Store initial test count
         self.test_results = None
 
-    def _write_log_file(self, attempt: int, success: bool, message: str, analysis: str = None) -> dict:
-        """
-        Write log information using the logging system.
-        
-        Args:
-            attempt: The current attempt number
-            success: Whether the attempt was successful, or None if in progress
-            message: Additional message to include in the log
-            analysis: Optional error analysis to include
-        """
-        if not self.protoblock_id:
-            logger.warning("No protoblock ID available for logging")
-            return None
-        
-        # Create execution data for reference
-        execution_data = {
-            'timestamp': datetime.now().isoformat(),
-            'attempt': attempt,
-            'success': success,
-            'message': message,
-            'protoblock': self.protoblock_factory.to_dict(self.protoblock),
-            'git_diff': self.git_manager.get_complete_diff() if self.git_enabled else "",
-            'test_results': self.get_test_results() or "",
-        }
-        
-        if analysis:
-            execution_data['failure_analysis'] = analysis
-            
-        # Log the execution data
-        logger.info(f"Execution {attempt}: {'SUCCESS' if success else 'FAILURE'} - {message}")
-        
-        return execution_data
-
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> bool:
         """
         Executes the block with a unified test-and-implement approach.
@@ -98,16 +65,16 @@ class ProtoBlockExecutor:
             analysis = ""  # Initialize as empty string instead of None
             
             try:
-                # Write log before task execution
-                self._write_log_file(idx_attempt + 1, None, "Starting task execution")
+                # Log start of task execution
+                logger.info(f"Starting task execution (attempt {idx_attempt + 1})")
                 
                 # Pass the previous attempt's analysis to the agent
                 self.agent.run(self.protoblock, previous_analysis=analysis)
                 # Ensure no tests/tests/ directory exists
                 self._cleanup_nested_tests()
                 
-                # Write log after task execution
-                self._write_log_file(idx_attempt + 1, None, "Task execution completed")
+                # Log completion of task execution
+                logger.info(f"Task execution completed (attempt {idx_attempt + 1})")
                 
             except Exception as e:
                 error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
@@ -127,8 +94,10 @@ class ProtoBlockExecutor:
                 execution_success = False
                 failure_type = "Exception during agent execution"
                 
-                # Write failure log with analysis
-                self._write_log_file(idx_attempt + 1, False, error_msg, error_analysis)
+                # Log failure with analysis
+                logger.error(f"Execution failed (attempt {idx_attempt + 1}): {error_msg}")
+                if error_analysis:
+                    logger.debug(f"Error analysis: {error_analysis}")
                 
                 return execution_success, failure_type, error_analysis
 
