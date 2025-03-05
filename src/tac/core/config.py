@@ -33,6 +33,7 @@ class GeneralConfig:
     halt_after_fail: bool = False
     ignore_paths: List[str] = field(default_factory=lambda: [".git", "__pycache__", "build"])
     test_path: str = "tests/"  # Add default test path
+    save_protoblock: bool = False  # Whether to save protoblocks to disk
 
 
 @dataclass

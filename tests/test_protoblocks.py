@@ -1,8 +1,9 @@
 import os
 import json
-from src.tac.protoblock import protoblock_io
+from src.tac.protoblock import ProtoBlock
 from src.tac.protoblock.factory import ProtoBlockFactory
 import time
+import uuid
 
 def test_save_and_validate_protoblock(tmp_path):
     # Create a valid protoblock dictionary (legacy format)
@@ -37,12 +38,29 @@ def test_save_and_validate_protoblock(tmp_path):
         # Generate a unique ID for testing
         unique_id = "test_" + str(int(time.time()))
         
-        # Save the protoblock using protoblock_io.save_protoblock
-        file_path, block_id = protoblock_io.save_protoblock(protoblock_json, template_type="test", unique_id=unique_id)
+        # Create a ProtoBlock instance
+        protoblock = ProtoBlock(
+            task_description=valid_protoblock["task"]["specification"],
+            test_specification=valid_protoblock["test"]["specification"],
+            test_data_generation=valid_protoblock["test"]["data"],
+            write_files=valid_protoblock["write_files"],
+            context_files=valid_protoblock["context_files"],
+            block_id=unique_id,
+            commit_message=valid_protoblock["commit_message"],
+            branch_name=valid_protoblock["branch_name"]
+        )
+        
+        # Save the protoblock using the new method
+        file_path = protoblock.save()
         
         # Verify the file was created
         assert os.path.exists(file_path)
-        assert block_id == unique_id
+        assert unique_id in file_path
+        
+        # Test loading the protoblock
+        loaded_protoblock = ProtoBlock.load(file_path)
+        assert loaded_protoblock.block_id == unique_id
+        assert loaded_protoblock.task_description == valid_protoblock["task"]["specification"]
         
         # Clean up the test file
         os.remove(file_path)

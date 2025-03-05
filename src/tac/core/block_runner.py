@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 import os
 import sys
-import yaml
-import argparse
-import ast
+import time
 import logging
+import traceback
+from typing import Optional, Dict, Any, List, Tuple
+import uuid
 import json
 from datetime import datetime
 import git
@@ -14,7 +15,7 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.protoblock import ProtoBlock, save_protoblock, ProtoBlockFactory
+from tac.protoblock import ProtoBlock, ProtoBlockFactory
 from tac.coding_agents.aider import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging
@@ -24,8 +25,6 @@ from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
-from tac.protoblock.protoblock_io import load_protoblock_from_json
-from typing import Dict
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 
 logger = setup_logging('tac.core.block_runner')
@@ -48,7 +47,7 @@ class BlockRunner:
     def generate_protoblock(self, idx_attempt, error_analysis):
         if self.json_file: 
             # in case the protoblock is fixed, we load it from the json file every time
-            protoblock = load_protoblock_from_json(self.json_file)
+            protoblock = ProtoBlock.load(self.json_file)
             logger.info(f"\n✨ Loaded protoblock: {self.json_file}")
         else:
             # Create protoblock using factory
@@ -71,8 +70,12 @@ class BlockRunner:
             if idx_attempt > 0:
                 self.override_new_protoblock_with_previous_protoblock(protoblock)
             
-            # Save protoblock to file
-            json_file = factory.save_protoblock(protoblock)
+            # Save protoblock to file only if enabled in config
+            if config.general.save_protoblock:
+                json_file = protoblock.save()
+                logger.info(f"Saved protoblock to {json_file}")
+            else:
+                logger.info("Protoblock saving is disabled. Use --save-protoblock to enable.")
 
         self.protoblock = protoblock
 
