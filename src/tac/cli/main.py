@@ -504,8 +504,13 @@ def main():
             
         logger.debug(f"Optimizing function: {args.function_name}")
         optimizer = PerformanceTestingAgent(args.function_name, config)
-        optimizer.pre_run() 
-        print("\nGoodbye!")
+        # First do a pre-run, setting up the test and getting baseline performance
+        optimizer.optimize(nmb_runs=5) 
+
+        # Now do the optimization
+        # optimizer.optimize_function()
+        # optimizer.run_test_function()
+
         sys.exit(0) # Call the optimize method
 
     voice_ui = None

@@ -2,7 +2,7 @@ import os
 import json
 import hashlib
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.config import config
 from tac.core.log_config import setup_logging
@@ -213,7 +213,7 @@ class ProjectFiles:
         
         return "\n\n".join(formatted_strings)
         
-    def get_function_exists(self, function_name: str) -> Tuple[bool, Optional[str]]:
+    def get_function_location(self, function_name: str) -> Union[str, bool]:
         """
         Check if a function with the given name exists in the codebase.
         
@@ -221,9 +221,9 @@ class ProjectFiles:
             function_name: Name of the function to find
             
         Returns:
-            Tuple[bool, Optional[str]]: 
-                - First element is True if the function exists, False otherwise
-                - Second element is an error message if the function exists in multiple files, None otherwise
+            Union[str, bool]: 
+                - Returns the relative path of the file containing the function if it exists in exactly one file
+                - Returns False if the function doesn't exist or exists in multiple files
         """
         found_locations = []
         
@@ -243,12 +243,9 @@ class ProjectFiles:
                         continue
         
         if len(found_locations) == 1:
-            return True, None
-        elif len(found_locations) > 1:
-            locations_str = ", ".join(found_locations)
-            return True, f"Function '{function_name}' exists in multiple files: {locations_str}"
+            return found_locations[0]  # Return the relative path of the file containing the function
         else:
-            return False, None
+            return False  # Return False if function doesn't exist or exists in multiple files
 
 
 

@@ -33,6 +33,10 @@ class NativeAgent(Agent):
             logger.warning("context_files is a string, converting to list")
             context_files = [context_files]
         
+        # Filter out non-string values
+        write_files = [path for path in write_files if isinstance(path, (str, os.PathLike))]
+        context_files = [path for path in context_files if isinstance(path, (str, os.PathLike))]
+        
         # Ensure all paths are relative
         write_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in write_files]
         context_files = [os.path.relpath(path) if os.path.isabs(path) else path for path in context_files]
@@ -73,6 +77,17 @@ class NativeAgent(Agent):
         file_contents = {}
         for file_path in files:
             try:
+                if not os.path.exists(file_path):
+                    if file_type == 'write':
+                        # For write files that don't exist, use a placeholder
+                        file_contents[file_path] = "# This file is empty at the moment."
+                        logger.info(f"Write file does not exist, using placeholder: {file_path}")
+                        continue
+                    else:
+                        # For context files, this shouldn't happen as we filter them earlier
+                        logger.error(f"Context file does not exist: {file_path}")
+                        raise FileNotFoundError(f"File not found: {file_path}")
+                
                 if not os.path.isfile(file_path):
                     logger.error(f"Path exists but is not a file: {file_path}")
                     raise ValueError(f"Path is not a file: {file_path}")
@@ -81,8 +96,13 @@ class NativeAgent(Agent):
                     file_contents[file_path] = f.read()
                 logger.debug(f"Successfully read {file_type} file: {file_path}")
             except (IOError, OSError) as e:
-                logger.error(f"Error reading {file_type} file {file_path}: {str(e)}")
-                raise
+                if file_type == 'write':
+                    # For write files with errors, use an empty string
+                    file_contents[file_path] = ""
+                    logger.warning(f"Error reading {file_type} file {file_path}, using empty string: {str(e)}")
+                else:
+                    logger.error(f"Error reading {file_type} file {file_path}: {str(e)}")
+                    raise
         return file_contents
 
     def _format_files_for_prompt(self, file_contents: dict[str, str], is_context: bool = False) -> str:
