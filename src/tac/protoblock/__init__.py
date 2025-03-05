@@ -1,5 +1,5 @@
-from .protoblock import ProtoBlock
+from .model import ProtoBlock
 from .factory import ProtoBlockFactory
-from .manager import validate_protoblock_json, save_protoblock
+from .protoblock_io import save_protoblock
 
-__all__ = ['ProtoBlock', 'ProtoBlockFactory', 'validate_protoblock_json', 'save_protoblock'] 
+__all__ = ['ProtoBlock', 'ProtoBlockFactory', 'save_protoblock'] 

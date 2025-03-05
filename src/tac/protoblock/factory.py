@@ -10,7 +10,7 @@ from tac.utils.file_gatherer import gather_python_files
 from tac.utils.project_files import ProjectFiles
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
-from .protoblock import ProtoBlock
+from .model import ProtoBlock
 
 logger = logging.getLogger(__name__)
 
@@ -345,8 +345,7 @@ stick exactly to the following output_format, filling in between ...
             "test": {
                 "specification": block.test_specification,
                 "data": block.test_data_generation,
-                "replacements": write_files,
-                "results": block.test_results if block.test_results else None  # Ensure test results are included
+                "replacements": write_files
             },
             "write_files": write_files,
             "context_files": context_files,
@@ -404,8 +403,7 @@ stick exactly to the following output_format, filling in between ...
             "test": {
                 "specification": block.test_specification,
                 "data": block.test_data_generation,
-                "replacements": write_files,
-                "results": block.test_results if block.test_results else None
+                "replacements": write_files
             },
             "write_files": write_files,
             "context_files": context_files,

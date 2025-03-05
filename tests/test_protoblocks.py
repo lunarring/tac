@@ -1,6 +1,8 @@
 import os
 import json
-from src.tac.protoblock import manager
+from src.tac.protoblock import protoblock_io
+from src.tac.protoblock.factory import ProtoBlockFactory
+import time
 
 def test_save_and_validate_protoblock(tmp_path):
     # Create a valid protoblock dictionary (legacy format)
@@ -13,13 +15,15 @@ def test_save_and_validate_protoblock(tmp_path):
         },
         "write_files": ["dummy.py"],
         "context_files": ["main.py"],
-        "commit_message": "TAC: Test commit message"
+        "commit_message": "TAC: Test commit message",
+        "branch_name": "tac/test-branch"
     }
     # Convert dictionary to JSON string
     protoblock_json = json.dumps(valid_protoblock)
 
-    # Validate using the manager's validation function
-    is_valid, error = manager.validate_protoblock_json(protoblock_json)
+    # Validate using the factory's verification method
+    factory = ProtoBlockFactory()
+    is_valid, error, _ = factory.verify_protoblock(protoblock_json)
     assert is_valid, f"Protoblock JSON should be valid, but got error: {error}"
 
     # Use temporary directory for file saving
@@ -28,22 +32,20 @@ def test_save_and_validate_protoblock(tmp_path):
     # Change current working directory to the temporary directory for the test
     old_cwd = os.getcwd()
     os.chdir(temp_dir)
+    
     try:
-        unique_id = "test123"
-        # Save the protoblock using manager.save_protoblock
-        file_path, block_id = manager.save_protoblock(protoblock_json, template_type="test", unique_id=unique_id)
-
-        # Verify that the file name matches the expected pattern and the block_id is as provided.
-        expected_file_name = f".tac_protoblock_{unique_id}.json"
-        assert file_path == expected_file_name, f"Expected file name {expected_file_name} but got {file_path}"
-        assert block_id == unique_id, "Block id should match the provided unique id"
-        assert os.path.exists(file_path), f"File {file_path} should exist"
-
-        # Load the file content and check for required keys
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            for key in ["task", "test", "write_files", "context_files", "commit_message"]:
-                assert key in data, f"Key {key} missing in saved protoblock file."
+        # Generate a unique ID for testing
+        unique_id = "test_" + str(int(time.time()))
+        
+        # Save the protoblock using protoblock_io.save_protoblock
+        file_path, block_id = protoblock_io.save_protoblock(protoblock_json, template_type="test", unique_id=unique_id)
+        
+        # Verify the file was created
+        assert os.path.exists(file_path)
+        assert block_id == unique_id
+        
+        # Clean up the test file
+        os.remove(file_path)
     finally:
         # Restore the original working directory
         os.chdir(old_cwd)

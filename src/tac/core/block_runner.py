@@ -14,7 +14,7 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
+from tac.protoblock import ProtoBlock, save_protoblock, ProtoBlockFactory
 from tac.coding_agents.aider import AiderAgent
 from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging
@@ -24,7 +24,7 @@ from tac.core.llm import LLMClient, Message
 from tac.core.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
-from tac.protoblock.manager import load_protoblock_from_json
+from tac.protoblock.protoblock_io import load_protoblock_from_json
 from typing import Dict
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 
