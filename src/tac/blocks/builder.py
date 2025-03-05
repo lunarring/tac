@@ -124,7 +124,7 @@ class BlockBuilder:
                     error_analysis = ""  # Initialize as empty string instead of "None"
                     logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
 
-                    if idx_attempt < config.general.max_retries_block - 1:
+                    if idx_attempt < config.general.max_retries_block_creation - 1:
                         if config.general.run_error_analysis:
                             error_analysis = self.error_analyzer.analyze_failure(
                                 self.protoblock, 

@@ -169,8 +169,8 @@ TAC uses a hierarchical configuration system (in `src/tac/core/config.py`) with 
   use_orchestrator: bool = True        # Whether to use the task orchestrator
   plausibility_test: bool = True       # Enable/disable plausibility testing
   minimum_plausibility_score: str = "B" # Minimum grade for plausibility
-  max_retries_block: int = 4           # Maximum retry attempts for blocks
-  max_retries_protoblock: int = 4      # Maximum retry attempts for protoblocks
+  max_retries_block_creation: int = 4  # Maximum retry attempts for block creation
+  max_retries_protoblock_creation: int = 4  # Maximum retry attempts for protoblock creation
   ```
 
 - **GitConfig**: Version control settings
@@ -207,9 +207,6 @@ Key configuration options include:
 All configuration options are documented in the command help:
 ```bash
 tac --help
-```
-
-sk" --model gpt-4
 ```
 
 ## ✍️ Contributing
