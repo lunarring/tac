@@ -16,7 +16,7 @@ import shutil
 from tac.trusty_agents.pytest import PytestTestingAgent, ErrorAnalyzer
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
 
-logger = setup_logging('tac.core.builder')
+logger = setup_logging('tac.blocks.builder')
 
 class BlockBuilder:
     """

@@ -5,7 +5,7 @@ import unittest
 import io
 import logging
 
-from src.tac.blocks import ProtoBlockExecutor
+from src.tac.blocks import BlockBuilder
 from src.tac.core.config import GitConfig
 
 # Define a dummy ProtoBlock with minimal attributes.
