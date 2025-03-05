@@ -1,4 +1,5 @@
-from tac.protoblock import ProtoBlock, ProtoBlockFactory
+from tac.blocks.model import ProtoBlock
+from tac.blocks.generator import ProtoBlockGenerator
 from tac.coding_agents.base import Agent
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
@@ -14,13 +15,12 @@ from tac.core.config import config
 import shutil
 from tac.trusty_agents.pytest import PytestTestingAgent, ErrorAnalyzer
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
-from tac.blocks import ProtoBlock, ProtoBlockGenerator
 
-logger = setup_logging('tac.core.executor')
+logger = setup_logging('tac.core.builder')
 
-class ProtoBlockExecutor:
+class BlockBuilder:
     """
-    Executes a ProtoBlock by managing the implementation process through an agent,
+    Builds a Block from a ProtoBlock by managing the implementation process through an agent,
     running tests, and handling version control operations.
     """
     def __init__(self, config_override: dict = None, codebase: Dict[str, str] = None):
@@ -45,7 +45,7 @@ class ProtoBlockExecutor:
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
         self.git_manager = GitManager() if self.git_enabled else None
         self.protoblock_id = None 
-        self.protoblock_factory = ProtoBlockGenerator()  # Initialize generator
+        self.protoblock_generator = ProtoBlockGenerator()  # Initialize generator
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
         self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
@@ -235,4 +235,4 @@ class ProtoBlockExecutor:
             logger.info("Removed nested tests directory and all its contents")
             
         except Exception as e:
-            logger.error(f"Error during test directory cleanup: {str(e)}")
+            logger.error(f"Error during test directory cleanup: {str(e)}") 

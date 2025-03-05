@@ -15,9 +15,10 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.blocks import ProtoBlock, ProtoBlockGenerator
+from tac.blocks.model import ProtoBlock
+from tac.blocks.generator import ProtoBlockGenerator
+from tac.blocks.builder import BlockBuilder
 from tac.coding_agents.aider import AiderAgent
-from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
@@ -27,9 +28,9 @@ from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 
-logger = setup_logging('tac.core.block_runner')
+logger = setup_logging('tac.blocks.processor')
 
-class BlockRunner:
+class BlockProcessor:
     def __init__(self, task_instructions=None, codebase=None, json_file=None, config_override=None):
         # Input validation
         if json_file is None and (task_instructions is None or codebase is None):
@@ -40,7 +41,7 @@ class BlockRunner:
         self.json_file = json_file
         self.protoblock = None
         self.previous_protoblock = None
-        self.executor = ProtoBlockExecutor(config_override=config_override, codebase=codebase)
+        self.builder = BlockBuilder(config_override=config_override, codebase=codebase)
         self.git_manager = GitManager()
 
 
@@ -50,8 +51,8 @@ class BlockRunner:
             protoblock = ProtoBlock.load(self.json_file)
             logger.info(f"\n✨ Loaded protoblock: {self.json_file}")
         else:
-            # Create protoblock using factory
-            factory = ProtoBlockGenerator()
+            # Create protoblock using generator
+            generator = ProtoBlockGenerator()
             if error_analysis and config.general.run_error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
@@ -60,11 +61,11 @@ class BlockRunner:
                 logger.info(f"\n🔄 Generating protoblock from task instructions: {genesis_prompt}")
 
             # Generate complete genesis prompt
-            protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
+            protoblock_genesis_prompt = generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
             logger.debug(f"Protoblock genesis prompt: {protoblock_genesis_prompt}")
             
             # Create protoblock from genesis prompt
-            protoblock = factory.create_protoblock(protoblock_genesis_prompt)
+            protoblock = generator.create_protoblock(protoblock_genesis_prompt)
 
             # Branch name and commit from the first one!
             if idx_attempt > 0:
@@ -146,8 +147,8 @@ class BlockRunner:
                 self.handle_git_branch_setup()
 
 
-            # Execute the protoblock
-            execution_success, failure_type, error_analysis = self.executor.execute_block(self.protoblock, idx_attempt)
+            # Execute the protoblock using the builder
+            execution_success, failure_type, error_analysis = self.builder.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}")
@@ -187,9 +188,4 @@ class BlockRunner:
             logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
             logger.error("="*80)
             
-        return False
-
-
-
-
-        
+        return False 

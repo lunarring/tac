@@ -22,16 +22,14 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.protoblock import ProtoBlock, ProtoBlockFactory
+from tac.blocks import ProtoBlock, ProtoBlockGenerator, BlockBuilder, BlockProcessor, MultiBlockOrchestrator
 from tac.coding_agents.aider import AiderAgent
-from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.utils.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
-from tac.core.block_runner import BlockRunner
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
 
@@ -602,11 +600,11 @@ def main():
                 
                 
                 # Implement orchestrator
-                from tac.core.orchestrator import TaskChunker
+                from tac.blocks import MultiBlockOrchestrator
                 
                 logger.info("Using orchestrator to chunk task instructions")
-                # Instantiate the TaskChunker directly
-                task_chunker = TaskChunker()
+                # Instantiate the MultiBlockOrchestrator directly
+                task_chunker = MultiBlockOrchestrator()
                 chunking_result = task_chunker.chunk(task_instructions, codebase)
                 
                 # Get the chunks from the result
@@ -684,12 +682,12 @@ def main():
                         project_files.update_summaries()
                         codebase = project_files.get_codebase_summary()
                     
-                    # Convert the chunk to text for the BlockRunner
+                    # Convert the chunk to text for the BlockProcessor
                     chunk_text = chunk.to_text()
                     
                     # Execute the chunk
-                    block_runner = BlockRunner(chunk_text, codebase, args.json)
-                    chunk_success = block_runner.run_loop()
+                    block_processor = BlockProcessor(chunk_text, codebase, args.json)
+                    chunk_success = block_processor.run_loop()
                     
                     if not chunk_success:
                         print(f"\n❌ Chunk {i+1} execution failed.")
@@ -731,8 +729,8 @@ def main():
                     task_instructions = voice_ui.wait_until_prompt()
                 else:
                     task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
-                block_runner = BlockRunner(task_instructions, codebase, args.json)
-                success = block_runner.run_loop()
+                block_processor = BlockProcessor(task_instructions, codebase, args.json)
+                success = block_processor.run_loop()
             
             if success:
                 print("\n✅ Task completed successfully!")

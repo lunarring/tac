@@ -3,10 +3,8 @@ import ast
 import json
 import logging
 from typing import Tuple, Optional, List, Dict, Any
-from tac.protoblock import ProtoBlock
-from tac.core.block_runner import BlockRunner
+from tac.blocks import ProtoBlock, BlockProcessor, ProtoBlockGenerator
 from tac.utils.project_files import ProjectFiles
-from tac.protoblock.factory import ProtoBlockFactory
 from tac.core.log_config import setup_logging
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
@@ -37,7 +35,7 @@ class PerformanceTestingAgent:
             raise ValueError(f"Function '{function_name}' not found. Please provide a valid function name.")
         logger.info(f"Function file path: {self.fp_func}")
         self.fp_test = self.get_test_function(function_name)
-        self.factory = ProtoBlockFactory()
+        self.factory = ProtoBlockGenerator()
 
         # Create coding agent directly
         if config.general.agent_type == "aider":
