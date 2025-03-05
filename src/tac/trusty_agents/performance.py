@@ -133,7 +133,8 @@ class PerformanceTestingAgent:
                 self.rewrite_function_agent()
                 
                 # Run the test function to check correctness and performance
-                passed, performance_stats = self.run_test_function()
+                # Don't update snapshots during optimization runs - we want to compare against the baseline
+                passed, performance_stats = self.run_test_function(update_snapshots=False)
                 
                 # Only keep the optimized version if:
                 # 1. The test passes
@@ -219,8 +220,10 @@ class PerformanceTestingAgent:
             logger.debug('Test function found, skipping creation...')
 
         # Run the test function and see how fast it runs!
+        # Always update snapshots during pre_run to ensure they match the current implementation
         try:
-            passed, performance_stats = self.run_test_function()
+            logger.info("Running initial tests with snapshot update to ensure snapshots are current")
+            passed, performance_stats = self.run_test_function(update_snapshots=True)
         except Exception as e:
             logger.error(f"Error running test function: {str(e)}")
             return False
@@ -316,8 +319,11 @@ def test_bubu_output_snapshot(benchmark, snapshot):
 
         return protoblock
 
-    def run_test_function(self):
+    def run_test_function(self, update_snapshots=False):
         """Run the test function and extract performance statistics.
+        
+        Args:
+            update_snapshots: Whether to update snapshots during this test run
         
         Returns:
             Tuple[bool, dict]: A tuple containing:
@@ -340,6 +346,12 @@ def test_bubu_output_snapshot(benchmark, snapshot):
                 "-v", 
                 "--benchmark-json", json_output_path
             ]
+            
+            # Add snapshot update flag if requested
+            if update_snapshots:
+                cmd.append("--snapshot-update")
+                logger.info("Running tests with snapshot update")
+            
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             # Check if tests passed
