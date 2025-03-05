@@ -22,7 +22,7 @@ from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
-from tac.core.git_manager import GitManager
+from tac.utils.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner

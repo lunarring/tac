@@ -28,7 +28,7 @@ from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
-from tac.core.git_manager import GitManager
+from tac.utils.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
 from tac.core.block_runner import BlockRunner

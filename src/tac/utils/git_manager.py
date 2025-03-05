@@ -5,7 +5,7 @@ from typing import Optional, Tuple
 from tac.core.log_config import setup_logging
 from tac.core.config import config
 
-logger = setup_logging('tac.core.git_manager')
+logger = setup_logging('tac.utils.git_manager')
 
 class GitManager:
     def __init__(self, repo_path: str = '.'):
@@ -438,6 +438,4 @@ class GitManager:
                 except Exception as commit_err:
                     logger.error(f"Failed to commit .gitignore update: {commit_err}")
         except Exception as e:
-            logger.error(f"Error ensuring gitignore includes '{pattern}': {e}")
-
-  
+            logger.error(f"Error ensuring gitignore includes '{pattern}': {e}") 

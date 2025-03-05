@@ -2,7 +2,7 @@ from tac.protoblock import ProtoBlock, ProtoBlockFactory
 from tac.coding_agents.base import Agent
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
-from tac.core.git_manager import GitManager
+from tac.utils.git_manager import GitManager
 import git
 import sys
 import os
