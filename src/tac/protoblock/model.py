@@ -1,9 +1,11 @@
 from dataclasses import dataclass
-from typing import Dict, Any, Optional, Union, ClassVar
+from typing import Dict, Any, Optional, Union, ClassVar, List
 import json
 import os
 from datetime import datetime
 import logging
+
+from tac.core.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +22,14 @@ class ProtoBlock:
     write_files: list
     context_files: list
     block_id: str
+    trusty_agents: List[str] = None
     branch_name: str = None
     commit_message: str = None
+
+    def __post_init__(self):
+        # Set default value for trusty_agents from config if None
+        if self.trusty_agents is None:
+            self.trusty_agents = config.general.default_trusty_agents
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -64,6 +72,7 @@ class ProtoBlock:
         context_files = version_data.get('context_files', [])
         commit_message = version_data.get('commit_message', '')
         branch_name = version_data.get('branch_name', '')
+        trusty_agents = version_data.get('trusty_agents', config.general.default_trusty_agents)
         
         # Create and return the ProtoBlock
         return cls(
@@ -74,7 +83,8 @@ class ProtoBlock:
             write_files=write_files,
             context_files=context_files,
             commit_message=commit_message,
-            branch_name=branch_name
+            branch_name=branch_name,
+            trusty_agents=trusty_agents
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -104,6 +114,7 @@ class ProtoBlock:
             "context_files": context_files,
             "commit_message": self.commit_message,
             "branch_name": self.branch_name,
+            "trusty_agents": self.trusty_agents,
             "timestamp": datetime.now().isoformat()
         }
         
@@ -154,5 +165,6 @@ class ProtoBlock:
             "context_files": self.context_files,
             "commit_message": self.commit_message,
             "branch_name": self.branch_name,
-            "block_id": self.block_id
+            "block_id": self.block_id,
+            "trusty_agents": self.trusty_agents
         }

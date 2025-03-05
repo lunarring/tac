@@ -85,7 +85,8 @@ stick exactly to the following output_format, filling in between ...
     "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test."],
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes.",
-    "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue."
+    "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
+    "trusty_agents": ["List of trusty agents to use for this task. Default is taken from configuration. Common options include 'pytest', 'plausibility', 'linting', 'security', etc."]
 }}
 </output_format_explained>"""
 
@@ -154,6 +155,10 @@ stick exactly to the following output_format, filling in between ...
                 },
                 "branch_name": {
                     "type": str
+                },
+                "trusty_agents": {
+                    "type": list,
+                    "optional": True  # This field is optional
                 }
             }
             
@@ -162,6 +167,9 @@ stick exactly to the following output_format, filling in between ...
             
             # First validate and extract required fields
             for key in required_structure:
+                # Skip optional fields if they don't exist in the data
+                if required_structure[key].get("optional", False) and key not in data:
+                    continue
                 if key not in data:
                     return False, f"Missing required key: {key}", None
                 validated_data[key] = data[key]
@@ -173,6 +181,9 @@ stick exactly to the following output_format, filling in between ...
             
             # Validate structure
             for key, requirements in required_structure.items():
+                # Skip optional fields if they don't exist in validated_data
+                if requirements.get("optional", False) and key not in validated_data:
+                    continue
                 # Check if required key exists
                 if key not in validated_data:
                     return False, f"Missing required key: {key}", None
@@ -215,6 +226,14 @@ stick exactly to the following output_format, filling in between ...
                             logger.warning(f"Converted absolute path '{item}' to relative path '{rel_path}' in {key}")
                         except ValueError:
                             return False, f"Cannot convert absolute path '{item}' to relative path in {key}", None
+
+            # Validate trusty_agents if present
+            if "trusty_agents" in validated_data:
+                if not all(isinstance(item, str) for item in validated_data["trusty_agents"]):
+                    return False, "All items in trusty_agents must be strings", None
+            else:
+                # Set default value if not present
+                validated_data["trusty_agents"] = config.general.default_trusty_agents
 
             # Validate test file naming convention and location - only for files in tests/ directory
             for file_path in validated_data["write_files"]:
@@ -299,14 +318,16 @@ stick exactly to the following output_format, filling in between ...
                         context_files=context_files,
                         block_id=str(uuid.uuid4())[:6],
                         commit_message=f"tac: {data.get('commit_message', 'Update')}",
-                        branch_name=data.get("branch_name")
+                        branch_name=data.get("branch_name"),
+                        trusty_agents=data.get("trusty_agents", config.general.default_trusty_agents)
                     )
                     logger.info("\nProtoblock details:")
                     logger.info(f"🎯 Task: {protoblock.task_description}")
                     logger.info(f"🧪 Test Specification: {protoblock.test_specification}")
                     logger.info(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
                     logger.info(f"📚 Context Files: {', '.join(protoblock.context_files)}")
-                    logger.info(f"💬 Commit Message: {protoblock.commit_message}\n")
+                    logger.info(f"💬 Commit Message: {protoblock.commit_message}")
+                    logger.info(f"🤖 Trusty Agents: {', '.join(protoblock.trusty_agents)}\n")
                     logger.info("🚀 Starting protoblock execution...\n")
                     return protoblock
                 except KeyError as e:

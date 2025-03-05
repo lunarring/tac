@@ -34,6 +34,7 @@ class GeneralConfig:
     ignore_paths: List[str] = field(default_factory=lambda: [".git", "__pycache__", "build"])
     test_path: str = "tests/"  # Add default test path
     save_protoblock: bool = False  # Whether to save protoblocks to disk
+    default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
 
 
 @dataclass
