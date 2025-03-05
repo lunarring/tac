@@ -1,4 +1,4 @@
-from tac.protoblock import ProtoBlock, ProtoBlockFactory
+from tac.blocks import ProtoBlock, ProtoBlockGenerator
 from tac.coding_agents.base import Agent
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
@@ -14,9 +14,8 @@ from tac.core.config import config
 import shutil
 from tac.trusty_agents.pytest import PytestTestingAgent, ErrorAnalyzer
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
-from tac.blocks import ProtoBlock, ProtoBlockGenerator
 
-logger = setup_logging('tac.core.executor')
+logger = setup_logging('tac.blocks.executor')
 
 class ProtoBlockExecutor:
     """
@@ -235,4 +234,4 @@ class ProtoBlockExecutor:
             logger.info("Removed nested tests directory and all its contents")
             
         except Exception as e:
-            logger.error(f"Error during test directory cleanup: {str(e)}")
+            logger.error(f"Error during test directory cleanup: {str(e)}") 

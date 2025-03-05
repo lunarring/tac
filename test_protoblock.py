@@ -1,4 +1,4 @@
-from tac.protoblock.model import ProtoBlock
+from tac.blocks import ProtoBlock
 from tac.core.config import config
 import json
 
