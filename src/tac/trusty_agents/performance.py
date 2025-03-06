@@ -255,33 +255,53 @@ class PerformanceTestingAgent:
         else:
             logger.debug('Test function found, skipping creation...')
 
-        # Run the test function and see how fast it runs!
-        # Always update snapshots during pre_run to ensure they match the current implementation
+        # Remove print statements from the function to reduce output during benchmarking
+        # First run: Generate a snapshot
         try:
-            logger.info("Running initial tests with snapshot update to ensure snapshots are current")
-            passed, performance_stats = self.run_test_function(update_snapshots=True)
+            logger.info("Running initial tests with snapshot update to generate baseline snapshot")
+            passed_first, performance_stats_first = self.run_test_function(update_snapshots=True)
         except Exception as e:
-            logger.error(f"Error running test function: {str(e)}")
+            logger.error(f"Error running test function (first run): {str(e)}")
             return False
         
-        # Check if we got valid benchmark results
-        if not passed:
+        # Check if the first run passed
+        if not passed_first:
             logger.error("Initial tests failed. There might be an issue with the function or test implementation.")
             return False
             
-        if not performance_stats:
+        if not performance_stats_first:
             logger.error("Tests passed but no benchmark results were captured.")
             logger.error("This might be due to missing benchmark fixtures in the test.")
             logger.error("Make sure your test function uses the pytest-benchmark fixture.")
             return False
+        
+        # Second run: Verify against the snapshot (without updating)
+        # This will detect if the function has random behavior
+        try:
+            logger.info("Running tests a second time to check for randomness in the function output")
+            passed_second, performance_stats_second = self.run_test_function(update_snapshots=False)
+        except Exception as e:
+            logger.error(f"Error running test function (second run): {str(e)}")
+            return False
+        
+        # Check if the second run passed
+        if not passed_second:
+            logger.error("RANDOMNESS DETECTED: The function appears to produce different outputs on each run.")
+            logger.error("This will make performance optimization unreliable.")
+            logger.error("Please modify the function to use a fixed random seed or remove randomness before optimizing.")
+            return False
             
         # Check if we have the essential performance metrics
-        if 'mean_ms' not in performance_stats:
+        if 'mean_ms' not in performance_stats_first:
             logger.error("Benchmark results are missing essential metrics (mean_ms).")
             logger.error("Make sure your test is properly using the benchmark fixture.")
             return False
             
-        logger.info(f"Initial test successful. Mean execution time: {performance_stats.get('mean_ms', 0):.4f} ms")
+        # Store the test stats from the first run
+        self.test_stats = [performance_stats_first]
+        
+        logger.info(f"Initial tests successful. Mean execution time: {performance_stats_first.get('mean_ms', 0):.4f} ms")
+        logger.info("Function output is consistent across runs (no randomness detected)")
         
         # Make an initial commit to the FakeGitManager
         # This will be used as the baseline for comparison
