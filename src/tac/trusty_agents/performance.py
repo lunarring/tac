@@ -14,6 +14,8 @@ from tac.utils.git_manager import FakeGitManager
 import subprocess
 import re
 import datetime
+import contextlib
+import io
 
 logger = setup_logging('tac.trusty_agents.performance')
 
@@ -42,7 +44,8 @@ class PerformanceTestingAgent:
         
         # Set up git manager (always use FakeGitManager for performance testing)
         logger.info("Using FakeGitManager for performance testing")
-        self.git_manager = FakeGitManager.for_performance_testing()
+        # Initialize FakeGitManager with the current directory and set cleanup_temp_dir to True
+        self.git_manager = FakeGitManager(repo_path='.', cleanup_temp_dir=False)
         self.temp_dir = self.git_manager.temp_dir
 
         # Create coding agent directly
@@ -124,14 +127,12 @@ class PerformanceTestingAgent:
         
         logger.info(f"Baseline performance: passed={baseline_passed}, mean_ms={baseline_mean_ms:.4f}")
         
-        # Save the original state before any optimizations
+        # The initial commit was already made in pre_run
         # We'll use this to restore if optimization fails
-        logger.info("Saving original function state")
-        original_state_commit = "original_state_before_optimization"
-        self.git_manager.commit(original_state_commit)
+        initial_commit = "initial_commit"
         
         # Track the best optimization
-        best_optimization_commit = original_state_commit
+        best_optimization_commit = initial_commit
         best_mean_ms = baseline_mean_ms
         optimization_succeeded = False
         
@@ -161,7 +162,7 @@ class PerformanceTestingAgent:
                     optimization_succeeded = True
                     
                     # "Commit" the changes in the fake git manager
-                    optimization_commit = f"optimization_run_{i+1}"
+                    optimization_commit = f"run_{i+1}"
                     self.git_manager.commit(optimization_commit)
                     best_optimization_commit = optimization_commit
                 else:
@@ -196,7 +197,7 @@ class PerformanceTestingAgent:
             
             # If optimization succeeded, keep the best version
             # Otherwise, revert to the original state
-            if optimization_succeeded and best_optimization_commit != original_state_commit:
+            if optimization_succeeded and best_optimization_commit != initial_commit:
                 logger.info(f"Keeping optimized version: {best_optimization_commit}")
                 # Make sure we're on the best version
                 self.git_manager.restore_commit(best_optimization_commit)
@@ -209,7 +210,7 @@ class PerformanceTestingAgent:
                     logger.info("Optimized function has been applied to your codebase")
             else:
                 logger.info("No successful optimization found, reverting to original state")
-                self.git_manager.restore_commit(original_state_commit)
+                self.git_manager.restore_commit(initial_commit)
                 logger.info("Original function state restored")
             
             # Return the optimization results
@@ -218,14 +219,17 @@ class PerformanceTestingAgent:
         except Exception as e:
             logger.error(f"Error during optimization: {e}")
             # Revert to original state in case of error
-            self.git_manager.restore_commit(original_state_commit)
-            logger.info("Reverted to original state due to error")
+            self.git_manager.restore_commit(initial_commit)
+            logger.info("Original function state restored due to error")
             return False
             
         finally:
             # We don't clean up the temporary directory here
             # It will be cleaned up when the cleanup() method is called
             logger.debug(f"Keeping FakeGitManager temporary directory for later use: {self.temp_dir}")
+            
+            # No need for final verification - FakeGitManager already handles file operations
+            # when we call restore_commit
 
     def pre_run(self):
         """Run initial setup and testing.
@@ -278,6 +282,12 @@ class PerformanceTestingAgent:
             return False
             
         logger.info(f"Initial test successful. Mean execution time: {performance_stats.get('mean_ms', 0):.4f} ms")
+        
+        # Make an initial commit to the FakeGitManager
+        # This will be used as the baseline for comparison
+        logger.info("Making initial commit to FakeGitManager")
+        self.git_manager.commit("initial_commit")
+        
         return True
 
     def create_test_function(self):
@@ -290,7 +300,13 @@ class PerformanceTestingAgent:
 
 
     def get_protoblock_performance_optimization(self):
-            task_description = f"""We want to optimize the performance of the {self.function_name} function. Importantly, the runtime of the function should be massively reduced, while the output should remain the same, see the test function in {self.fp_test}. You can use any method you want to optimize the function, but you need to make sure that the output of the function is the same as the original version, and you can remove unncecessary code.
+            # First, get line profiling results
+            profiling_results = self.profile_function()
+            
+            task_description = f"""We want to optimize the performance of the {self.function_name} function. Importantly, the runtime of the function should be reduced, while the output should remain the same, see the test function in {self.fp_test}. You can use any method you want to optimize the function, but you need to make sure that the output of the function is the same as the original version, and you can remove unncecessary code. Be careful however, the critical thing is that we pass the test function, and keep in mind we are running this iteratively, so pick something that is likely to have a big impact and is safe.
+
+Additionally, here the line profiling results for the function to identify the bottlenecks:
+{profiling_results}
         """
             test_specification = "No tests need to be written, we are only optimizing the function"
             test_data_generation = "No test data generation needed"
@@ -321,6 +337,7 @@ class PerformanceTestingAgent:
     - The test should call the benchmark fixture with the function and input data
     - Use snapshot.assert_match() to compare the output with the stored snapshot
     - Convert any numpy arrays to lists before snapshot comparison using .tolist()
+    - The input data to test the function should be generated in the test function and be completely reproducible.
     - Include necessary imports (pytest, numpy, etc.). Here is an example:
     
 @pytest.mark.performance
@@ -374,16 +391,34 @@ def test_bubu_output_snapshot(benchmark, snapshot):
             cmd = [
                 "pytest", 
                 self.fp_test, 
-                "-v", 
-                "--benchmark-json", json_output_path
+                "-v",  # Verbose flag for test results
             ]
+            
+            # Only add quiet flags if we're not updating snapshots
+            # This ensures we see output during initial test runs
+            if not update_snapshots:
+                cmd.extend([
+                    "-q",  # Quiet flag to reduce output
+                    "--no-header",  # Suppress header
+                    "--no-summary",  # Suppress summary
+                    "--benchmark-quiet",  # Suppress benchmark output
+                ])
+            
+            # Add benchmark JSON output
+            cmd.extend(["--benchmark-json", json_output_path])
             
             # Add snapshot update flag if requested
             if update_snapshots:
                 cmd.append("--snapshot-update")
                 logger.info("Running tests with snapshot update")
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            # Only suppress stdout if we're not updating snapshots
+            if not update_snapshots:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+            else:
+                # For initial runs, show the output
+                result = subprocess.run(cmd, capture_output=True, text=True)
             
             # Check if tests passed
             passed = "FAILED" not in result.stdout and result.returncode == 0
@@ -438,8 +473,12 @@ def test_bubu_output_snapshot(benchmark, snapshot):
                 logger.info(f"Test passed with performance stats: {performance_stats}")
                 logger.info(f"Total successful runs recorded: {len(self.test_stats)}")
             else:
+                # For failed tests, show the full output to help diagnose the issue
                 logger.error(f"Test failed. Output: {result.stdout}")
-                logger.error(f"Error: {result.stderr}")
+                
+                # If there's error output, show that too
+                if result.stderr:
+                    logger.error(f"Error output: {result.stderr}")
             
             return passed, performance_stats
         
@@ -506,9 +545,293 @@ def test_my_method(my_instance):
         if self.git_manager:
             try:
                 logger.info("Cleaning up FakeGitManager resources")
-                self.git_manager.cleanup()
-                self.temp_dir = None
+                # FakeGitManager doesn't have a cleanup method, but it will clean up
+                # its temp directory when garbage collected if cleanup_temp_dir is True.
+                # We can force cleanup by manually removing the temp directory
+                if hasattr(self.git_manager, 'temp_dir') and self.git_manager.temp_dir and os.path.exists(self.git_manager.temp_dir):
+                    logger.info(f"Manually cleaning up temporary directory: {self.git_manager.temp_dir}")
+                    shutil.rmtree(self.git_manager.temp_dir)
+                    self.git_manager.temp_dir = None
+                    self.temp_dir = None
             except Exception as e:
                 logger.warning(f"Failed to clean up FakeGitManager resources: {str(e)}")
         
-        logger.info("PerformanceTestingAgent cleanup complete") 
+        logger.info("PerformanceTestingAgent cleanup complete")
+
+    def profile_function(self):
+        """
+        Performs line-wise profiling of the function in fp_func.
+        
+        Returns:
+            str: Formatted line profiling results similar to line_profiler output
+        """
+        logger.info(f"Performing line-wise profiling of {self.function_name}")
+        
+        # Create a temporary directory for profiling
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Copy the function file to the temp directory
+            func_filename = os.path.basename(self.fp_func)
+            temp_func_path = os.path.join(temp_dir, func_filename)
+            shutil.copy2(self.fp_func, temp_func_path)
+            
+            # Copy the test file to the temp directory
+            test_filename = os.path.basename(self.fp_test)
+            temp_test_path = os.path.join(temp_dir, test_filename)
+            shutil.copy2(self.fp_test, temp_test_path)
+            
+            # Create a wrapper script that imports the function and runs it with the @profile decorator
+            wrapper_path = os.path.join(temp_dir, "profile_wrapper.py")
+            
+            # Create the wrapper script
+            with open(wrapper_path, 'w') as f:
+                f.write(f"""
+import os
+import sys
+import time
+import importlib.util
+from line_profiler import LineProfiler
+import contextlib
+import io
+
+# Redirect stdout to suppress function output
+@contextlib.contextmanager
+def suppress_stdout():
+    # Save the original stdout
+    original_stdout = sys.stdout
+    # Create a dummy file-like object to capture output
+    dummy_stdout = io.StringIO()
+    # Redirect stdout to the dummy file
+    sys.stdout = dummy_stdout
+    try:
+        yield dummy_stdout
+    finally:
+        # Restore the original stdout
+        sys.stdout = original_stdout
+
+# Add the current directory and parent directories to sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import the module containing the function
+spec = importlib.util.spec_from_file_location("{os.path.splitext(func_filename)[0]}", "{temp_func_path}")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+# Get the function
+func = getattr(module, "{self.function_name}")
+
+# Create a LineProfiler
+profile = LineProfiler()
+
+# Wrap the function with the profile decorator
+profiled_func = profile(func)
+
+# Import the test module to get test data
+test_spec = importlib.util.spec_from_file_location("{os.path.splitext(test_filename)[0]}", "{temp_test_path}")
+test_module = importlib.util.module_from_spec(test_spec)
+test_spec.loader.exec_module(test_module)
+
+# Variables to store test data
+test_args = []
+test_kwargs = {{}}
+captured_args = []
+captured_kwargs = {{}}
+
+# Create a mock function to capture arguments
+def mock_func(*args, **kwargs):
+    global captured_args, captured_kwargs
+    captured_args = args
+    captured_kwargs = kwargs
+    # Return a dummy value to prevent errors
+    return "mock_result"
+
+# Try to find a function that creates test data
+found_test_data = False
+
+# First, try to find a test function that calls our target function
+for name in dir(test_module):
+    if name.startswith('test_') and '{self.function_name}' in name:
+        test_func = getattr(test_module, name)
+        
+        # Temporarily replace the real function with our mock
+        original_func = getattr(module, "{self.function_name}")
+        setattr(module, "{self.function_name}", mock_func)
+        
+        try:
+            # Run the test function to capture the arguments
+            with suppress_stdout():
+                test_func()
+            # Check if we captured any arguments
+            if captured_args or captured_kwargs:
+                test_args = captured_args
+                test_kwargs = captured_kwargs
+                print(f"Successfully extracted test data from {{name}}")
+                found_test_data = True
+                break
+        except Exception as e:
+            print(f"Error running test function {{name}}: {{e}}")
+        finally:
+            # Restore the original function
+            setattr(module, "{self.function_name}", original_func)
+
+# If we couldn't get test data from the test function, try to create appropriate test data
+if not found_test_data:
+    print("Could not extract test data from test functions, attempting to create test data")
+    
+    # Try to infer the expected input type from the function body
+    import inspect
+    import re
+    
+    # Get the function source code
+    func_source = inspect.getsource(func)
+    
+    # Check for common patterns that indicate the expected input type
+    if "numpy" in func_source or "np." in func_source:
+        print("Function appears to use numpy arrays")
+        
+        # Check for shape references
+        shape_matches = re.findall(r'(\w+)\.shape', func_source)
+        if shape_matches:
+            param_name = shape_matches[0]
+            print(f"Function expects a numpy array with shape attribute in parameter {{param_name}}")
+            
+            # Try to create a small numpy array
+            try:
+                import numpy as np
+                # Create a small 3D array (common for image processing)
+                test_args = [np.zeros((10, 10, 3))]
+                print(f"Created test numpy array with shape {{test_args[0].shape}}")
+            except ImportError:
+                print("Could not import numpy, using fallback test data")
+                test_args = [1]  # Fallback
+    else:
+        # For other types, use simple defaults based on parameter names
+        sig = inspect.signature(func)
+        for param_name, param in sig.parameters.items():
+            # Try to infer type from parameter name
+            if "str" in param_name.lower() or "name" in param_name.lower() or "path" in param_name.lower():
+                test_args.append("test_string")
+            elif "int" in param_name.lower() or "count" in param_name.lower() or "num" in param_name.lower():
+                test_args.append(1)
+            elif "float" in param_name.lower() or "val" in param_name.lower():
+                test_args.append(1.0)
+            elif "list" in param_name.lower() or "array" in param_name.lower():
+                test_args.append([1, 2, 3])
+            elif "dict" in param_name.lower() or "map" in param_name.lower():
+                test_args.append({{"key": "value"}})
+            elif "bool" in param_name.lower() or "flag" in param_name.lower():
+                test_args.append(True)
+            else:
+                # Default fallback
+                test_args.append(None)
+
+# Run the profiled function with the test data
+success = False
+try:
+    print(f"Running profiled function with args: {{test_args}} and kwargs: {{test_kwargs}}")
+    # Suppress output during profiling
+    with suppress_stdout():
+        result = profiled_func(*test_args, **test_kwargs)
+    print(f"Function executed successfully, result type: {{type(result)}}")
+    success = True
+except Exception as e:
+    print(f"Error running profiled function: {{e}}")
+    # If we get an error, try one more approach - look for test data in the test file
+    try:
+        # Look for variables in the test module that might be test data
+        for name in dir(test_module):
+            if not name.startswith('__') and not callable(getattr(test_module, name)):
+                value = getattr(test_module, name)
+                # Try using this as test data
+                print(f"Trying {{name}} as test data, type: {{type(value)}}")
+                try:
+                    with suppress_stdout():
+                        result = profiled_func(value)
+                    print(f"Success using {{name}} as test data!")
+                    success = True
+                    break
+                except Exception as inner_e:
+                    print(f"Error with {{name}}: {{inner_e}}")
+    except Exception as outer_e:
+        print(f"Failed to find usable test data: {{outer_e}}")
+
+# If all attempts failed, try with a numpy array as a last resort for image processing functions
+if not success and ("image" in func_source.lower() or "img" in func_source.lower()):
+    try:
+        import numpy as np
+        print("Trying with different numpy array shapes as last resort")
+        
+        # Try different common shapes for image data
+        shapes = [(10, 10), (10, 10, 1), (10, 10, 3), (10, 10, 4)]
+        for shape in shapes:
+            try:
+                print(f"Trying numpy array with shape {{shape}}")
+                test_array = np.zeros(shape)
+                with suppress_stdout():
+                    result = profiled_func(test_array)
+                print(f"Success with shape {{shape}}!")
+                success = True
+                break
+            except Exception as e:
+                print(f"Failed with shape {{shape}}: {{e}}")
+    except ImportError:
+        print("Could not import numpy for last resort attempt")
+
+# Print the profiling results to a string
+import io
+output = io.StringIO()
+if success:
+    profile.print_stats(stream=output)
+    print(output.getvalue())
+else:
+    print("Failed to profile function with any test data")
+    output.write("Failed to profile function with any test data")
+""")
+            
+            # Install line_profiler if not already installed
+            try:
+                subprocess.run(["pip", "install", "line_profiler"], check=True, capture_output=True)
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to install line_profiler: {e}")
+                return "Error: Failed to install line_profiler"
+            
+            # Run the wrapper script
+            try:
+                result = subprocess.run(
+                    ["python", wrapper_path], 
+                    check=True, 
+                    capture_output=True,
+                    text=True
+                )
+                
+                # Extract just the line profiler output from the result
+                output_lines = result.stdout.split('\n')
+                profiler_output_start = None
+                
+                # Find where the line profiler output starts
+                for i, line in enumerate(output_lines):
+                    if line.startswith('Timer unit:'):
+                        profiler_output_start = i
+                        break
+                
+                if profiler_output_start is not None:
+                    # Return only the line profiler output
+                    return '\n'.join(output_lines[profiler_output_start:])
+                else:
+                    # If we can't find the profiler output, return the full output
+                    return result.stdout
+                
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to run profiling: {e}")
+                logger.error(f"Stderr: {e.stderr}")
+                
+                # If profiling failed, return a more user-friendly error message
+                error_msg = f"""
+Error: Failed to run profiling
+
+{e.stderr}
+
+The profiling failed, likely because we couldn't determine the correct test data for the function.
+You can still proceed with optimization without the profiling results.
+"""
+                return error_msg 

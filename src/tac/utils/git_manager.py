@@ -3,6 +3,7 @@ import os
 import subprocess
 import shutil
 import tempfile
+import difflib
 from typing import Optional, Tuple
 from tac.core.log_config import setup_logging
 from tac.core.config import config
@@ -544,34 +545,25 @@ class GitManager:
 
 class FakeGitManager:
     """
-    A fake Git manager that simulates key Git operations without requiring an actual Git repository.
-    This is useful for performance testing where we want to work with a temporary copy of the codebase.
-    
-    The FakeGitManager mirrors the GitManager interface but operates on a temporary directory
-    containing copies of the original files rather than using actual Git commands.
-    
-    Can be used as a context manager to automatically clean up the temporary directory:
-    
-    ```python
-    with FakeGitManager.for_performance_testing() as git_manager:
-        # Use git_manager
-        # Temporary directory will be automatically cleaned up when exiting the with block
-    ```
+    A minimalistic fake Git manager that simulates basic Git operations without requiring an actual Git repository.
+    Only implements the core methods needed for simple version tracking.
     """
     
-    def __init__(self, repo_path: str = '.', temp_dir: str = None):
+    def __init__(self, repo_path: str = '.', cleanup_temp_dir: bool = True):
         """
         Initialize the FakeGitManager.
         
         Args:
             repo_path: Path to the original repository
-            temp_dir: Path to the temporary directory where files will be copied
+            cleanup_temp_dir: Whether to automatically clean up the temp directory when done (default: True)
         """
         self.repo_path = os.path.abspath(repo_path)
-        self.temp_dir = temp_dir
-        self.original_files = {}  # Store original file contents for reverting
-        self.base_branch = "fake_main"
-        self.current_branch = "fake_main"
+        self.temp_dir = tempfile.mkdtemp(prefix="fake_git_")
+        self.commits = {}  # Store commits by name
+        self.cleanup_temp_dir = cleanup_temp_dir
+        self.current_commit = None  # Track the current commit
+        
+        # File extensions to consider as programming-relevant
         self.code_file_extensions = [
             '.py', '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.scss', 
             '.java', '.c', '.cpp', '.h', '.hpp', '.cs', '.go', '.rs', '.rb', 
@@ -579,111 +571,185 @@ class FakeGitManager:
             '.md', '.txt', '.sql'
         ]
         
-        # Store commits by name for later restoration
-        self.commits = {}
-        
         logger.info(f"Initialized FakeGitManager with repo path: {self.repo_path}")
-        if self.temp_dir:
-            logger.info(f"Using temporary directory: {self.temp_dir}")
-            self._copy_code_files()
+        logger.info(f"Using temporary directory: {self.temp_dir}")
     
-    def __enter__(self):
-        """Context manager entry point."""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit point - clean up temporary directory."""
-        self.cleanup()
-        return False  # Don't suppress exceptions
-    
-    def cleanup(self):
-        """Clean up resources used by the FakeGitManager."""
-        if self.temp_dir and os.path.exists(self.temp_dir):
-            try:
-                logger.info(f"Cleaning up temporary directory: {self.temp_dir}")
-                shutil.rmtree(self.temp_dir)
-                self.temp_dir = None
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary directory: {str(e)}")
-    
-    def _copy_code_files(self):
-        """Copy all code files from the original repository to the temporary directory."""
-        if not self.temp_dir or not os.path.exists(self.repo_path):
-            return
-            
-        logger.info(f"Copying code files from {self.repo_path} to {self.temp_dir}")
+    def _get_files_from_repo(self):
+        """Get all programming-relevant files from the original repository."""
+        files = {}
         
-        for root, _, files in os.walk(self.repo_path):
+        if not os.path.exists(self.repo_path):
+            logger.error(f"Repository path does not exist: {self.repo_path}")
+            return files
+            
+        logger.info(f"Reading files from repository: {self.repo_path}")
+        
+        for root, _, file_list in os.walk(self.repo_path):
             # Skip hidden directories (like .git)
             if any(part.startswith('.') for part in root.split(os.sep)):
                 continue
                 
-            for file in files:
-                # Only copy files with code extensions
+            for file in file_list:
+                # Only include files with code extensions
                 _, ext = os.path.splitext(file)
                 if ext.lower() not in self.code_file_extensions:
                     continue
                     
-                src_path = os.path.join(root, file)
-                # Create relative path from repo_path
-                rel_path = os.path.relpath(src_path, self.repo_path)
-                dst_path = os.path.join(self.temp_dir, rel_path)
-                
-                # Create destination directory if it doesn't exist
-                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, self.repo_path)
                 
                 try:
-                    # Copy the file
-                    shutil.copy2(src_path, dst_path)
-                    
-                    # Store original content for potential reversion
-                    with open(src_path, 'r', encoding='utf-8') as f:
-                        self.original_files[rel_path] = f.read()
-                        
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        files[rel_path] = content
                 except Exception as e:
-                    logger.error(f"Error copying file {src_path}: {e}")
-    
-    def get_current_branch(self) -> Optional[str]:
-        """Get the name of the current fake branch."""
-        return self.current_branch
-    
-    def get_complete_diff(self) -> str:
-        """
-        Get a complete diff of the current state compared to the original files.
+                    logger.error(f"Error reading file {file_path}: {e}")
         
+        return files
+    
+    def _get_commit_dir(self, commit_msg):
+        """Get the directory path for a specific commit."""
+        return os.path.join(self.temp_dir, commit_msg)
+    
+    def commit(self, commit_msg: str) -> bool:
+        """
+        Create a new commit by copying all programming-relevant files into temp/commit_message.
+        
+        Args:
+            commit_msg: Message/name for this commit
+            
+        Returns:
+            bool: True if commit was successful, False otherwise
+        """
+        try:
+            # Create a directory for this commit
+            commit_dir = self._get_commit_dir(commit_msg)
+            os.makedirs(commit_dir, exist_ok=True)
+            
+            # Get all current files from the repository
+            current_files = self._get_files_from_repo()
+            
+            # Store this commit
+            self.commits[commit_msg] = current_files
+            self.current_commit = commit_msg
+            
+            # Copy files to the commit directory
+            for rel_path, content in current_files.items():
+                file_path = os.path.join(commit_dir, rel_path)
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            
+            logger.info(f"Created commit: {commit_msg} with {len(current_files)} files")
+            return True
+        except Exception as e:
+            logger.error(f"Error creating commit: {e}")
+            return False
+    
+    def restore_commit(self, commit_msg: str) -> bool:
+        """
+        Restore the commit_msg version completely.
+        
+        Args:
+            commit_msg: Name of the commit to restore to
+            
+        Returns:
+            bool: True if restoration was successful, False otherwise
+        """
+        if commit_msg not in self.commits:
+            logger.error(f"Commit '{commit_msg}' not found")
+            return False
+            
+        try:
+            # Get the files from the commit
+            commit_files = self.commits[commit_msg]
+            
+            logger.info(f"Restoring to commit: {commit_msg}")
+            
+            # Restore each file to its state in the commit
+            for rel_path, content in commit_files.items():
+                # Restore in the original repository
+                orig_path = os.path.join(self.repo_path, rel_path)
+                
+                # Create directory if it doesn't exist
+                os.makedirs(os.path.dirname(orig_path), exist_ok=True)
+                
+                # Write content back to the file
+                with open(orig_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            
+            # Remove files in repo that don't exist in the commit
+            for root, _, files in os.walk(self.repo_path):
+                # Skip hidden directories (like .git)
+                if any(part.startswith('.') for part in root.split(os.sep)):
+                    continue
+                    
+                for file in files:
+                    # Only consider files with code extensions
+                    _, ext = os.path.splitext(file)
+                    if ext.lower() not in self.code_file_extensions:
+                        continue
+                        
+                    file_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(file_path, self.repo_path)
+                    
+                    if rel_path not in commit_files:
+                        try:
+                            os.remove(file_path)
+                            logger.debug(f"Removed file not in commit: {rel_path}")
+                        except Exception as e:
+                            logger.error(f"Error removing file {rel_path}: {e}")
+            
+            self.current_commit = commit_msg
+            logger.info(f"Successfully restored to commit: {commit_msg}")
+            return True
+        except Exception as e:
+            logger.error(f"Error restoring commit: {e}")
+            return False
+    
+    def get_complete_diff(self, commit_msg: str) -> str:
+        """
+        Get the complete diff in a git similar fashion between the current commit and the one specified in commit_msg.
+        
+        Args:
+            commit_msg: Name of the commit to compare against
+            
         Returns:
             str: A formatted string containing all relevant diffs
         """
-        if not self.temp_dir:
-            return "Temporary directory not available"
+        if commit_msg not in self.commits:
+            return f"Error: Commit '{commit_msg}' not found"
             
         try:
+            # Get the files from the specified commit
+            commit_files = self.commits[commit_msg]
+            
+            # Get current files from the repository
+            current_files = self._get_files_from_repo()
+            
             git_diff = []
             
-            # Compare each file in the temporary directory with its original
-            for rel_path, original_content in self.original_files.items():
-                temp_path = os.path.join(self.temp_dir, rel_path)
-                
-                if not os.path.exists(temp_path):
+            # Check for modified and deleted files
+            for rel_path, commit_content in commit_files.items():
+                if rel_path not in current_files:
                     git_diff.append(f"=== Deleted File: {rel_path} ===")
                     git_diff.append(f"- {rel_path}")
                     git_diff.append("")
                     continue
                 
-                with open(temp_path, 'r', encoding='utf-8') as f:
-                    current_content = f.read()
+                current_content = current_files[rel_path]
                 
-                if current_content != original_content:
+                if current_content != commit_content:
                     git_diff.append(f"=== Modified File: {rel_path} ===")
                     
                     # Generate a simple diff
-                    original_lines = original_content.splitlines()
+                    commit_lines = commit_content.splitlines()
                     current_lines = current_content.splitlines()
                     
                     # Use difflib to get a unified diff
-                    import difflib
                     diff = difflib.unified_diff(
-                        original_lines,
+                        commit_lines,
                         current_lines,
                         fromfile=f'a/{rel_path}',
                         tofile=f'b/{rel_path}',
@@ -694,323 +760,86 @@ class FakeGitManager:
                     git_diff.append("")
             
             # Check for new files
-            for root, _, files in os.walk(self.temp_dir):
-                if any(part.startswith('.') for part in root.split(os.sep)):
-                    continue
+            for rel_path in current_files:
+                if rel_path not in commit_files:
+                    git_diff.append(f"=== New File: {rel_path} ===")
+                    git_diff.append(f"+ {rel_path}")
                     
-                for file in files:
-                    _, ext = os.path.splitext(file)
-                    if ext.lower() not in self.code_file_extensions:
-                        continue
-                        
-                    temp_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(temp_path, self.temp_dir)
+                    # Show the content of the new file
+                    content_lines = current_files[rel_path].splitlines()
+                    for line in content_lines:
+                        git_diff.append(f"+ {line}")
                     
-                    if rel_path not in self.original_files:
-                        git_diff.append(f"=== New File: {rel_path} ===")
-                        git_diff.append(f"+ {rel_path}")
-                        
-                        try:
-                            with open(temp_path, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                            git_diff.append("File contents:")
-                            git_diff.append("```")
-                            git_diff.append(content)
-                            git_diff.append("```")
-                        except Exception as e:
-                            git_diff.append(f"Error reading file contents: {str(e)}")
-                            
-                        git_diff.append("")
+                    git_diff.append("")
             
             if not git_diff:
-                return "No changes detected"
+                return "No differences found"
                 
             return "\n".join(git_diff)
-            
         except Exception as e:
-            return f"Failed to get diff: {str(e)}"
+            logger.error(f"Error generating diff: {e}")
+            return f"Error generating diff: {str(e)}"
     
-    def check_status(self, ignore_untracked: bool = False) -> Tuple[bool, str]:
-        """
-        Check if there are any changes in the temporary directory.
-        
-        Args:
-            ignore_untracked: If True, new files will not cause the status check to fail
-            
-        Returns:
-            tuple: (success, current_branch)
-        """
-        if not self.temp_dir:
-            logger.debug("No temporary directory to check status.")
-            return False, ""
-            
-        try:
-            has_changes = False
-            
-            # Check for modified files
-            for rel_path, original_content in self.original_files.items():
-                temp_path = os.path.join(self.temp_dir, rel_path)
-                
-                if not os.path.exists(temp_path):
-                    # File was deleted
-                    has_changes = True
-                    break
-                
-                with open(temp_path, 'r', encoding='utf-8') as f:
-                    current_content = f.read()
-                
-                if current_content != original_content:
-                    # File was modified
-                    has_changes = True
-                    break
-            
-            # Check for new files if not ignoring untracked
-            if not ignore_untracked and not has_changes:
-                for root, _, files in os.walk(self.temp_dir):
-                    if any(part.startswith('.') for part in root.split(os.sep)):
-                        continue
-                        
-                    for file in files:
-                        _, ext = os.path.splitext(file)
-                        if ext.lower() not in self.code_file_extensions:
-                            continue
-                            
-                        temp_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(temp_path, self.temp_dir)
-                        
-                        if rel_path not in self.original_files:
-                            # New file
-                            has_changes = True
-                            break
-                    
-                    if has_changes:
-                        break
-            
-            if has_changes:
-                logger.debug("Changes detected in the temporary directory.")
-                return False, self.current_branch
-                
-            logger.debug("No changes detected in the temporary directory.")
-            return True, self.current_branch
-            
-        except Exception as e:
-            logger.error(f"Error checking status: {e}")
-            return False, ""
-    
-    def revert_changes(self) -> bool:
-        """Revert all changes in the temporary directory to the original state."""
-        if not self.temp_dir:
-            logger.debug("No temporary directory to revert changes.")
-            return False
+    def __del__(self):
+        """Clean up temporary directory when the object is garbage collected."""
+        if self.cleanup_temp_dir and hasattr(self, 'temp_dir') and self.temp_dir and os.path.exists(self.temp_dir):
+            try:
+                logger.info(f"Cleaning up temporary directory: {self.temp_dir}")
+                shutil.rmtree(self.temp_dir)
+                self.temp_dir = None
+            except Exception as e:
+                logger.warning(f"Failed to clean up temporary directory: {str(e)}")
+        elif not self.cleanup_temp_dir and hasattr(self, 'temp_dir') and self.temp_dir:
+            logger.info(f"Keeping temporary directory for inspection: {self.temp_dir}")
 
-        try:
-            # Restore all original files
-            for rel_path, original_content in self.original_files.items():
-                temp_path = os.path.join(self.temp_dir, rel_path)
-                
-                # Create directory if it doesn't exist
-                os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-                
-                # Write original content back to the file
-                with open(temp_path, 'w', encoding='utf-8') as f:
-                    f.write(original_content)
-            
-            # Remove any new files
-            for root, _, files in os.walk(self.temp_dir):
-                if any(part.startswith('.') for part in root.split(os.sep)):
-                    continue
-                    
-                for file in files:
-                    _, ext = os.path.splitext(file)
-                    if ext.lower() not in self.code_file_extensions:
-                        continue
-                        
-                    temp_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(temp_path, self.temp_dir)
-                    
-                    if rel_path not in self.original_files:
-                        # Remove new file
-                        os.remove(temp_path)
-            
-            logger.info("Successfully reverted all changes in the temporary directory.")
-            return True
-        except Exception as e:
-            logger.error(f"Error reverting changes: {e}")
-            return False
+# Example usage
+if __name__ == "__main__":
+    # Create a simple example project
+    example_dir = tempfile.mkdtemp(prefix="example_project_")
     
-    def create_or_switch_to_tac_branch(self, tac_id: str) -> bool:
-        """Simulate creating or switching to a TAC branch."""
-        self.current_branch = tac_id
-        logger.info(f"Switched to fake TAC branch: {tac_id}")
-        return True
-    
-    def checkout_branch(self, branch_name: str, create: bool = False) -> bool:
-        """Simulate checking out a branch."""
-        self.current_branch = branch_name
-        logger.info(f"Switched to fake branch: {branch_name}")
-        return True
-    
-    def commit(self, commit_message: str) -> bool:
-        """Simulate committing changes."""
-        logger.info(f"Fake commit with message: {commit_message}")
+    try:
+        # Create some example files
+        with open(os.path.join(example_dir, "main.py"), "w") as f:
+            f.write("def hello():\n    print('Hello, world!')\n\nif __name__ == '__main__':\n    hello()")
         
-        # Store the current state of files for this commit
-        commit_files = {}
+        with open(os.path.join(example_dir, "utils.py"), "w") as f:
+            f.write("def add(a, b):\n    return a + b")
         
-        for root, _, files in os.walk(self.temp_dir):
-            if any(part.startswith('.') for part in root.split(os.sep)):
-                continue
-                
-            for file in files:
-                _, ext = os.path.splitext(file)
-                if ext.lower() not in self.code_file_extensions:
-                    continue
-                    
-                temp_path = os.path.join(root, file)
-                rel_path = os.path.relpath(temp_path, self.temp_dir)
-                
-                try:
-                    with open(temp_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        # Update original files for revert_changes()
-                        self.original_files[rel_path] = content
-                        # Store in this commit
-                        commit_files[rel_path] = content
-                except Exception as e:
-                    logger.error(f"Error updating original file content for {rel_path}: {e}")
+        # Initialize the FakeGitManager with our example project - don't clean up temp dir
+        git_manager = FakeGitManager(example_dir, cleanup_temp_dir=False)
         
-        # Store this commit by name
-        self.commits[commit_message] = commit_files
+        # Create initial commit
+        git_manager.commit("initial_commit")
         
-        return True
-    
-    def handle_post_execution(self, config: dict, commit_message: str) -> bool:
-        """Simulate post-execution handling."""
-        return self.commit(commit_message)
-    
-    def get_github_web_url(self) -> str:
-        """Return a placeholder GitHub URL."""
-        return "https://github.com/fake/repository"
-    
-    def ensure_gitignore_includes_tac(self):
-        """No-op for fake git manager."""
+        # Make some changes
+        with open(os.path.join(example_dir, "main.py"), "w") as f:
+            f.write("def hello():\n    print('Hello, Git!')\n\nif __name__ == '__main__':\n    hello()")
+        
+        with open(os.path.join(example_dir, "config.py"), "w") as f:
+            f.write("DEBUG = True\nVERSION = '1.0.0'")
+        
+        # Commit the changes
+        git_manager.commit("add_config_update_main")
+        
+        # Show the diff between current state and initial commit
+        diff = git_manager.get_complete_diff("initial_commit")
+        print("\nDiff between current state and initial commit:")
+        print(diff)
+        
+        # Restore to initial commit
+        git_manager.restore_commit("initial_commit")
+        
+        # Verify restoration by checking diff (should be empty)
+        diff_after_restore = git_manager.get_complete_diff("initial_commit")
+        print("\nDiff after restore (should be empty):")
+        print(diff_after_restore)
+        
+        # Print the temp directory path for inspection
+        print(f"\nTemporary directory for inspection: {git_manager.temp_dir}")
+        
+    finally:
+        # Clean up the example project directory, but not the git manager temp dir
         pass
+        # if os.path.exists(example_dir):
+        #     shutil.rmtree(example_dir)
     
-    def restore_commit(self, commit_name: str) -> bool:
-        """
-        Restore the codebase to a specific commit state.
-        
-        Args:
-            commit_name: Name of the commit to restore to
-            
-        Returns:
-            bool: True if restoration was successful, False otherwise
-        """
-        if commit_name not in self.commits:
-            logger.error(f"Commit '{commit_name}' not found")
-            return False
-            
-        try:
-            # Get the files from the commit
-            commit_files = self.commits[commit_name]
-            
-            # Determine if this is an original or optimized version
-            is_original = commit_name == "original_state_before_optimization"
-            action_verb = "Restoring" if is_original else "Applying"
-            file_action = "to original state" if is_original else "optimized version"
-            
-            logger.info(f"{action_verb} files {file_action} ({commit_name})")
-            
-            # Restore each file to its state in the commit
-            files_processed = 0
-            for rel_path, content in commit_files.items():
-                # Restore in the temporary directory
-                temp_path = os.path.join(self.temp_dir, rel_path)
-                
-                # Create directory if it doesn't exist
-                os.makedirs(os.path.dirname(temp_path), exist_ok=True)
-                
-                # Write content back to the file in temp dir
-                with open(temp_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                
-                # Also restore in the original repository
-                orig_path = os.path.join(self.repo_path, rel_path)
-                try:
-                    # Ensure the directory exists
-                    os.makedirs(os.path.dirname(orig_path), exist_ok=True)
-                    
-                    # Write content back to the original file
-                    with open(orig_path, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    
-                    files_processed += 1
-                    # Only log at debug level to avoid flooding the console
-                    if is_original:
-                        logger.debug(f"Restored file to original state: {rel_path}")
-                    else:
-                        logger.debug(f"Applied optimized version to file: {rel_path}")
-                        
-                except Exception as e:
-                    action = "restoring" if is_original else "applying optimization to"
-                    logger.error(f"Error {action} file {rel_path}: {e}")
-                    # Continue with other files even if one fails
-            
-            # Remove any files that don't exist in the commit from the temp directory
-            for root, _, files in os.walk(self.temp_dir):
-                if any(part.startswith('.') for part in root.split(os.sep)):
-                    continue
-                    
-                for file in files:
-                    _, ext = os.path.splitext(file)
-                    if ext.lower() not in self.code_file_extensions:
-                        continue
-                        
-                    temp_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(temp_path, self.temp_dir)
-                    
-                    if rel_path not in commit_files:
-                        # Remove file that doesn't exist in the commit
-                        os.remove(temp_path)
-                        
-                        # Also remove from original repository if it exists
-                        orig_path = os.path.join(self.repo_path, rel_path)
-                        if os.path.exists(orig_path):
-                            try:
-                                os.remove(orig_path)
-                                logger.debug(f"Removed file: {rel_path}")
-                            except Exception as e:
-                                logger.error(f"Error removing file {rel_path}: {e}")
-            
-            # Update original_files to match the commit state
-            self.original_files = commit_files.copy()
-            
-            if is_original:
-                logger.info(f"Successfully restored {files_processed} files to original state")
-            else:
-                logger.info(f"Successfully applied optimized version: {commit_name} ({files_processed} files updated)")
-                
-            return True
-        except Exception as e:
-            action = "restoring to original state" if commit_name == "original_state_before_optimization" else "applying optimized version"
-            logger.error(f"Error {action}: {e}")
-            return False
-    
-    @classmethod
-    def for_performance_testing(cls, repo_path: str = '.') -> 'FakeGitManager':
-        """
-        Create a FakeGitManager instance configured for performance testing.
-        
-        This class method creates a temporary directory and initializes a FakeGitManager
-        that copies all code files from the original repository to the temporary directory.
-        
-        Args:
-            repo_path: Path to the original repository
-            
-        Returns:
-            FakeGitManager: A FakeGitManager instance initialized with a temporary directory
-        """
-        temp_dir = tempfile.mkdtemp(prefix="tac_performance_")
-        logger.info(f"Created temporary directory for performance testing: {temp_dir}")
-        
-        return cls(repo_path=repo_path, temp_dir=temp_dir) 
