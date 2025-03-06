@@ -358,6 +358,7 @@ Additionally, here the line profiling results for the function to identify the b
     - Use snapshot.assert_match() to compare the output with the stored snapshot
     - Convert any numpy arrays to lists before snapshot comparison using .tolist()
     - The input data to test the function should be generated in the test function and be completely reproducible.
+    - Use realistic sizes for the input data, don't make it too small or too big
     - Include necessary imports (pytest, numpy, etc.). Here is an example:
     
 @pytest.mark.performance
