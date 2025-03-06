@@ -2,12 +2,15 @@ import os
 import ast
 import json
 import logging
+import tempfile
+import shutil
 from typing import Tuple, Optional, List, Dict, Any
 from tac.blocks import ProtoBlock, BlockProcessor, ProtoBlockGenerator
 from tac.utils.project_files import ProjectFiles
 from tac.core.log_config import setup_logging
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
+from tac.utils.git_manager import FakeGitManager
 import subprocess
 import re
 import datetime
@@ -36,12 +39,23 @@ class PerformanceTestingAgent:
         logger.info(f"Function file path: {self.fp_func}")
         self.fp_test = self.get_test_function(function_name)
         self.factory = ProtoBlockGenerator()
+        
+        # Set up git manager (always use FakeGitManager for performance testing)
+        logger.info("Using FakeGitManager for performance testing")
+        self.git_manager = FakeGitManager.for_performance_testing()
+        self.temp_dir = self.git_manager.temp_dir
 
         # Create coding agent directly
         if config.general.agent_type == "aider":
             self.agent = AiderAgent(config.raw_config.copy())
+            # Inject FakeGitManager into the agent
+            if hasattr(self.agent, 'git_manager'):
+                self.agent.git_manager = self.git_manager
         elif config.general.agent_type == "native":
             self.agent = NativeAgent(config.raw_config.copy())
+            # Inject FakeGitManager into the agent
+            if hasattr(self.agent, 'git_manager'):
+                self.agent.git_manager = self.git_manager
         else:
             raise ValueError(f"Invalid agent type: {config.general.agent_type}")
         
@@ -78,7 +92,7 @@ class PerformanceTestingAgent:
         test_file = os.path.join(test_path, f"test_performance_{function_name}.py")
         return test_file
     
-    def optimize(self, nmb_runs=5):
+    def optimize(self, nmb_runs=1):
         """Optimize the function for performance.
         
         Args:
@@ -110,18 +124,16 @@ class PerformanceTestingAgent:
         
         logger.info(f"Baseline performance: passed={baseline_passed}, mean_ms={baseline_mean_ms:.4f}")
         
-        # Create a temporary directory for backups
-        import tempfile
-        import shutil
-        import os
+        # Save the original state before any optimizations
+        # We'll use this to restore if optimization fails
+        logger.info("Saving original function state")
+        original_state_commit = "original_state_before_optimization"
+        self.git_manager.commit(original_state_commit)
         
-        temp_dir = tempfile.mkdtemp(prefix="performance_optimization_")
-        logger.debug(f"Created temporary directory for backups: {temp_dir}")
-        
-        # Make a backup of the original function file
-        backup_file = os.path.join(temp_dir, "original.bak")
-        shutil.copy2(self.fp_func, backup_file)
-        logger.info(f"Created backup of original function")
+        # Track the best optimization
+        best_optimization_commit = original_state_commit
+        best_mean_ms = baseline_mean_ms
+        optimization_succeeded = False
         
         try:
             for i in range(nmb_runs):
@@ -139,59 +151,81 @@ class PerformanceTestingAgent:
                 # 2. The mean execution time is faster than the previous best
                 current_mean_ms = performance_stats.get('mean_ms', float('inf'))
                 
-                if passed and current_mean_ms < baseline_mean_ms:
-                    logger.info(f"Optimization successful: mean_ms improved from {baseline_mean_ms:.4f} to {current_mean_ms:.4f}")
-                    # Update the baseline for the next iteration
-                    baseline_mean_ms = current_mean_ms
-                    baseline_passed = passed
-                    # Make a backup of this successful version
-                    opt_backup = os.path.join(temp_dir, f"opt_{i+1}.bak")
-                    shutil.copy2(self.fp_func, opt_backup)
+                if passed and current_mean_ms < best_mean_ms:
+                    # Calculate speedup factor from the previous best
+                    speedup_factor = best_mean_ms / current_mean_ms if current_mean_ms > 0 else float('inf')
+                    logger.info(f"Optimization successful: {speedup_factor:.2f}x speedup ({best_mean_ms:.4f} ms → {current_mean_ms:.4f} ms)")
+                    
+                    # Update the best metrics
+                    best_mean_ms = current_mean_ms
+                    optimization_succeeded = True
+                    
+                    # "Commit" the changes in the fake git manager
+                    optimization_commit = f"optimization_run_{i+1}"
+                    self.git_manager.commit(optimization_commit)
+                    best_optimization_commit = optimization_commit
                 else:
                     # Restore the previous best version
                     if not passed:
                         logger.warning(f"Optimization failed: tests did not pass")
                     else:
-                        logger.warning(f"Optimization did not improve performance: {current_mean_ms:.4f} ms vs baseline {baseline_mean_ms:.4f} ms")
+                        logger.warning(f"Optimization did not improve performance: {current_mean_ms:.4f} ms vs best {best_mean_ms:.4f} ms")
                     
-                    # Restore the previous best version (either the original or the last successful optimization)
-                    if i == 0:
-                        # Restore from the original backup
-                        shutil.copy2(backup_file, self.fp_func)
-                        logger.info(f"Restored original function from backup")
-                    else:
-                        # Find the latest successful optimization backup
-                        latest_opt = None
-                        for j in range(i, 0, -1):
-                            opt_path = os.path.join(temp_dir, f"opt_{j}.bak")
-                            if os.path.exists(opt_path):
-                                latest_opt = j
-                                break
-                                
-                        if latest_opt:
-                            opt_path = os.path.join(temp_dir, f"opt_{latest_opt}.bak")
-                            shutil.copy2(opt_path, self.fp_func)
-                            logger.info(f"Restored function from optimization run {latest_opt}")
-                        else:
-                            shutil.copy2(backup_file, self.fp_func)
-                            logger.info(f"Restored original function from backup")
+                    # Restore to the best version so far
+                    self.git_manager.restore_commit(best_optimization_commit)
+                    logger.info(f"Restored to best version: {best_optimization_commit}")
             
-            # Calculate improvement factor
-            initial_baseline = self.test_stats[0].get('mean_ms', float('inf'))
-            improvement_factor = initial_baseline / baseline_mean_ms if baseline_mean_ms > 0 else 0
+            # Final performance comparison - calculate speedup from baseline
+            if baseline_mean_ms > 0 and best_mean_ms > 0:
+                # Calculate overall speedup factor from the baseline
+                baseline_speedup = baseline_mean_ms / best_mean_ms
+                
+                # Format the speedup message
+                if baseline_speedup > 1:
+                    speedup_msg = f"{baseline_speedup:.2f}x faster than baseline"
+                else:
+                    # In case optimization made things worse
+                    slowdown = 1 / baseline_speedup
+                    speedup_msg = f"{slowdown:.2f}x slower than baseline"
+                
+                logger.info(f"Optimization complete. Final result: {speedup_msg}")
+                logger.info(f"Baseline execution time: {baseline_mean_ms:.4f} ms")
+                logger.info(f"Best execution time: {best_mean_ms:.4f} ms")
+            else:
+                logger.info("Could not calculate speedup due to invalid timing values")
             
-            logger.info(f"Optimization complete. Initial performance: {initial_baseline:.4f} ms, Final performance: {baseline_mean_ms:.4f} ms")
-            logger.info(f"Code now runs {improvement_factor:.2f}x faster than the original version")
+            # If optimization succeeded, keep the best version
+            # Otherwise, revert to the original state
+            if optimization_succeeded and best_optimization_commit != original_state_commit:
+                logger.info(f"Keeping optimized version: {best_optimization_commit}")
+                # Make sure we're on the best version
+                self.git_manager.restore_commit(best_optimization_commit)
+                
+                # Report the final speedup in the success message
+                if baseline_mean_ms > 0 and best_mean_ms > 0:
+                    baseline_speedup = baseline_mean_ms / best_mean_ms
+                    logger.info(f"Optimized function has been applied to your codebase ({baseline_speedup:.2f}x faster than baseline)")
+                else:
+                    logger.info("Optimized function has been applied to your codebase")
+            else:
+                logger.info("No successful optimization found, reverting to original state")
+                self.git_manager.restore_commit(original_state_commit)
+                logger.info("Original function state restored")
             
-            return improvement_factor > 1.0  # Return True if we achieved any improvement
+            # Return the optimization results
+            return optimization_succeeded
+            
+        except Exception as e:
+            logger.error(f"Error during optimization: {e}")
+            # Revert to original state in case of error
+            self.git_manager.restore_commit(original_state_commit)
+            logger.info("Reverted to original state due to error")
+            return False
             
         finally:
-            # Clean up the temporary directory and all backup files
-            try:
-                shutil.rmtree(temp_dir)
-                logger.debug(f"Removed temporary backup directory: {temp_dir}")
-            except Exception as e:
-                logger.warning(f"Failed to clean up temporary directory: {str(e)}")
+            # We don't clean up the temporary directory here
+            # It will be cleaned up when the cleanup() method is called
+            logger.debug(f"Keeping FakeGitManager temporary directory for later use: {self.temp_dir}")
 
     def pre_run(self):
         """Run initial setup and testing.
@@ -332,7 +366,6 @@ def test_bubu_output_snapshot(benchmark, snapshot):
         logger.debug(f'Running test function: {self.fp_test}')
         
         # Create a temporary file for the benchmark JSON output
-        import tempfile
         with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as tmp:
             json_output_path = tmp.name
         
@@ -403,7 +436,7 @@ def test_bubu_output_snapshot(benchmark, snapshot):
             # Log the results
             if passed:
                 logger.info(f"Test passed with performance stats: {performance_stats}")
-                logger.info(f"Total runs recorded: {len(self.test_stats)}")
+                logger.info(f"Total successful runs recorded: {len(self.test_stats)}")
             else:
                 logger.error(f"Test failed. Output: {result.stdout}")
                 logger.error(f"Error: {result.stderr}")
@@ -463,3 +496,19 @@ def test_my_method(my_instance):
     result = my_instance.my_method()
     assert result == expected_value
 """ 
+
+    def cleanup(self):
+        """Clean up resources used by the PerformanceTestingAgent.
+        
+        This method should be called when you're done with the agent to clean up
+        any temporary directories or resources it created.
+        """
+        if self.git_manager:
+            try:
+                logger.info("Cleaning up FakeGitManager resources")
+                self.git_manager.cleanup()
+                self.temp_dir = None
+            except Exception as e:
+                logger.warning(f"Failed to clean up FakeGitManager resources: {str(e)}")
+        
+        logger.info("PerformanceTestingAgent cleanup complete") 
