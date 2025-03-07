@@ -1,13 +1,13 @@
 from .model import ProtoBlock
 from .generator import ProtoBlockGenerator
+from .executor import BlockExecutor
 from .processor import BlockProcessor
-from .builder import BlockBuilder
 from .orchestrator import MultiBlockOrchestrator
 
 __all__ = [
     'ProtoBlock',
     'ProtoBlockGenerator',
+    'BlockExecutor',
     'BlockProcessor',
-    'BlockBuilder',
-    'MultiBlockOrchestrator'
+    'MultiBlockOrchestrator',
 ] 

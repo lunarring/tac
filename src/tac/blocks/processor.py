@@ -17,7 +17,7 @@ if src_dir not in sys.path:
 
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
-from tac.blocks.builder import BlockBuilder
+from tac.blocks.executor import BlockExecutor
 from tac.coding_agents.aider import AiderAgent
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
@@ -42,7 +42,7 @@ class BlockProcessor:
         self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
-        self.builder = BlockBuilder(config_override=config_override, codebase=codebase)
+        self.executor = BlockExecutor(config_override=config_override, codebase=codebase)
         self.generator = ProtoBlockGenerator()
         self.git_manager = GitManager()
 
@@ -154,7 +154,7 @@ class BlockProcessor:
 
 
             # Execute the protoblock using the builder
-            execution_success, failure_type, error_analysis = self.builder.execute_block(self.protoblock, idx_attempt)
+            execution_success, failure_type, error_analysis = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}")

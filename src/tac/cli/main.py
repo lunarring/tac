@@ -22,7 +22,7 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.blocks import ProtoBlock, ProtoBlockGenerator, BlockBuilder, BlockProcessor, MultiBlockOrchestrator
+from tac.blocks import ProtoBlock, ProtoBlockGenerator, BlockExecutor, BlockProcessor, MultiBlockOrchestrator
 from tac.coding_agents.aider import AiderAgent
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer

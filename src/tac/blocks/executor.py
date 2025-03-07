@@ -14,11 +14,11 @@ import shutil
 from tac.trusty_agents.pytest import PytestTestingAgent, ErrorAnalyzer
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
 
-logger = setup_logging('tac.blocks.builder')
+logger = setup_logging('tac.blocks.executor')
 
-class BlockBuilder:
+class BlockExecutor:
     """
-    Builds a Block from a ProtoBlock by managing the implementation process through an agent,
+    Executes a Block from a ProtoBlock by managing the implementation process through an agent,
     running tests, and handling version control operations.
     """
     def __init__(self, config_override: Optional[Dict] = None, codebase: Optional[Dict[str, str]] = None):
