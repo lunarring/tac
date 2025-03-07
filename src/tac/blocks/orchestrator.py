@@ -374,7 +374,7 @@ class MultiBlockOrchestrator:
         try:
             # Prepare prompt
             chunking_prompt = f"""<purpose>
-You are a senior software engineer tasked with breaking down a complex programming task into smaller, manageable chunks. Your goal is to analyze the task instructions and determine the optimal way to split them into separate sub-tasks that can be implemented independently or in sequence. It is important that the chain of chunks is complete and that each chunk is self-contained and can be reasonably implemented.
+You are a senior software engineer tasked with breaking down a complex programming task into smaller, manageable chunks. Your goal is to analyze the task instructions and determine the optimal way to split them into separate sub-tasks that can be implemented independently or in sequence. It is important that the chain of chunks is complete and that each chunk is self-contained and can be reasonably implemented. The end goal needs to bring everything together and the task needs to be completed. Your goal is to think everything through end to end and focusing on the big picture of the deliverable.
 </purpose>
 
 Here is a summary of the codebase:
@@ -388,21 +388,17 @@ Here are the full task instructions:
 </task_instructions>
 
 <chunking_rules>
-1. Analyze the complexity and scope of the task
-2. Identify logical boundaries where the task can be split
-3. Consider dependencies between different parts of the task
-4. Ensure each chunk is self-contained and can be reasonably implemented
-5. Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
-6. Keep the number of chunks reasonable (typically 1-10 chunks, depending on complexity)
-7. For simple tasks, it's perfectly acceptable to have just 1 chunk
-8. For very complex tasks, don't exceed 10 chunks to maintain manageability
-9. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
+1. Analyze the complexity and scope of the task and 
+2. identify logical boundaries where the task can be split, considering dependencies between different parts of the task
+3. Ensure each chunk is self-contained and can be reasonably implemented
+4. Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
+5. For simple tasks, it's perfectly acceptable to have just 1 chunk, for very complex tasks, don't exceed 10 chunks to maintain manageability
+6. Each chunk should include its own tests where appropriate - no separate integration test is needed, and don't create chunks that only contain tests
+7. mention the files that we are creating on the way and where they should be placed, e.g. src/tac/blocks/orchestrator.py and use them throughout the task
+8. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
    - This branch name should be prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication')
    - The branch name should be descriptive of the overall task, not individual chunks
-10. Each chunk should include its own tests where appropriate - no separate integration test is needed
-11. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
-12. A single chunk should not be too big and just focus on one thing
-13. Don't create chunks that only contain tests
+9. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
 </chunking_rules>
 
 <output_format>
