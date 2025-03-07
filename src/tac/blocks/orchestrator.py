@@ -3,8 +3,10 @@ import json
 from typing import Dict, List, Optional, Any
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
+from tac.core.log_config import setup_logging
+from tac.utils.project_files import ProjectFiles
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.blocks.orchestrator')
 
 
 class Chunk:
@@ -203,6 +205,157 @@ class MultiBlockOrchestrator:
     def __init__(self):
         logger.info("Initializing MultiBlockOrchestrator")
         self.llm_client = LLMClient(strength="strong")
+    
+    def execute(self, task_instructions: str, codebase: str, args=None, voice_ui=None, git_manager=None):
+        """
+        Executes a task by chunking it and then processing each chunk sequentially.
+        
+        Args:
+            task_instructions: The full task instructions to be executed
+            codebase: A summary of the codebase for context
+            args: Command line arguments (optional)
+            voice_ui: Voice UI instance (optional)
+            git_manager: Git manager instance (optional)
+            
+        Returns:
+            bool: True if execution was successful, False otherwise
+        """
+        import sys
+        from tac.blocks.processor import BlockProcessor
+        
+        if voice_ui is not None:
+            raise NotImplementedError("Voice UI is not supported with orchestrator")
+            
+        # Chunk the task instructions
+        logger.info("Using orchestrator to chunk task instructions")
+        chunking_result = self.chunk(task_instructions, codebase)
+        
+        # Get the chunks from the result
+        chunks = chunking_result.chunks
+        
+        logger.info(f"Task chunked into {len(chunks)} potential blocks (chunks)")
+        
+        # Get branch name directly from the result
+        branch_name = chunking_result.branch_name
+        
+        # Get commit messages for each chunk
+        commit_messages = chunking_result.get_commit_messages()
+        
+        # Display the chunked tasks with commit messages
+        print("\n🔍 Task Analysis Complete")
+        if chunking_result.strategy:
+            print(f"Strategy: {chunking_result.strategy}")
+        print(f"The task has been divided into {len(chunks)} parts")
+        if branch_name:
+            print(f"🌿 Git Branch: {branch_name}")
+        
+        # Display violated tests if any
+        if hasattr(chunking_result, 'violated_tests') and chunking_result.violated_tests:
+            print("\n⚠️ Tests that may be violated by this chunking:")
+            for test in chunking_result.violated_tests:
+                print(f"  - {test}")
+        else:
+            print("\n✅ No tests will be violated by this chunking")
+        
+        # Display chunks with 1-based indexing for user-friendly output
+        for i, chunk in enumerate(chunks):
+            # Display chunk with commit message but without branch name
+            print(f"--- Chunk {i+1} ---")
+            # Display the chunk content without title and branch name
+            print(chunk.get_display_content())
+            print(f"📝 Commit: {commit_messages[i]}")
+            print()
+        
+        # Ask user if they want to proceed with execution
+        proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+        
+        if proceed != 'y':
+            print("Execution cancelled by user.")
+            return False
+        
+        logger.info(f"Using branch name: {branch_name}")
+        
+        # Switch to branch if git is enabled and branch name is available
+        original_branch = None
+        if config.git.enabled and branch_name and git_manager:
+            original_branch = git_manager.get_current_branch()
+            print(f"\n🔄 Switching to branch: {branch_name}")
+            if not git_manager.checkout_branch(branch_name, create=True):
+                print(f"Failed to switch to branch {branch_name}, continuing in current branch")
+            
+            # Inform user about commit behavior
+            print("\n📝 Git behavior: Changes will be committed after each chunk but NOT pushed")
+            print("   You can push changes manually after execution completes")
+            print("   You will remain on the feature branch after execution completes")
+        
+        # Execute each chunk sequentially with 0-based indexing
+        success = True
+        
+        # Disable auto-push for orchestrator mode
+        if config.git.enabled:
+            config.override_with_dict({'git': {'auto_push_if_success': False}})
+            logger.info("Auto-push disabled for orchestrator mode (commits will be created but not pushed)")
+        
+        project_files = ProjectFiles()
+        
+        for i, chunk in enumerate(chunks):
+            print(f"\n🚀 Executing Chunk {i+1}/{len(chunks)}...")
+
+            # Update codebase if it's not the first chunk
+            if i > 0:
+                project_files.update_summaries()
+                codebase = project_files.get_codebase_summary()
+            
+            # Convert the chunk to text for the BlockProcessor
+            chunk_text = chunk.to_text()
+            
+            # Execute the chunk
+            protoblock = None
+            if args and hasattr(args, 'json') and args.json:
+                from tac.blocks.model import ProtoBlock
+                protoblock = ProtoBlock.load(args.json)
+                print(f"\n📄 Loaded protoblock from: {args.json}")
+            
+            block_processor = BlockProcessor(chunk_text, codebase, protoblock=protoblock)
+            chunk_success = block_processor.run_loop()
+            
+            if not chunk_success:
+                print(f"\n❌ Chunk {i+1} execution failed.")
+                success = False
+                break
+            else:
+                print(f"\n✅ Chunk {i+1} completed successfully!")
+                
+                # Create a commit for this chunk if git is enabled
+                if config.git.enabled and git_manager:
+                    commit_message = commit_messages[i]
+                    print(f"\n📝 Creating commit: {commit_message}")
+                    git_manager.commit(commit_message)
+        
+        # Don't switch back to original branch - stay on feature branch
+        # if config.git.enabled and original_branch and git_manager:
+        #     print(f"\n🔄 Switching back to branch: {original_branch}")
+        #     git_manager.checkout_branch(original_branch)
+        
+        if success:
+            print("\n✅ Task completed successfully!")
+            print("Each chunk included its own tests, so no additional integration tests are needed.")
+            
+            # Add instructions for pushing changes if git is enabled
+            if config.git.enabled and branch_name and git_manager:
+                print(f"\n📝 Git status: All changes have been committed to branch '{branch_name}'")
+                print(f"   You are now on the feature branch '{branch_name}' with all changes")
+                print(f"   To push changes manually, run: git push origin {branch_name}")
+                if original_branch:
+                    print(f"   To switch back to your original branch, run: git checkout {original_branch}")
+            
+            logger.info("Task completed successfully with per-chunk tests.")
+        else:
+            print("\n❌ Task execution failed.")
+            logger.error("Task execution failed.")
+            return False
+            
+        return success
     
     def chunk(self, task_instructions: str, codebase: str) -> ChunkingResult:
         """
