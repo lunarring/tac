@@ -6,8 +6,7 @@ Trusty Agentic Chains (tac) is a AI-driven coding framework that combines coding
 > This project is in **alpha**. Interfaces, commands, and features may change without notice. Use at your own risk and carefully test before deploying in production environments. 
 
 ## 🏗️ Architecture
-tac operates through a chain of specialized agents working together:
-
+![Block Execution Process](docs/block_execution.png)
 ### Coding Agents
 These agents generate and modify code based on your instructions:
 - **Aider Agent**: Leverages the aider-chat library for code generation [https://aider.chat/]
@@ -18,8 +17,18 @@ These agents validate and verify the code changes:
 - **Pytest Agent**: Runs software tests and analyzes results to ensure functionality
 - **Plausibility Agent**: Evaluates if code changes match the requested functionality
 - **Performance Agent**: Benchmarks code and guides performance optimization
+- **(coming soon): visual agent, able to look at graphics
+- **(more coming soon...)
 
-The system creates *protoblocks* (specifications for changes and trusty measures) that are to be executed by coding agents and validated by trusty agents before being committed as finalized *blocks* in your codebase. A given task is automatically parcellated into smaller blocks by the orchestrator and executed.
+### Block execution flow
+* **Block**: A valid block is defined as a change in code (diff) and trust assurances (e.g. passing unit tests)
+* **ProtoBlock**: Standardized specification for a coding task, containing task description, test specifications, and files to modify
+* **BlockExecutor**: Executes the changes specified in a ProtoBlock and validates them with trusty agents
+* **BlockBuilder**: Transforms a ProtoBlock into a finalized Block by implementing the requested changes and obtaining the trust assurances
+* **ProtoBlockGenerator**: Creates structured ProtoBlocks from high-level task instructions
+* **BlockProcessor**: Runs in a loop to execute ProtoBlocks, handling retries
+* **MultiBlockOrchestrator**: Splits complex tasks into smaller, manageable chunks that can be executed sequentially
+tac operates through a chain of specialized agents working together:
 
 ## 🚀 Installation
 
@@ -169,8 +178,8 @@ TAC uses a hierarchical configuration system (in `src/tac/core/config.py`) with 
   use_orchestrator: bool = True        # Whether to use the task orchestrator
   plausibility_test: bool = True       # Enable/disable plausibility testing
   minimum_plausibility_score: str = "B" # Minimum grade for plausibility
-  max_retries_block: int = 4           # Maximum retry attempts for blocks
-  max_retries_protoblock: int = 4      # Maximum retry attempts for protoblocks
+  max_retries_block_creation: int = 4  # Maximum retry attempts for block creation
+  max_retries_protoblock_creation: int = 4  # Maximum retry attempts for protoblock creation
   ```
 
 - **GitConfig**: Version control settings
@@ -207,9 +216,6 @@ Key configuration options include:
 All configuration options are documented in the command help:
 ```bash
 tac --help
-```
-
-sk" --model gpt-4
 ```
 
 ## ✍️ Contributing

@@ -8,7 +8,7 @@ import re
 import shutil
 from typing import Dict
 from tac.core.llm import LLMClient, Message
-from tac.protoblock import ProtoBlock
+from tac.blocks import ProtoBlock
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.core.log_config import setup_logging

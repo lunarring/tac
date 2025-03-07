@@ -22,21 +22,20 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
+from tac.blocks import ProtoBlock, ProtoBlockGenerator, BlockExecutor, BlockProcessor, MultiBlockOrchestrator
 from tac.coding_agents.aider import AiderAgent
-from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
-from tac.core.git_manager import GitManager
+from tac.utils.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
-from tac.protoblock.manager import load_protoblock_from_json
-from tac.core.block_runner import BlockRunner
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.blocks import MultiBlockOrchestrator
 
-logger = setup_logging('tac.cli.main')
+# Initialize logger at module level but don't use it as a global in functions
+_module_logger = setup_logging('tac.cli.main')
 
 def cli_gather_python_files(directory, formatting_options, exclusions, exclude_dot_files=True):
     """
@@ -49,7 +48,7 @@ def cli_gather_python_files(directory, formatting_options, exclusions, exclude_d
         exclude_dot_files: Whether to exclude files/directories starting with a dot.
         
     Returns:
-        str: Formatted output of directory tree and file contents.
+        Dictionary with file paths as keys and file contents as values.
     """
     MAX_FILE_SIZE = 100 * 1024  
     CHUNK_SIZE = 40 * 1024
@@ -186,6 +185,7 @@ def gather_files_command(args):
 
 def run_tests_command(args):
     """Handle the test run command"""
+    logger = setup_logging('tac.cli.main')
     test_path = args.directory
     if not os.path.exists(test_path):
         logger.error(f"Test path not found: {test_path}")
@@ -200,6 +200,7 @@ def run_tests_command(args):
 
 def list_tests_command(args):
     """Handle the test list command"""
+    logger = setup_logging('tac.cli.main')
     test_dir = args.directory
     if not os.path.exists(test_dir):
         logger.error(f"Test directory not found: {test_dir}")
@@ -243,8 +244,6 @@ def list_tests_command(args):
     
     print(f"\nTotal tests found: {test_count}")
 
-
-
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
@@ -274,10 +273,12 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default='.',
         help='Directory to analyze and create block from (default: current directory)'
     )
+
     
     # Dynamically add arguments from general config
     general_config = config.general
     for key, value in vars(general_config).items():
+            
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
         if arg_type == bool:
@@ -447,14 +448,23 @@ def main():
     config.override_with_args(vars(args))
     
     # Set up logging with config values
-    log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else config.logging.get_tac('level', 'INFO')
+    # Check environment variable first (highest priority)
+    env_log_level = os.environ.get('TAC_LOG_LEVEL')
+    
+    # Command line args have second highest priority
+    cmd_log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else None
+    
+    # Config has lowest priority
+    config_log_level = config.logging.get_tac('level', 'INFO')
+    
+    # Determine final log level
+    log_level = env_log_level or cmd_log_level or config_log_level
     log_color = config.logging.get_tac('color', 'green')
     
-    # Override the logging config with the command-line log level if provided
-    if hasattr(args, 'log_level') and args.log_level:
-        config.override_with_dict({'logging': {'tac': {'level': log_level}}})
+    # Override the logging config with the final log level
+    config.override_with_dict({'logging': {'tac': {'level': log_level}}})
     
-    global logger
+    # Create a logger for this function instead of using a global
     logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
     
     # Update all existing loggers with the new log level
@@ -560,20 +570,32 @@ def main():
             # Add no_git flag to config
             if args.no_git:
                 config_override['git'] = {'enabled': False}
+                # Apply the override immediately to ensure it takes effect
+                config.override_with_dict(config_override)
+                logger.info("Git operations disabled via --no-git flag")
 
             if config.git.enabled:
                 git_manager = GitManager()
                 if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                     sys.exit(1)
             else:
-                # Check if plausibility test is enabled but git is disabled
-                if config.general.plausibility_test:
-                    print("\nError: Plausibility test requires git to be enabled.")
+                # Use FakeGitManager when git is disabled
+                from tac.utils.git_manager import FakeGitManager
+                git_manager = FakeGitManager()
+                # Check if any generated protoblocks will have plausibility checks but git is disabled
+                if "plausibility" in config.general.default_trusty_agents:
+                    print("\nWarning: Default trusty agents include plausibility checks, but git is disabled.")
+                    print("Plausibility checks require git to be enabled.")
                     print("To proceed, either:")
                     print("1. Enable git by removing --no-git flag")
-                    print("2. Disable plausibility test using one of these methods:")
-                    print("   - Use --plausibility-test false via CLI")
-                    sys.exit(1)
+                    print("2. Remove 'plausibility' from default_trusty_agents in your configuration")
+                    print("Continuing without plausibility checks...")
+                    
+                    # Remove plausibility from default trusty agents if git is disabled
+                    config.general.default_trusty_agents = [
+                        agent for agent in config.general.default_trusty_agents 
+                        if agent != "plausibility"
+                    ]
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")
@@ -592,145 +614,39 @@ def main():
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
 
-            
+                        # Get task instructions directly from args.instructions or voice_instructions
+            if voice_ui is not None:
+                task_instructions = voice_ui.wait_until_prompt()
+            else:
+                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
+
+        
             if config.general.use_orchestrator:
                 if voice_ui is not None:
                     raise NotImplementedError("Voice UI is not supported with orchestrator")
-                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
                 
-                
-                # Implement orchestrator
-                from tac.core.orchestrator import TaskChunker
-                
-                logger.info("Using orchestrator to chunk task instructions")
-                # Instantiate the TaskChunker directly
-                task_chunker = TaskChunker()
-                chunking_result = task_chunker.chunk(task_instructions, codebase)
-                
-                # Get the chunks from the result
-                chunks = chunking_result.chunks
-                
-                logger.info(f"Task chunked into {len(chunks)} potential blocks (chunks)")
-                
-                # Get branch name directly from the result
-                branch_name = chunking_result.branch_name
-                
-                # Get commit messages for each chunk
-                commit_messages = chunking_result.get_commit_messages()
-                
-                # Display the chunked tasks with commit messages
-                print("\n🔍 Task Analysis Complete")
-                if chunking_result.strategy:
-                    print(f"Strategy: {chunking_result.strategy}")
-                print(f"The task has been divided into {len(chunks)} parts")
-                if branch_name:
-                    print(f"🌿 Git Branch: {branch_name}")
-                
-                # Display violated tests if any
-                if hasattr(chunking_result, 'violated_tests') and chunking_result.violated_tests:
-                    print("\n⚠️ Tests that may be violated by this chunking:")
-                    for test in chunking_result.violated_tests:
-                        print(f"  - {test}")
-                else:
-                    print("\n✅ No tests will be violated by this chunking")
-                
-                
-                # Display chunks with 1-based indexing for user-friendly output
-                for i, chunk in enumerate(chunks):
-                    # Display chunk with commit message but without branch name
-                    print(f"--- Chunk {i+1} ---")
-                    # Display the chunk content without title and branch name
-                    print(chunk.get_display_content())
-                    print(f"📝 Commit: {commit_messages[i]}")
-                    print()
-                
-                # Ask user if they want to proceed with execution
-                proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
-                
-                if proceed != 'y':
-                    print("Execution cancelled by user.")
-                    sys.exit(0)
-                
-                logger.info(f"Using branch name: {branch_name}")
-                
-                # Switch to branch if git is enabled and branch name is available
-                original_branch = None
-                if config.git.enabled and branch_name and git_manager:
-                    original_branch = git_manager.get_current_branch()
-                    print(f"\n🔄 Switching to branch: {branch_name}")
-                    if not git_manager.checkout_branch(branch_name, create=True):
-                        print(f"Failed to switch to branch {branch_name}, continuing in current branch")
-                    
-                    # Inform user about commit behavior
-                    print("\n📝 Git behavior: Changes will be committed after each chunk but NOT pushed")
-                    print("   You can push changes manually after execution completes")
-                    print("   You will remain on the feature branch after execution completes")
-                
-                # Execute each chunk sequentially with 0-based indexing
-                success = True
-                
-                # Disable auto-push for orchestrator mode
-                if config.git.enabled:
-                    config.override_with_dict({'git': {'auto_push_if_success': False}})
-                    logger.info("Auto-push disabled for orchestrator mode (commits will be created but not pushed)")
-                
-                for i, chunk in enumerate(chunks):
-                    print(f"\n🚀 Executing Chunk {i+1}/{len(chunks)}...")
-
-                    # Update codebase if it's not the first chunk
-                    if i > 0:
-                        project_files.update_summaries()
-                        codebase = project_files.get_codebase_summary()
-                    
-                    # Convert the chunk to text for the BlockRunner
-                    chunk_text = chunk.to_text()
-                    
-                    # Execute the chunk
-                    block_runner = BlockRunner(chunk_text, codebase, args.json)
-                    chunk_success = block_runner.run_loop()
-                    
-                    if not chunk_success:
-                        print(f"\n❌ Chunk {i+1} execution failed.")
-                        success = False
-                        break
-                    else:
-                        print(f"\n✅ Chunk {i+1} completed successfully!")
-                        
-                        # Create a commit for this chunk if git is enabled
-                        if config.git.enabled and git_manager:
-                            commit_message = commit_messages[i]
-                            print(f"\n📝 Creating commit: {commit_message}")
-                            git_manager.commit(commit_message)
-                
-                # Don't switch back to original branch - stay on feature branch
-                # if config.git.enabled and original_branch and git_manager:
-                #     print(f"\n🔄 Switching back to branch: {original_branch}")
-                #     git_manager.checkout_branch(original_branch)
+                # Instantiate the MultiBlockOrchestrator and execute the task
+                multi_block_orchestrator = MultiBlockOrchestrator()
+                success = multi_block_orchestrator.execute(task_instructions, codebase, args, voice_ui, git_manager)
                 
                 if success:
-                    print("\n✅ Task completed successfully!")
-                    print("Each chunk included its own tests, so no additional integration tests are needed.")
-                    
-                    # Add instructions for pushing changes if git is enabled
-                    if config.git.enabled and branch_name and git_manager:
-                        print(f"\n📝 Git status: All changes have been committed to branch '{branch_name}'")
-                        print(f"   You are now on the feature branch '{branch_name}' with all changes")
-                        print(f"   To push changes manually, run: git push origin {branch_name}")
-                        print(f"   To switch back to your original branch, run: git checkout {original_branch}")
-                    
-                    logger.info("Task completed successfully with per-chunk tests.")
+                    print("\n✅ Multi-block orchestrator completed successfully!")
+                    logger.info("Multi-block orchestrator completed successfully.")
                 else:
-                    print("\n❌ Task execution failed.")
-                    logger.error("Task execution failed.")
+                    print("\n❌ Multi-block orchestrator execution failed.")
+                    logger.error("Multi-block orchestrator execution failed.")
                     sys.exit(1)
             else:
-                # Get task instructions directly from args.instructions or voice_instructions
-                if voice_ui is not None:
-                    task_instructions = voice_ui.wait_until_prompt()
-                else:
-                    task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
-                block_runner = BlockRunner(task_instructions, codebase, args.json)
-                success = block_runner.run_loop()
+                
+                # Load protoblock from JSON file if provided
+                protoblock = None
+                if args.json:
+                    from tac.blocks.model import ProtoBlock
+                    protoblock = ProtoBlock.load(args.json)
+                    print(f"\n📄 Loaded protoblock from: {args.json}")
+                
+                block_processor = BlockProcessor(task_instructions, codebase, protoblock=protoblock)
+                success = block_processor.run_loop()
             
             if success:
                 print("\n✅ Task completed successfully!")

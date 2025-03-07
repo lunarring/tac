@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import unittest
 
-from src.tac.core.git_manager import GitManager
+from src.tac.utils.git_manager import GitManager
 
 class TestGitManager(unittest.TestCase):
     def setUp(self):

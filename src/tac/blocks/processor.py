@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 import os
 import sys
-import yaml
-import argparse
-import ast
+import time
 import logging
+import traceback
+from typing import Optional, Dict, Any, List, Tuple
+import uuid
 import json
 from datetime import datetime
 import git
@@ -14,45 +15,57 @@ src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
-from tac.protoblock import ProtoBlock, validate_protoblock_json, save_protoblock, ProtoBlockFactory
+from tac.blocks.model import ProtoBlock
+from tac.blocks.generator import ProtoBlockGenerator
+from tac.blocks.executor import BlockExecutor
 from tac.coding_agents.aider import AiderAgent
-from tac.core.executor import ProtoBlockExecutor
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
-from tac.core.git_manager import GitManager
+from tac.utils.git_manager import GitManager, FakeGitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
-from tac.protoblock.manager import load_protoblock_from_json
-from typing import Dict
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 
-logger = setup_logging('tac.core.block_runner')
+logger = setup_logging('tac.blocks.processor')
 
-class BlockRunner:
-    def __init__(self, task_instructions=None, codebase=None, json_file=None, config_override=None):
+class BlockProcessor:
+    """
+    Handles the end-to-end workflow given a task instructions and codebase, handling 
+ the lifecycle of a coding task from specification to implementation and trust assurances.
+    1. Creates a ProtoBlock (task specification) from instructions
+    2. Executes the implementation + trust assurances in a looped with retries
+    
+    Acts as the central coordinator between the generator and executor components.
+    """
+    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None):
         # Input validation
-        if json_file is None and (task_instructions is None or codebase is None):
-            raise ValueError("Either json_file must be specified, or both task_instructions and codebase must be provided")
+        if protoblock is None and (task_instructions is None or codebase is None):
+            raise ValueError("Either protoblock must be specified, or both task_instructions and codebase must be provided")
         
         self.task_instructions = task_instructions
         self.codebase = codebase
-        self.json_file = json_file
+        self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
-        self.executor = ProtoBlockExecutor(config_override=config_override, codebase=codebase)
-        self.git_manager = GitManager()
-
-
-    def generate_protoblock(self, idx_attempt, error_analysis):
-        if self.json_file: 
-            # in case the protoblock is fixed, we load it from the json file every time
-            protoblock = load_protoblock_from_json(self.json_file)
-            logger.info(f"\n✨ Loaded protoblock: {self.json_file}")
+        self.executor = BlockExecutor(config_override=config_override, codebase=codebase)
+        self.generator = ProtoBlockGenerator()
+        
+        # Use the appropriate git manager based on config
+        if config.git.enabled:
+            self.git_manager = GitManager()
         else:
-            # Create protoblock using factory
-            factory = ProtoBlockFactory()
+            self.git_manager = FakeGitManager()
+
+    def create_protoblock(self, idx_attempt, error_analysis):
+        if self.input_protoblock:
+            # Use the directly provided protoblock
+            protoblock = self.input_protoblock
+            logger.info("\n✨ Using provided protoblock")
+        else:
+            # Create protoblock using generator
+            
             if error_analysis and config.general.run_error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
@@ -61,18 +74,22 @@ class BlockRunner:
                 logger.info(f"\n🔄 Generating protoblock from task instructions: {genesis_prompt}")
 
             # Generate complete genesis prompt
-            protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
+            protoblock_genesis_prompt = self.generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
             logger.debug(f"Protoblock genesis prompt: {protoblock_genesis_prompt}")
             
             # Create protoblock from genesis prompt
-            protoblock = factory.create_protoblock(protoblock_genesis_prompt)
+            protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
 
             # Branch name and commit from the first one!
             if idx_attempt > 0:
                 self.override_new_protoblock_with_previous_protoblock(protoblock)
             
-            # Save protoblock to file
-            json_file = factory.save_protoblock(protoblock)
+            # Save protoblock to file only if enabled in config
+            if config.general.save_protoblock:
+                json_file = protoblock.save()
+                logger.info(f"Saved protoblock to {json_file}")
+            else:
+                logger.info("Protoblock saving is disabled. Use --save-protoblock to enable.")
 
         self.protoblock = protoblock
 
@@ -111,7 +128,7 @@ class BlockRunner:
     def run_loop(self):
 
         # Preliminary tests before we start.
-        max_retries = config.general.max_retries_block
+        max_retries = config.general.max_retries_block_creation
 
         # Here we enter the loop for trying to make protoblock and executing it!
         logger.info(f"Starting execution loop, using max_retries={max_retries} from config")
@@ -136,14 +153,14 @@ class BlockRunner:
 
 
             # Generate a protoblock
-            self.generate_protoblock(idx_attempt, error_analysis)
+            self.create_protoblock(idx_attempt, error_analysis)
 
             # Handle git branch setup first if git is enabled
             if idx_attempt == 0:
                 self.handle_git_branch_setup()
 
 
-            # Execute the protoblock
+            # Execute the protoblock using the builder
             execution_success, failure_type, error_analysis = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
@@ -184,9 +201,4 @@ class BlockRunner:
             logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
             logger.error("="*80)
             
-        return False
-
-
-
-
-        
+        return False 

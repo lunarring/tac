@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Optional
 from tac.core.llm import LLMClient, Message
-from tac.protoblock import ProtoBlock
+from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 

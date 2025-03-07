@@ -3,8 +3,10 @@ import json
 from typing import Dict, List, Optional, Any
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
+from tac.core.log_config import setup_logging
+from tac.utils.project_files import ProjectFiles
 
-logger = logging.getLogger(__name__)
+logger = setup_logging('tac.blocks.orchestrator')
 
 
 class Chunk:
@@ -193,15 +195,167 @@ class ChunkingResult:
         return [chunk.get_commit_message() for chunk in self.chunks]
 
 
-class TaskChunker:
+class MultiBlockOrchestrator:
     """
-    Uses an LLM to intelligently split task instructions into appropriate chunks
-    based on complexity, dependencies, and logical separation.
+    Uses an LLM to intelligently split task instructions into appropriate chunks (blocks)
+    based on complexity, dependencies, and logical separation, then manages the execution
+    of each block in the correct order.
     """
     
     def __init__(self):
-        logger.info("Initializing TaskChunker")
+        logger.info("Initializing MultiBlockOrchestrator")
         self.llm_client = LLMClient(strength="strong")
+    
+    def execute(self, task_instructions: str, codebase: str, args=None, voice_ui=None, git_manager=None):
+        """
+        Executes a task by chunking it and then processing each chunk sequentially.
+        
+        Args:
+            task_instructions: The full task instructions to be executed
+            codebase: A summary of the codebase for context
+            args: Command line arguments (optional)
+            voice_ui: Voice UI instance (optional)
+            git_manager: Git manager instance (optional)
+            
+        Returns:
+            bool: True if execution was successful, False otherwise
+        """
+        import sys
+        from tac.blocks.processor import BlockProcessor
+        
+        if voice_ui is not None:
+            raise NotImplementedError("Voice UI is not supported with orchestrator")
+            
+        # Chunk the task instructions
+        logger.info("Using orchestrator to chunk task instructions")
+        chunking_result = self.chunk(task_instructions, codebase)
+        
+        # Get the chunks from the result
+        chunks = chunking_result.chunks
+        
+        logger.info(f"Task chunked into {len(chunks)} potential blocks (chunks)")
+        
+        # Get branch name directly from the result
+        branch_name = chunking_result.branch_name
+        
+        # Get commit messages for each chunk
+        commit_messages = chunking_result.get_commit_messages()
+        
+        # Display the chunked tasks with commit messages
+        print("\n🔍 Task Analysis Complete")
+        if chunking_result.strategy:
+            print(f"Strategy: {chunking_result.strategy}")
+        print(f"The task has been divided into {len(chunks)} parts")
+        if branch_name:
+            print(f"🌿 Git Branch: {branch_name}")
+        
+        # Display violated tests if any
+        if hasattr(chunking_result, 'violated_tests') and chunking_result.violated_tests:
+            print("\n⚠️ Tests that may be violated by this chunking:")
+            for test in chunking_result.violated_tests:
+                print(f"  - {test}")
+        else:
+            print("\n✅ No tests will be violated by this chunking")
+        
+        # Display chunks with 1-based indexing for user-friendly output
+        for i, chunk in enumerate(chunks):
+            # Display chunk with commit message but without branch name
+            print(f"--- Chunk {i+1} ---")
+            # Display the chunk content without title and branch name
+            print(chunk.get_display_content())
+            print(f"📝 Commit: {commit_messages[i]}")
+            print()
+        
+        # Ask user if they want to proceed with execution
+        proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+        
+        if proceed != 'y':
+            print("Execution cancelled by user.")
+            return False
+        
+        logger.info(f"Using branch name: {branch_name}")
+        
+        # Switch to branch if git is enabled and branch name is available
+        original_branch = None
+        if config.git.enabled and branch_name and git_manager:
+            original_branch = git_manager.get_current_branch()
+            print(f"\n🔄 Switching to branch: {branch_name}")
+            if not git_manager.checkout_branch(branch_name, create=True):
+                print(f"Failed to switch to branch {branch_name}, continuing in current branch")
+            
+            # Inform user about commit behavior
+            print("\n📝 Git behavior: Changes will be committed after each chunk but NOT pushed")
+            print("   You can push changes manually after execution completes")
+            print("   You will remain on the feature branch after execution completes")
+        
+        # Execute each chunk sequentially with 0-based indexing
+        success = True
+        
+        # Disable auto-push for orchestrator mode
+        if config.git.enabled:
+            config.override_with_dict({'git': {'auto_push_if_success': False}})
+            logger.info("Auto-push disabled for orchestrator mode (commits will be created but not pushed)")
+        
+        project_files = ProjectFiles()
+        
+        for i, chunk in enumerate(chunks):
+            print(f"\n🚀 Executing Chunk {i+1}/{len(chunks)}...")
+
+            # Update codebase if it's not the first chunk
+            if i > 0:
+                project_files.update_summaries()
+                codebase = project_files.get_codebase_summary()
+            
+            # Convert the chunk to text for the BlockProcessor
+            chunk_text = chunk.to_text()
+            
+            # Execute the chunk
+            protoblock = None
+            if args and hasattr(args, 'json') and args.json:
+                from tac.blocks.model import ProtoBlock
+                protoblock = ProtoBlock.load(args.json)
+                print(f"\n📄 Loaded protoblock from: {args.json}")
+            
+            block_processor = BlockProcessor(chunk_text, codebase, protoblock=protoblock)
+            chunk_success = block_processor.run_loop()
+            
+            if not chunk_success:
+                print(f"\n❌ Chunk {i+1} execution failed.")
+                success = False
+                break
+            else:
+                print(f"\n✅ Chunk {i+1} completed successfully!")
+                
+                # Create a commit for this chunk if git is enabled
+                if config.git.enabled and git_manager:
+                    commit_message = commit_messages[i]
+                    print(f"\n📝 Creating commit: {commit_message}")
+                    git_manager.commit(commit_message)
+        
+        # Don't switch back to original branch - stay on feature branch
+        # if config.git.enabled and original_branch and git_manager:
+        #     print(f"\n🔄 Switching back to branch: {original_branch}")
+        #     git_manager.checkout_branch(original_branch)
+        
+        if success:
+            print("\n✅ Task completed successfully!")
+            print("Each chunk included its own tests, so no additional integration tests are needed.")
+            
+            # Add instructions for pushing changes if git is enabled
+            if config.git.enabled and branch_name and git_manager:
+                print(f"\n📝 Git status: All changes have been committed to branch '{branch_name}'")
+                print(f"   You are now on the feature branch '{branch_name}' with all changes")
+                print(f"   To push changes manually, run: git push origin {branch_name}")
+                if original_branch:
+                    print(f"   To switch back to your original branch, run: git checkout {original_branch}")
+            
+            logger.info("Task completed successfully with per-chunk tests.")
+        else:
+            print("\n❌ Task execution failed.")
+            logger.error("Task execution failed.")
+            return False
+            
+        return success
     
     def chunk(self, task_instructions: str, codebase: str) -> ChunkingResult:
         """
@@ -220,7 +374,7 @@ class TaskChunker:
         try:
             # Prepare prompt
             chunking_prompt = f"""<purpose>
-You are a senior software engineer tasked with breaking down a complex programming task into smaller, manageable chunks. Your goal is to analyze the task instructions and determine the optimal way to split them into separate sub-tasks that can be implemented independently or in sequence. It is important that the chain of chunks is complete and that each chunk is self-contained and can be reasonably implemented.
+You are a senior software engineer tasked with breaking down a complex programming task into smaller, manageable chunks. Your goal is to analyze the task instructions and determine the optimal way to split them into separate sub-tasks that can be implemented independently or in sequence. It is important that the chain of chunks is complete and that each chunk is self-contained and can be reasonably implemented. The end goal needs to bring everything together and the task needs to be completed. Your goal is to think everything through end to end and focusing on the big picture of the deliverable.
 </purpose>
 
 Here is a summary of the codebase:
@@ -234,22 +388,18 @@ Here are the full task instructions:
 </task_instructions>
 
 <chunking_rules>
-1. Analyze the complexity and scope of the task
-2. Identify logical boundaries where the task can be split
-3. Consider dependencies between different parts of the task
-4. Ensure each chunk is self-contained and can be reasonably implemented
-5. Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
-6. Keep the number of chunks reasonable (typically 1-10 chunks, depending on complexity)
-7. For simple tasks, it's perfectly acceptable to have just 1 chunk
-8. For very complex tasks, don't exceed 10 chunks to maintain manageability
-9. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
+1. Analyze the complexity and scope of the task and 
+2. identify logical boundaries where the task can be split, considering dependencies between different parts of the task
+3. Ensure each chunk is self-contained and can be reasonably implemented
+4. Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
+5. For simple tasks, it's perfectly acceptable to have just 1 chunk, for very complex tasks, don't exceed 10 chunks to maintain manageability
+6. Each chunk should include its own tests where appropriate - no separate integration test is needed, and don't create chunks that only contain tests
+7. mention the files that we are creating on the way and where they should be placed, e.g. src/tac/blocks/orchestrator.py and use them throughout the task
+8. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
    - This branch name should be prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication')
    - The branch name should be descriptive of the overall task, not individual chunks
-10. Each chunk should include its own tests where appropriate - no separate integration test is needed
-11. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
+9. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
 </chunking_rules>
-12. A single chunk should not be too big and just focus on one thing
-13. Don't create chunks that only contain tests
 
 <output_format>
 Provide your analysis in the following JSON format:
@@ -422,4 +572,4 @@ Provide your analysis in the following JSON format:
                     if open_count == 0:
                         return text[start_idx:i+1]
         
-        return None
+        return None 

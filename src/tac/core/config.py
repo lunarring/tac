@@ -22,17 +22,18 @@ class GeneralConfig:
     agent_type: str = "native"
     reasoning_effort: str = "medium"
     use_orchestrator: bool = False
-    plausibility_test: bool = True
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
     run_error_analysis: bool = True  # Whether to run error analysis after failures
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
-    max_retries_block: int = 4
-    max_retries_protoblock: int = 4
+    max_retries_block_creation: int = 4
+    max_retries_protoblock_creation: int = 4
     total_timeout: int = 600
     halt_after_fail: bool = False
     ignore_paths: List[str] = field(default_factory=lambda: [".git", "__pycache__", "build"])
     test_path: str = "tests/"  # Add default test path
+    save_protoblock: bool = False  # Whether to save protoblocks to disk
+    default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
 
 
 @dataclass
@@ -67,7 +68,7 @@ class LLMConfig:
 @dataclass
 class LoggingConfig:
     tac: Dict[str, Any] = field(default_factory=lambda: {
-        "level": "DEBUG",
+        "level": "INFO",
         "color": "green"
     })
     other_packages: Dict[str, Any] = field(default_factory=lambda: {
@@ -224,7 +225,7 @@ class ConfigManager:
         
         Example:
             {
-                'general': {'plausibility_test': False},
+                'general': {'default_trusty_agents': ['pytest']},
                 'git': {'auto_commit_if_success': False}
             }
         """

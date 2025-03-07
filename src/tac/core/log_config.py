@@ -14,7 +14,31 @@ init()
 _configured_loggers = {}
 
 def get_log_level(name: str = None, default_level: str = 'INFO') -> str:
-    """Get the log level, with fallback to default value."""
+    """Get the log level, with fallback to default value.
+    
+    Args:
+        name: The logger name to get level for
+        default_level: The default level to return if not configured
+        
+    Returns:
+        The log level as a string
+    """
+    # Check environment variable first (highest priority)
+    env_var = os.environ.get('TAC_LOG_LEVEL')
+    if env_var:
+        return env_var.upper()
+        
+    # Try to get from config if available
+    try:
+        from tac.core.config import config
+        if hasattr(config, 'logging'):
+            if name and hasattr(config.logging, name):
+                return getattr(config.logging, name).get('level', default_level)
+            # Fall back to general TAC level
+            return config.logging.get_tac('level', default_level)
+    except (ImportError, AttributeError):
+        pass
+        
     return default_level
 
 class ExecutionContext:
@@ -119,7 +143,7 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     Args:
         name: Logger name
         execution_id: Optional execution ID to use for log files
-        log_level: Logging level to use (default: INFO)
+        log_level: Logging level to use for console output (default: INFO)
         log_color: Color to use for logging (default: green)
     """
     # Convert log_level string to logging level
@@ -139,8 +163,9 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     # If this logger was already configured, update its level and return it
     if name in _configured_loggers:
         logger = _configured_loggers[name]
-        logger.setLevel(numeric_level)
-        # Update console handler level
+        # Always set logger level to DEBUG to allow messages to go to the file handler
+        logger.setLevel(logging.DEBUG)
+        # Update console handler level to the requested level
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
                 handler.setLevel(numeric_level)
@@ -189,10 +214,10 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     if logger.handlers:
         logger.handlers.clear()
     
-    # Set logger level directly from the provided log_level
-    logger.setLevel(numeric_level)
+    # Set logger level to DEBUG to allow handlers to filter
+    logger.setLevel(logging.DEBUG)
 
-    # Create console handler with the same level
+    # Create console handler with the specified level
     console_handler = logging.StreamHandler(sys.__stdout__)
     console_handler.setLevel(numeric_level)
 
@@ -271,13 +296,14 @@ def update_all_loggers(log_level: str = 'INFO'):
     """Update all existing loggers with a new log level.
     
     Args:
-        log_level: The new log level to set for all loggers
+        log_level: The new log level to set for console handlers
     """
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
     
     # Update all configured loggers
     for name, logger in _configured_loggers.items():
-        logger.setLevel(numeric_level)
+        # Keep the logger level at DEBUG to allow messages to go to the file handler
+        logger.setLevel(logging.DEBUG)
         # Update console handler level
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:

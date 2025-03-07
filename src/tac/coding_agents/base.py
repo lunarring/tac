@@ -1,6 +1,6 @@
 import os
 from abc import ABC, abstractmethod
-from tac.protoblock import ProtoBlock
+from tac.blocks import ProtoBlock
 
 class Agent(ABC):
     def __init__(self, config: dict):
