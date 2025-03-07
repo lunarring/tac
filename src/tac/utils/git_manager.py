@@ -562,6 +562,7 @@ class FakeGitManager:
         self.commits = {}  # Store commits by name
         self.cleanup_temp_dir = cleanup_temp_dir
         self.current_commit = None  # Track the current commit
+        self.base_branch = "main"  # Default base branch
         
         # File extensions to consider as programming-relevant
         self.code_file_extensions = [
@@ -708,16 +709,20 @@ class FakeGitManager:
             logger.error(f"Error restoring commit: {e}")
             return False
     
-    def get_complete_diff(self, commit_msg: str) -> str:
+    def get_complete_diff(self, commit_msg: str = None) -> str:
         """
         Get the complete diff in a git similar fashion between the current commit and the one specified in commit_msg.
         
         Args:
-            commit_msg: Name of the commit to compare against
+            commit_msg: Name of the commit to compare against (optional)
             
         Returns:
             str: A formatted string containing all relevant diffs
         """
+        if commit_msg is None:
+            logger.info("FakeGitManager: get_complete_diff called without commit_msg")
+            return "No differences found (FakeGitManager)"
+            
         if commit_msg not in self.commits:
             return f"Error: Commit '{commit_msg}' not found"
             
@@ -779,6 +784,50 @@ class FakeGitManager:
         except Exception as e:
             logger.error(f"Error generating diff: {e}")
             return f"Error generating diff: {str(e)}"
+    
+    def get_github_web_url(self) -> str:
+        """Fake implementation of get_github_web_url"""
+        logger.info("FakeGitManager: get_github_web_url called")
+        return None
+    
+    def get_current_branch(self) -> Optional[str]:
+        """Fake implementation of get_current_branch"""
+        logger.info("FakeGitManager: get_current_branch called")
+        return "main"
+    
+    def check_status(self, ignore_untracked: bool = False) -> Tuple[bool, str]:
+        """Fake implementation of check_status"""
+        logger.info("FakeGitManager: check_status called")
+        return True, "main"
+    
+    def create_or_switch_to_tac_branch(self, tac_id: str) -> bool:
+        """Fake implementation of create_or_switch_to_tac_branch"""
+        logger.info(f"FakeGitManager: create_or_switch_to_tac_branch called with tac_id={tac_id}")
+        return True
+    
+    def checkout_branch(self, branch_name: str, create: bool = False) -> bool:
+        """Fake implementation of checkout_branch"""
+        logger.info(f"FakeGitManager: checkout_branch called with branch_name={branch_name}, create={create}")
+        return True
+    
+    def handle_post_execution(self, config: dict, commit_message: str) -> bool:
+        """Fake implementation of handle_post_execution"""
+        logger.info(f"FakeGitManager: handle_post_execution called with commit_message={commit_message}")
+        return True
+    
+    def revert_changes(self) -> bool:
+        """Fake implementation of revert_changes that restores to the first commit"""
+        logger.info("FakeGitManager: revert_changes called")
+        
+        # If we have any commits, restore to the first one
+        if self.commits:
+            # Get the first commit (assuming the first one added is the initial one)
+            first_commit = next(iter(self.commits))
+            logger.info(f"FakeGitManager: Restoring to first commit: {first_commit}")
+            return self.restore_commit(first_commit)
+        
+        logger.info("FakeGitManager: No commits to revert to")
+        return True
     
     def __del__(self):
         """Clean up temporary directory when the object is garbage collected."""

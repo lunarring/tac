@@ -1,7 +1,7 @@
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
 from tac.coding_agents import AgentConstructor
-from tac.utils.git_manager import GitManager
+from tac.utils.git_manager import GitManager, FakeGitManager
 import git
 import sys
 import os
@@ -31,7 +31,13 @@ class BlockExecutor:
         self.test_runner = PytestTestingAgent()
         self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
-        self.git_manager = GitManager() if self.git_enabled else None
+        
+        # Use the appropriate git manager based on config
+        if self.git_enabled:
+            self.git_manager = GitManager()
+        else:
+            self.git_manager = FakeGitManager()
+            
         self.protoblock_id = None 
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()

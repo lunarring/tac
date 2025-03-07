@@ -569,12 +569,18 @@ def main():
             # Add no_git flag to config
             if args.no_git:
                 config_override['git'] = {'enabled': False}
+                # Apply the override immediately to ensure it takes effect
+                config.override_with_dict(config_override)
+                logger.info("Git operations disabled via --no-git flag")
 
             if config.git.enabled:
                 git_manager = GitManager()
                 if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                     sys.exit(1)
             else:
+                # Use FakeGitManager when git is disabled
+                from tac.utils.git_manager import FakeGitManager
+                git_manager = FakeGitManager()
                 # Check if any generated protoblocks will have plausibility checks but git is disabled
                 if "plausibility" in config.general.default_trusty_agents:
                     print("\nWarning: Default trusty agents include plausibility checks, but git is disabled.")
