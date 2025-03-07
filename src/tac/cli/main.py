@@ -707,7 +707,7 @@ def main():
                         protoblock = ProtoBlock.load(args.json)
                         print(f"\n📄 Loaded protoblock from: {args.json}")
                     
-                    block_processor = BlockProcessor(chunk_text, codebase, json_file=None, protoblock=protoblock)
+                    block_processor = BlockProcessor(chunk_text, codebase, protoblock=protoblock)
                     chunk_success = block_processor.run_loop()
                     
                     if not chunk_success:
@@ -758,7 +758,7 @@ def main():
                     protoblock = ProtoBlock.load(args.json)
                     print(f"\n📄 Loaded protoblock from: {args.json}")
                 
-                block_processor = BlockProcessor(task_instructions, codebase, json_file=None, protoblock=protoblock)
+                block_processor = BlockProcessor(task_instructions, codebase, protoblock=protoblock)
                 success = block_processor.run_loop()
             
             if success:

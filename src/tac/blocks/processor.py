@@ -31,14 +31,13 @@ from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 logger = setup_logging('tac.blocks.processor')
 
 class BlockProcessor:
-    def __init__(self, task_instructions=None, codebase=None, json_file=None, protoblock=None, config_override=None):
+    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None):
         # Input validation
-        if protoblock is None and json_file is None and (task_instructions is None or codebase is None):
-            raise ValueError("Either protoblock, json_file must be specified, or both task_instructions and codebase must be provided")
+        if protoblock is None and (task_instructions is None or codebase is None):
+            raise ValueError("Either protoblock must be specified, or both task_instructions and codebase must be provided")
         
         self.task_instructions = task_instructions
         self.codebase = codebase
-        self.json_file = json_file
         self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
@@ -52,10 +51,6 @@ class BlockProcessor:
             # Use the directly provided protoblock
             protoblock = self.input_protoblock
             logger.info("\n✨ Using provided protoblock")
-        elif self.json_file: 
-            # in case the protoblock is fixed, we load it from the json file every time
-            protoblock = ProtoBlock.load(self.json_file)
-            logger.info(f"\n✨ Loaded protoblock: {self.json_file}")
         else:
             # Create protoblock using generator
             
