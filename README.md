@@ -17,8 +17,8 @@ These agents validate and verify the code changes:
 - **Pytest Agent**: Runs software tests and analyzes results to ensure functionality
 - **Plausibility Agent**: Evaluates if code changes match the requested functionality
 - **Performance Agent**: Benchmarks code and guides performance optimization
-- **(coming soon): visual agent, able to look at graphics
-- **(more coming soon...)
+- **(coming soon):** visual agent, able to look at graphics
+- **(more trusty agents coming soon...)**
 
 ### Block execution flow
 * **Block**: A valid block is defined as a change in code (diff) and trust assurances (e.g. passing unit tests)
