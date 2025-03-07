@@ -1,9 +1,9 @@
-# tac (Trusty Agentic Chains)
+# Trusty Agentic Chains (tac)
 
-Trusty Agentic Chains (tac) is a AI-driven coding framework that combines coding agents with empirical verifications (trusty agents). The empirical verifications could for instance take the form of unit tests or simulated runs of the software. The coding agents implement desired changes in a codebase and the trusty agents verify them, yielding a *block* that can be merged into the codebase. Think of it as blockchain for code changes, but actually useful. For a detailed technical overview of the system architecture and methodology, please refer to our [whitepaper](docs/whitepaper.md).
+Trusty Agentic Chains (tac) is a AI-driven coding framework that leverages *coding agents* with *trusty agents*. Tac employs two classes of agents, *coding agents* who implement desired changes in a codebase and *trusty agents* that yield trust assurances. They yield trust assurances by means of empirical verifications. For instance, a trust agent could run unit tests or even execute the software and look at it carefully. If one of the trusty agents protests, the issue goes back to the coding agents until they fix it for good. We coin the result of each successful operation as a *block*, consisting of code changes and trust assurances and ready to be merged into the codebase. Thus you can think of tac as a blockchain for code changes, but actually useful. For a detailed technical overview of the system architecture and methodology, please refer to our [whitepaper](docs/whitepaper.md).
 
 > **Warning** ⚠️  
-> This project is in **alpha**. Interfaces, commands, and features may change without notice. Use at your own risk and carefully test before deploying in production environments. 
+> This project is in **alpha**. Interfaces, commands, and features may change without notice. Use at your own risk and do not use in production environments. 
 
 ## 🏗️ Architecture
 ![Block Execution Process](docs/block_execution.png)
