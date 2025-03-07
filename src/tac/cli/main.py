@@ -32,6 +32,7 @@ from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.blocks import MultiBlockOrchestrator
 
 # Initialize logger at module level but don't use it as a global in functions
 _module_logger = setup_logging('tac.cli.main')
@@ -620,19 +621,17 @@ def main():
                 task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
                 
                 
-                # Implement orchestrator
-                from tac.blocks import MultiBlockOrchestrator
                 
                 # Instantiate the MultiBlockOrchestrator and execute the task
-                task_chunker = MultiBlockOrchestrator()
-                success = task_chunker.execute(task_instructions, codebase, args, voice_ui, git_manager)
+                multi_block_orchestrator = MultiBlockOrchestrator()
+                success = multi_block_orchestrator.execute(task_instructions, codebase, args, voice_ui, git_manager)
                 
                 if success:
-                    print("\n✅ Task completed successfully!")
-                    logger.info("Task completed successfully.")
+                    print("\n✅ Multi-block orchestrator completed successfully!")
+                    logger.info("Multi-block orchestrator completed successfully.")
                 else:
-                    print("\n❌ Task execution failed.")
-                    logger.error("Task execution failed.")
+                    print("\n❌ Multi-block orchestrator execution failed.")
+                    logger.error("Multi-block orchestrator execution failed.")
                     sys.exit(1)
             else:
                 # Get task instructions directly from args.instructions or voice_instructions
