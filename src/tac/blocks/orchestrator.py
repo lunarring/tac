@@ -266,12 +266,18 @@ class MultiBlockOrchestrator:
             print(f"📝 Commit: {commit_messages[i]}")
             print()
         
-        # Ask user if they want to proceed with execution
-        proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
-        
-        if proceed != 'y':
-            print("Execution cancelled by user.")
-            return False
+        # Ask user if they want to proceed with execution only if confirm_multiblock_execution is enabled
+        if config.general.confirm_multiblock_execution:
+            logger.info("Confirmation required before execution (confirm_multiblock_execution is enabled)")
+            proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+            
+            if proceed != 'y':
+                logger.info("Execution cancelled by user")
+                print("Execution cancelled by user.")
+                return False
+        else:
+            logger.info("Proceeding with execution automatically (confirm_multiblock_execution is disabled)")
+            print("\nProceeding with execution automatically.")
         
         logger.info(f"Using branch name: {branch_name}")
         
