@@ -614,13 +614,16 @@ def main():
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
 
-            
+                        # Get task instructions directly from args.instructions or voice_instructions
+            if voice_ui is not None:
+                task_instructions = voice_ui.wait_until_prompt()
+            else:
+                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
+
+        
             if config.general.use_orchestrator:
                 if voice_ui is not None:
                     raise NotImplementedError("Voice UI is not supported with orchestrator")
-                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
-                
-                
                 
                 # Instantiate the MultiBlockOrchestrator and execute the task
                 multi_block_orchestrator = MultiBlockOrchestrator()
@@ -634,11 +637,6 @@ def main():
                     logger.error("Multi-block orchestrator execution failed.")
                     sys.exit(1)
             else:
-                # Get task instructions directly from args.instructions or voice_instructions
-                if voice_ui is not None:
-                    task_instructions = voice_ui.wait_until_prompt()
-                else:
-                    task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
                 
                 # Load protoblock from JSON file if provided
                 protoblock = None
