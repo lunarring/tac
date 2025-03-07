@@ -21,6 +21,18 @@ These agents validate and verify the code changes:
 
 The system creates *protoblocks* (specifications for changes and trusty measures) that are to be executed by coding agents and validated by trusty agents before being committed as finalized *blocks* in your codebase. A given task is automatically parcellated into smaller blocks by the orchestrator and executed.
 
+## 🔄 Block Execution
+![Block Execution Process](docs/block_execution.png)
+
+Legend:
+* **Block**: A valid block is defined as a change in code (diff) and trust assurances (e.g. passing unit tests)
+* **ProtoBlock**: Standardized specification for a coding task, containing task description, test specifications, and files to modify
+* **BlockExecutor**: Executes the changes specified in a ProtoBlock and validates them with trusty agents
+* **BlockBuilder**: Transforms a ProtoBlock into a finalized Block by implementing the requested changes and obtaining the trust assurances
+* **ProtoBlockGenerator**: Creates structured ProtoBlocks from high-level task instructions
+* **BlockProcessor**: Runs in a loop to execute ProtoBlocks, handling retries
+* **MultiBlockOrchestrator**: Splits complex tasks into smaller, manageable chunks that can be executed sequentially
+
 ## 🚀 Installation
 
 1. **Clone this repository** (or download it) to your local machine:
