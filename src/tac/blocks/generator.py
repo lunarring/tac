@@ -250,13 +250,15 @@ stick exactly to the following output_format, filling in between ...
         except Exception as e:
             return False, f"Validation error: {str(e)}", None
 
-    def create_protoblock(self, protoblock_genesis_prompt: str) -> ProtoBlock:
+    def create_protoblock(self, protoblock_genesis_prompt: str, protoblock: Optional[ProtoBlock] = None) -> ProtoBlock:
         """
         Create a protoblock from genesis prompt that contain all necessary information.
         Will retry creation based on max_retries_protoblock_creation from config.
         
         Args:
             protoblock_genesis_prompt: Complete instructions for the LLM to generate the protoblock
+            protoblock: Optional existing ProtoBlock object. If provided, it will be returned directly
+                        without creating a new one.
             
         Returns:
             ProtoBlock object containing the protoblock specification
@@ -264,6 +266,11 @@ stick exactly to the following output_format, filling in between ...
         Raises:
             ValueError: If unable to create a valid protoblock after all retries
         """
+        # If protoblock is provided, return it directly
+        if protoblock is not None:
+            logger.info("Using provided protoblock, skipping creation process")
+            return protoblock
+            
         # Use centralized config
         use_summaries = config.general.use_file_summaries
         max_retries = config.general.max_retries_protoblock_creation

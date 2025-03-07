@@ -31,28 +31,34 @@ from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 logger = setup_logging('tac.blocks.processor')
 
 class BlockProcessor:
-    def __init__(self, task_instructions=None, codebase=None, json_file=None, config_override=None):
+    def __init__(self, task_instructions=None, codebase=None, json_file=None, protoblock=None, config_override=None):
         # Input validation
-        if json_file is None and (task_instructions is None or codebase is None):
-            raise ValueError("Either json_file must be specified, or both task_instructions and codebase must be provided")
+        if protoblock is None and json_file is None and (task_instructions is None or codebase is None):
+            raise ValueError("Either protoblock, json_file must be specified, or both task_instructions and codebase must be provided")
         
         self.task_instructions = task_instructions
         self.codebase = codebase
         self.json_file = json_file
+        self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
         self.builder = BlockBuilder(config_override=config_override, codebase=codebase)
+        self.generator = ProtoBlockGenerator()
         self.git_manager = GitManager()
 
 
-    def generate_protoblock(self, idx_attempt, error_analysis):
-        if self.json_file: 
+    def create_protoblock(self, idx_attempt, error_analysis):
+        if self.input_protoblock:
+            # Use the directly provided protoblock
+            protoblock = self.input_protoblock
+            logger.info("\n✨ Using provided protoblock")
+        elif self.json_file: 
             # in case the protoblock is fixed, we load it from the json file every time
             protoblock = ProtoBlock.load(self.json_file)
             logger.info(f"\n✨ Loaded protoblock: {self.json_file}")
         else:
             # Create protoblock using generator
-            generator = ProtoBlockGenerator()
+            
             if error_analysis and config.general.run_error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
@@ -61,11 +67,11 @@ class BlockProcessor:
                 logger.info(f"\n🔄 Generating protoblock from task instructions: {genesis_prompt}")
 
             # Generate complete genesis prompt
-            protoblock_genesis_prompt = generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
+            protoblock_genesis_prompt = self.generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
             logger.debug(f"Protoblock genesis prompt: {protoblock_genesis_prompt}")
             
             # Create protoblock from genesis prompt
-            protoblock = generator.create_protoblock(protoblock_genesis_prompt)
+            protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
 
             # Branch name and commit from the first one!
             if idx_attempt > 0:
@@ -140,7 +146,7 @@ class BlockProcessor:
 
 
             # Generate a protoblock
-            self.generate_protoblock(idx_attempt, error_analysis)
+            self.create_protoblock(idx_attempt, error_analysis)
 
             # Handle git branch setup first if git is enabled
             if idx_attempt == 0:

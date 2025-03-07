@@ -701,7 +701,13 @@ def main():
                     chunk_text = chunk.to_text()
                     
                     # Execute the chunk
-                    block_processor = BlockProcessor(chunk_text, codebase, args.json)
+                    protoblock = None
+                    if args.json:
+                        from tac.blocks.model import ProtoBlock
+                        protoblock = ProtoBlock.load(args.json)
+                        print(f"\n📄 Loaded protoblock from: {args.json}")
+                    
+                    block_processor = BlockProcessor(chunk_text, codebase, json_file=None, protoblock=protoblock)
                     chunk_success = block_processor.run_loop()
                     
                     if not chunk_success:
@@ -744,7 +750,15 @@ def main():
                     task_instructions = voice_ui.wait_until_prompt()
                 else:
                     task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
-                block_processor = BlockProcessor(task_instructions, codebase, args.json)
+                
+                # Load protoblock from JSON file if provided
+                protoblock = None
+                if args.json:
+                    from tac.blocks.model import ProtoBlock
+                    protoblock = ProtoBlock.load(args.json)
+                    print(f"\n📄 Loaded protoblock from: {args.json}")
+                
+                block_processor = BlockProcessor(task_instructions, codebase, json_file=None, protoblock=protoblock)
                 success = block_processor.run_loop()
             
             if success:

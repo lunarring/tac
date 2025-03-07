@@ -33,7 +33,6 @@ class BlockBuilder:
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
         self.git_manager = GitManager() if self.git_enabled else None
         self.protoblock_id = None 
-        self.protoblock_generator = ProtoBlockGenerator()  # Initialize generator
         self.revert_on_failure = False  # Default to not reverting changes on failure
         self.error_analyzer = ErrorAnalyzer()
         self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
