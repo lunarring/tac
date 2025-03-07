@@ -103,6 +103,8 @@ tac make "your task" --minimum-plausibility-score B
 
 TAC will create a new branch with an id (e.g., tac/buxfix/refactor_spaghetti_code) where it will commit all changes IF everything worked out. If not, you'll have to manually switch back to your previous branch. 
 
+If you don't want to use the git integration, tac will switch to a FakeGitManager that emulates git in temp directories. 
+
 ### Voice Interface (Experimental)
 
 TAC now includes an experimental voice interface that allows you to interact with the system using speech:
