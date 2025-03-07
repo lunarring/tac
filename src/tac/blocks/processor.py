@@ -31,6 +31,14 @@ from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 logger = setup_logging('tac.blocks.processor')
 
 class BlockProcessor:
+    """
+    Handles the end-to-end workflow given a task instructions and codebase, handling 
+ the lifecycle of a coding task from specification to implementation and trust assurances.
+    1. Creates a ProtoBlock (task specification) from instructions
+    2. Executes the implementation + trust assurances in a looped with retries
+    
+    Acts as the central coordinator between the generator and executor components.
+    """
     def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None):
         # Input validation
         if protoblock is None and (task_instructions is None or codebase is None):

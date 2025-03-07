@@ -15,7 +15,17 @@ from .model import ProtoBlock
 logger = logging.getLogger(__name__)
 
 class ProtoBlockGenerator:
-    """Generator class for creating protoblocks"""
+    """
+    Creates structured task specifications (ProtoBlocks) from high-level instructions.
+    
+    Workflow:
+    1. Analyzes codebase and task instructions
+    2. Generates a comprehensive task specification in JSON format
+    3. Validates the specification structure
+    4. Creates a ProtoBlock object ready for execution
+    
+    Uses LLM to transform abstract requirements into concrete implementation plans.
+    """
     
     def __init__(self):
         self.llm_client = LLMClient(strength="strong")

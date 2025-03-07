@@ -12,9 +12,16 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ProtoBlock:
     """
-    A ProtoBlock represents a task specification that needs to be implemented.
-    It contains the task description, test specifications, file information needed
-    to implement a change in the codebase.
+    A structured specification for a coding task that serves as the contract between planning and execution.
+    
+    Contains all information needed to implement a change:
+    - Task description and requirements
+    - Test specifications and data generation instructions
+    - Files to modify and reference during implementation
+    - Version control metadata
+    - Trusted agents to delegate trust assurances to
+    
+    ProtoBlocks can be serialized to JSON for storage and loaded back for execution.
     """
     task_description: str
     test_specification: str

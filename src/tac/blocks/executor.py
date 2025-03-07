@@ -18,8 +18,15 @@ logger = setup_logging('tac.blocks.executor')
 
 class BlockExecutor:
     """
-    Executes a Block from a ProtoBlock by managing the implementation process through an agent,
-    running tests, and handling version control operations.
+    Executes a ProtoBlock by transforming it into actual code changes plus trust assurances.
+    
+    Workflow:
+    1. Receives a ProtoBlock
+    2. Delegates implementation to a coding agent
+    3. Delegates trust assurances to trusty agents
+    5. Manages Git operations for the changes
+    
+    Provides error analysis and feedback for failed implementations.
     """
     def __init__(self, config_override: Optional[Dict] = None, codebase: Optional[Dict[str, str]] = None):
         self.protoblock = None
