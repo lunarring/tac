@@ -245,25 +245,33 @@ class MultiBlockOrchestrator:
         print("\n🔍 Task Analysis Complete")
         if chunking_result.strategy:
             print(f"Strategy: {chunking_result.strategy}")
+            logger.info(f"Chunking strategy: {chunking_result.strategy}")
         print(f"The task has been divided into {len(chunks)} parts")
+        logger.info(f"Task divided into {len(chunks)} chunks")
         if branch_name:
             print(f"🌿 Git Branch: {branch_name}")
+            logger.info(f"Using Git branch: {branch_name}")
         
         # Display violated tests if any
         if hasattr(chunking_result, 'violated_tests') and chunking_result.violated_tests:
+            logger.warning("Some tests may be violated by this chunking")
             print("\n⚠️ Tests that may be violated by this chunking:")
             for test in chunking_result.violated_tests:
                 print(f"  - {test}")
+                logger.warning(f"Potentially violated test: {test}")
         else:
+            logger.info("No tests will be violated by this chunking")
             print("\n✅ No tests will be violated by this chunking")
         
         # Display chunks with 1-based indexing for user-friendly output
         for i, chunk in enumerate(chunks):
             # Display chunk with commit message but without branch name
+            logger.info(f"Displaying chunk {i+1}/{len(chunks)}")
             print(f"--- Chunk {i+1} ---")
             # Display the chunk content without title and branch name
             print(chunk.get_display_content())
             print(f"📝 Commit: {commit_messages[i]}")
+            logger.info(f"Chunk {i+1} commit message: {commit_messages[i]}")
             print()
         
         # Ask user if they want to proceed with execution only if confirm_multiblock_execution is enabled
@@ -285,11 +293,14 @@ class MultiBlockOrchestrator:
         original_branch = None
         if config.git.enabled and branch_name and git_manager:
             original_branch = git_manager.get_current_branch()
+            logger.info(f"Switching from branch '{original_branch}' to '{branch_name}'")
             print(f"\n🔄 Switching to branch: {branch_name}")
             if not git_manager.checkout_branch(branch_name, create=True):
+                logger.warning(f"Failed to switch to branch {branch_name}, continuing in current branch")
                 print(f"Failed to switch to branch {branch_name}, continuing in current branch")
             
             # Inform user about commit behavior
+            logger.info("Git behavior: Changes will be committed after each chunk but NOT pushed")
             print("\n📝 Git behavior: Changes will be committed after each chunk but NOT pushed")
             print("   You can push changes manually after execution completes")
             print("   You will remain on the feature branch after execution completes")
