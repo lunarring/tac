@@ -24,8 +24,8 @@ class ProtoBlock:
     ProtoBlocks can be serialized to JSON for storage and loaded back for execution.
     """
     task_description: str
-    test_specification: str
-    test_data_generation: str
+    pytest_specification: str
+    pytest_data_generation: str
     write_files: list
     context_files: list
     block_id: str
@@ -72,8 +72,8 @@ class ProtoBlock:
         task_description = version_data.get('task', {}).get('specification', '')
         
         test_data = version_data.get('test', {})
-        test_specification = test_data.get('specification', '')
-        test_data_generation = test_data.get('data', '')
+        pytest_specification = test_data.get('specification', '')
+        pytest_data_generation = test_data.get('data', '')
         
         write_files = version_data.get('write_files', [])
         context_files = version_data.get('context_files', [])
@@ -85,8 +85,8 @@ class ProtoBlock:
         return cls(
             block_id=block_id,
             task_description=task_description,
-            test_specification=test_specification,
-            test_data_generation=test_data_generation,
+            pytest_specification=pytest_specification,
+            pytest_data_generation=pytest_data_generation,
             write_files=write_files,
             context_files=context_files,
             commit_message=commit_message,
@@ -113,8 +113,8 @@ class ProtoBlock:
                 "specification": self.task_description
             },
             "test": {
-                "specification": self.test_specification,
-                "data": self.test_data_generation,
+                "specification": self.pytest_specification,
+                "data": self.pytest_data_generation,
                 "replacements": write_files
             },
             "write_files": write_files,
@@ -165,8 +165,8 @@ class ProtoBlock:
                 "specification": self.task_description
             },
             "test": {
-                "specification": self.test_specification,
-                "data": self.test_data_generation
+                "specification": self.pytest_specification,
+                "data": self.pytest_data_generation
             },
             "write_files": self.write_files,
             "context_files": self.context_files,

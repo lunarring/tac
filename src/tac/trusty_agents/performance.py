@@ -357,8 +357,8 @@ class PerformanceTestingAgent(TrustyAgent):
 Additionally, here the line profiling results for the function to identify the bottlenecks:
 {profiling_results}
         """
-            test_specification = "No tests need to be written, we are only optimizing the function"
-            test_data_generation = "No test data generation needed"
+            pytest_specification = "No tests need to be written, we are only optimizing the function"
+            pytest_data_generation = "No test data generation needed"
             write_files = [self.fp_func]
             context_files = [self.fp_test]
             commit_message = "None"
@@ -366,8 +366,8 @@ Additionally, here the line profiling results for the function to identify the b
 
             protoblock = ProtoBlock(
                 task_description,
-                test_specification,
-                test_data_generation,
+                pytest_specification,
+                pytest_data_generation,
                 write_files,
                 context_files,
                 commit_message,
@@ -399,8 +399,8 @@ def test_bubu_output_snapshot(benchmark, snapshot):
     snapshot.assert_match(output.tolist())
     
     """
-        test_specification = "we are only writing a test function, nothing else"
-        test_data_generation = f"""you need to have a careful look at {self.function_name} and decide what is a valid and reasonable input for the test function."""
+        pytest_specification = "we are only writing a test function, nothing else"
+        pytest_data_generation = f"""you need to have a careful look at {self.function_name} and decide what is a valid and reasonable input for the test function."""
         write_files = [self.fp_test]
         context_files = [self.fp_func]
         commit_message = "None"
@@ -408,8 +408,8 @@ def test_bubu_output_snapshot(benchmark, snapshot):
 
         protoblock = ProtoBlock(
             task_description,
-            test_specification,
-            test_data_generation,
+            pytest_specification,
+            pytest_data_generation,
             write_files,
             context_files,
             commit_message,

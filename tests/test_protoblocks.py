@@ -42,8 +42,8 @@ class TestProtoBlocks(unittest.TestCase):
                 # Create a ProtoBlock instance
                 protoblock = ProtoBlock(
                     task_description=valid_protoblock["task"]["specification"],
-                    test_specification=valid_protoblock["test"]["specification"],
-                    test_data_generation=valid_protoblock["test"]["data"],
+                    pytest_specification=valid_protoblock["test"]["specification"],
+                    pytest_data_generation=valid_protoblock["test"]["data"],
                     write_files=valid_protoblock["write_files"],
                     context_files=valid_protoblock["context_files"],
                     block_id=unique_id,

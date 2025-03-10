@@ -27,8 +27,8 @@ class AiderAgent(Agent):
             protoblock: The ProtoBlock instance containing task details and specifications
         """
         task_description = protoblock.task_description
-        test_specification = protoblock.test_specification
-        test_data_generation = protoblock.test_data_generation
+        pytest_specification = protoblock.pytest_specification
+        pytest_data_generation = protoblock.pytest_data_generation
         
         # Deduplicate write_files using a set
         write_files = list(set(protoblock.write_files))
@@ -57,8 +57,8 @@ class AiderAgent(Agent):
         prompt = f"""Implement both the functionality AND its tests simultaneously according to these specifications:
 Task Description: {task_description}
 Test Requirements:
-- Test Specification: {test_specification}
-- Test Data Requirements: {test_data_generation}
+- Test Specification: {pytest_specification}
+- Test Data Requirements: {pytest_data_generation}
 Important Guidelines:
 - Write both the implementation and corresponding tests
 - Ensure tests are CONSISTENT with the code implemented!

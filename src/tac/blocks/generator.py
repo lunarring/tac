@@ -71,7 +71,7 @@ stick exactly to the following output_format, filling in between ...
     "task": {{
         "specification": "...",
     }},
-    "test": {{
+    "pytest": {{
         "specification": "...",
         "data": "..."
     }},
@@ -88,7 +88,7 @@ stick exactly to the following output_format, filling in between ...
     "task": {{
         "specification": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, however mainly in terms og goals that we want to achieve. Thus make a high level plan of what we want to implement and how this on a high level could be achieved. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive."
     }},
-    "test": {{
+    "pytest": {{
         "specification": "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test.",
         "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
     }},
@@ -104,7 +104,7 @@ stick exactly to the following output_format, filling in between ...
         """
         Verifies that a protoblock JSON is valid and contains all required fields.
         First tries to parse as-is, only cleans code fences if that fails.
-        Test sections can be empty strings if no test is needed.
+        Pytest sections can be empty strings if no test is needed.
         
         Args:
             json_content: The JSON content to validate
@@ -149,7 +149,7 @@ stick exactly to the following output_format, filling in between ...
                     "required_keys": ["specification"],
                     "type": dict
                 },
-                "test": {
+                "pytest": {
                     "required_keys": ["specification", "data"],
                     "type": dict,
                     "allow_empty": True  # New flag to indicate empty values are allowed
@@ -204,14 +204,14 @@ stick exactly to the following output_format, filling in between ...
                     
                 # Check nested required keys if any
                 if "required_keys" in requirements and isinstance(validated_data[key], dict):
-                    # For test section, allow empty strings for required fields
+                    # For pytest section, allow empty strings for required fields
                     allow_empty = requirements.get("allow_empty", False)
-                    if allow_empty and key == "test":
+                    if allow_empty and key == "pytest":
                         # Ensure all required keys exist but can be empty strings
                         for req_key in requirements["required_keys"]:
                             if req_key not in validated_data[key]:
                                 return False, f"{key} section missing key: {req_key}", None
-                            # Allow empty string for test section fields
+                            # Allow empty string for pytest section fields
                             if not isinstance(validated_data[key][req_key], str):
                                 validated_data[key][req_key] = ""
                     else:
@@ -292,7 +292,7 @@ stick exactly to the following output_format, filling in between ...
         
         # Create messages for LLM
         messages = [
-            Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'test', 'write_files', 'context_files', 'commit_message'.No markdown, no code fences. Keep it short and strictly formatted."),
+            Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'pytest', 'write_files', 'context_files', 'commit_message'. No markdown, no code fences. Keep it short and strictly formatted."),
             Message(role="user", content=protoblock_genesis_prompt)
         ]
         
@@ -329,8 +329,8 @@ stick exactly to the following output_format, filling in between ...
                 try:
                     protoblock = ProtoBlock(
                         task_description=data["task"]["specification"],
-                        test_specification=data["test"]["specification"],
-                        test_data_generation=data["test"]["data"],
+                        pytest_specification=data["pytest"]["specification"],
+                        pytest_data_generation=data["pytest"]["data"],
                         write_files=write_files,
                         context_files=context_files,
                         block_id=str(uuid.uuid4())[:6],
@@ -340,7 +340,8 @@ stick exactly to the following output_format, filling in between ...
                     )
                     logger.info("\nProtoblock details:")
                     logger.info(f"🎯 Task: {protoblock.task_description}")
-                    logger.info(f"🧪 Test Specification: {protoblock.test_specification}")
+                    logger.info(f"🧪 Pytest Specification: {protoblock.pytest_specification}")
+                    logger.info(f"📊 Pytest Data Generation: {protoblock.pytest_data_generation}")
                     logger.info(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
                     logger.info(f"📚 Context Files: {', '.join(protoblock.context_files)}")
                     logger.info(f"💬 Commit Message: {protoblock.commit_message}")

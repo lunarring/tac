@@ -4,8 +4,8 @@ from tac.trusty_agents.pytest import ErrorAnalyzer
 class DummyProtoBlock:
     block_id = "dummy_id"
     task_description = "Dummy task"
-    test_specification = "Dummy spec"
-    test_data_generation = "Dummy data"
+    pytest_specification = "Dummy spec"
+    pytest_data_generation = "Dummy data"
     write_files = "dummy_file.py"
     context_files = "None"
 

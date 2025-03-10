@@ -239,7 +239,7 @@ class PexpectTestingAgent(TrustyAgent):
         
         try:
             # Extract test cases from the test specification
-            test_cases = self._parse_test_cases(protoblock.test_specification)
+            test_cases = self._parse_test_cases(protoblock.pytest_specification)
             
             if not test_cases:
                 logger.warning("No E2E test cases found in the test specification")
@@ -270,7 +270,7 @@ class PexpectTestingAgent(TrustyAgent):
             logger.error(error_msg)
             return False, error_msg, "E2E test execution error"
     
-    def _parse_test_cases(self, test_specification: str) -> List[E2ETestCase]:
+    def _parse_test_cases(self, pytest_specification: str) -> List[E2ETestCase]:
         """
         Parse test cases from the test specification.
         
@@ -289,7 +289,7 @@ class PexpectTestingAgent(TrustyAgent):
         ```
         
         Args:
-            test_specification: The test specification from the ProtoBlock
+            pytest_specification: The test specification from the ProtoBlock
             
         Returns:
             List[E2ETestCase]: Parsed test cases
@@ -297,7 +297,7 @@ class PexpectTestingAgent(TrustyAgent):
         test_cases = []
         
         # Look for e2e_tests section
-        e2e_section_match = re.search(r'```e2e_tests\s*([\s\S]*?)\s*```', test_specification)
+        e2e_section_match = re.search(r'```e2e_tests\s*([\s\S]*?)\s*```', pytest_specification)
         if not e2e_section_match:
             return test_cases
             

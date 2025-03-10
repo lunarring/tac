@@ -69,7 +69,7 @@ Here a summary of the codebase:
 And here the description of the task:
 <protoblock>
 Task Description: {protoblock.task_description}
-Test Specification: {protoblock.test_specification}
+Test Specification: {protoblock.pytest_specification}
 Write Files: {protoblock.write_files}
 Context Files: {protoblock.context_files}
 </protoblock>

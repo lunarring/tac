@@ -273,8 +273,8 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         self.protoblock = protoblock
         
         task_description = protoblock.task_description
-        test_specification = protoblock.test_specification
-        test_data_generation = protoblock.test_data_generation
+        pytest_specification = protoblock.pytest_specification
+        pytest_data_generation = protoblock.pytest_data_generation
         
         # Process and validate files
         write_files, context_files = self.process_write_and_context_files(protoblock)

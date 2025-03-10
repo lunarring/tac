@@ -85,8 +85,8 @@ You are a senior python software engineer analyzing a failed implementation atte
 
 <protoblock>
 Task Description: {protoblock.task_description}
-Test Specification: {protoblock.test_specification}
-Test Data: {protoblock.test_data_generation}
+Test Specification: {protoblock.pytest_specification}
+Test Data: {protoblock.pytest_data_generation}
 Write Files: {protoblock.write_files}
 Context Files: {protoblock.context_files}
 </protoblock>

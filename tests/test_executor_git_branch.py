@@ -13,8 +13,8 @@ class DummyProtoBlock:
     def __init__(self):
         self.block_id = "test123"
         self.task_description = "dummy task"
-        self.test_specification = "dummy spec"
-        self.test_data_generation = "dummy data"
+        self.pytest_specification = "dummy spec"
+        self.pytest_data_generation = "dummy data"
         self.write_files = {}
         self.context_files = {}
         self.commit_message = "dummy commit"
