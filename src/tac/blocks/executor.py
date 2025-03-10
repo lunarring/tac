@@ -47,7 +47,7 @@ class BlockExecutor:
             
         self.protoblock_id = None 
         self.revert_on_failure = False  # Default to not reverting changes on failure
-        self.error_analyzer = ErrorAnalyzer()
+        # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
         self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
         self.initial_test_functions = []  # Store initial test function names
         self.initial_test_count = 0  # Store initial test count
@@ -90,7 +90,7 @@ class BlockExecutor:
                 logger.error(error_msg)
                 
                 # Get analysis before writing log
-                error_analysis = self.error_analyzer.analyze_failure(
+                error_analysis = self.test_runner.error_analyzer.analyze_failure(
                     self.protoblock, 
                     error_msg,
                     self.codebase
@@ -138,7 +138,7 @@ class BlockExecutor:
 
                     if idx_attempt < config.general.max_retries_block_creation - 1:
                         if config.general.run_error_analysis:
-                            error_analysis = self.error_analyzer.analyze_failure(
+                            error_analysis = self.test_runner.error_analyzer.analyze_failure(
                                 self.protoblock, 
                                 test_results,
                                 self.codebase

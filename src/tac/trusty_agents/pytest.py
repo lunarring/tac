@@ -156,6 +156,7 @@ class PytestTestingAgent:
         self.test_functions = []
         self.had_execution_error = False
         self._test_stats = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
+        self.error_analyzer = ErrorAnalyzer()  # Initialize error analyzer
         
     def get_test_stats(self) -> dict:
         """Get the current test statistics"""
