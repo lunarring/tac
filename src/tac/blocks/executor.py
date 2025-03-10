@@ -2,6 +2,7 @@ from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
 from tac.coding_agents import CodingAgentConstructor
 from tac.utils.git_manager import GitManager, FakeGitManager
+from tac.utils.filesystem import cleanup_nested_tests
 import git
 import sys
 import os
@@ -36,15 +37,13 @@ class BlockExecutor:
         self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
         
         self.test_runner = PytestTestingAgent()
-        self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
         
         # Use the appropriate git manager based on config
-        if self.git_enabled:
+        if config.git.enabled:
             self.git_manager = GitManager()
         else:
             self.git_manager = FakeGitManager()
             
-        self.protoblock_id = None 
         # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
         self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
         self.test_results = None
@@ -64,7 +63,6 @@ class BlockExecutor:
                 - str: Error analysis if available, empty string otherwise
         """
         self.protoblock = protoblock
-        self.protoblock_id = protoblock.block_id
         try:
             execution_success = False
             analysis = ""  # Initialize as empty string instead of None
@@ -75,8 +73,6 @@ class BlockExecutor:
                 
                 # Pass the previous attempt's analysis to the coding agent
                 self.coding_agent.run(self.protoblock, previous_analysis=analysis)
-                # Ensure no tests/tests/ directory exists
-                self._cleanup_nested_tests()
                 
                 # Log completion of task execution
                 logger.info(f"Task execution completed (attempt {idx_attempt + 1})")
@@ -212,37 +208,4 @@ class BlockExecutor:
 
     def get_test_results(self) -> str:
         """Get the full test results including output and summary"""
-        return self.test_results
-
-    def _cleanup_nested_tests(self):
-        """
-        Cleanup nested test directory by moving files from tests/tests/ to tests/
-        and removing the tests/tests directory if it exists.
-        """
-        nested_tests_dir = os.path.join('tests', 'tests')
-        if not os.path.exists(nested_tests_dir):
-            return
-
-        logger.info("Found nested tests directory. Moving files to parent directory...")
-        
-        try:
-            # Move all files from tests/tests to tests
-            for item in os.listdir(nested_tests_dir):
-                src_path = os.path.join(nested_tests_dir, item)
-                dst_path = os.path.join('tests', item)
-                
-                if os.path.isfile(src_path):
-                    # If destination exists, remove it first
-                    if os.path.exists(dst_path):
-                        os.remove(dst_path)
-                        logger.info(f"Removed existing file {item} in tests/")
-                    
-                    os.rename(src_path, dst_path)
-                    logger.info(f"Moved {item} to tests/")
-            
-            # Force remove the tests/tests directory and all its contents
-            shutil.rmtree(nested_tests_dir)
-            logger.info("Removed nested tests directory and all its contents")
-            
-        except Exception as e:
-            logger.error(f"Error during test directory cleanup: {str(e)}") 
+        return self.test_results 

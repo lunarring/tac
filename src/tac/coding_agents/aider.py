@@ -7,6 +7,10 @@ from tac.blocks import ProtoBlock
 import select
 import time
 import sys
+import tempfile
+from typing import List, Optional
+from tac.core.config import config
+from tac.utils.filesystem import cleanup_nested_tests
 
 logger = setup_logging('tac.coding_agents.aider')
 
@@ -153,7 +157,8 @@ Important Guidelines:
                 logger.error(f"Aider command that failed: {' '.join(command)}")
                 raise subprocess.CalledProcessError(process.returncode, command)
             
-    
+            # Clean up any nested test directories that might have been created
+            cleanup_nested_tests()
 
             logger.info("Aider executed successfully.")
             
