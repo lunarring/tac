@@ -36,7 +36,6 @@ class BlockExecutor:
         self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
         
         self.test_runner = PytestTestingAgent()
-        self.previous_error = None  # Track previous error
         self.git_enabled = config.git.enabled  # Get git enabled status from centralized config
         
         # Use the appropriate git manager based on config
@@ -46,11 +45,8 @@ class BlockExecutor:
             self.git_manager = FakeGitManager()
             
         self.protoblock_id = None 
-        self.revert_on_failure = False  # Default to not reverting changes on failure
         # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
         self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
-        self.initial_test_functions = []  # Store initial test function names
-        self.initial_test_count = 0  # Store initial test count
         self.test_results = None
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
