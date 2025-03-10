@@ -1,6 +1,6 @@
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
-from tac.coding_agents import AgentConstructor
+from tac.coding_agents import CodingAgentConstructor
 from tac.utils.git_manager import GitManager, FakeGitManager
 import git
 import sys
@@ -32,8 +32,8 @@ class BlockExecutor:
         self.protoblock = None
         self.codebase = codebase  # Store codebase internally
         
-        # Use the AgentConstructor to create the appropriate agent
-        self.agent = AgentConstructor.create_agent(config_override=config_override)
+        # Use the CodingAgentConstructor to create the appropriate coding agent
+        self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
         
         self.test_runner = PytestTestingAgent()
         self.previous_error = None  # Track previous error
@@ -77,8 +77,8 @@ class BlockExecutor:
                 # Log start of task execution
                 logger.info(f"Starting task execution (attempt {idx_attempt + 1})")
                 
-                # Pass the previous attempt's analysis to the agent
-                self.agent.run(self.protoblock, previous_analysis=analysis)
+                # Pass the previous attempt's analysis to the coding agent
+                self.coding_agent.run(self.protoblock, previous_analysis=analysis)
                 # Ensure no tests/tests/ directory exists
                 self._cleanup_nested_tests()
                 

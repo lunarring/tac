@@ -5,7 +5,7 @@ from tac.core.config import config
 from typing import Optional, Dict
 
 
-class AgentConstructor:
+class CodingAgentConstructor:
     """
     Constructor class for creating coding agents based on configuration.
     """
