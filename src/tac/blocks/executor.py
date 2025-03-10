@@ -105,32 +105,30 @@ class BlockExecutor:
             
             # Run tests if pytest is in trusty_agents
             if "pytest" in self.protoblock.trusty_agents:
-                
+                logger.info("Trusty agent: Pytest starting...")
+                execution_success, error_analysis, failure_type = self.trusty_agents['plausibiltiy'].check(self.protoblock, self.codebase,code_diff)
+                if not execution_success:
+                    logger.error(f"Pytest failed: {failure_type}")
+                    return execution_success, error_analysis, failure_type
+                else:
+                    logger.info("Pytest passed")
                 # If we get here, tests passed - continue with other trusty agents
-                logger.info("Tests passed, continuing with remaining trusty agents if any")
             else:
-                logger.info("Pytest tests skipped (not included in trusty_agents)")
+                logger.info("Trusty agent: Pytest skipped (not included in protoblock)")
 
             # Check if plausibility test is in trusty_agents
             if "plausibility" in self.protoblock.trusty_agents:
-                logger.info("Running plausibility check (included in trusty_agents)...")
+                logger.info("Trusty agent: Plausibility starting...")
                 # Get git diff for plausibility check
-                plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, self.codebase,code_diff)
-                
-                # If run_error_analysis is disabled, set error_analysis to empty string
-                if not config.general.run_error_analysis:
-                    error_analysis = ""
-                    
-                if not plausibility_check_success:
-                    failure_type = "Plausibility check failed"
-                    execution_success = False
-                    return execution_success, failure_type, error_analysis
-                
+                execution_success, error_analysis, failure_type = self.trusty_agents['plausibiltiy'].check(self.protoblock, self.codebase,code_diff)
+                if not execution_success:
+                    logger.error(f"Plausibility check failed: {failure_type}")
+                    return execution_success, error_analysis, failure_type
                 else:
-                    # If we got here, both tests and plausibility check (if enabled) passed
-                    logger.info(f"Plausibility check passed with score: {final_plausibility_score}")
+                    logger.info("Plausibility check passed")
+                
             else:
-                logger.info("Plausibility check skipped (not included in trusty_agents)")
+                logger.info("Trusty agent: Plausibility skipped (not included in protoblock)")
             
             # If we got here, all required tests passed
             execution_success = True

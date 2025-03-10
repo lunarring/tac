@@ -120,18 +120,17 @@ PLAUSIBILITY SCORE RATING:
             ]
             
             logger.info("Plausibility check starting, sending request to LLM")
-            response = self.llm_client.chat_completion(messages)
+            analysis = self.llm_client.chat_completion(messages)
             
-            if not response or not response.strip():
+            if not analysis or not analysis.strip():
                 logger.error("Received empty response from LLM")
                 return "Error: Unable to generate plausibility analysis"
             
-            logger.info("Successfully received LLM response")
-            logger.debug(f"LLM response:\n{response}")
+            logger.info("Successfully received LLM analysis")
 
             final_plausibility_score = ""
-            if "PLAUSIBILITY SCORE RATING:" in response:
-                score_section = response.split("PLAUSIBILITY SCORE RATING:")[1].strip()
+            if "PLAUSIBILITY SCORE RATING:" in analysis:
+                score_section = analysis.split("PLAUSIBILITY SCORE RATING:")[1].strip()
                 # Extract just the letter grade, ignoring any additional text
                 for char in score_section:
                     if char in "ABCDF":
@@ -143,8 +142,10 @@ PLAUSIBILITY SCORE RATING:
 
             # Check if score meets minimum requirement
             is_plausible = self._is_score_passing(final_plausibility_score)
+
+            logger.info(f"Plausibility score: {final_plausibility_score}")
             
-            return is_plausible, final_plausibility_score, response
+            return is_plausible, analysis, "Plausibility check"
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)

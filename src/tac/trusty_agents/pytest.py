@@ -194,7 +194,7 @@ class PytestTestingAgent:
 
         # Only return early if tests failed
         if not test_success:
-            failure_type = "Unit tests failed"
+            failure_type = "Pytest failed"
             execution_success = False
             error_analysis = ""  # Initialize as empty string instead of "None"
             logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
