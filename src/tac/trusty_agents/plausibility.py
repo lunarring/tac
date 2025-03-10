@@ -1,13 +1,14 @@
 import json
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
+from tac.trusty_agents.base import TrustyAgent
 
 logger = setup_logging('tac.trusty_agents.plausibility')
 
-class PlausibilityTestingAgent:
+class PlausibilityTestingAgent(TrustyAgent):
     """
     Checks if the implemented changes match the promised functionality by analyzing
     git diff and protoblock specifications using LLM.
@@ -35,16 +36,20 @@ class PlausibilityTestingAgent:
         min_score_value = self._score_values.get(self._min_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
-    def check(self, protoblock: ProtoBlock,  codebase: str, code_diff: str) -> str:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
         """
         Analyzes the implementation against the promised changes.
         
         Args:
             protoblock: The ProtoBlock containing task specifications
-            git_diff: The git diff showing implemented changes
+            codebase: Dictionary mapping file paths to their contents
+            code_diff: The git diff showing implemented changes
             
         Returns:
-            str: Formatted analysis string containing correctness and reasoning
+            Tuple containing:
+            - bool: Success status (True if check passed, False otherwise)
+            - str: Error analysis (empty string if success is True)
+            - str: Failure type description (empty string if success is True)
         """
         logger.info("Starting LLM-based plausibility check")
         logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
@@ -124,7 +129,7 @@ PLAUSIBILITY SCORE RATING:
             
             if not analysis or not analysis.strip():
                 logger.error("Received empty response from LLM")
-                return "Error: Unable to generate plausibility analysis"
+                return False, "Error: Unable to generate plausibility analysis", "Plausibility check failed"
             
             logger.info("Successfully received LLM analysis")
 
@@ -145,8 +150,11 @@ PLAUSIBILITY SCORE RATING:
 
             logger.info(f"Plausibility score: {final_plausibility_score}")
             
-            return is_plausible, analysis, "Plausibility check"
+            if is_plausible:
+                return True, "", ""
+            else:
+                return False, analysis, "Plausibility check failed"
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)
-            return f"Error during plausibility check: {str(e)}" 
+            return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception" 

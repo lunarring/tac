@@ -15,6 +15,7 @@ import shutil
 from tac.trusty_agents.pytest import PytestTestingAgent
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
 from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.trusty_agents.base import TrustyAgent
 logger = setup_logging('tac.blocks.executor')
 
 class BlockExecutor:
@@ -47,9 +48,9 @@ class BlockExecutor:
         # Initialize trusty agents
         self.trusty_agents = {}
         self.trusty_agents['pytest'] = PytestTestingAgent()
-        self.trusty_agents['plausibiltiy'] = PlausibilityTestingAgent()
-        # Comment out the PerformanceTestingAgent initialization since it's marked as TBD
-        # self.trusty_agents['performance'] = PerformanceTestingAgent() # TBD soon
+        self.trusty_agents['plausibility'] = PlausibilityTestingAgent()
+        # Initialize PerformanceTestingAgent with no arguments for the base implementation
+        self.trusty_agents['performance'] = PerformanceTestingAgent()
 
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
@@ -106,7 +107,7 @@ class BlockExecutor:
             # Run tests if pytest is in trusty_agents
             if "pytest" in self.protoblock.trusty_agents:
                 logger.info("Trusty agent: Pytest starting...")
-                execution_success, error_analysis, failure_type = self.trusty_agents['plausibiltiy'].check(self.protoblock, self.codebase,code_diff)
+                execution_success, error_analysis, failure_type = self.trusty_agents['pytest'].check(self.protoblock, self.codebase, code_diff)
                 if not execution_success:
                     logger.error(f"Pytest failed: {failure_type}")
                     return execution_success, error_analysis, failure_type
@@ -120,7 +121,7 @@ class BlockExecutor:
             if "plausibility" in self.protoblock.trusty_agents:
                 logger.info("Trusty agent: Plausibility starting...")
                 # Get git diff for plausibility check
-                execution_success, error_analysis, failure_type = self.trusty_agents['plausibiltiy'].check(self.protoblock, self.codebase,code_diff)
+                execution_success, error_analysis, failure_type = self.trusty_agents['plausibility'].check(self.protoblock, self.codebase, code_diff)
                 if not execution_success:
                     logger.error(f"Plausibility check failed: {failure_type}")
                     return execution_success, error_analysis, failure_type
@@ -130,9 +131,22 @@ class BlockExecutor:
             else:
                 logger.info("Trusty agent: Plausibility skipped (not included in protoblock)")
             
+            # Check if performance test is in trusty_agents
+            # Commented out for now as it's not fully implemented
+            # if "performance" in self.protoblock.trusty_agents:
+            #     logger.info("Trusty agent: Performance starting...")
+            #     execution_success, error_analysis, failure_type = self.trusty_agents['performance'].check(self.protoblock, self.codebase, code_diff)
+            #     if not execution_success:
+            #         logger.error(f"Performance check failed: {failure_type}")
+            #         return execution_success, error_analysis, failure_type
+            #     else:
+            #         logger.info("Performance check passed")
+            # else:
+            #     logger.info("Trusty agent: Performance skipped (not included in protoblock)")
+            
             # If we got here, all required tests passed
             execution_success = True
-            logger.info("All trusty agents completed successfully")
+            logger.info("All trusty agents are happy. Trust is assured!")
             return execution_success, None, ""  # Return empty string instead of None
 
             

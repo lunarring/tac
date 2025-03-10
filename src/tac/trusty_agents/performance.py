@@ -14,6 +14,7 @@ from tac.core.log_config import setup_logging
 from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
 from tac.utils.git_manager import FakeGitManager
+from tac.trusty_agents.base import TrustyAgent
 import subprocess
 import re
 import datetime
@@ -22,10 +23,10 @@ import io
 
 logger = setup_logging('tac.trusty_agents.performance')
 
-class PerformanceTestingAgent:
+class PerformanceTestingAgent(TrustyAgent):
     """Class responsible for optimizing Python code functions."""
     
-    def __init__(self, function_name: str, config):
+    def __init__(self, function_name: str = None, config = None):
         """Initialize the code optimizer.
         
         Args:
@@ -33,41 +34,66 @@ class PerformanceTestingAgent:
             config: Configuration object
         """
         logger.info("Initializing PerformanceTestingAgent")
-        self.config = config
-        self.project_files = ProjectFiles()
-        self.function_name = self.clean_function_name(function_name)
-        self.fp_func = self.project_files.get_function_location(function_name)
-        # Check if function location was found
-        if not self.fp_func:
-            logger.error(f"Function '{function_name}' could not be found in the project.")
-            raise ValueError(f"Function '{function_name}' not found. Please provide a valid function name.")
-        logger.info(f"Function file path: {self.fp_func}")
-        self.fp_test = self.get_test_function(function_name)
-        self.factory = ProtoBlockGenerator()
         
-        # Set up git manager (always use FakeGitManager for performance testing)
-        logger.info("Using FakeGitManager for performance testing")
-        # Initialize FakeGitManager with the current directory and set cleanup_temp_dir to True
-        self.git_manager = FakeGitManager(repo_path='.', cleanup_temp_dir=False)
-        self.temp_dir = self.git_manager.temp_dir
+        # Only initialize the full agent if function_name and config are provided
+        if function_name and config:
+            self.config = config
+            self.project_files = ProjectFiles()
+            self.function_name = self.clean_function_name(function_name)
+            self.fp_func = self.project_files.get_function_location(function_name)
+            # Check if function location was found
+            if not self.fp_func:
+                logger.error(f"Function '{function_name}' could not be found in the project.")
+                raise ValueError(f"Function '{function_name}' not found. Please provide a valid function name.")
+            logger.info(f"Function file path: {self.fp_func}")
+            self.fp_test = self.get_test_function(function_name)
+            self.factory = ProtoBlockGenerator()
+            
+            # Set up git manager (always use FakeGitManager for performance testing)
+            logger.info("Using FakeGitManager for performance testing")
+            # Initialize FakeGitManager with the current directory and set cleanup_temp_dir to True
+            self.git_manager = FakeGitManager(repo_path='.', cleanup_temp_dir=False)
+            self.temp_dir = self.git_manager.temp_dir
 
-        # Create coding agent directly
-        if config.general.agent_type == "aider":
-            self.agent = AiderAgent(config.raw_config.copy())
-            # Inject FakeGitManager into the agent
-            if hasattr(self.agent, 'git_manager'):
-                self.agent.git_manager = self.git_manager
-        elif config.general.agent_type == "native":
-            self.agent = NativeAgent(config.raw_config.copy())
-            # Inject FakeGitManager into the agent
-            if hasattr(self.agent, 'git_manager'):
-                self.agent.git_manager = self.git_manager
+            # Create coding agent directly
+            if config.general.agent_type == "aider":
+                self.agent = AiderAgent(config.raw_config.copy())
+                # Inject FakeGitManager into the agent
+                if hasattr(self.agent, 'git_manager'):
+                    self.agent.git_manager = self.git_manager
+            elif config.general.agent_type == "native":
+                self.agent = NativeAgent(config.raw_config.copy())
+                # Inject FakeGitManager into the agent
+                if hasattr(self.agent, 'git_manager'):
+                    self.agent.git_manager = self.git_manager
+            else:
+                raise ValueError(f"Invalid agent type: {config.general.agent_type}")
+            
+            # List to store test statistics from multiple runs
+            self.test_stats: List[Dict[str, Any]] = []
         else:
-            raise ValueError(f"Invalid agent type: {config.general.agent_type}")
+            logger.info("Initialized PerformanceTestingAgent in base mode (no function specified)")
+    
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+        """
+        Check the implementation for performance issues.
         
-        # List to store test statistics from multiple runs
-        self.test_stats: List[Dict[str, Any]] = []
-        
+        Args:
+            protoblock: The ProtoBlock containing task specifications
+            codebase: Dictionary mapping file paths to their contents
+            code_diff: The git diff showing implemented changes
+            
+        Returns:
+            Tuple containing:
+            - bool: Success status (True if performance is acceptable, False otherwise)
+            - str: Error analysis (empty string if success is True)
+            - str: Failure type description (empty string if success is True)
+        """
+        logger.info("Performance check not yet implemented")
+        # For now, always return success since this agent is not fully implemented
+        # In the future, this would analyze the code for performance issues
+        return True, "", ""
+    
     def clean_function_name(self, function_name: str) -> str:
         """Clean the function name by removing brackets, spaces, and other invalid characters.
         

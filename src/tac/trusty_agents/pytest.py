@@ -6,12 +6,13 @@ from _pytest.reports import TestReport
 import sys
 import re
 import shutil
-from typing import Dict
+from typing import Dict, Tuple, Optional
 from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.core.log_config import setup_logging
+from tac.trusty_agents.base import TrustyAgent
 
 logger = setup_logging('tac.trusty_agents.pytest')
 
@@ -148,7 +149,7 @@ class CustomReporter:
             if report.longrepr:
                 self.output_lines.append(str(report.longrepr))
 
-class PytestTestingAgent:
+class PytestTestingAgent(TrustyAgent):
     """
     A dedicated class for handling test execution and reporting using pytest.
     """
@@ -161,7 +162,21 @@ class PytestTestingAgent:
         self.error_analyzer = ErrorAnalyzer()  # Initialize error analyzer
         
 
-    def check(self, protoblock, codebase, code_diff=None):
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+        """
+        Run tests and check if they pass.
+        
+        Args:
+            protoblock: The ProtoBlock containing task specifications
+            codebase: Dictionary mapping file paths to their contents
+            code_diff: The git diff showing implemented changes (not used in this agent)
+            
+        Returns:
+            Tuple containing:
+            - bool: Success status (True if tests passed, False otherwise)
+            - str: Error analysis (empty string if success is True)
+            - str: Failure type description (empty string if success is True)
+        """
         try:
             test_path = config.general.test_path
             logger.info("Test Execution Details:")
@@ -177,11 +192,11 @@ class PytestTestingAgent:
             error_msg = f"Error during test execution: {type(e).__name__}: {str(e)}"
             logger.error(error_msg)
             test_results = error_msg
-            test_success =  False
+            test_success = False
 
         
         # Extract test statistics
-        test_stats = self.test_runner.get_test_stats()
+        test_stats = self.get_test_stats()
         total_tests = sum(test_stats.values()) if test_stats else 0
         failed_tests = test_stats.get('failed', 0) if test_stats else 0
         
@@ -213,8 +228,6 @@ class PytestTestingAgent:
             return execution_success, error_analysis, failure_type
         else:
             return True, "", ""
-
-    
 
     def get_test_stats(self) -> dict:
         """Get the current test statistics"""
