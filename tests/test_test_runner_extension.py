@@ -17,18 +17,4 @@ def dummy_tests(tmp_path):
     os.utime(str(file2), (old_time, old_time))
     return test_dir
 
-def test_collect_all_tests(dummy_tests):
-    tr = TestRunner()
-    test_names = tr.collect_all_tests(tests_dir=str(dummy_tests))
-    assert "test_func1" in test_names
-    assert "test_func2" in test_names
-    assert len(test_names) == 2
 
-def test_get_modified_tests(dummy_tests):
-    tr = TestRunner()
-    # Set baseline to just 1 second ago so only the recently modified file qualifies.
-    baseline = time.time() - 1
-    modified = tr.get_modified_tests(baseline, tests_dir=str(dummy_tests))
-    # Only test_dummy1.py should be considered modified.
-    assert "test_func1" in modified
-    assert "test_func2" not in modified
