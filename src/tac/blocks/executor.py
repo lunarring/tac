@@ -69,29 +69,19 @@ class BlockExecutor:
             
             try:
                 # Log start of task execution
-                logger.info(f"Starting task execution (attempt {idx_attempt + 1})")
+                logger.info(f"Starting coding agent execution (attempt {idx_attempt + 1})")
                 
                 # Pass the previous attempt's analysis to the coding agent
                 self.coding_agent.run(self.protoblock, previous_analysis=analysis)
                 
                 # Log completion of task execution
-                logger.info(f"Task execution completed (attempt {idx_attempt + 1})")
+                logger.info(f"Coding agent execution completed (attempt {idx_attempt + 1})")
                 
             except Exception as e:
-                error_msg = f"Error during task execution: {type(e).__name__}: {str(e)}"
+                error_msg = f"Error during coding agent execution: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg)
-                
-                # Get analysis before writing log
-                error_analysis = self.test_runner.error_analyzer.analyze_failure(
-                    self.protoblock, 
-                    error_msg,
-                    self.codebase
-                )
 
-                # If run_error_analysis is disabled, set error_analysis to empty string
-                if not config.general.run_error_analysis:
-                    error_analysis = ""
-
+                error_analysis= error_msg
                 execution_success = False
                 failure_type = "Exception during agent execution"
                 
@@ -100,7 +90,7 @@ class BlockExecutor:
                 if error_analysis:
                     logger.debug(f"Error analysis: {error_analysis}")
                 
-                return execution_success, failure_type, error_analysis
+                return execution_success, error_analysis, failure_type 
 
             
             # Run tests if pytest is in trusty_agents
@@ -206,6 +196,3 @@ class BlockExecutor:
             self.test_results = error_msg
             return False
 
-    def get_test_results(self) -> str:
-        """Get the full test results including output and summary"""
-        return self.test_results 

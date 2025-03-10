@@ -161,7 +161,7 @@ class BlockProcessor:
 
 
             # Execute the protoblock using the builder
-            execution_success, failure_type, error_analysis = self.executor.execute_block(self.protoblock, idx_attempt)
+            execution_success, error_analysis, failure_type  = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}")
