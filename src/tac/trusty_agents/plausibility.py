@@ -35,7 +35,7 @@ class PlausibilityTestingAgent:
         min_score_value = self._score_values.get(self._min_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
-    def check(self, protoblock: ProtoBlock, git_diff: str, codebase: str) -> str:
+    def check(self, protoblock: ProtoBlock,  codebase: str, code_diff: str) -> str:
         """
         Analyzes the implementation against the promised changes.
         
@@ -48,7 +48,7 @@ class PlausibilityTestingAgent:
         """
         logger.info("Starting LLM-based plausibility check")
         logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
-        logger.debug(f"Git diff length: {len(git_diff) if git_diff else 'None'}")
+        logger.debug(f"Git diff length: {len(code_diff) if code_diff else 'None'}")
         
         try:
             # Prepare prompt
@@ -70,7 +70,7 @@ Context Files: {protoblock.context_files}
 </protoblock>
 
 <implemented_changes>
-{git_diff}
+{code_diff}
 </implemented_changes>
 
 <analysis_rules>

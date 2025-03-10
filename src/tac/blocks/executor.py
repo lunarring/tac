@@ -12,9 +12,9 @@ from typing import Dict, Optional, Tuple
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
-from tac.trusty_agents.pytest import PytestTestingAgent, ErrorAnalyzer
+from tac.trusty_agents.pytest import PytestTestingAgent
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
-
+from tac.trusty_agents.performance import PerformanceTestingAgent
 logger = setup_logging('tac.blocks.executor')
 
 class BlockExecutor:
@@ -36,8 +36,6 @@ class BlockExecutor:
         # Use the CodingAgentConstructor to create the appropriate coding agent
         self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
         
-        self.test_runner = PytestTestingAgent()
-        
         # Use the appropriate git manager based on config
         if config.git.enabled:
             self.git_manager = GitManager()
@@ -45,8 +43,13 @@ class BlockExecutor:
             self.git_manager = FakeGitManager()
             
         # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
-        self.plausibility_checker = PlausibilityTestingAgent()  # Initialize plausibility checker
-        self.test_results = None
+
+        # Initialize trusty agents
+        self.trusty_agents = {}
+        self.trusty_agents['pytest'] = PytestTestingAgent()
+        self.trusty_agents['plausibiltiy'] = PlausibilityTestingAgent()
+        self.trusty_agents['performance'] = PerformanceTestingAgent()
+
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
         """
@@ -63,7 +66,9 @@ class BlockExecutor:
                 - str: Error analysis if available, empty string otherwise
         """
         self.protoblock = protoblock
+
         try:
+            # First run the coding agent
             execution_success = False
             analysis = ""  # Initialize as empty string instead of None
             
@@ -92,45 +97,13 @@ class BlockExecutor:
                 
                 return execution_success, error_analysis, failure_type 
 
+
+            # Cycle through trusty agents, gather materials first
+            code_diff = self.git_manager.get_complete_diff()
+            # protoblock decides the tests that are run, but the order is always hardfixed here.
             
             # Run tests if pytest is in trusty_agents
             if "pytest" in self.protoblock.trusty_agents:
-                logger.info("Running pytest tests (included in trusty_agents)...")
-                test_success = self.run_tests()
-                test_results = self.test_runner.get_test_results()
-                
-                # Extract test statistics
-                test_stats = self.test_runner.get_test_stats()
-                total_tests = sum(test_stats.values()) if test_stats else 0
-                failed_tests = test_stats.get('failed', 0) if test_stats else 0
-                
-                # Log test results
-                if failed_tests > 0:
-                    logger.warning(f"{failed_tests} out of {total_tests} tests failed")
-                    logger.warning("This indicates potential issues but won't stop execution")
-                else:
-                    logger.info(f"All {total_tests} tests passed successfully")
-
-                # Only return early if tests failed
-                if not test_success:
-                    failure_type = "Unit tests failed"
-                    execution_success = False
-                    error_analysis = ""  # Initialize as empty string instead of "None"
-                    logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
-
-                    if idx_attempt < config.general.max_retries_block_creation - 1:
-                        if config.general.run_error_analysis:
-                            error_analysis = self.test_runner.error_analyzer.analyze_failure(
-                                self.protoblock, 
-                                test_results,
-                                self.codebase
-                            )
-                            logger.debug(f"Error Analysis: {error_analysis}")
-                    else:
-                        logger.debug("Software test result: FAILURE!")
-
-                    logger.info("Returning early due to test failure, skipping any remaining trusty agents")
-                    return execution_success, failure_type, error_analysis
                 
                 # If we get here, tests passed - continue with other trusty agents
                 logger.info("Tests passed, continuing with remaining trusty agents if any")
@@ -141,8 +114,7 @@ class BlockExecutor:
             if "plausibility" in self.protoblock.trusty_agents:
                 logger.info("Running plausibility check (included in trusty_agents)...")
                 # Get git diff for plausibility check
-                git_diff = self.git_manager.get_complete_diff()
-                plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, git_diff, self.codebase)
+                plausibility_check_success, final_plausibility_score, error_analysis = self.plausibility_checker.check(self.protoblock, self.codebase,code_diff)
                 
                 # If run_error_analysis is disabled, set error_analysis to empty string
                 if not config.general.run_error_analysis:

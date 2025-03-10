@@ -24,6 +24,8 @@ class ErrorAnalyzer:
         self.llm_client = LLMClient(strength="strong")
         self.project_files = ProjectFiles()
 
+
+
     def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
         Analyzes test failures and implementation errors using LLM.
@@ -158,6 +160,62 @@ class PytestTestingAgent:
         self._test_stats = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
         self.error_analyzer = ErrorAnalyzer()  # Initialize error analyzer
         
+
+    def check(self, protoblock, codebase, code_diff=None):
+        try:
+            test_path = config.general.test_path
+            logger.info("Test Execution Details:")
+            logger.info("="*50)
+            logger.info(f"Test path: {test_path}")
+            logger.info(f"Working directory: {os.getcwd()}")
+            logger.info(f"Python path: {sys.path}")
+            logger.info("="*50)
+            
+            test_success = self.run_tests(test_path)
+            test_results = self.get_test_results()
+        except Exception as e:
+            error_msg = f"Error during test execution: {type(e).__name__}: {str(e)}"
+            logger.error(error_msg)
+            test_results = error_msg
+            test_success =  False
+
+        
+        # Extract test statistics
+        test_stats = self.test_runner.get_test_stats()
+        total_tests = sum(test_stats.values()) if test_stats else 0
+        failed_tests = test_stats.get('failed', 0) if test_stats else 0
+        
+        # Log test results
+        if failed_tests > 0:
+            logger.warning(f"{failed_tests} out of {total_tests} tests failed")
+            logger.warning("This indicates potential issues but won't stop execution")
+        else:
+            logger.info(f"All {total_tests} tests passed successfully")
+
+        # Only return early if tests failed
+        if not test_success:
+            failure_type = "Unit tests failed"
+            execution_success = False
+            error_analysis = ""  # Initialize as empty string instead of "None"
+            logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
+
+            if config.general.run_error_analysis:
+                error_analysis = self.error_analyzer.analyze_failure(
+                    protoblock, 
+                    test_results,
+                    codebase
+                )
+                logger.debug(f"Error Analysis: {error_analysis}")
+            else:
+                logger.debug("Software test result: FAILURE!")
+
+            logger.info("Returning early due to test failure, skipping any remaining trusty agents")
+            return execution_success, error_analysis, failure_type
+        else:
+            return True, "", ""
+
+    
+
     def get_test_stats(self) -> dict:
         """Get the current test statistics"""
         return self._test_stats.copy()
