@@ -4,20 +4,16 @@ import sys
 import time
 import logging
 import traceback
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
 import uuid
 import json
 from datetime import datetime
 import git
 
-# Add the src directory to Python path for local development
-src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
-
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
-from tac.blocks.executor import BlockExecutor
+# Remove direct import to break circular dependency
+# from tac.blocks.executor import BlockExecutor
 from tac.coding_agents.aider import AiderAgent
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
@@ -27,6 +23,10 @@ from tac.utils.git_manager import GitManager, FakeGitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
+
+# Use TYPE_CHECKING for type hints to avoid circular imports
+if TYPE_CHECKING:
+    from tac.blocks.executor import BlockExecutor
 
 logger = setup_logging('tac.blocks.processor')
 
@@ -49,6 +49,9 @@ class BlockProcessor:
         self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
+        
+        # Import BlockExecutor at runtime to avoid circular imports
+        from tac.blocks.executor import BlockExecutor
         self.executor = BlockExecutor(config_override=config_override, codebase=codebase)
         self.generator = ProtoBlockGenerator()
         

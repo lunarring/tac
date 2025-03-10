@@ -5,7 +5,10 @@ import logging
 import tempfile
 import shutil
 from typing import Tuple, Optional, List, Dict, Any
-from tac.blocks import ProtoBlock, BlockProcessor, ProtoBlockGenerator
+# Fix circular import by importing directly from specific modules
+from tac.blocks.model import ProtoBlock
+from tac.blocks.processor import BlockProcessor
+from tac.blocks.generator import ProtoBlockGenerator
 from tac.utils.project_files import ProjectFiles
 from tac.core.log_config import setup_logging
 from tac.coding_agents.aider import AiderAgent

@@ -48,7 +48,8 @@ class BlockExecutor:
         self.trusty_agents = {}
         self.trusty_agents['pytest'] = PytestTestingAgent()
         self.trusty_agents['plausibiltiy'] = PlausibilityTestingAgent()
-        self.trusty_agents['performance'] = PerformanceTestingAgent()
+        # Comment out the PerformanceTestingAgent initialization since it's marked as TBD
+        # self.trusty_agents['performance'] = PerformanceTestingAgent() # TBD soon
 
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
