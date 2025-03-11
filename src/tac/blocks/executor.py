@@ -146,7 +146,7 @@ class BlockExecutor:
             
             # If we got here, all required tests passed
             execution_success = True
-            logger.info("All trusty agents are happy. Trust is assured!")
+            logger.info(f"All trusty agents are happy ({', '.join(protoblock.trusty_agents)}). Trust is assured!")
             return execution_success, None, ""  # Return empty string instead of None
 
             

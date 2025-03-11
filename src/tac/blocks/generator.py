@@ -257,9 +257,20 @@ stick exactly to the following output_format, filling in between ...
             if "trusty_agents" in validated_data:
                 if not all(isinstance(item, str) for item in validated_data["trusty_agents"]):
                     return False, "All items in trusty_agents must be strings", None
+                
+                # Ensure pytest and plausibility are always included
+                if "pytest" not in validated_data["trusty_agents"]:
+                    validated_data["trusty_agents"].append("pytest")
+                if "plausibility" not in validated_data["trusty_agents"]:
+                    validated_data["trusty_agents"].append("plausibility")
             else:
                 # Set default value if not present
                 validated_data["trusty_agents"] = config.general.default_trusty_agents
+                # Ensure pytest and plausibility are always included
+                if "pytest" not in validated_data["trusty_agents"]:
+                    validated_data["trusty_agents"].append("pytest")
+                if "plausibility" not in validated_data["trusty_agents"]:
+                    validated_data["trusty_agents"].append("plausibility")
 
             # Validate test file naming convention and location - only for files in tests/ directory
             for file_path in validated_data["write_files"]:
@@ -343,6 +354,13 @@ stick exactly to the following output_format, filling in between ...
                 
                 # Create ProtoBlock directly
                 try:
+                    # Ensure pytest and plausibility are always included in trusty_agents
+                    trusty_agents = data.get("trusty_agents", config.general.default_trusty_agents)
+                    if "pytest" not in trusty_agents:
+                        trusty_agents.append("pytest")
+                    if "plausibility" not in trusty_agents:
+                        trusty_agents.append("plausibility")
+                    
                     protoblock = ProtoBlock(
                         task_description=data["task"]["specification"],
                         pytest_specification=data["pytest"]["specification"],
@@ -352,7 +370,7 @@ stick exactly to the following output_format, filling in between ...
                         block_id=str(uuid.uuid4())[:6],
                         commit_message=f"tac: {data.get('commit_message', 'Update')}",
                         branch_name=data.get("branch_name"),
-                        trusty_agents=data.get("trusty_agents", config.general.default_trusty_agents)
+                        trusty_agents=trusty_agents
                     )
                     logger.info("\nProtoblock details:")
                     logger.info(f"🎯 Task: {protoblock.task_description}")
