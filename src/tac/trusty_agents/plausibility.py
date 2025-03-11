@@ -14,6 +14,28 @@ class PlausibilityTestingAgent(TrustyAgent):
     git diff and protoblock specifications using LLM.
     """
     
+    # Registration information
+    agent_name = "plausibility"
+    config_schema = {}  # No specific configuration needed
+    prompt_spec = "'plausibility': A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
+    
+    # Prompt content for the protoblock genesis prompt
+    plausibility_prompt = "Evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
+    
+    @classmethod
+    def get_prompt_sections(cls):
+        """
+        Get the prompt sections for this agent.
+        
+        Returns:
+            dict: A dictionary mapping section names to field dictionaries
+        """
+        return {
+            "plausibility": {
+                "evaluation": cls.plausibility_prompt
+            }
+        }
+    
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
         self.llm_client = LLMClient(strength="strong")
@@ -157,4 +179,7 @@ PLAUSIBILITY SCORE RATING:
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)
-            return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception" 
+            return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception"
+
+# Register this agent
+PlausibilityTestingAgent.register() 

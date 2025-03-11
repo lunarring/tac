@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Optional, Dict, Any, TypeVar, cast
+from typing import Tuple, Optional, Dict, Any, TypeVar, cast, ClassVar
 from functools import wraps
 
 from tac.blocks import ProtoBlock
@@ -14,7 +14,50 @@ class TrustyAgent(ABC):
     All trusty agents must implement the _check_impl method which evaluates
     a protoblock implementation and returns success status, error analysis,
     and failure type.
+    
+    Class attributes:
+        agent_name: Name of the agent for registration (defaults to class name)
+        config_schema: Schema describing the agent's configuration requirements
+        prompt_spec: Description of the agent for the protoblock genesis prompt
     """
+    
+    # Class variables for registration
+    agent_name: ClassVar[str] = ""
+    config_schema: ClassVar[Dict[str, Any]] = {}
+    prompt_spec: ClassVar[str] = ""
+    
+    @classmethod
+    def register(cls):
+        """Register this agent with the registry."""
+        try:
+            from tac.trusty_agents.registry import TrustyAgentRegistry
+            
+            if not cls.agent_name:
+                # Use class name if agent_name is not set
+                name = cls.__name__.lower()
+                if name.endswith('agent'):
+                    name = name[:-5]  # Remove 'agent' suffix if present
+                if name.endswith('testing'):
+                    name = name[:-7]  # Remove 'testing' suffix if present
+            else:
+                name = cls.agent_name
+                
+            # Default prompt spec if not provided
+            prompt_spec = cls.prompt_spec or f"'{name}': A trusty agent for verification"
+            
+            # Register with the registry
+            TrustyAgentRegistry.register(
+                name,
+                cls,
+                cls.config_schema,
+                prompt_spec
+            )
+            
+            logger.info(f"Registered trusty agent: {name}")
+        except Exception as e:
+            logger.error(f"Error registering trusty agent {cls.__name__}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
     
     def check(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
         """

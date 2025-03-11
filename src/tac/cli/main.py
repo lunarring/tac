@@ -263,9 +263,15 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     run_parser = subparsers.add_parser('make',
         help='Execute a task with automated tests based on instructions'
     )
+    # Also add log-level to the make subcommand to handle both positions
+    run_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
     run_parser.add_argument(
         'instructions',
-        nargs=argparse.REMAINDER,
+        nargs='+',  # Changed from REMAINDER to + to ensure it doesn't capture --log-level
         help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
     )
     run_parser.add_argument(
@@ -320,8 +326,8 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     
     # File gathering command
-    gather_parser = subparsers.add_parser('gather', 
-        help='Gather information about Python files in a directory'
+    gather_parser = subparsers.add_parser('gather',
+        help='Gather and analyze Python files in a directory'
     )
     gather_parser.add_argument(
         'directory',
@@ -357,16 +363,39 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         action='store_true',
         help='Include files and directories that start with a dot'
     )
+    gather_parser.add_argument(
+        '--format',
+        choices=['summary', 'full', 'json'],
+        default='summary',
+        help='Output format (default: summary)'
+    )
+    gather_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
     
     # Test command
     test_parser = subparsers.add_parser('test',
-        help='Test-related commands'
+        help='Run or list tests'
+    )
+    # Add log-level to the test subcommand
+    test_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
     )
     test_subparsers = test_parser.add_subparsers(dest='test_command', help='Test commands')
     
     # Run tests command
     run_test_parser = test_subparsers.add_parser('run',
-        help='Run tests found in tests/ subfolder'
+        help='Run tests'
+    )
+    # Add log-level to the run test subcommand
+    run_test_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
     )
     run_test_parser.add_argument(
         '--directory',
@@ -383,10 +412,16 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default='tests',
         help='Directory containing tests (default: tests)'
     )
+    # Add log-level to the list test subcommand
+    list_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
     
     # Optimize command
     optimize_parser = subparsers.add_parser('optimize',
-        help='Optimize a specific function in the codebase'
+        help='Optimize a Python function'
     )
     optimize_parser.add_argument(
         'function_name',
@@ -400,17 +435,29 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     optimize_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        help='Set the logging level for this command'
+        help='Set the logging level (default: from config)'
     )
     
     # View command
     view_parser = subparsers.add_parser('view',
-        help='Interactive viewer for logs and protoblocks'
+        help='View a protoblock in a GUI'
+    )
+    # Add log-level to the view subcommand
+    view_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
     )
     
     # Voice command
     voice_parser = subparsers.add_parser('voice',
-        help='Start the voice interface'
+        help='Start voice interface'
+    )
+    # Add log-level to the voice subcommand
+    voice_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
     )
     voice_parser.add_argument(
         '--codebase',
@@ -428,6 +475,22 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         '--no-git',
         action='store_true',
         help='Disable all git operations (branch checks, commits, etc.)'
+    )
+    
+    # Debug command
+    debug_parser = subparsers.add_parser('debug',
+        help='Debug commands for development'
+    )
+    # Add log-level to the debug subcommand
+    debug_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
+    debug_parser.add_argument(
+        '--prompt-sections',
+        action='store_true',
+        help='Print all registered prompt sections'
     )
     
     args = parser.parse_args()
@@ -452,6 +515,7 @@ def main():
     env_log_level = os.environ.get('TAC_LOG_LEVEL')
     
     # Command line args have second highest priority
+    # Check both global and subcommand log-level arguments
     cmd_log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else None
     
     # Config has lowest priority
@@ -614,11 +678,12 @@ def main():
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
 
-                        # Get task instructions directly from args.instructions or voice_instructions
+            # Get task instructions directly from args.instructions or voice_instructions
             if voice_ui is not None:
                 task_instructions = voice_ui.wait_until_prompt()
             else:
-                task_instructions = " ".join(args.instructions).strip() if isinstance(args.instructions, list) else args.instructions
+                # Ensure instructions are properly joined when using nargs='+'
+                task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
 
         
             if config.general.use_orchestrator:
@@ -659,6 +724,10 @@ def main():
         except Exception as e:
             logger.error(f"Error during execution: {e}")
             sys.exit(1)
+    elif args.command == 'debug':
+        if args.prompt_sections:
+            from tac.trusty_agents.registry import TrustyAgentRegistry
+            print(TrustyAgentRegistry.debug_prompt_sections())
     else:
         parser.print_help()
         sys.exit(1)

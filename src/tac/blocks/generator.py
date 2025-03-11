@@ -11,6 +11,7 @@ from tac.utils.project_files import ProjectFiles
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
 from .model import ProtoBlock
+from tac.trusty_agents.registry import TrustyAgentRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,17 @@ class ProtoBlockGenerator:
         Returns:
             str: Complete protoblock genesis prompt for the LLM
         """
-
         codebase = self.project_files.get_codebase_summary()
-
         
+        # Get the trusty agents prompt section
+        trusty_agents_section = TrustyAgentRegistry.generate_trusty_agents_prompt_section()
+        
+        # Get all agent-specific sections for the output format
+        agent_sections_output = TrustyAgentRegistry.generate_agent_sections_for_output_format()
+        
+        # Get all agent-specific sections for the output format explained
+        agent_sections_explained = TrustyAgentRegistry.generate_agent_sections_for_output_format_explained()
+
         return f"""<purpose>
     You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
 </purpose>
@@ -61,9 +69,13 @@ class ProtoBlockGenerator:
 - We will need to supply two kinds of files to the junior developer:
     - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!
     - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test.
-- Design a test that could be used to verify if the task has been implemented correctly, particularly if the integration is correct. The test should be as close as possible to the real usage of the code. However, it is possible that we do not need a unit test for the requested task, in which case you can skip this step.
+
 - Bring everything into the right format and structure as outlines below.
 </planning_rules>
+
+<trusty_agents>
+{trusty_agents_section}
+</trusty_agents>
 
 stick exactly to the following output_format, filling in between ...
 <output_format>
@@ -71,15 +83,17 @@ stick exactly to the following output_format, filling in between ...
     "task": {{
         "specification": "...",
     }},
-    "pytest": {{
-        "specification": "...",
-        "data": "..."
-    }},
+{agent_sections_output}
     "write_files": ["..."],
     "context_files": ["..."],
     "commit_message": "...",
-    "branch_name": "..."
-    
+    "branch_name": "...",
+    "trusty_agents": ["..."],
+    "trusty_agent_configs": {{
+        "agent_name": {{
+            // Configuration specific to each trusty agent
+        }}
+    }}
 }}
 </output_format_explained>
 
@@ -88,15 +102,17 @@ stick exactly to the following output_format, filling in between ...
     "task": {{
         "specification": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, however mainly in terms og goals that we want to achieve. Thus make a high level plan of what we want to implement and how this on a high level could be achieved. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive."
     }},
-    "pytest": {{
-        "specification": "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test.",
-        "data": "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
-    }},
+{agent_sections_explained}
     "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test."],
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes.",
     "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
-    "trusty_agents": ["List of trusty agents to use for this task. Default is taken from configuration. Common options include 'pytest', 'plausibility', 'linting', 'security', etc."]
+    "trusty_agents": ["List of trusty agents to use for this task. Choose from the agents described in the <trusty_agents> section. Default is taken from configuration."],
+    "trusty_agent_configs": {{
+        "agent_name": {{
+            // Configuration specific to each trusty agent as described in the <trusty_agents> section
+        }}
+    }}
 }}
 </output_format_explained>"""
 

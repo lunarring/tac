@@ -30,6 +30,7 @@ class ProtoBlock:
     context_files: list
     block_id: str
     trusty_agents: List[str] = None
+    trusty_agent_configs: Dict[str, Dict[str, Any]] = None
     branch_name: str = None
     commit_message: str = None
 
@@ -37,6 +38,10 @@ class ProtoBlock:
         # Set default value for trusty_agents from config if None
         if self.trusty_agents is None:
             self.trusty_agents = config.general.default_trusty_agents
+        
+        # Set default empty dict for trusty_agent_configs if None
+        if self.trusty_agent_configs is None:
+            self.trusty_agent_configs = {}
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -80,6 +85,7 @@ class ProtoBlock:
         commit_message = version_data.get('commit_message', '')
         branch_name = version_data.get('branch_name', '')
         trusty_agents = version_data.get('trusty_agents', config.general.default_trusty_agents)
+        trusty_agent_configs = version_data.get('trusty_agent_configs', {})
         
         # Create and return the ProtoBlock
         return cls(
@@ -91,7 +97,8 @@ class ProtoBlock:
             context_files=context_files,
             commit_message=commit_message,
             branch_name=branch_name,
-            trusty_agents=trusty_agents
+            trusty_agents=trusty_agents,
+            trusty_agent_configs=trusty_agent_configs
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -122,6 +129,7 @@ class ProtoBlock:
             "commit_message": self.commit_message,
             "branch_name": self.branch_name,
             "trusty_agents": self.trusty_agents,
+            "trusty_agent_configs": self.trusty_agent_configs,
             "timestamp": datetime.now().isoformat()
         }
         
@@ -173,5 +181,6 @@ class ProtoBlock:
             "commit_message": self.commit_message,
             "branch_name": self.branch_name,
             "block_id": self.block_id,
-            "trusty_agents": self.trusty_agents
+            "trusty_agents": self.trusty_agents,
+            "trusty_agent_configs": self.trusty_agent_configs
         }

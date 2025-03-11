@@ -153,6 +153,33 @@ class PytestTestingAgent(TrustyAgent):
     """
     A dedicated class for handling test execution and reporting using pytest.
     """
+    # Registration information
+    agent_name = "pytest"
+    config_schema = {
+        "specification": "Test specification describing what to test",
+        "data": "Test data generation instructions"
+    }
+    prompt_spec = "'pytest': A trusty agent that runs pytest tests to verify functionality. Requires test specification and test data generation instructions."
+    
+    # Prompt content for the protoblock genesis prompt
+    specification_prompt = "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. "
+    data_prompt = "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
+    
+    @classmethod
+    def get_prompt_sections(cls):
+        """
+        Get the prompt sections for this agent.
+        
+        Returns:
+            dict: A dictionary mapping section names to field dictionaries
+        """
+        return {
+            "pytest": {
+                "specification": cls.specification_prompt,
+                "data": cls.data_prompt
+            }
+        }
+    
     def __init__(self):
         init()  # Initialize colorama
         self.test_results = ""
@@ -396,4 +423,7 @@ class PytestTestingAgent(TrustyAgent):
                     except Exception as e:
                         logger.error(f"Failed to process file {filepath}: {e}")
         return modified_tests
+
+# Register this agent
+PytestTestingAgent.register()
 

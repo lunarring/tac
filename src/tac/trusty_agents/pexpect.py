@@ -213,11 +213,18 @@ class E2ETestRunner:
 
 class PexpectTestingAgent(TrustyAgent):
     """
-    A trusty agent that uses Pexpect to perform end-to-end testing of command-line applications.
+    A trusty agent that performs end-to-end testing using Pexpect.
     """
+    # Registration information
+    agent_name = "pexpect"
+    config_schema = {
+        "specification": "E2E test specification in e2e_tests code block format"
+    }
+    prompt_spec = "'pexpect': A trusty agent that performs end-to-end testing using Pexpect. Requires E2E test specification in the format ```e2e_tests [...]```."
+    
     def __init__(self):
-        self.test_runner = E2ETestRunner()
         self.test_results = []
+        self.runner = E2ETestRunner()
         self.report = ""
         
     def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
@@ -248,8 +255,8 @@ class PexpectTestingAgent(TrustyAgent):
             logger.info(f"Found {len(test_cases)} E2E test cases to run")
             
             # Run the tests
-            self.test_results = self.test_runner.run_tests(test_cases)
-            self.report = self.test_runner.generate_report()
+            self.test_results = self.runner.run_tests(test_cases)
+            self.report = self.runner.generate_report()
             
             # Check if all tests passed
             all_passed = all(result.success for result in self.test_results)
@@ -384,3 +391,6 @@ class PexpectTestingAgent(TrustyAgent):
             str: Formatted test report
         """
         return self.report 
+
+# Register this agent
+PexpectTestingAgent.register() 

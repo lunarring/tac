@@ -11,7 +11,8 @@ from datetime import datetime
 import git
 
 from tac.blocks.model import ProtoBlock
-from tac.blocks.generator import ProtoBlockGenerator
+# Remove direct import to break circular dependency
+# from tac.blocks.generator import ProtoBlockGenerator
 # Remove direct import to break circular dependency
 # from tac.blocks.executor import BlockExecutor
 from tac.coding_agents.aider import AiderAgent
@@ -53,6 +54,9 @@ class BlockProcessor:
         # Import BlockExecutor at runtime to avoid circular imports
         from tac.blocks.executor import BlockExecutor
         self.executor = BlockExecutor(config_override=config_override, codebase=codebase)
+        
+        # Import ProtoBlockGenerator at runtime to avoid circular imports
+        from tac.blocks.generator import ProtoBlockGenerator
         self.generator = ProtoBlockGenerator()
         
         # Use the appropriate git manager based on config

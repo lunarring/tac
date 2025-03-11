@@ -7,8 +7,10 @@ import shutil
 from typing import Tuple, Optional, List, Dict, Any
 # Fix circular import by importing directly from specific modules
 from tac.blocks.model import ProtoBlock
-from tac.blocks.processor import BlockProcessor
-from tac.blocks.generator import ProtoBlockGenerator
+# Remove direct import of BlockProcessor to avoid circular dependency
+# from tac.blocks.processor import BlockProcessor
+# Remove direct import of ProtoBlockGenerator to avoid circular dependency
+# from tac.blocks.generator import ProtoBlockGenerator
 from tac.utils.project_files import ProjectFiles
 from tac.core.log_config import setup_logging
 from tac.coding_agents.aider import AiderAgent
@@ -26,13 +28,78 @@ logger = setup_logging('tac.trusty_agents.performance')
 class PerformanceTestingAgent(TrustyAgent):
     """Class responsible for optimizing Python code functions."""
     
+    @classmethod
+    def get_prompt_sections(cls):
+        """
+        Get the prompt sections for this agent.
+        
+        Returns:
+            dict: A dictionary mapping section names to field dictionaries
+        """
+        return {
+            "performance": {
+                "function_name": "Name of the function to optimize. This should be a fully qualified name (e.g., 'module.submodule.function').",
+                "iterations": "Number of iterations to run for benchmarking. Default is 100."
+            }
+        }
+    
     def __init__(self, function_name: str = None, config = None):
         """Initialize the code optimizer.
         
         Args:
             function_name: Name of the function to optimize
-            config: Configuration object
+            config: Configuration for the optimizer
         """
+        self.function_name = function_name
+        self.config = config
+        self.project_files = ProjectFiles()
+        self.codebase = None
+        self.function_code = None
+        self.function_file = None
+        self.function_ast = None
+        self.function_node = None
+        self.function_body = None
+        self.function_args = None
+        self.function_returns = None
+        self.function_docstring = None
+        self.function_decorators = None
+        self.function_class = None
+        self.function_module = None
+        self.function_imports = None
+        self.function_globals = None
+        self.function_locals = None
+        self.function_nonlocals = None
+        self.function_calls = None
+        self.function_assignments = None
+        self.function_returns_node = None
+        self.function_yields = None
+        self.function_raises = None
+        self.function_asserts = None
+        self.function_loops = None
+        self.function_conditionals = None
+        self.function_try_excepts = None
+        self.function_with_statements = None
+        self.function_comprehensions = None
+        self.function_lambdas = None
+        self.function_generators = None
+        self.function_async = None
+        self.function_await = None
+        self.function_type_annotations = None
+        self.function_comments = None
+        self.function_line_count = None
+        self.function_complexity = None
+        self.function_cognitive_complexity = None
+        self.function_maintainability_index = None
+        self.function_halstead_metrics = None
+        self.function_cyclomatic_complexity = None
+        self.function_nesting_depth = None
+        self.function_fan_in = None
+        self.function_fan_out = None
+        self.function_coupling = None
+        self.function_cohesion = None
+        self.function_dependencies = None
+        self.function_dependents = None
+        
         logger.info("Initializing PerformanceTestingAgent")
         
         # Only initialize the full agent if function_name and config are provided
@@ -47,7 +114,6 @@ class PerformanceTestingAgent(TrustyAgent):
                 raise ValueError(f"Function '{function_name}' not found. Please provide a valid function name.")
             logger.info(f"Function file path: {self.fp_func}")
             self.fp_test = self.get_test_function(function_name)
-            self.factory = ProtoBlockGenerator()
             
             # Set up git manager (always use FakeGitManager for performance testing)
             logger.info("Using FakeGitManager for performance testing")
@@ -112,11 +178,11 @@ class PerformanceTestingAgent(TrustyAgent):
         # Ensure the function name starts with a letter or underscore
         if cleaned_name and not (cleaned_name[0].isalpha() or cleaned_name[0] == '_'):
             cleaned_name = 'f_' + cleaned_name
-            
+        
         # If the name is empty after cleaning, use a default
         if not cleaned_name:
             cleaned_name = "bad_error"
-            
+        
         return cleaned_name
 
     def get_test_function(self, function_name: str):
@@ -340,83 +406,90 @@ class PerformanceTestingAgent(TrustyAgent):
         return True
 
     def create_test_function(self):
-        protoblock = self.get_protoblock_test_function()
-        self.agent.run(protoblock)
-
+        try:
+            # Use lazy import to avoid circular dependency
+            from tac.blocks.processor import BlockProcessor
+            
+            # Get the protoblock genesis prompt
+            protoblock_genesis_prompt = self.get_protoblock_test_function()
+            
+            # Create a block processor
+            block_processor = BlockProcessor(protoblock_genesis_prompt)
+            
+            # Run the block processor
+            success = block_processor.run_loop()
+            
+            return success
+        except ImportError as e:
+            logger.error(f"Error importing BlockProcessor: {e}")
+            return False
+    
     def rewrite_function_agent(self):
-        protoblock = self.get_protoblock_performance_optimization()
-        self.agent.run(protoblock)
-
+        try:
+            # Use lazy import to avoid circular dependency
+            from tac.blocks.processor import BlockProcessor
+            
+            # Get the protoblock genesis prompt
+            protoblock_genesis_prompt = self.get_protoblock_performance_optimization()
+            
+            # Create a block processor
+            block_processor = BlockProcessor(protoblock_genesis_prompt)
+            
+            # Run the block processor
+            success = block_processor.run_loop()
+            
+            return success
+        except ImportError as e:
+            logger.error(f"Error importing BlockProcessor: {e}")
+            return False
 
     def get_protoblock_performance_optimization(self):
-            # First, get line profiling results
-            profiling_results = self.profile_function()
+        # First, get line profiling results
+        profile_results = self.profile_function()
+        
+        try:
+            # Use lazy import to avoid circular dependency
+            from tac.blocks.generator import ProtoBlockGenerator
             
-            task_description = f"""We want to optimize the performance of the {self.function_name} function. Importantly, the runtime of the function should be reduced, while the output should remain the same, see the test function in {self.fp_test}. You can use any method you want to optimize the function, but you need to make sure that the output of the function is the same as the original version, and you can remove unncecessary code. Be careful however, the critical thing is that we pass the test function, and keep in mind we are running this iteratively, so pick something that is likely to have a big impact and is safe.
-
-Additionally, here the line profiling results for the function to identify the bottlenecks:
-{profiling_results}
-        """
-            pytest_specification = "No tests need to be written, we are only optimizing the function"
-            pytest_data_generation = "No test data generation needed"
-            write_files = [self.fp_func]
-            context_files = [self.fp_test]
-            commit_message = "None"
-            test_results = None
-
-            protoblock = ProtoBlock(
-                task_description,
-                pytest_specification,
-                pytest_data_generation,
-                write_files,
-                context_files,
-                commit_message,
-                test_results,
-            )
-
-            return protoblock
+            # Create a protoblock for the optimization
+            task_instructions = f"Optimize the function {self.function_name} for better performance."
+            
+            # Get codebase content
+            codebase = self.project_files.get_codebase_summary()
+            
+            # Create the protoblock
+            factory = ProtoBlockGenerator()
+            protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(codebase, task_instructions)
+            
+            # Add profile results to the prompt
+            protoblock_genesis_prompt += f"\n\n<profile_results>\n{profile_results}\n</profile_results>"
+            
+            return protoblock_genesis_prompt
+        except ImportError as e:
+            logger.error(f"Error importing ProtoBlockGenerator: {e}")
+            # Fallback to a simple prompt
+            return f"Optimize the function {self.function_name} for better performance.\n\n<profile_results>\n{profile_results}\n</profile_results>"
 
     def get_protoblock_test_function(self):
-        task_description = f"""Generate a test function for the {self.function_name} function. The test HAS to have the following properties:
-    - Use the pytest.mark.performance decorator to mark it as a performance test
-    - Use pytest's benchmark fixture to measure the performance of the function
-    - Use snapshot testing to verify the correctness of the function output
-    - Create appropriate test input data that exercises the function's capabilities
-    - The test function name should follow the pattern test_{self.function_name}_output_snapshot
-    - The test should call the benchmark fixture with the function and input data
-    - Use snapshot.assert_match() to compare the output with the stored snapshot
-    - Convert any numpy arrays to lists before snapshot comparison using .tolist()
-    - The input data to test the function should be generated in the test function and be completely reproducible.
-    - Use realistic sizes for the input data, don't make it too small or too big
-    - Include necessary imports (pytest, numpy, etc.). Here is an example:
-    
-@pytest.mark.performance
-def test_bubu_output_snapshot(benchmark, snapshot):
-    input_arr = np.array([[0, np.pi/4], [np.pi/2, np.pi]])
-    # Run bubu with the benchmark fixture
-    output = benchmark(bubu, input_arr)
-    # Assert that the output matches the stored snapshot
-    snapshot.assert_match(output.tolist())
-    
-    """
-        pytest_specification = "we are only writing a test function, nothing else"
-        pytest_data_generation = f"""you need to have a careful look at {self.function_name} and decide what is a valid and reasonable input for the test function."""
-        write_files = [self.fp_test]
-        context_files = [self.fp_func]
-        commit_message = "None"
-        test_results = None
-
-        protoblock = ProtoBlock(
-            task_description,
-            pytest_specification,
-            pytest_data_generation,
-            write_files,
-            context_files,
-            commit_message,
-            test_results,
-        )
-
-        return protoblock
+        try:
+            # Use lazy import to avoid circular dependency
+            from tac.blocks.generator import ProtoBlockGenerator
+            
+            # Create a protoblock for the test function
+            task_instructions = f"Create a test function for {self.function_name} to verify its correctness."
+            
+            # Get codebase content
+            codebase = self.project_files.get_codebase_summary()
+            
+            # Create the protoblock
+            factory = ProtoBlockGenerator()
+            protoblock_genesis_prompt = factory.get_protoblock_genesis_prompt(codebase, task_instructions)
+            
+            return protoblock_genesis_prompt
+        except ImportError as e:
+            logger.error(f"Error importing ProtoBlockGenerator: {e}")
+            # Fallback to a simple prompt
+            return f"Create a test function for {self.function_name} to verify its correctness."
 
     def run_test_function(self, update_snapshots=False):
         """Run the test function and extract performance statistics.
@@ -885,3 +958,14 @@ The profiling failed, likely because we couldn't determine the correct test data
 You can still proceed with optimization without the profiling results.
 """
                 return error_msg 
+
+# Add agent registration
+PerformanceTestingAgent.agent_name = "performance"
+PerformanceTestingAgent.config_schema = {
+    "function_name": "Name of the function to optimize",
+    "iterations": "Number of iterations to run for benchmarking"
+}
+PerformanceTestingAgent.prompt_spec = "'performance': A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize."
+
+# Register this agent
+PerformanceTestingAgent.register() 
