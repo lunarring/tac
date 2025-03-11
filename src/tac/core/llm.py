@@ -3,10 +3,11 @@
 import os
 import base64
 from enum import Enum
-from typing import List, Dict, Optional, Union, Any
+from typing import List, Dict, Optional, Union, Any, Tuple
 from dataclasses import dataclass
 import logging
 import requests
+from PIL import Image
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from tac.core.log_config import setup_logging
@@ -224,12 +225,37 @@ class LLMClient:
         Returns:
             str: The content of the model's response message
         """
-        # Encode image to base64
+        # Verify the image exists
+        if not os.path.exists(image_path):
+            error_msg = f"Image file not found: {image_path}"
+            logger.error(error_msg)
+            return f"Vision LLM failure: {error_msg}"
+        
+        # Process the image to ensure it's in a compatible format
         try:
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+            # Open and convert the image to ensure it's in a compatible format
+            with Image.open(image_path) as img:
+                # Create a temporary file for the processed image
+                temp_dir = os.path.dirname(image_path)
+                temp_filename = f"processed_{os.path.basename(image_path)}"
+                processed_path = os.path.join(temp_dir, temp_filename)
+                
+                # Convert to RGB and save as JPEG (most compatible format)
+                img_rgb = img.convert('RGB')
+                img_rgb.save(processed_path, format='JPEG')
+                logger.info(f"Image processed and saved to {processed_path}")
+                
+                # Read the processed image
+                with open(processed_path, "rb") as image_file:
+                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+                
+                # Clean up the temporary file
+                try:
+                    os.remove(processed_path)
+                except Exception as e:
+                    logger.warning(f"Failed to remove temporary processed image: {str(e)}")
         except Exception as e:
-            error_msg = f"Failed to read image file: {str(e)}"
+            error_msg = f"Failed to process image: {str(e)}"
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
@@ -294,6 +320,39 @@ class LLMClient:
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
 
+    def analyze_screenshot(
+        self,
+        program_runner,
+        prompt: str,
+        temperature: Optional[float] = None,
+    ) -> str:
+        """
+        Analyze a screenshot taken by a ProgramRunner using vision model.
+        
+        Args:
+            program_runner: An instance of ProgramRunner that has taken a screenshot
+            prompt: The prompt to send to the vision model
+            temperature: Controls randomness (0.0 to 1.0)
+            
+        Returns:
+            str: The content of the model's response message
+        """
+        # Get the screenshot path from the program runner
+        screenshot_path = program_runner.get_screenshot_path()
+        if not screenshot_path or not os.path.exists(screenshot_path):
+            error_msg = "No screenshot available or screenshot file not found"
+            logger.error(error_msg)
+            return f"Vision LLM failure: {error_msg}"
+        
+        # Create messages for the vision model
+        messages = [
+            Message(role="system", content="You are a helpful assistant that can analyze images"),
+            Message(role="user", content=prompt)
+        ]
+        
+        # Send the screenshot to the vision model
+        return self.vision_chat_completion(messages, screenshot_path, temperature)
+
 # Example usage:
 if __name__ == "__main__":
     # Example messages
@@ -323,7 +382,7 @@ if __name__ == "__main__":
         client_vision = LLMClient(llm_type="vision")
         vision_messages = [
             Message(role="system", content="You are a helpful assistant that can analyze images"),
-            Message(role="user", content="What do you see in this image? Please describe it in detail.")
+            Message(role="user", content="Do you see a black background and a red dot in the middle?")
         ]
         print(f"Analyzing image at: {image_path}")
         response_vision = client_vision.vision_chat_completion(vision_messages, image_path)
