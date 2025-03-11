@@ -231,31 +231,28 @@ class LLMClient:
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
-        # Process the image to ensure it's in a compatible format
+        # Encode image to base64
         try:
-            # Open and convert the image to ensure it's in a compatible format
-            with Image.open(image_path) as img:
-                # Create a temporary file for the processed image
-                temp_dir = os.path.dirname(image_path)
-                temp_filename = f"processed_{os.path.basename(image_path)}"
-                processed_path = os.path.join(temp_dir, temp_filename)
+            # Read the image directly without processing
+            with open(image_path, "rb") as image_file:
+                image_bytes = image_file.read()
                 
-                # Convert to RGB and save as JPEG (most compatible format)
-                img_rgb = img.convert('RGB')
-                img_rgb.save(processed_path, format='JPEG')
-                logger.info(f"Image processed and saved to {processed_path}")
+            # Determine image format from file extension
+            image_ext = os.path.splitext(image_path)[1].lower()
+            if image_ext in ['.jpg', '.jpeg']:
+                mime_type = 'image/jpeg'
+            elif image_ext == '.png':
+                mime_type = 'image/png'
+            else:
+                # Default to JPEG if unknown
+                mime_type = 'image/jpeg'
                 
-                # Read the processed image
-                with open(processed_path, "rb") as image_file:
-                    base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-                
-                # Clean up the temporary file
-                try:
-                    os.remove(processed_path)
-                except Exception as e:
-                    logger.warning(f"Failed to remove temporary processed image: {str(e)}")
+            # Encode to base64
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            logger.info(f"Image encoded successfully: {image_path} as {mime_type}")
+            
         except Exception as e:
-            error_msg = f"Failed to process image: {str(e)}"
+            error_msg = f"Failed to encode image: {str(e)}"
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
@@ -272,7 +269,7 @@ class LLMClient:
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
+                                "url": f"data:{mime_type};base64,{base64_image}"
                             }
                         }
                     ]
@@ -320,39 +317,6 @@ class LLMClient:
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
 
-    def analyze_screenshot(
-        self,
-        program_runner,
-        prompt: str,
-        temperature: Optional[float] = None,
-    ) -> str:
-        """
-        Analyze a screenshot taken by a ProgramRunner using vision model.
-        
-        Args:
-            program_runner: An instance of ProgramRunner that has taken a screenshot
-            prompt: The prompt to send to the vision model
-            temperature: Controls randomness (0.0 to 1.0)
-            
-        Returns:
-            str: The content of the model's response message
-        """
-        # Get the screenshot path from the program runner
-        screenshot_path = program_runner.get_screenshot_path()
-        if not screenshot_path or not os.path.exists(screenshot_path):
-            error_msg = "No screenshot available or screenshot file not found"
-            logger.error(error_msg)
-            return f"Vision LLM failure: {error_msg}"
-        
-        # Create messages for the vision model
-        messages = [
-            Message(role="system", content="You are a helpful assistant that can analyze images"),
-            Message(role="user", content=prompt)
-        ]
-        
-        # Send the screenshot to the vision model
-        return self.vision_chat_completion(messages, screenshot_path, temperature)
-
 # Example usage:
 if __name__ == "__main__":
     # Example messages
@@ -362,16 +326,16 @@ if __name__ == "__main__":
     ]
     
     # Example with weak model (default)
-    print("Using weak model:")
-    client_weak = LLMClient(llm_type="weak")
-    response_weak = client_weak.chat_completion(messages)
-    print(response_weak)
+    # print("Using weak model:")
+    # client_weak = LLMClient(llm_type="weak")
+    # response_weak = client_weak.chat_completion(messages)
+    # print(response_weak)
     
-    # Example with strong model
-    print("\nUsing strong model:")
-    client_strong = LLMClient(llm_type="strong")
-    response_strong = client_strong.chat_completion(messages)
-    print(response_strong)
+    # # Example with strong model
+    # print("\nUsing strong model:")
+    # client_strong = LLMClient(llm_type="strong")
+    # response_strong = client_strong.chat_completion(messages)
+    # print(response_strong)
     
     # Example with vision model
     print("\nUsing vision model:")
@@ -382,7 +346,7 @@ if __name__ == "__main__":
         client_vision = LLMClient(llm_type="vision")
         vision_messages = [
             Message(role="system", content="You are a helpful assistant that can analyze images"),
-            Message(role="user", content="Do you see a black background and a red dot in the middle?")
+            Message(role="user", content="Do you see a white background and a blue dot in the middle? Answer with ONLY :here you add an explanation what you see in the image")
         ]
         print(f"Analyzing image at: {image_path}")
         response_vision = client_vision.vision_chat_completion(vision_messages, image_path)
