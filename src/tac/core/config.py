@@ -69,7 +69,7 @@ class LLMConfig:
 @dataclass
 class LoggingConfig:
     tac: Dict[str, Any] = field(default_factory=lambda: {
-        "level": "INFO",
+        "level": "DEBUG",
         "color": "green"
     })
     other_packages: Dict[str, Any] = field(default_factory=lambda: {
