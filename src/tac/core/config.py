@@ -110,6 +110,16 @@ class Config:
             timeout=120
         )
     ))
+    llm_vision: LLMConfig = field(default_factory=lambda: LLMConfig(
+        provider="openai",
+        model="gpt-4o",
+        settings=LLMSettings(
+            temperature=0.7,
+            max_tokens=None,
+            verify_ssl=True,
+            timeout=180
+        )
+    ))
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
@@ -146,6 +156,7 @@ class ConfigManager:
             'aider': vars(self._config.aider),
             'llm_strong': vars(self._config.llm_strong),
             'llm_weak': vars(self._config.llm_weak),
+            'llm_vision': vars(self._config.llm_vision),
             'logging': vars(self._config.logging)
         }
 
@@ -164,9 +175,13 @@ class ConfigManager:
         """Get aider configuration."""
         return self._config.aider
 
-    def get_llm_config(self, strength: str = "weak") -> LLMConfig:
-        """Get LLM configuration for specified strength."""
-        return getattr(self._config, f"llm_{strength}")
+    def get_llm_config(self, llm_type: str = "weak") -> LLMConfig:
+        """Get LLM configuration for specified type.
+        
+        Args:
+            llm_type: Type of LLM to use ("weak", "strong", or "vision", defaults to "weak")
+        """
+        return getattr(self._config, f"llm_{llm_type}")
 
     @property
     def logging(self) -> LoggingConfig:

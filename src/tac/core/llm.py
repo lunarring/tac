@@ -1,10 +1,12 @@
 """Module for handling LLM (Language Model) interactions."""
 
 import os
+import base64
 from enum import Enum
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 from dataclasses import dataclass
 import logging
+import requests
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from tac.core.log_config import setup_logging
@@ -26,15 +28,15 @@ class Message:
 class LLMClient:
     """Client for interacting with Language Models."""
     
-    def __init__(self, config_override: Optional[Dict] = None, strength: str = "weak"):
+    def __init__(self, config_override: Optional[Dict] = None, llm_type: str = "weak"):
         """Initialize client with config from file or provided config.
         
         Args:
             config_override: Optional config override dictionary
-            strength: Whether to use strong or weak LLM ("strong" or "weak", defaults to "weak")
+            llm_type: Type of LLM to use ("weak", "strong", or "vision", defaults to "weak")
         """
         # Get config from centralized config
-        llm_config = config.get_llm_config(strength)
+        llm_config = config.get_llm_config(llm_type)
         if config_override:
             # Override settings if provided
             for key, value in config_override.items():
@@ -205,6 +207,93 @@ class LLMClient:
         
         return '\n'.join(cleaned_lines)
 
+    def vision_chat_completion(
+        self,
+        messages: List[Message],
+        image_path: str,
+        temperature: Optional[float] = None,
+    ) -> str:
+        """
+        Send a vision chat completion request to the LLM with an image.
+        
+        Args:
+            messages: List of messages in the conversation
+            image_path: Path to the image file
+            temperature: Controls randomness (0.0 to 1.0)
+            
+        Returns:
+            str: The content of the model's response message
+        """
+        # Encode image to base64
+        try:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        except Exception as e:
+            error_msg = f"Failed to read image file: {str(e)}"
+            logger.error(error_msg)
+            return f"Vision LLM failure: {error_msg}"
+        
+        # Convert messages to the format expected by the API
+        formatted_messages = []
+        
+        for i, msg in enumerate(messages):
+            # For the last user message, add the image
+            if i == len(messages) - 1 and msg.role == "user":
+                formatted_messages.append({
+                    "role": msg.role,
+                    "content": [
+                        {"type": "text", "text": msg.content},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                })
+            else:
+                formatted_messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+        
+        # Prepare completion parameters
+        params = {
+            "model": self.config.model,
+            "messages": formatted_messages,
+            "stream": False,
+            "timeout": self.config.settings.timeout,
+        }
+        
+        # Use settings from config if not overridden
+        if temperature is None:
+            temperature = self.config.settings.temperature
+        params["temperature"] = temperature
+        
+        max_tokens = self.config.settings.max_tokens
+        if max_tokens:
+            params["max_tokens"] = max_tokens
+            
+        try:
+            logger.debug(f"Vision LLM pre: Params: {params}")
+            response = self.client.chat.completions.create(**params)
+            logger.debug(f"Vision LLM post: {response}")
+            if not response or not response.choices:
+                raise ValueError("Empty response received from API")
+            return response.choices[0].message.content
+        except Exception as e:
+            provider_name = self.config.provider.capitalize()
+            # Add more detailed error information
+            error_msg = f"{provider_name} Vision API call failed: {str(e)}"
+            if hasattr(e, 'response'):
+                error_msg += f"\nResponse status: {e.response.status_code}"
+                try:
+                    error_msg += f"\nResponse body: {e.response.text}"
+                except:
+                    pass
+            logger.error(error_msg)
+            return f"Vision LLM failure: {error_msg}"
+
 # Example usage:
 if __name__ == "__main__":
     # Example messages
@@ -213,9 +302,31 @@ if __name__ == "__main__":
         Message(role="user", content="Hello!")
     ]
     
-    # Create client with default config
-    client = LLMClient()
+    # Example with weak model (default)
+    print("Using weak model:")
+    client_weak = LLMClient(llm_type="weak")
+    response_weak = client_weak.chat_completion(messages)
+    print(response_weak)
     
-    # Get completion
-    response = client.chat_completion(messages)
-    print(response)  # Now directly prints the message content 
+    # Example with strong model
+    print("\nUsing strong model:")
+    client_strong = LLMClient(llm_type="strong")
+    response_strong = client_strong.chat_completion(messages)
+    print(response_strong)
+    
+    # Example with vision model
+    print("\nUsing vision model:")
+    image_path = os.path.expanduser("~/Downloads/tmpip7ugsgv.png")
+    
+    # Check if the image exists
+    if os.path.exists(image_path):
+        client_vision = LLMClient(llm_type="vision")
+        vision_messages = [
+            Message(role="system", content="You are a helpful assistant that can analyze images"),
+            Message(role="user", content="What do you see in this image? Please describe it in detail.")
+        ]
+        print(f"Analyzing image at: {image_path}")
+        response_vision = client_vision.vision_chat_completion(vision_messages, image_path)
+        print(response_vision)
+    else:
+        print(f"Image not found at {image_path}. Vision example skipped.") 
