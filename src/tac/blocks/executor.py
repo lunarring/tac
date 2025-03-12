@@ -14,6 +14,7 @@ import shutil
 from tac.trusty_agents.pytest import PytestTestingAgent
 from tac.trusty_agents.plausibility import PlausibilityTestingAgent
 from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.trusty_agents.vision import VisionTestingAgent
 from tac.trusty_agents.base import TrustyAgent
 logger = setup_logging('tac.blocks.executor')
 
@@ -47,6 +48,8 @@ class BlockExecutor:
         self.trusty_agents['plausibility'] = PlausibilityTestingAgent()
         # Initialize PerformanceTestingAgent with no arguments for the base implementation
         self.trusty_agents['performance'] = PerformanceTestingAgent()
+        # Initialize VisionTestingAgent
+        self.trusty_agents['vision'] = VisionTestingAgent()
 
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
