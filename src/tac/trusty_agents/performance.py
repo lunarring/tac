@@ -28,21 +28,6 @@ logger = setup_logging('tac.trusty_agents.performance')
 class PerformanceTestingAgent(TrustyAgent):
     """Class responsible for optimizing Python code functions."""
     
-    @classmethod
-    def get_prompt_sections(cls):
-        """
-        Get the prompt sections for this agent.
-        
-        Returns:
-            dict: A dictionary mapping section names to field dictionaries
-        """
-        return {
-            "performance": {
-                "function_name": "Name of the function to optimize. This should be a fully qualified name (e.g., 'module.submodule.function').",
-                "iterations": "Number of iterations to run for benchmarking. Default is 100."
-            }
-        }
-    
     def __init__(self, function_name: str = None, config = None):
         """Initialize the code optimizer.
         
@@ -961,11 +946,8 @@ You can still proceed with optimization without the profiling results.
 
 # Add agent registration
 PerformanceTestingAgent.agent_name = "performance"
-PerformanceTestingAgent.config_schema = {
-    "function_name": "Name of the function to optimize",
-    "iterations": "Number of iterations to run for benchmarking"
-}
-PerformanceTestingAgent.prompt_spec = "'performance': A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize."
+PerformanceTestingAgent.protoblock_prompt = "A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize."
+PerformanceTestingAgent.description = "A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize."
 
 # Register this agent
 PerformanceTestingAgent.register() 

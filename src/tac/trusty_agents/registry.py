@@ -6,16 +6,16 @@ class TrustyAgentRegistry:
     """Registry for all trusty agents in the system."""
     
     _registry = {}
-    _config_schemas = {}
-    _prompt_specs = {}
+    _protoblock_prompts = {}
+    _descriptions = {}
     _prompt_sections = {}
     
     @classmethod
-    def register(cls, name, agent_class, config_schema=None, prompt_spec=None):
+    def register(cls, name, agent_class, protoblock_prompt=None, description=None):
         """Register a trusty agent with the system."""
         cls._registry[name] = agent_class
-        cls._config_schemas[name] = config_schema or {}
-        cls._prompt_specs[name] = prompt_spec or f"'{name}': A trusty agent for verification"
+        cls._protoblock_prompts[name] = protoblock_prompt or ""
+        cls._descriptions[name] = description or f"'{name}': A trusty agent for verification"
         
         # Register any prompt sections defined by the agent
         if hasattr(agent_class, "get_prompt_sections") and callable(getattr(agent_class, "get_prompt_sections")):
@@ -32,9 +32,9 @@ class TrustyAgentRegistry:
         return cls._registry.get(name)
     
     @classmethod
-    def get_config_schema(cls, name):
-        """Get the configuration schema for an agent."""
-        return cls._config_schemas.get(name, {})
+    def get_protoblock_prompt(cls, name):
+        """Get the protoblock prompt for an agent."""
+        return cls._protoblock_prompts.get(name, "")
     
     @classmethod
     def get_all_agents(cls):
@@ -42,11 +42,21 @@ class TrustyAgentRegistry:
         return list(cls._registry.keys())
     
     @classmethod
+    def get_trusty_agents_description(cls):
+        """
+        Get a dictionary of all registered trusty agents and their descriptions.
+        
+        Returns:
+            dict: A dictionary mapping agent names to their descriptions
+        """
+        return {name: desc for name, desc in cls._descriptions.items()}
+    
+    @classmethod
     def generate_trusty_agents_prompt_section(cls):
         """Generate the trusty agents section for the protoblock genesis prompt."""
         sections = []
-        for name, spec in cls._prompt_specs.items():
-            sections.append(f"    {spec}")
+        for name, desc in cls._descriptions.items():
+            sections.append(f"    {desc}")
         
         if not sections:
             return "    No trusty agents are currently registered."
@@ -62,19 +72,15 @@ class TrustyAgentRegistry:
             section_name: The name of the prompt section to get
             
         Returns:
-            dict: A dictionary mapping field names to their prompt content
+            str: The prompt content for the section, or empty string if not found
         """
-        result = {}
-        
-        # Collect all fields for this section from all agents
+        # Look for the section in all registered agents
         for agent_name, sections in cls._prompt_sections.items():
             if section_name in sections:
-                for field_name, content in sections[section_name].items():
-                    # Only use the first agent's content for each field
-                    if field_name not in result:
-                        result[field_name] = content
+                return sections[section_name]
         
-        return result
+        # Return empty string if section not found
+        return ""
         
     @classmethod
     def get_agent_prompt_sections_for_output_format(cls):
@@ -82,7 +88,7 @@ class TrustyAgentRegistry:
         Get all agent-specific prompt sections for the output format.
         
         Returns:
-            dict: A dictionary mapping section names to their field dictionaries
+            dict: A dictionary mapping section names to their prompt content
         """
         result = {}
         
@@ -92,14 +98,9 @@ class TrustyAgentRegistry:
         
         # Collect all sections from all agents
         for agent_name, sections in cls._prompt_sections.items():
-            for section_name, fields in sections.items():
+            for section_name, content in sections.items():
                 if section_name not in result:
-                    result[section_name] = fields
-                else:
-                    # Merge fields from different agents for the same section
-                    for field_name, content in fields.items():
-                        if field_name not in result[section_name]:
-                            result[section_name][field_name] = content
+                    result[section_name] = content
         
         return result
         
@@ -118,13 +119,10 @@ class TrustyAgentRegistry:
             
         result = ""
         
-        for section_name, fields in sections.items():
-            result += f'    "{section_name}": {{\n'
-            for field_name, content in fields.items():
-                # Escape any quotes in the content
-                escaped_content = content.replace('"', '\\"')
-                result += f'        "{field_name}": "{escaped_content}",\n'
-            result = result.rstrip(',\n') + '\n    }},\n'
+        for section_name, content in sections.items():
+            # Escape any quotes in the content
+            escaped_content = content.replace('"', '\\"')
+            result += f'    "{section_name}": "{escaped_content}",\n'
         
         return result.rstrip(',\n')
     
@@ -143,11 +141,8 @@ class TrustyAgentRegistry:
             
         result = ""
         
-        for section_name, fields in sections.items():
-            result += f'    "{section_name}": {{\n'
-            for field_name in fields.keys():
-                result += f'        "{field_name}": "...",\n'
-            result = result.rstrip(',\n') + '\n    }},\n'
+        for section_name in sections.keys():
+            result += f'    "{section_name}": "...",\n'
         
         return result.rstrip(',\n')
     
@@ -167,12 +162,10 @@ class TrustyAgentRegistry:
         # Print all prompt sections
         for agent_name, sections in cls._prompt_sections.items():
             result += f"  Agent: {agent_name}\n"
-            for section_name, fields in sections.items():
-                result += f"    Section: {section_name}\n"
-                for field_name, content in fields.items():
-                    # Truncate content if it's too long
-                    content_preview = content[:50] + "..." if len(content) > 50 else content
-                    result += f"      Field: {field_name} = {content_preview}\n"
+            for section_name, content in sections.items():
+                # Truncate content if it's too long
+                content_preview = content[:50] + "..." if len(content) > 50 else content
+                result += f"    Section: {section_name} = {content_preview}\n"
         
         if not cls._prompt_sections:
             result += "  No prompt sections registered.\n"

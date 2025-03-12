@@ -204,7 +204,7 @@ class MultiBlockOrchestrator:
     
     def __init__(self):
         logger.info("Initializing MultiBlockOrchestrator")
-        self.llm_client = LLMClient(strength="strong")
+        self.llm_client = LLMClient(llm_type="strong")
     
     def execute(self, task_instructions: str, codebase: str, args=None, voice_ui=None, git_manager=None):
         """

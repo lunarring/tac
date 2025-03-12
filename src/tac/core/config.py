@@ -21,7 +21,6 @@ class GitConfig:
 class GeneralConfig:
     agent_type: str = "native"
     reasoning_effort: str = "medium"
-    use_orchestrator: bool = False
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
     run_error_analysis: bool = True  # Whether to run error analysis after failures
@@ -34,6 +33,7 @@ class GeneralConfig:
     test_path: str = "tests/"  # Add default test path
     save_protoblock: bool = False  # Whether to save protoblocks to disk
     default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
+    use_orchestrator: bool = False
     confirm_multiblock_execution: bool = False  # Whether to ask for confirmation before executing multiblock chunks
 
 

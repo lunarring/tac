@@ -16,29 +16,12 @@ class PlausibilityTestingAgent(TrustyAgent):
     
     # Registration information
     agent_name = "plausibility"
-    config_schema = {}  # No specific configuration needed
-    prompt_spec = "'plausibility': A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
-    
-    # Prompt content for the protoblock genesis prompt
-    plausibility_prompt = "Evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
-    
-    @classmethod
-    def get_prompt_sections(cls):
-        """
-        Get the prompt sections for this agent.
-        
-        Returns:
-            dict: A dictionary mapping section names to field dictionaries
-        """
-        return {
-            "plausibility": {
-                "evaluation": cls.plausibility_prompt
-            }
-        }
+    protoblock_prompt = "Evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
+    description = "A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
     
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
-        self.llm_client = LLMClient(strength="strong")
+        self.llm_client = LLMClient(llm_type="strong")
         self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
         self._min_score = config.general.minimum_plausibility_score
 

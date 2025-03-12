@@ -121,7 +121,7 @@ class ProtoBlock:
             },
             "test": {
                 "specification": self.pytest_specification,
-                "data": self.pytest_data_generation,
+                "data": self.pytest_specification,  # Use the same value for backward compatibility
                 "replacements": write_files
             },
             "write_files": write_files,
@@ -174,7 +174,7 @@ class ProtoBlock:
             },
             "test": {
                 "specification": self.pytest_specification,
-                "data": self.pytest_data_generation
+                "data": self.pytest_specification  # Use the same value for backward compatibility
             },
             "write_files": self.write_files,
             "context_files": self.context_files,

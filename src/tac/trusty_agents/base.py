@@ -13,18 +13,18 @@ class TrustyAgent(ABC):
     
     All trusty agents must implement the _check_impl method which evaluates
     a protoblock implementation and returns success status, error analysis,
-    and failure type.
+    and failure type.A trusty agent for verification
     
     Class attributes:
         agent_name: Name of the agent for registration (defaults to class name)
-        config_schema: Schema describing the agent's configuration requirements
-        prompt_spec: Description of the agent for the protoblock genesis prompt
+        protoblock_prompt: Prompt content for the protoblock genesis prompt
+        description: Description of the agent for the protoblock genesis prompt
     """
     
     # Class variables for registration
     agent_name: ClassVar[str] = ""
-    config_schema: ClassVar[Dict[str, Any]] = {}
-    prompt_spec: ClassVar[str] = ""
+    protoblock_prompt: ClassVar[str] = ""
+    description: ClassVar[str] = ""
     
     @classmethod
     def register(cls):
@@ -42,15 +42,15 @@ class TrustyAgent(ABC):
             else:
                 name = cls.agent_name
                 
-            # Default prompt spec if not provided
-            prompt_spec = cls.prompt_spec or f"'{name}': A trusty agent for verification"
+            # Default description if not provided
+            description = cls.description or f"'{name}': A trusty agent for verification"
             
             # Register with the registry
             TrustyAgentRegistry.register(
                 name,
                 cls,
-                cls.config_schema,
-                prompt_spec
+                cls.protoblock_prompt,
+                description
             )
             
             logger.info(f"Registered trusty agent: {name}")
@@ -137,3 +137,30 @@ class TrustyAgent(ABC):
             - str: Failure type description (empty string if success is True)
         """
         pass 
+
+    @classmethod
+    def get_prompt_sections(cls):
+        """
+        Get the prompt sections for this agent.
+        
+        By default, this returns a dictionary with a single section named after the agent_name,
+        with the protoblock_prompt as its value.
+        
+        Subclasses can override this method to provide custom prompt sections.
+        
+        Returns:
+            dict: A dictionary mapping section names to their prompt content
+        """
+        # Get the agent name, defaulting to the lowercase class name if not set
+        name = cls.agent_name
+        if not name:
+            name = cls.__name__.lower()
+            if name.endswith('agent'):
+                name = name[:-5]  # Remove 'agent' suffix if present
+            if name.endswith('testing'):
+                name = name[:-7]  # Remove 'testing' suffix if present
+                
+        # Return a dictionary with a single section named after the agent
+        return {
+            name: cls.protoblock_prompt
+        } 

@@ -17,168 +17,16 @@ from tac.trusty_agents.base import TrustyAgent
 logger = setup_logging('tac.trusty_agents.pytest')
 
 
-class ErrorAnalyzer:
-    """Analyzes test failures and implementation errors to provide insights using LLM"""
-    
-    def __init__(self):
-        logger.info("Initializing ErrorAnalyzer")
-        self.llm_client = LLMClient(strength="strong")
-        self.project_files = ProjectFiles()
-
-
-
-    def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
-        """
-        Analyzes test failures and implementation errors using LLM.
-        
-        Args:
-            protoblock: The ProtoBlock that failed
-            test_results: The test results/error output
-            codebase: Dictionary mapping file paths to their contents or string content
-            
-        Returns:
-            str: Detailed analysis of what went wrong and suggestions for improvement
-        """
-        logger.info("Starting LLM-based failure analysis")
-        logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
-        logger.debug(f"Test results length: {len(test_results) if test_results else 'None'}")
-        
-        try:
-            # Use centralized config
-            use_summaries = config.general.use_file_summaries
-            logger.info(f"Using file summaries: {use_summaries}")
-            
-            # Format codebase for prompt
-            logger.info("Formatting codebase for LLM prompt")
-            codebase_content = []
-            
-            # Handle string codebase
-            if isinstance(codebase, str):
-                codebase_content.append(f"Codebase Content:\n```python\n{codebase}\n```")
-            else:
-                # Handle dictionary codebase
-                logger.debug(f"Codebase files to analyze: {list(codebase.keys())}")
-                for path, content in codebase.items():
-                    logger.debug(f"Processing file: {path}")
-                    if use_summaries:
-                        # Use existing summaries instead of generating new ones
-                        summary = self.project_files._load_existing_summaries().get(path, {}).get('summary')
-                        if summary:
-                            file_content = f"File Summary:\n{summary}"
-                        else:
-                            file_content = content
-                    else:
-                        file_content = content
-                    codebase_content.append(f"File: {path}\n```python\n{file_content}\n```")
-            
-            codebase_str = "\n\n".join(codebase_content)
-            logger.debug(f"Formatted codebase length: {len(codebase_str)} characters")
-            
-            # Prepare prompt
-            analysis_prompt = f"""<purpose>
-You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements. The information for the junior software engineer who failed at their attempt is given in the <protoblock> section, the codebase in <codebase_str>, the test results in <test_results>. Your concrete analysis rules are given in <analysis_rules>.
-</purpose>
-
-<codebase_state>
-{codebase_str}
-</codebase_state>
-
-<protoblock>
-Task Description: {protoblock.task_description}
-Test Specification: {protoblock.pytest_specification}
-Test Data: {protoblock.pytest_data_generation}
-Write Files: {protoblock.write_files}
-Context Files: {protoblock.context_files}
-</protoblock>
-
-<test_results>
-{test_results}
-</test_results>
-
-<analysis_rules>
-1. First identify the type of failure (syntax error, runtime error, test assertion, etc.)
-2. Gather understanding whether the error is due to an already existing test, that needs to be updated, because the protoblock makes it necessary to change existing tests.
-3. In case the error is due to an already existing test, that needs to be updated, provide a detailed description of how to update the test.
-4. In case the error is due to a missing file, list the files that need to be created.
-5. In case the error is due to a missing import, list the imports that need to be added.
-</analysis_rules>
-
-<output_format>
-Provide your analysis in the following structure:
-
-NEW STRATEGY FOR SOLVING THE TASK:
-(In more detail describe how the next implementation attempt should look like based on whst you learned from the previois attempt.)
-
-MISSING WRITE FILES:
-(so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If there are files missing, directly mention them here in a list, without any additional text e.g. your reply is ["tests/test_piano_trainer_main.py"])
-</output_format>"""
-
-            messages = [
-                Message(role="system", content="You are a coding assistant specialized in analyzing test failures and implementation errors. Provide clear, actionable analysis."),
-                Message(role="user", content=analysis_prompt)
-            ]
-            
-            response = self.llm_client.chat_completion(messages)
-            
-            if not response or not response.strip():
-                logger.error("Received empty response from LLM")
-                return "Error: Unable to generate analysis"
-                
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error during LLM failure analysis: {str(e)}", exc_info=True)
-            return f"Error analyzing failure: {str(e)}" 
-
-class CustomReporter:
-    def __init__(self):
-        self.test_functions = []
-        self.results = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
-        self.output_lines = []
-        
-    def pytest_runtest_logreport(self, report: TestReport):
-        if report.when == 'call' or (report.when == 'setup' and report.outcome == 'skipped'):
-            self.test_functions.append(report.nodeid.split("::")[-1])
-            if report.passed:
-                self.results['passed'] += 1
-            elif report.failed:
-                self.results['failed'] += 1
-            elif report.skipped:
-                self.results['skipped'] += 1
-        if hasattr(report, 'longrepr'):
-            if report.longrepr:
-                self.output_lines.append(str(report.longrepr))
-
 class PytestTestingAgent(TrustyAgent):
     """
     A dedicated class for handling test execution and reporting using pytest.
     """
     # Registration information
     agent_name = "pytest"
-    config_schema = {
-        "specification": "Test specification describing what to test",
-        "data": "Test data generation instructions"
-    }
-    prompt_spec = "'pytest': A trusty agent that runs pytest tests to verify functionality. Requires test specification and test data generation instructions."
+    description = "creates and runs new unit tests using pytest. great for verifying isolated functionality."
     
     # Prompt content for the protoblock genesis prompt
-    specification_prompt = "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. "
-    data_prompt = "Describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
-    
-    @classmethod
-    def get_prompt_sections(cls):
-        """
-        Get the prompt sections for this agent.
-        
-        Returns:
-            dict: A dictionary mapping section names to field dictionaries
-        """
-        return {
-            "pytest": {
-                "specification": cls.specification_prompt,
-                "data": cls.data_prompt
-            }
-        }
+    protoblock_prompt = "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. Furthermore, describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
     
     def __init__(self):
         init()  # Initialize colorama
@@ -423,6 +271,138 @@ class PytestTestingAgent(TrustyAgent):
                     except Exception as e:
                         logger.error(f"Failed to process file {filepath}: {e}")
         return modified_tests
+
+class ErrorAnalyzer:
+    """Analyzes test failures and implementation errors to provide insights using LLM"""
+    
+    def __init__(self):
+        logger.info("Initializing ErrorAnalyzer")
+        self.llm_client = LLMClient(llm_type="strong")
+        self.project_files = ProjectFiles()
+
+
+
+    def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
+        """
+        Analyzes test failures and implementation errors using LLM.
+        
+        Args:
+            protoblock: The ProtoBlock that failed
+            test_results: The test results/error output
+            codebase: Dictionary mapping file paths to their contents or string content
+            
+        Returns:
+            str: Detailed analysis of what went wrong and suggestions for improvement
+        """
+        logger.info("Starting LLM-based failure analysis")
+        logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
+        logger.debug(f"Test results length: {len(test_results) if test_results else 'None'}")
+        
+        try:
+            # Use centralized config
+            use_summaries = config.general.use_file_summaries
+            logger.info(f"Using file summaries: {use_summaries}")
+            
+            # Format codebase for prompt
+            logger.info("Formatting codebase for LLM prompt")
+            codebase_content = []
+            
+            # Handle string codebase
+            if isinstance(codebase, str):
+                codebase_content.append(f"Codebase Content:\n```python\n{codebase}\n```")
+            else:
+                # Handle dictionary codebase
+                logger.debug(f"Codebase files to analyze: {list(codebase.keys())}")
+                for path, content in codebase.items():
+                    logger.debug(f"Processing file: {path}")
+                    if use_summaries:
+                        # Use existing summaries instead of generating new ones
+                        summary = self.project_files._load_existing_summaries().get(path, {}).get('summary')
+                        if summary:
+                            file_content = f"File Summary:\n{summary}"
+                        else:
+                            file_content = content
+                    else:
+                        file_content = content
+                    codebase_content.append(f"File: {path}\n```python\n{file_content}\n```")
+            
+            codebase_str = "\n\n".join(codebase_content)
+            logger.debug(f"Formatted codebase length: {len(codebase_str)} characters")
+            
+            # Prepare prompt
+            analysis_prompt = f"""<purpose>
+You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements. The information for the junior software engineer who failed at their attempt is given in the <protoblock> section, the codebase in <codebase_str>, the test results in <test_results>. Your concrete analysis rules are given in <analysis_rules>.
+</purpose>
+
+<codebase_state>
+{codebase_str}
+</codebase_state>
+
+<protoblock>
+Task Description: {protoblock.task_description}
+Test Specification: {protoblock.pytest_specification}
+Test Data: {protoblock.pytest_data_generation}
+Write Files: {protoblock.write_files}
+Context Files: {protoblock.context_files}
+</protoblock>
+
+<test_results>
+{test_results}
+</test_results>
+
+<analysis_rules>
+1. First identify the type of failure (syntax error, runtime error, test assertion, etc.)
+2. Gather understanding whether the error is due to an already existing test, that needs to be updated, because the protoblock makes it necessary to change existing tests.
+3. In case the error is due to an already existing test, that needs to be updated, provide a detailed description of how to update the test.
+4. In case the error is due to a missing file, list the files that need to be created.
+5. In case the error is due to a missing import, list the imports that need to be added.
+</analysis_rules>
+
+<output_format>
+Provide your analysis in the following structure:
+
+NEW STRATEGY FOR SOLVING THE TASK:
+(In more detail describe how the next implementation attempt should look like based on whst you learned from the previois attempt.)
+
+MISSING WRITE FILES:
+(so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If there are files missing, directly mention them here in a list, without any additional text e.g. your reply is ["tests/test_piano_trainer_main.py"])
+</output_format>"""
+
+            messages = [
+                Message(role="system", content="You are a coding assistant specialized in analyzing test failures and implementation errors. Provide clear, actionable analysis."),
+                Message(role="user", content=analysis_prompt)
+            ]
+            
+            response = self.llm_client.chat_completion(messages)
+            
+            if not response or not response.strip():
+                logger.error("Received empty response from LLM")
+                return "Error: Unable to generate analysis"
+                
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error during LLM failure analysis: {str(e)}", exc_info=True)
+            return f"Error analyzing failure: {str(e)}" 
+
+class CustomReporter:
+    def __init__(self):
+        self.test_functions = []
+        self.results = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
+        self.output_lines = []
+        
+    def pytest_runtest_logreport(self, report: TestReport):
+        if report.when == 'call' or (report.when == 'setup' and report.outcome == 'skipped'):
+            self.test_functions.append(report.nodeid.split("::")[-1])
+            if report.passed:
+                self.results['passed'] += 1
+            elif report.failed:
+                self.results['failed'] += 1
+            elif report.skipped:
+                self.results['skipped'] += 1
+        if hasattr(report, 'longrepr'):
+            if report.longrepr:
+                self.output_lines.append(str(report.longrepr))
 
 # Register this agent
 PytestTestingAgent.register()

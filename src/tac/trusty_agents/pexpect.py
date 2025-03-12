@@ -293,13 +293,7 @@ class PexpectTestingAgent(TrustyAgent):
     """
     # Registration information
     agent_name = "pexpect"
-    config_schema = {
-        "specification": "E2E test specification in e2e_tests code block format"
-    }
-    prompt_spec = "'pexpect': A trusty agent that performs end-to-end testing using Pexpect. Requires E2E test specification in the format ```e2e_tests [...]```."
-    
-    # Prompt content for the protoblock genesis prompt
-    specification_prompt = """
+    protoblock_prompt = """
 Define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would.
 
 Format your tests in a code block with the following structure:
@@ -307,44 +301,33 @@ Format your tests in a code block with the following structure:
 [
   {
     "name": "Test Name",
-    "description": "Detailed description of what this test verifies",
+    "description": "Description of what this test verifies",
     "commands": [
       "command to run",
-      "another command if needed"
+      "next command"
     ],
     "expected_outputs": [
-      "expected output pattern (can use regex)",
-      "another expected output pattern"
+      "expected output from first command",
+      "expected output from second command"
     ],
-    "timeout": 10,  // Optional: timeout in seconds (default: 10)
-    "exit_code": 0  // Optional: expected exit code (default: 0)
+    "timeout": 10,  # Optional, defaults to 10 seconds
+    "exit_code": 0  # Optional, defaults to 0
   }
 ]
 ```
 
-Each test should:
-1. Have a clear name and description
-2. Include commands that would be run in a terminal
-3. Specify expected outputs (text patterns that should appear in the output)
-4. Set appropriate timeouts for long-running commands
-5. Verify the correct exit code if relevant
+The test will:
+1. Run each command in sequence
+2. Check if the output contains the expected text
+3. Verify the exit code of the last command
 
-If the task doesn't require end-to-end testing, you can leave this section empty.
+Tips:
+- Use regular expressions in expected_outputs for flexible matching
+- Keep commands simple and focused on one action
+- Include assertions for both positive and negative cases
+- Test edge cases and error handling
 """
-    
-    @classmethod
-    def get_prompt_sections(cls):
-        """
-        Get the prompt sections for this agent.
-        
-        Returns:
-            dict: A dictionary mapping section names to field dictionaries
-        """
-        return {
-            "pexpect": {
-                "specification": cls.specification_prompt
-            }
-        }
+    description = "A trusty agent that performs end-to-end testing using Pexpect. Requires E2E test specification in the format ```e2e_tests [...]```."
     
     def __init__(self):
         self.test_results = []

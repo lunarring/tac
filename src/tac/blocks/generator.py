@@ -29,7 +29,7 @@ class ProtoBlockGenerator:
     """
     
     def __init__(self):
-        self.llm_client = LLMClient(strength="strong")
+        self.llm_client = LLMClient(llm_type="strong")
         self.project_files = ProjectFiles()
     
     def get_protoblock_genesis_prompt(self, codebase: str, task_instructions: str) -> str:
@@ -52,6 +52,8 @@ class ProtoBlockGenerator:
         # Get all agent-specific sections for the output format explained
         agent_sections_explained = TrustyAgentRegistry.generate_agent_sections_for_output_format_explained()
 
+        trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
+
         return f"""<purpose>
     You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
 </purpose>
@@ -66,54 +68,54 @@ class ProtoBlockGenerator:
 
 <planning_rules>
 - Examine carefully the codebase and the task instructions, and then develop a plan how this task could be implemented, but stay on the GOAL level and do not describe the exact implementation details.
-- We will need to supply two kinds of files to the junior developer:
-    - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!
-    - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test.
-
-- Bring everything into the right format and structure as outlines below.
+- We will need to supply two kinds of files to the coding agent:
+    - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context! Test files should only be created in tests/test_*.py e.g. tests/test_piano_trainer_main.py.
+    - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! 
+- Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
+- Here a description of what each trusty agent is capable of {trusty_agents_description}
+- Select the most appropriate trusty agents for the task, it is good if there are multiple.
+- The output format is two JSONs, you need to follow the format as described below. The first JSON is for the coding agents, and the second JSON is for the trusty agents that give trust assurances for the code changes.
 </planning_rules>
-
-<trusty_agents>
-{trusty_agents_section}
-</trusty_agents>
 
 stick exactly to the following output_format, filling in between ...
 <output_format>
 {{
-    "task": {{
-        "specification": "...",
-    }},
-{agent_sections_output}
+    "task": ["..."],
     "write_files": ["..."],
     "context_files": ["..."],
     "commit_message": "...",
     "branch_name": "...",
+}}
+{{
     "trusty_agents": ["..."],
     "trusty_agent_configs": {{
         "agent_name": {{
-            // Configuration specific to each trusty agent
+            "config": "..."
         }}
     }}
 }}
-</output_format_explained>
+</output_format>
+
+And here a bit more detailed explanation of the output format:
 
 <output_format_explained>
 {{
-    "task": {{
-        "specification": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, however mainly in terms og goals that we want to achieve. Thus make a high level plan of what we want to implement and how this on a high level could be achieved. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive."
-    }},
-{agent_sections_explained}
+    "task": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, however mainly in terms og goals that we want to achieve. Thus make a high level plan of what we want to implement and how this on a high level could be achieved. Refrain from implementing the solution here, i.e. we are not describing exactly HOW the code needs to be changed but keep it higher level and super descriptive.",
     "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test."],
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes.",
     "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
-    "trusty_agents": ["List of trusty agents to use for this task. Choose from the agents described in the <trusty_agents> section. Default is taken from configuration."],
-    "trusty_agent_configs": {{
-        "agent_name": {{
-            // Configuration specific to each trusty agent as described in the <trusty_agents> section
-        }}
+}}
+
+{{
+    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}]",
+    "trusty_agent_prompts": {{
+        "agent_name": "... fill in here the prompt for the trusty agent"
     }}
 }}
+
+To fill in the trusty_agent_prompts, you can use the following guidelines:
+{agent_sections_explained}
 </output_format_explained>"""
 
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
@@ -166,7 +168,7 @@ stick exactly to the following output_format, filling in between ...
                     "type": dict
                 },
                 "pytest": {
-                    "required_keys": ["specification", "data"],
+                    "required_keys": ["specification"],
                     "type": dict,
                     "allow_empty": True  # New flag to indicate empty values are allowed
                 },
@@ -241,7 +243,7 @@ stick exactly to the following output_format, filling in between ...
                     return False, f"All items in {key} must be strings", None
                 if not all(item.strip() for item in validated_data[key]):
                     return False, f"Empty or whitespace-only items not allowed in {key}", None
-                
+
                 # Ensure all paths are relative (not absolute)
                 for i, item in enumerate(validated_data[key]):
                     if os.path.isabs(item):
@@ -319,7 +321,7 @@ stick exactly to the following output_format, filling in between ...
         
         # Create messages for LLM
         messages = [
-            Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'pytest', 'write_files', 'context_files', 'commit_message'. No markdown, no code fences. Keep it short and strictly formatted."),
+            Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'pytest', 'write_files', 'context_files', 'commit_message'. The 'pytest' key should only have a 'specification' field. No markdown, no code fences. Keep it short and strictly formatted."),
             Message(role="user", content=protoblock_genesis_prompt)
         ]
         
@@ -364,7 +366,7 @@ stick exactly to the following output_format, filling in between ...
                     protoblock = ProtoBlock(
                         task_description=data["task"]["specification"],
                         pytest_specification=data["pytest"]["specification"],
-                        pytest_data_generation=data["pytest"]["data"],
+                        pytest_data_generation=data["pytest"]["specification"],
                         write_files=write_files,
                         context_files=context_files,
                         block_id=str(uuid.uuid4())[:6],

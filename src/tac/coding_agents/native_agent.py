@@ -16,7 +16,7 @@ class NativeAgent(Agent):
         super().__init__(config)
         self.agent_config = config.get('aider', {})
         # Initialize LLM client with strong model for implementation
-        self.llm_client = LLMClient(strength="strong")
+        self.llm_client = LLMClient(llm_type="strong")
         # Initialize note attribute
         self.note = ""
     
