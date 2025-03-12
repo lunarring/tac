@@ -247,15 +247,40 @@ class TACViewer:
         """Display log content in a paged view with single-key navigation."""
         page = 0
         
+        # Absolute maximum number of lines to display - no exceptions
+        MAX_CONTENT_LINES = 6
+        
         while True:
-            # Get terminal size and calculate available lines
+            # Clear screen first
+            os.system('cls' if os.name == 'nt' else 'clear')
+            
+            # Get terminal size
             terminal_height = os.get_terminal_size().lines
             terminal_width = os.get_terminal_size().columns
-            # Account for title (2 lines), navigation (2 lines), and spacing (1 line)
-            lines_per_page = terminal_height - 5
             
-            start_idx = page * lines_per_page
-            end_idx = start_idx + lines_per_page
+            # Calculate optimal number of content lines based on terminal height
+            # Account for:
+            # - Header: 2 lines (title and info)
+            # - Footer: 2 lines (blank line + navigation)
+            # - Safety buffer: 3 lines (to prevent scrolling)
+            available_height = terminal_height - 2 - 2 - 3
+            
+            # Use at least 4 lines, at most 20 lines, but stay within available height
+            content_lines = max(4, min(20, available_height))
+            
+            # Calculate optimal number of content lines based on terminal height
+            # Account for:
+            # - Header: 2 lines (title and info)
+            # - Footer: 2 lines (blank line + navigation)
+            # - Safety buffer: 1 line (reduced from 3)
+            available_height = terminal_height - 2 - 2 - 1
+            
+            # Use at least 4 lines, at most 40 lines, but stay within available height
+            content_lines = max(4, min(40, available_height))
+            
+            # Calculate page indices
+            start_idx = page * content_lines
+            end_idx = start_idx + content_lines
             current_lines = log_content[start_idx:end_idx]
             
             if not current_lines:
@@ -264,18 +289,13 @@ class TACViewer:
                 get_single_key()
                 return
                 
-            total_pages = (len(log_content) + lines_per_page - 1) // lines_per_page
+            total_pages = (len(log_content) + content_lines - 1) // content_lines
             
-            # Clear screen for better readability
-            os.system('cls' if os.name == 'nt' else 'clear')
-            
-            self.console.print(f"\n[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
-            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)}")
+            # Print header (2 lines)
+            self.console.print(f"[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
+            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}, Lines/page: {content_lines}")
             
             # Display log lines with syntax highlighting based on log level
-            content_height = 0
-            current_style = None
-            
             for item in current_lines:
                 # Handle search results differently
                 if is_search_result:
@@ -283,25 +303,30 @@ class TACViewer:
                 else:
                     line = item
                 
-                # Check for the start of a new log entry
-                if line.startswith(("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")):
-                    if line.startswith("DEBUG"):
-                        current_style = "blue"
-                    elif line.startswith("INFO"):
-                        current_style = "green"
-                    elif line.startswith("WARNING"):
-                        current_style = "yellow"
-                    elif line.startswith("ERROR"):
-                        current_style = "red"
-                    elif line.startswith("CRITICAL"):
-                        current_style = "red bold"
+                # Truncate long lines to fit terminal width
+                # Leave some margin (20 chars) for safety
+                max_line_length = terminal_width - 20
+                if len(line) > max_line_length:
+                    line = line[:max_line_length] + "..."
                 
-                # For search results, highlight the search term while maintaining the log level color
+                # Determine style based on log level
+                style = None
+                if line.startswith("DEBUG"):
+                    style = "blue"
+                elif line.startswith("INFO"):
+                    style = "green"
+                elif line.startswith("WARNING"):
+                    style = "yellow"
+                elif line.startswith("ERROR"):
+                    style = "red"
+                elif line.startswith("CRITICAL"):
+                    style = "red bold"
+                
+                # For search results, highlight the search term
                 if is_search_result:
-                    # Create a text object for the line
                     text = Text(line.strip())
-                    if current_style:
-                        text.stylize(current_style)
+                    if style:
+                        text.stylize(style)
                     
                     # Find all occurrences of the search term (case insensitive)
                     line_lower = line.lower()
@@ -317,23 +342,16 @@ class TACViewer:
                     
                     self.console.print(text)
                 else:
-                    # Print normal line with current style if set
-                    if current_style:
-                        self.console.print(line.strip(), style=current_style)
+                    # Print normal line with style if set
+                    if style:
+                        self.console.print(line.strip(), style=style)
                     else:
                         self.console.print(line.strip())
-                
-                content_height += 1
             
-            # Add padding to push navigation to bottom, plus one extra line for spacing
-            padding_needed = terminal_height - content_height - 5  # Account for header, nav, and spacing
-            if padding_needed > 0:
-                self.console.print("\n" * (padding_needed - 1))
-            
-            # Add extra line of spacing before navigation
+            # Add a single blank line before navigation
             self.console.print("")
             
-            # Create navigation text with search option and page counter
+            # Create navigation text
             nav_text = Text()
             nav_text.append("Navigate: ", style="bold")
             nav_text.append("[n]ext ", style="cyan" if end_idx < len(log_content) else "dim")
@@ -355,6 +373,7 @@ class TACViewer:
             # Print navigation with dark background
             self.console.print(nav_text, style="on grey11")
             
+            # Get user choice
             choice = get_single_key().lower()
             
             if choice == 'q':
