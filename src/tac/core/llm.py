@@ -339,14 +339,14 @@ if __name__ == "__main__":
     
     # Example with vision model
     print("\nUsing vision model:")
-    image_path = os.path.expanduser("~/Downloads/tmpip7ugsgv.png")
-    
+    # image_path = os.path.expanduser("~/Downloads/tmpip7ugsgv.png")
+    image_path = os.path.expanduser("~/Downloads/tmpig4ajga7.png")
     # Check if the image exists
     if os.path.exists(image_path):
         client_vision = LLMClient(llm_type="vision")
         vision_messages = [
             Message(role="system", content="You are a helpful assistant that can analyze images"),
-            Message(role="user", content="Do you see a white background and a blue dot in the middle? Answer with ONLY :here you add an explanation what you see in the image")
+            Message(role="user", content="Do you see a white background and a blue dot in the middle?")
         ]
         print(f"Analyzing image at: {image_path}")
         response_vision = client_vision.vision_chat_completion(vision_messages, image_path)
