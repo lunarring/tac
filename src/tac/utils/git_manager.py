@@ -4,11 +4,51 @@ import subprocess
 import shutil
 import tempfile
 import difflib
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 from tac.core.log_config import setup_logging
 from tac.core.config import config
 
 logger = setup_logging('tac.utils.git_manager')
+
+def create_git_manager(repo_path: str = '.', use_fake_git: bool = False) -> Union['GitManager', 'FakeGitManager']:
+    """
+    Factory function that creates and returns either a GitManager or FakeGitManager instance.
+    
+    Args:
+        repo_path: Path to the repository
+        use_fake_git: If True, always use FakeGitManager regardless of other conditions
+        
+    Returns:
+        Either a GitManager or FakeGitManager instance
+    """
+    # Always use FakeGitManager if explicitly requested
+    if use_fake_git:
+        logger.info("Using FakeGitManager as explicitly requested")
+        return FakeGitManager(repo_path)
+        
+    # Use FakeGitManager if git is disabled in config
+    if not config.git.enabled:
+        logger.info("Using FakeGitManager because git is disabled in config")
+        return FakeGitManager(repo_path)
+        
+    # Try to initialize real GitManager
+    try:
+        # Check if git is available by trying to initialize a repo
+        git_manager = GitManager(repo_path)
+        
+        # If initialization failed (repo is None), use FakeGitManager
+        if git_manager.repo is None:
+            logger.info("Using FakeGitManager because GitManager initialization failed")
+            return FakeGitManager(repo_path)
+        
+        # Otherwise, use the real GitManager
+        logger.info(f"Using real GitManager with repository at {repo_path}")
+        return git_manager
+        
+    except Exception as e:
+        # If any exception occurs during GitManager initialization, use FakeGitManager
+        logger.warning(f"Error initializing GitManager: {e}. Falling back to FakeGitManager")
+        return FakeGitManager(repo_path)
 
 class GitManager:
     def __init__(self, repo_path: str = '.'):
@@ -25,11 +65,11 @@ class GitManager:
             logger.debug(f"Git repository initialized successfully at {repo_path} with base branch {self.base_branch}.")
             self.ensure_gitignore_includes_tac()
         except git.exc.InvalidGitRepositoryError:
-            logger.error("Not a git repository. Please initialize git first.")
+            logger.warning("Not a git repository. Please initialize git first.")
             self.repo = None
             self.base_branch = None
         except git.exc.GitCommandError as e:
-            logger.error(f"Error initializing git repository: {e}")
+            logger.warning(f"Error initializing git repository: {e}")
             self.repo = None
             self.base_branch = None
 
@@ -574,6 +614,8 @@ class FakeGitManager:
         
         logger.info(f"Initialized FakeGitManager with repo path: {self.repo_path}")
         logger.info(f"Using temporary directory: {self.temp_dir}")
+
+        self.commit("initial_commit")
     
     def _get_files_from_repo(self):
         """Get all programming-relevant files from the original repository."""
@@ -709,7 +751,7 @@ class FakeGitManager:
             logger.error(f"Error restoring commit: {e}")
             return False
     
-    def get_complete_diff(self, commit_msg: str = None) -> str:
+    def get_complete_diff(self, commit_msg: str = "initial_commit") -> str:
         """
         Get the complete diff in a git similar fashion between the current commit and the one specified in commit_msg.
         
@@ -719,9 +761,6 @@ class FakeGitManager:
         Returns:
             str: A formatted string containing all relevant diffs
         """
-        if commit_msg is None:
-            logger.info("FakeGitManager: get_complete_diff called without commit_msg")
-            return "No differences found (FakeGitManager)"
             
         if commit_msg not in self.commits:
             return f"Error: Commit '{commit_msg}' not found"

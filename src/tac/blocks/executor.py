@@ -1,9 +1,8 @@
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
 from tac.coding_agents import CodingAgentConstructor
-from tac.utils.git_manager import GitManager, FakeGitManager
 from tac.utils.filesystem import cleanup_nested_tests
-import git
+from tac.utils.git_manager import create_git_manager
 import sys
 import os
 from datetime import datetime
@@ -38,10 +37,7 @@ class BlockExecutor:
         self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
         
         # Use the appropriate git manager based on config
-        if config.git.enabled:
-            self.git_manager = GitManager()
-        else:
-            self.git_manager = FakeGitManager()
+        self.git_manager = create_git_manager()
             
         # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
 

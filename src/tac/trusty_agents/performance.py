@@ -395,7 +395,7 @@ class PerformanceTestingAgent(TrustyAgent):
         # Make an initial commit to the FakeGitManager
         # This will be used as the baseline for comparison
         logger.info("Making initial commit to FakeGitManager")
-        self.git_manager.commit("initial_commit")
+        
         
         return True
 

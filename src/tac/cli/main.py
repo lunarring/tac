@@ -27,12 +27,12 @@ from tac.coding_agents.aider import AiderAgent
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
-from tac.utils.git_manager import GitManager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
 from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
+from tac.utils.git_manager import create_git_manager
 
 # Initialize logger at module level but don't use it as a global in functions
 _module_logger = setup_logging('tac.cli.main')
@@ -638,28 +638,32 @@ def main():
                 config.override_with_dict(config_override)
                 logger.info("Git operations disabled via --no-git flag")
 
-            if config.git.enabled:
-                git_manager = GitManager()
-                if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
-                    sys.exit(1)
-            else:
-                # Use FakeGitManager when git is disabled
-                from tac.utils.git_manager import FakeGitManager
-                git_manager = FakeGitManager()
-                # Check if any generated protoblocks will have plausibility checks but git is disabled
-                if "plausibility" in config.general.default_trusty_agents:
-                    print("\nWarning: Default trusty agents include plausibility checks, but git is disabled.")
-                    print("Plausibility checks require git to be enabled.")
-                    print("To proceed, either:")
-                    print("1. Enable git by removing --no-git flag")
-                    print("2. Remove 'plausibility' from default_trusty_agents in your configuration")
-                    print("Continuing without plausibility checks...")
+            git_manager = create_git_manager()
+            if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
+                sys.exit(1)
+
+            # if config.git.enabled:
+            #     git_manager = GitManager()
+            #     if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
+            #         sys.exit(1)
+            # else:
+            #     # Use FakeGitManager when git is disabled
+            #     from tac.utils.git_manager import FakeGitManager
+            #     git_manager = FakeGitManager()
+            #     # Check if any generated protoblocks will have plausibility checks but git is disabled
+            #     if "plausibility" in config.general.default_trusty_agents:
+            #         print("\nWarning: Default trusty agents include plausibility checks, but git is disabled.")
+            #         print("Plausibility checks require git to be enabled.")
+            #         print("To proceed, either:")
+            #         print("1. Enable git by removing --no-git flag")
+            #         print("2. Remove 'plausibility' from default_trusty_agents in your configuration")
+            #         print("Continuing without plausibility checks...")
                     
-                    # Remove plausibility from default trusty agents if git is disabled
-                    config.general.default_trusty_agents = [
-                        agent for agent in config.general.default_trusty_agents 
-                        if agent != "plausibility"
-                    ]
+            #         # Remove plausibility from default trusty agents if git is disabled
+            #         config.general.default_trusty_agents = [
+            #             agent for agent in config.general.default_trusty_agents 
+            #             if agent != "plausibility"
+            #         ]
 
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:")

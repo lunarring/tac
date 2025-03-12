@@ -76,7 +76,7 @@ And here the description of the task:
 Task Description: {protoblock.task_description}
 Write Files: {protoblock.write_files}
 Context Files: {protoblock.context_files}
-Plausibility Prompt: {protoblock.trusty_agent_prompts["plausibility"]}
+Plausibility Prompt: {protoblock.trusty_agent_prompts.get("plausibility", "Use common sense.")}
 </protoblock>
 
 <implemented_changes>
