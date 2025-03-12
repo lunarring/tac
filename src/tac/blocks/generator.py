@@ -88,10 +88,9 @@ stick exactly to the following output_format, filling in between ...
 }}
 {{
     "trusty_agents": ["..."],
-    "trusty_agent_configs": {{
-        "agent_name": {{
-            "config": "..."
-        }}
+    "trusty_agent_prompts": {{
+        "agent_name1": "generate here the prompt for the trusty agent 1",
+        "agent_name2": "generate here the prompt for the trusty agent 2",
     }}
 }}
 </output_format>
@@ -322,7 +321,7 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
         
         # Create messages for LLM
         messages = [
-            Message(role="system", content="You are a coding assistant. Output must be valid JSON with keys: 'task', 'pytest', 'write_files', 'context_files', 'commit_message'. The 'pytest' key should only have a 'specification' field. No markdown, no code fences. Keep it short and strictly formatted."),
+            Message(role="system", content="You are a coding assistant. Stick to the output format as described. No markdown, no code fences. Keep it short and strictly formatted."),
             Message(role="user", content=protoblock_genesis_prompt)
         ]
         
@@ -340,7 +339,7 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
                     
                 # Clean code fences from response
                 response = self.llm_client._clean_code_fences(response)
-                    
+
                 # Verify and parse the response
                 is_valid, error_msg, data = self.verify_protoblock(response)
                 if not is_valid:

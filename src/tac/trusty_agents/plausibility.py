@@ -161,6 +161,6 @@ PLAUSIBILITY SCORE RATING:
 
 # Register this agent
 PlausibilityTestingAgent.agent_name = "plausibility"
-PlausibilityTestingAgent.protoblock_prompt = ""
+PlausibilityTestingAgent.protoblock_prompt = "Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description."
 PlausibilityTestingAgent.description = "A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
 PlausibilityTestingAgent.register() 
