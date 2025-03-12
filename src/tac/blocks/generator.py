@@ -237,11 +237,6 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
             if not all(isinstance(item, str) for item in validated_data["trusty_agents"]):
                 return False, "All items in trusty_agents must be strings", None
             
-            # Ensure pytest and plausibility are always included
-            if "pytest" not in validated_data["trusty_agents"]:
-                validated_data["trusty_agents"].append("pytest")
-            if "plausibility" not in validated_data["trusty_agents"]:
-                validated_data["trusty_agents"].append("plausibility")
                 
             # Validate trusty_agent_prompts
             if not all(isinstance(key, str) and isinstance(value, str) for key, value in validated_data["trusty_agent_prompts"].items()):

@@ -105,18 +105,16 @@ class BlockExecutor:
             # Sort trusty agents: pytest first, plausibility last, others in between
             sorted_agents = []
             
-            # Add pytest first if it exists in the list
-            if "pytest" in self.protoblock.trusty_agents:
-                sorted_agents.append("pytest")
+            # Add pytest first if it exists in the list (hard fixed. we always want pytest first)
+            sorted_agents.append("pytest")
             
             # Add all other agents except pytest and plausibility
             for agent_name in self.protoblock.trusty_agents:
                 if agent_name != "pytest" and agent_name != "plausibility":
                     sorted_agents.append(agent_name)
             
-            # Add plausibility last if it exists in the list
-            if "plausibility" in self.protoblock.trusty_agents:
-                sorted_agents.append("plausibility")
+            # Add plausibility last, hard fixed. we always want plausibility last.
+            sorted_agents.append("plausibility")
             
             # Run trusty agents in the sorted order
             for agent_name in sorted_agents:
