@@ -117,15 +117,20 @@ tac voice
 
 ### View Blocks and Logs
 
-View blocks and execution logs interactively:
+View execution logs interactively:
 
 ```bash
 tac view
 ```
 
 This command provides an interactive interface to:
-- View execution logs with test results and changes
-- Relive the glory (or horror) of your AI's coding journey
+- Browse and read log files from previous TAC executions
+- View log entries with syntax highlighting based on log level
+- Navigate through logs with an easy-to-use interface
+- Search for specific text within logs
+- Jump to section headings for easier navigation
+- See the current section heading while browsing logs
+
 
 ### Test Management
 
