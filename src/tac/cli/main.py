@@ -542,7 +542,7 @@ def main():
         # Import and run the viewer without creating log files
         from tac.cli.viewer import TACViewer
         try:
-            TACViewer().main_menu()
+            TACViewer().logs_menu()
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)

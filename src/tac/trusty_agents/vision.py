@@ -179,8 +179,8 @@ The red dot is not present, I see a blue square instead that is in the upper rig
         Returns:
             str: The content of the model's response message
         """
-        # Sleep 1 sec so the screenshot is fully written to disk
-        time.sleep(1)
+        # Sleep 3 sec so the screenshot is fully written to disk
+        time.sleep(3)
         try:
             # Verify the image file exists and has content
             if not self.screenshot_path or not os.path.exists(self.screenshot_path):
