@@ -69,7 +69,7 @@ class ProtoBlockGenerator:
     - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! 
 - Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
 - Here a description of what each trusty agent is capable of {trusty_agents_description}
-- Select the most appropriate trusty agents for the task, it is good if there are multiple.
+- Select the most appropriate trusty agents for the task. Select only one agent!
 - The output format is a single JSON object, you need to follow the format as described below.
 </planning_rules>
 

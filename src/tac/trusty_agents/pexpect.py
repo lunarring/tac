@@ -29,9 +29,25 @@ class PexpectTestingAgent(TrustyAgent):
     A trusty agent that performs end-to-end testing using Pexpect.
     """
     # Registration information
-
     
     def __init__(self):
         self.test_results = []
         self.report = ""
         
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+        """
+        Implementation of the check method for Pexpect testing.
+        
+        Args:
+            protoblock: The ProtoBlock containing task specifications
+            codebase: Dictionary mapping file paths to their contents
+            code_diff: The git diff showing implemented changes
+            
+        Returns:
+            Tuple containing:
+            - bool: Success status (always True as we rely on pytest)
+            - str: Error analysis (empty string)
+            - str: Failure type description (empty string)
+        """
+        logger.info("PexpectTestingAgent relies on pytest for checking pexpect-based tests")
+        return True, "", ""

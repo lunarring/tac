@@ -98,51 +98,42 @@ class BlockExecutor:
 
             # Cycle through trusty agents, gather materials first
             code_diff = self.git_manager.get_complete_diff()
-            # protoblock decides the tests that are run, but the order is always hardfixed here.
             
-            # Run tests if pytest is in trusty_agents
+            # Sort trusty agents: pytest first, plausibility last, others in between
+            sorted_agents = []
+            
+            # Add pytest first if it exists in the list
             if "pytest" in self.protoblock.trusty_agents:
-                logger.info("Trusty agent: Pytest starting...")
-                execution_success, error_analysis, failure_type = self.trusty_agents['pytest'].check(self.protoblock, self.codebase, code_diff)
-                if not execution_success:
-                    logger.error(f"Pytest failed: {failure_type}")
-                    return execution_success, error_analysis, failure_type
-                else:
-                    logger.info("Pytest passed")
-                # If we get here, tests passed - continue with other trusty agents
-            else:
-                logger.info("Trusty agent: Pytest skipped (not included in protoblock)")
-
-            # Check if plausibility test is in trusty_agents
-            if "plausibility" in self.protoblock.trusty_agents:
-                logger.info("Trusty agent: Plausibility starting...")
-                # Get git diff for plausibility check
-                execution_success, error_analysis, failure_type = self.trusty_agents['plausibility'].check(self.protoblock, self.codebase, code_diff)
-                if not execution_success:
-                    logger.error(f"Plausibility check failed: {failure_type}")
-                    return execution_success, error_analysis, failure_type
-                else:
-                    logger.info("Plausibility check passed")
-                
-            else:
-                logger.info("Trusty agent: Plausibility skipped (not included in protoblock)")
+                sorted_agents.append("pytest")
             
-            # Check if performance test is in trusty_agents
-            # Commented out for now as it's not fully implemented
-            # if "performance" in self.protoblock.trusty_agents:
-            #     logger.info("Trusty agent: Performance starting...")
-            #     execution_success, error_analysis, failure_type = self.trusty_agents['performance'].check(self.protoblock, self.codebase, code_diff)
-            #     if not execution_success:
-            #         logger.error(f"Performance check failed: {failure_type}")
-            #         return execution_success, error_analysis, failure_type
-            #     else:
-            #         logger.info("Performance check passed")
-            # else:
-            #     logger.info("Trusty agent: Performance skipped (not included in protoblock)")
+            # Add all other agents except pytest and plausibility
+            for agent_name in self.protoblock.trusty_agents:
+                if agent_name != "pytest" and agent_name != "plausibility":
+                    sorted_agents.append(agent_name)
+            
+            # Add plausibility last if it exists in the list
+            if "plausibility" in self.protoblock.trusty_agents:
+                sorted_agents.append("plausibility")
+            
+            # Run trusty agents in the sorted order
+            for agent_name in sorted_agents:
+                if agent_name in self.trusty_agents:
+                    logger.info(f"Trusty agent: {agent_name} starting...")
+                    execution_success, error_analysis, failure_type = self.trusty_agents[agent_name].check(
+                        self.protoblock, self.codebase, code_diff
+                    )
+                    
+                    if not execution_success:
+                        logger.error(f"{agent_name} check failed: {failure_type}")
+                        return execution_success, error_analysis, failure_type
+                    else:
+                        logger.info(f"{agent_name} check passed")
+                else:
+                    logger.warning(f"Trusty agent '{agent_name}' specified in protoblock but not available in executor")
             
             # If we got here, all required tests passed
             execution_success = True
-            logger.info(f"All trusty agents are happy ({', '.join(protoblock.trusty_agents)}). Trust is assured!")
+            logger.info(f"All trusty agents are happy ({', '.join(self.protoblock.trusty_agents)}). Trust is assured!")
             return execution_success, None, ""  # Return empty string instead of None
 
             
