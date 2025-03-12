@@ -724,10 +724,7 @@ def main():
         except Exception as e:
             logger.error(f"Error during execution: {e}")
             sys.exit(1)
-    elif args.command == 'debug':
-        if args.prompt_sections:
-            from tac.trusty_agents.registry import TrustyAgentRegistry
-            print(TrustyAgentRegistry.debug_prompt_sections())
+
     else:
         parser.print_help()
         sys.exit(1)

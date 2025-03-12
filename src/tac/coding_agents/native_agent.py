@@ -152,7 +152,7 @@ Context Files, please do not edit these files:
 Write files, these are the ones you need to modify:
 {write_files_section}
 
-Make sure your implementation passes the tests, listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
+Make sure your implementation passes the tests, if listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
 You edit the code in a minimally invasive way, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task.For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. The response format is:
 
 ###FILE: /path/to/first/file.py
@@ -263,7 +263,7 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
 
     def run(self, protoblock: ProtoBlock, previous_analysis: str = None) -> None:
         """
-        Executes the native o3-mini command to implement both tests and functionality simultaneously.
+        Executes the native LLM command to implement both tests and functionality simultaneously.
         
         Args:
             protoblock: The ProtoBlock instance containing task details and specifications

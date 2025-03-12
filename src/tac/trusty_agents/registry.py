@@ -50,38 +50,7 @@ class TrustyAgentRegistry:
             dict: A dictionary mapping agent names to their descriptions
         """
         return {name: desc for name, desc in cls._descriptions.items()}
-    
-    @classmethod
-    def generate_trusty_agents_prompt_section(cls):
-        """Generate the trusty agents section for the protoblock genesis prompt."""
-        sections = []
-        for name, desc in cls._descriptions.items():
-            sections.append(f"    {desc}")
-        
-        if not sections:
-            return "    No trusty agents are currently registered."
-        
-        return "\n".join(sections)
-    
-    @classmethod
-    def get_prompt_section(cls, section_name):
-        """
-        Get a prompt section by name from all registered agents.
-        
-        Args:
-            section_name: The name of the prompt section to get
-            
-        Returns:
-            str: The prompt content for the section, or empty string if not found
-        """
-        # Look for the section in all registered agents
-        for agent_name, sections in cls._prompt_sections.items():
-            if section_name in sections:
-                return sections[section_name]
-        
-        # Return empty string if section not found
-        return ""
-        
+
     @classmethod
     def get_agent_prompt_sections_for_output_format(cls):
         """
@@ -125,49 +94,3 @@ class TrustyAgentRegistry:
             result += f'"{section_name}": "{escaped_content}",\n'
         
         return result.rstrip(',\n')
-    
-    @classmethod
-    def generate_agent_sections_for_output_format(cls):
-        """
-        Generate all agent-specific sections for the output_format.
-        
-        Returns:
-            str: JSON-formatted string containing all agent-specific sections
-        """
-        sections = cls.get_agent_prompt_sections_for_output_format()
-        
-        if not sections:
-            return ""
-            
-        result = ""
-        
-        for section_name in sections.keys():
-            result += f'    "{section_name}": "...",\n'
-        
-        return result.rstrip(',\n')
-    
-    @classmethod
-    def debug_prompt_sections(cls):
-        """
-        Debug method to print all registered prompt sections.
-        
-        Returns:
-            str: A string representation of all registered prompt sections
-        """
-        result = "Registered prompt sections:\n"
-        
-        # Print all registered agents
-        result += f"\nRegistered agents: {cls.get_all_agents()}\n\n"
-        
-        # Print all prompt sections
-        for agent_name, sections in cls._prompt_sections.items():
-            result += f"  Agent: {agent_name}\n"
-            for section_name, content in sections.items():
-                # Truncate content if it's too long
-                content_preview = content[:50] + "..." if len(content) > 50 else content
-                result += f"    Section: {section_name} = {content_preview}\n"
-        
-        if not cls._prompt_sections:
-            result += "  No prompt sections registered.\n"
-            
-        return result 

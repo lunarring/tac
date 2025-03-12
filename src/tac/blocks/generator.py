@@ -43,11 +43,7 @@ class ProtoBlockGenerator:
         """
         codebase = self.project_files.get_codebase_summary()
         
-        # Get the trusty agents prompt section
-        trusty_agents_section = TrustyAgentRegistry.generate_trusty_agents_prompt_section()
-        
-        # Get all agent-specific sections for the output format
-        agent_sections_output = TrustyAgentRegistry.generate_agent_sections_for_output_format()
+
         
         # Get all agent-specific sections for the output format explained
         trusty_agents_prompts = TrustyAgentRegistry.generate_agent_prompts()
