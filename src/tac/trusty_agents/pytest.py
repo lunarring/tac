@@ -54,11 +54,9 @@ class PytestTestingAgent(TrustyAgent):
         try:
             test_path = config.general.test_path
             logger.info("Test Execution Details:")
-            logger.info("="*50)
             logger.info(f"Test path: {test_path}")
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
-            logger.info("="*50)
             
             test_success = self.run_tests(test_path)
             test_results = self.get_test_results()
@@ -215,8 +213,7 @@ class PytestTestingAgent(TrustyAgent):
         total = sum(results.values())
         color = Fore.RED if results['failed'] > 0 or results['error'] > 0 else Fore.GREEN
         
-        logger.info("="*50)
-        logger.info(f"{color}Test Summary:{Style.RESET_ALL}")
+        logger.info(f"{color}Test Summary:{Style.RESET_ALL}", heading=True)
         
         if results['failed'] > 0 or results['error'] > 0:
             logger.info(f"{Fore.RED}Passed: {results['passed']}/{total}{Style.RESET_ALL}")
@@ -229,7 +226,6 @@ class PytestTestingAgent(TrustyAgent):
         
         if results['skipped'] > 0:
             logger.info(f"{Fore.YELLOW}Skipped: {results['skipped']}{Style.RESET_ALL}")
-        logger.info("="*50)
 
     def get_test_results(self) -> str:
         """Get the full test results including output and summary"""

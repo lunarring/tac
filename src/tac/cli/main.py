@@ -666,11 +666,9 @@ def main():
             #         ]
 
             # First of all: run tests, do they all pass
-            logger.info("Test Execution Details:")
-            logger.info("="*50)
+            logger.info("Test Execution Details:", heading=True)
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
-            logger.info("="*50)
             test_runner = TestRunner()
             success = test_runner.run_tests()
             if not success:

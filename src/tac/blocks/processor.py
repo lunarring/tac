@@ -141,9 +141,7 @@ class BlockProcessor:
         error_analysis = ""  # Initialize as empty string instead of None
 
         for idx_attempt in range(max_retries):
-            logger.info("="*60)
-            logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}")
-            logger.info("="*60)
+            logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
 
             # Halt execution? Also revert the changes on the feature branch if git is enabled
             if idx_attempt > 0:
@@ -169,13 +167,11 @@ class BlockProcessor:
             execution_success, error_analysis, failure_type  = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
-                logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}")
-                logger.error("="*50)
+                logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
                 
                 # Only log error analysis if run_error_analysis is enabled in config
                 if config.general.run_error_analysis and error_analysis:
                     logger.error(error_analysis)
-                logger.error("="*50)
 
                 # Store the previous protoblock
                 self.store_previous_protoblock()
@@ -198,12 +194,9 @@ class BlockProcessor:
             base_branch = self.git_manager.base_branch if self.git_manager.base_branch else "main"
             
             # Print cleanup instructions
-            logger.error("="*80)
-            logger.error("❌ All execution attempts failed")
-            logger.error("="*80)
+            logger.error("❌ All execution attempts failed", heading=True)
             logger.error("📋 Git Cleanup Commands:")
             logger.error(f"  To switch back to your main branch and clean up:")
             logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
-            logger.error("="*80)
             
         return False 

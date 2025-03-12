@@ -258,17 +258,14 @@ class GitManager:
             pr_url = f"{github_url}/pull/new/{current_branch}" if github_url else "https://github.com/<owner>/<repo>/pull/new/{current_branch}"
             
             # Print manual git commands with more visibility
-            logger.info("="*80)
-            logger.info(f"✅ Changes successfully committed to branch '{current_branch}'")
-            logger.info("="*80)
+            logger.info(f"✅ Changes successfully committed to branch '{current_branch}'", heading=False)
             logger.info("📋 Manual Git Commands:")
             logger.info(f"  To merge these changes from the terminal:")
             logger.info(f"    git switch {base_branch} && git merge {current_branch}")
             logger.info(f"  To merge and delete the branch after:")
             logger.info(f"    git switch {base_branch} && git merge {current_branch} && git branch -D {current_branch}")
             logger.info(f"  To create a pull request:")
-            logger.info(f"    {pr_url}")
-            logger.info("="*80)
+            logger.info(f"    {pr_url}", heading=False)
             
             return True
         except Exception as e:
@@ -304,13 +301,10 @@ class GitManager:
             logger.info("Successfully stashed all changes and cleaned working directory")
             
             # Print manual cleanup instructions
-            logger.info("="*80)
-            logger.info("🔄 Attempt failed - Changes have been stashed")
-            logger.info("="*80)
+            logger.info("🔄 Attempt failed - Changes have been stashed", heading=True)
             logger.info("📋 Manual Git Cleanup Commands (if needed):")
             logger.info(f"  To switch back to your main branch and clean up:")
             logger.info(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
-            logger.info("="*80)
             
             return True
         except Exception as e:
@@ -320,13 +314,10 @@ class GitManager:
             current_branch = self.get_current_branch() or "current_branch"
             base_branch = self.base_branch if self.base_branch else "main"
             
-            logger.error("="*80)
-            logger.error("❌ Failed to automatically revert changes")
-            logger.error("="*80)
+            logger.error("❌ Failed to automatically revert changes", heading=True)
             logger.error("📋 Manual Git Cleanup Commands:")
             logger.error(f"  To switch back to your main branch and clean up:")
             logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
-            logger.error("="*80)
             
             return False
 

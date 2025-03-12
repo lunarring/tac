@@ -6,6 +6,7 @@ from colorama import Fore, Style, init
 import sys
 import time
 import datetime
+import shutil
 
 # Initialize colorama
 init()
@@ -74,6 +75,28 @@ class ExecutionContext:
 # Create a singleton instance
 execution_context = ExecutionContext()
 
+class TACLogger(logging.Logger):
+    """Custom logger class that extends the standard Logger with additional features."""
+    
+    def info(self, msg, *args, heading=False, **kwargs):
+        """
+        Log an info message with optional heading formatting.
+        
+        Args:
+            msg: The message to log
+            heading: If True, add screen-width separators before and after the message
+            *args, **kwargs: Standard logging arguments
+        """
+        if heading:
+            # Store heading flag in extra dict
+            kwargs.setdefault('extra', {})['heading'] = True
+        
+        # Call the parent info method
+        super().info(msg, *args, **kwargs)
+
+# Register our custom logger class
+logging.setLoggerClass(TACLogger)
+
 def setup_console_logging(name: str = None, log_level: str = 'INFO') -> logging.Logger:
     """
     Setup logging configuration for console only (no log files)
@@ -120,7 +143,21 @@ def setup_console_logging(name: str = None, log_level: str = 'INFO') -> logging.
             # Add color to the level name
             if orig_levelname in self.COLORS:
                 record.levelname = f"{self.COLORS[orig_levelname]}{orig_levelname}{Style.RESET_ALL}"
+            
+            # Check if this is a heading
+            is_heading = hasattr(record, 'heading') and record.heading
+            
+            # Get terminal width
+            terminal_width = shutil.get_terminal_size().columns
+            
+            # Format the message
             formatted_msg = super().format(record)
+            
+            # Add separators for headings
+            if is_heading:
+                separator = '=' * terminal_width
+                formatted_msg = f"\n{separator}\n{formatted_msg}\n{separator}"
+            
             # Restore original levelname
             record.levelname = orig_levelname
             return formatted_msg
@@ -189,7 +226,21 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
             # Add color to the level name
             if orig_levelname in self.COLORS:
                 record.levelname = f"{self.COLORS[orig_levelname]}{orig_levelname}{Style.RESET_ALL}"
+            
+            # Check if this is a heading
+            is_heading = hasattr(record, 'heading') and record.heading
+            
+            # Get terminal width
+            terminal_width = shutil.get_terminal_size().columns
+            
+            # Format the message
             formatted_msg = super().format(record)
+            
+            # Add separators for headings
+            if is_heading:
+                separator = '=' * terminal_width
+                formatted_msg = f"\n{separator}\n{formatted_msg}\n{separator}"
+            
             # Restore original levelname
             record.levelname = orig_levelname
             return formatted_msg
@@ -262,8 +313,18 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
                 timestamp = datetime.datetime.fromtimestamp(record.created)
                 timestamp_str = timestamp.strftime("%y%m%d %H:%M %S.%f")[:-4]
                 
+                # Check if this is a heading
+                is_heading = hasattr(record, 'heading') and record.heading
+                
                 # Format the log message
-                return f"{record.levelname} - {record.getMessage()} [{record.name} {timestamp_str}]"
+                msg = f"{record.levelname} - {record.getMessage()} [{record.name} {timestamp_str}]"
+                
+                # Add separators for headings in file logs too
+                if is_heading:
+                    separator = '=' * 80  # Fixed width for file logs
+                    msg = f"\n{separator}\n{msg}\n{separator}"
+                
+                return msg
         
         file_formatter = FileFormatter()
         file_handler.setFormatter(file_formatter)
