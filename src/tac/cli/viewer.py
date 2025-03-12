@@ -247,9 +247,6 @@ class TACViewer:
         """Display log content in a paged view with single-key navigation."""
         page = 0
         
-        # Absolute maximum number of lines to display - no exceptions
-        MAX_CONTENT_LINES = 6
-        
         while True:
             # Clear screen first
             os.system('cls' if os.name == 'nt' else 'clear')
@@ -262,17 +259,7 @@ class TACViewer:
             # Account for:
             # - Header: 2 lines (title and info)
             # - Footer: 2 lines (blank line + navigation)
-            # - Safety buffer: 3 lines (to prevent scrolling)
-            available_height = terminal_height - 2 - 2 - 3
-            
-            # Use at least 4 lines, at most 20 lines, but stay within available height
-            content_lines = max(4, min(20, available_height))
-            
-            # Calculate optimal number of content lines based on terminal height
-            # Account for:
-            # - Header: 2 lines (title and info)
-            # - Footer: 2 lines (blank line + navigation)
-            # - Safety buffer: 1 line (reduced from 3)
+            # - Safety buffer: 1 line (minimal buffer)
             available_height = terminal_height - 2 - 2 - 1
             
             # Use at least 4 lines, at most 40 lines, but stay within available height
@@ -293,7 +280,7 @@ class TACViewer:
             
             # Print header (2 lines)
             self.console.print(f"[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
-            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}, Lines/page: {content_lines}")
+            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}, Available: {available_height}, Using: {content_lines}")
             
             # Display log lines with syntax highlighting based on log level
             for item in current_lines:
