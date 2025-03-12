@@ -13,12 +13,7 @@ class PlausibilityTestingAgent(TrustyAgent):
     Checks if the implemented changes match the promised functionality by analyzing
     git diff and protoblock specifications using LLM.
     """
-    
-    # Registration information
-    agent_name = "plausibility"
-    protoblock_prompt = "Evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
-    description = "A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
-    
+
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
         self.llm_client = LLMClient(llm_type="strong")
@@ -165,4 +160,7 @@ PLAUSIBILITY SCORE RATING:
             return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception"
 
 # Register this agent
+PlausibilityTestingAgent.agent_name = "plausibility"
+PlausibilityTestingAgent.protoblock_prompt = ""
+PlausibilityTestingAgent.description = "A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
 PlausibilityTestingAgent.register() 

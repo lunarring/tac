@@ -292,42 +292,7 @@ class PexpectTestingAgent(TrustyAgent):
     A trusty agent that performs end-to-end testing using Pexpect.
     """
     # Registration information
-    agent_name = "pexpect"
-    protoblock_prompt = """
-Define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would.
 
-Format your tests in a code block with the following structure:
-```e2e_tests
-[
-  {
-    "name": "Test Name",
-    "description": "Description of what this test verifies",
-    "commands": [
-      "command to run",
-      "next command"
-    ],
-    "expected_outputs": [
-      "expected output from first command",
-      "expected output from second command"
-    ],
-    "timeout": 10,  # Optional, defaults to 10 seconds
-    "exit_code": 0  # Optional, defaults to 0
-  }
-]
-```
-
-The test will:
-1. Run each command in sequence
-2. Check if the output contains the expected text
-3. Verify the exit code of the last command
-
-Tips:
-- Use regular expressions in expected_outputs for flexible matching
-- Keep commands simple and focused on one action
-- Include assertions for both positive and negative cases
-- Test edge cases and error handling
-"""
-    description = "A trusty agent that performs end-to-end testing using Pexpect. Requires E2E test specification in the format ```e2e_tests [...]```."
     
     def __init__(self):
         self.test_results = []
@@ -732,4 +697,7 @@ Each test should include:
         return self.report 
 
 # Register this agent
+PexpectTestingAgent.agent_name = "pexpect"
+PexpectTestingAgent.protoblock_prompt = """Define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here."""
+PexpectTestingAgent.description = "A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verifies the functionality of the entire program through the command line interface."
 PexpectTestingAgent.register() 

@@ -105,7 +105,7 @@ class TrustyAgentRegistry:
         return result
         
     @classmethod
-    def generate_agent_sections_for_output_format_explained(cls):
+    def generate_agent_prompts(cls):
         """
         Generate all agent-specific sections for the output_format_explained.
         
@@ -122,7 +122,7 @@ class TrustyAgentRegistry:
         for section_name, content in sections.items():
             # Escape any quotes in the content
             escaped_content = content.replace('"', '\\"')
-            result += f'    "{section_name}": "{escaped_content}",\n'
+            result += f'"{section_name}": "{escaped_content}",\n'
         
         return result.rstrip(',\n')
     

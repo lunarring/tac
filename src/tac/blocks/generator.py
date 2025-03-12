@@ -50,7 +50,7 @@ class ProtoBlockGenerator:
         agent_sections_output = TrustyAgentRegistry.generate_agent_sections_for_output_format()
         
         # Get all agent-specific sections for the output format explained
-        agent_sections_explained = TrustyAgentRegistry.generate_agent_sections_for_output_format_explained()
+        trusty_agents_prompts = TrustyAgentRegistry.generate_agent_prompts()
 
         trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
 
@@ -110,12 +110,13 @@ And here a bit more detailed explanation of the output format:
 {{
     "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}]",
     "trusty_agent_prompts": {{
-        "agent_name": "... fill in here the prompt for the trusty agent"
+        "agent_name1": "... fill in here the prompt for the trusty agent 1",
+        "agent_name2": "... fill in here the prompt for the trusty agent 2",
     }}
 }}
 
-To fill in the trusty_agent_prompts, you can use the following guidelines:
-{agent_sections_explained}
+To fill in the trusty_agent_prompts, it really depends on your choice of trusty agents. When you know which trusty agents you are using, you can use the following guidelines to obtain the prompt for the trusty agents.
+{trusty_agents_prompts}
 </output_format_explained>"""
 
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:

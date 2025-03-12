@@ -21,13 +21,7 @@ class PytestTestingAgent(TrustyAgent):
     """
     A dedicated class for handling test execution and reporting using pytest.
     """
-    # Registration information
-    agent_name = "pytest"
-    description = "creates and runs new unit tests using pytest. great for verifying isolated functionality."
-    
-    # Prompt content for the protoblock genesis prompt
-    protoblock_prompt = "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. Furthermore, describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
-    
+
     def __init__(self):
         init()  # Initialize colorama
         self.test_results = ""
@@ -405,5 +399,8 @@ class CustomReporter:
                 self.output_lines.append(str(report.longrepr))
 
 # Register this agent
+PytestTestingAgent.agent_name = "pytest"
+PytestTestingAgent.description = "creates and runs new unit tests using pytest. great for verifying isolated functionality."
+PytestTestingAgent.protoblock_prompt = "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. Furthermore, describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
 PytestTestingAgent.register()
 
