@@ -290,7 +290,7 @@ class E2ETestRunner:
 @trusty_agent(
     name="pexpect",
     description="A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verifies the functionality of the entire program through the command line interface.",
-    protoblock_prompt="""Define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here."""
+    protoblock_prompt="""On basis of the pexpect library, define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here. Ensure we are using pexpect."""
 )
 class PexpectTestingAgent(TrustyAgent):
     """

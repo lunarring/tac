@@ -341,7 +341,7 @@ You are a senior python software engineer analyzing a failed implementation atte
 Task Description: {protoblock.task_description}
 Write Files: {protoblock.write_files}
 Context Files: {protoblock.context_files}
-Test Specification: {protoblock.trusty_agent_prompts["pytest"]}
+Test Specification: {protoblock.trusty_agent_prompts.get("pytest", "No test specification provided")}
 </protoblock>
 
 <test_results>
