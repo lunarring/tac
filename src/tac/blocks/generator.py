@@ -74,19 +74,17 @@ class ProtoBlockGenerator:
 - Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
 - Here a description of what each trusty agent is capable of {trusty_agents_description}
 - Select the most appropriate trusty agents for the task, it is good if there are multiple.
-- The output format is two JSONs, you need to follow the format as described below. The first JSON is for the coding agents, and the second JSON is for the trusty agents that give trust assurances for the code changes.
+- The output format is a single JSON object, you need to follow the format as described below.
 </planning_rules>
 
 stick exactly to the following output_format, filling in between ...
 <output_format>
 {{
-    "task": ["..."],
+    "task": "...",
     "write_files": ["..."],
     "context_files": ["..."],
     "commit_message": "...",
     "branch_name": "...",
-}}
-{{
     "trusty_agents": ["..."],
     "trusty_agent_prompts": {{
         "agent_name1": "generate here the prompt for the trusty agent 1",
@@ -104,10 +102,7 @@ And here a bit more detailed explanation of the output format:
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes.",
     "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
-}}
-
-{{
-    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}]",
+    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}"],
     "trusty_agent_prompts": {{
         "agent_name1": "... fill in here the prompt for the trusty agent 1",
         "agent_name2": "... fill in here the prompt for the trusty agent 2",
@@ -122,7 +117,6 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
         """
         Verifies that a protoblock JSON is valid and contains all required fields.
         First tries to parse as-is, only cleans code fences if that fails.
-        Pytest sections can be empty strings if no test is needed.
         
         Args:
             json_content: The JSON content to validate
@@ -164,13 +158,7 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
             # Define required structure - only check these keys, ignore additional ones
             required_structure = {
                 "task": {
-                    "required_keys": ["specification"],
-                    "type": dict
-                },
-                "pytest": {
-                    "required_keys": ["specification"],
-                    "type": dict,
-                    "allow_empty": True  # New flag to indicate empty values are allowed
+                    "type": (str, list)  # Can be either a string or a list
                 },
                 "write_files": {
                     "type": list
@@ -185,8 +173,10 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
                     "type": str
                 },
                 "trusty_agents": {
-                    "type": list,
-                    "optional": True  # This field is optional
+                    "type": list
+                },
+                "trusty_agent_prompts": {
+                    "type": dict
                 }
             }
             
@@ -195,9 +185,6 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
             
             # First validate and extract required fields
             for key in required_structure:
-                # Skip optional fields if they don't exist in the data
-                if required_structure[key].get("optional", False) and key not in data:
-                    continue
                 if key not in data:
                     return False, f"Missing required key: {key}", None
                 validated_data[key] = data[key]
@@ -209,33 +196,28 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
             
             # Validate structure
             for key, requirements in required_structure.items():
-                # Skip optional fields if they don't exist in validated_data
-                if requirements.get("optional", False) and key not in validated_data:
-                    continue
                 # Check if required key exists
                 if key not in validated_data:
                     return False, f"Missing required key: {key}", None
                     
                 # Check type
-                if not isinstance(validated_data[key], requirements["type"]):
-                    return False, f"{key} must be a {requirements['type'].__name__}", None
-                    
-                # Check nested required keys if any
-                if "required_keys" in requirements and isinstance(validated_data[key], dict):
-                    # For pytest section, allow empty strings for required fields
-                    allow_empty = requirements.get("allow_empty", False)
-                    if allow_empty and key == "pytest":
-                        # Ensure all required keys exist but can be empty strings
-                        for req_key in requirements["required_keys"]:
-                            if req_key not in validated_data[key]:
-                                return False, f"{key} section missing key: {req_key}", None
-                            # Allow empty string for pytest section fields
-                            if not isinstance(validated_data[key][req_key], str):
-                                validated_data[key][req_key] = ""
-                    else:
-                        missing_nested = [k for k in requirements["required_keys"] if k not in validated_data[key]]
-                        if missing_nested:
-                            return False, f"{key} section missing keys: {', '.join(missing_nested)}", None
+                if isinstance(requirements["type"], tuple):
+                    # Multiple allowed types
+                    if not any(isinstance(validated_data[key], t) for t in requirements["type"]):
+                        allowed_types = ", ".join(t.__name__ for t in requirements["type"])
+                        return False, f"{key} must be one of these types: {allowed_types}", None
+                else:
+                    # Single allowed type
+                    if not isinstance(validated_data[key], requirements["type"]):
+                        return False, f"{key} must be a {requirements['type'].__name__}", None
+            
+            # Handle task field which can be a string or a list
+            if isinstance(validated_data["task"], list):
+                # If it's a list, join it into a string
+                validated_data["task"] = {"specification": "\n".join(validated_data["task"])}
+            elif isinstance(validated_data["task"], str):
+                # If it's a string, wrap it in a dict
+                validated_data["task"] = {"specification": validated_data["task"]}
             
             # Additional validation for lists
             for key in ["write_files", "context_files"]:
@@ -255,24 +237,19 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
                         except ValueError:
                             return False, f"Cannot convert absolute path '{item}' to relative path in {key}", None
 
-            # Validate trusty_agents if present
-            if "trusty_agents" in validated_data:
-                if not all(isinstance(item, str) for item in validated_data["trusty_agents"]):
-                    return False, "All items in trusty_agents must be strings", None
+            # Validate trusty_agents
+            if not all(isinstance(item, str) for item in validated_data["trusty_agents"]):
+                return False, "All items in trusty_agents must be strings", None
+            
+            # Ensure pytest and plausibility are always included
+            if "pytest" not in validated_data["trusty_agents"]:
+                validated_data["trusty_agents"].append("pytest")
+            if "plausibility" not in validated_data["trusty_agents"]:
+                validated_data["trusty_agents"].append("plausibility")
                 
-                # Ensure pytest and plausibility are always included
-                if "pytest" not in validated_data["trusty_agents"]:
-                    validated_data["trusty_agents"].append("pytest")
-                if "plausibility" not in validated_data["trusty_agents"]:
-                    validated_data["trusty_agents"].append("plausibility")
-            else:
-                # Set default value if not present
-                validated_data["trusty_agents"] = config.general.default_trusty_agents
-                # Ensure pytest and plausibility are always included
-                if "pytest" not in validated_data["trusty_agents"]:
-                    validated_data["trusty_agents"].append("pytest")
-                if "plausibility" not in validated_data["trusty_agents"]:
-                    validated_data["trusty_agents"].append("plausibility")
+            # Validate trusty_agent_prompts
+            if not all(isinstance(key, str) and isinstance(value, str) for key, value in validated_data["trusty_agent_prompts"].items()):
+                return False, "All keys and values in trusty_agent_prompts must be strings", None
 
             # Validate test file naming convention and location - only for files in tests/ directory
             for file_path in validated_data["write_files"]:
@@ -357,31 +334,37 @@ To fill in the trusty_agent_prompts, it really depends on your choice of trusty 
                 # Create ProtoBlock directly
                 try:
                     # Ensure pytest and plausibility are always included in trusty_agents
-                    trusty_agents = data.get("trusty_agents", config.general.default_trusty_agents)
+                    trusty_agents = data.get("trusty_agents", [])
                     if "pytest" not in trusty_agents:
                         trusty_agents.append("pytest")
                     if "plausibility" not in trusty_agents:
                         trusty_agents.append("plausibility")
                     
+                    # Get trusty_agent_prompts
+                    trusty_agent_prompts = data.get("trusty_agent_prompts", {})
+                    
+                    # Get task specification
+                    task_spec = data["task"]["specification"] if isinstance(data["task"], dict) else data["task"]
+                    if isinstance(task_spec, list):
+                        task_spec = "\n".join(task_spec)
+                    
                     protoblock = ProtoBlock(
-                        task_description=data["task"]["specification"],
-                        pytest_specification=data["pytest"]["specification"],
-                        pytest_data_generation=data["pytest"]["specification"],
+                        task_description=task_spec,
                         write_files=write_files,
                         context_files=context_files,
                         block_id=str(uuid.uuid4())[:6],
                         commit_message=f"tac: {data.get('commit_message', 'Update')}",
                         branch_name=data.get("branch_name"),
-                        trusty_agents=trusty_agents
+                        trusty_agents=trusty_agents,
+                        trusty_agent_prompts=trusty_agent_prompts
                     )
                     logger.info("\nProtoblock details:")
                     logger.info(f"🎯 Task: {protoblock.task_description}")
-                    logger.info(f"🧪 Pytest Specification: {protoblock.pytest_specification}")
-                    logger.info(f"📊 Pytest Data Generation: {protoblock.pytest_data_generation}")
                     logger.info(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
                     logger.info(f"📚 Context Files: {', '.join(protoblock.context_files)}")
                     logger.info(f"💬 Commit Message: {protoblock.commit_message}")
-                    logger.info(f"🤖 Trusty Agents: {', '.join(protoblock.trusty_agents)}\n")
+                    logger.info(f"🤖 Trusty Agents: {', '.join(protoblock.trusty_agents)}")
+                    logger.info(f"🔍 Trusty Agent Prompts: {len(protoblock.trusty_agent_prompts)} prompts defined")
                     logger.info("🚀 Starting protoblock execution...\n")
                     return protoblock
                 except KeyError as e:

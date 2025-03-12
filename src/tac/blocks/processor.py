@@ -87,6 +87,7 @@ class BlockProcessor:
             # Create protoblock from genesis prompt
             protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
 
+
             # Branch name and commit from the first one!
             if idx_attempt > 0:
                 self.override_new_protoblock_with_previous_protoblock(protoblock)

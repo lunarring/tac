@@ -16,7 +16,6 @@ class ProtoBlock:
     
     Contains all information needed to implement a change:
     - Task description and requirements
-    - Test specifications and data generation instructions
     - Files to modify and reference during implementation
     - Version control metadata
     - Trusted agents to delegate trust assurances to
@@ -24,13 +23,11 @@ class ProtoBlock:
     ProtoBlocks can be serialized to JSON for storage and loaded back for execution.
     """
     task_description: str
-    pytest_specification: str
-    pytest_data_generation: str
     write_files: list
     context_files: list
     block_id: str
     trusty_agents: List[str] = None
-    trusty_agent_configs: Dict[str, Dict[str, Any]] = None
+    trusty_agent_prompts: Dict[str, str] = None
     branch_name: str = None
     commit_message: str = None
 
@@ -39,9 +36,9 @@ class ProtoBlock:
         if self.trusty_agents is None:
             self.trusty_agents = config.general.default_trusty_agents
         
-        # Set default empty dict for trusty_agent_configs if None
-        if self.trusty_agent_configs is None:
-            self.trusty_agent_configs = {}
+        # Set default empty dict for trusty_agent_prompts if None
+        if self.trusty_agent_prompts is None:
+            self.trusty_agent_prompts = {}
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -76,29 +73,23 @@ class ProtoBlock:
         # Extract data from the version
         task_description = version_data.get('task', {}).get('specification', '')
         
-        test_data = version_data.get('test', {})
-        pytest_specification = test_data.get('specification', '')
-        pytest_data_generation = test_data.get('data', '')
-        
         write_files = version_data.get('write_files', [])
         context_files = version_data.get('context_files', [])
         commit_message = version_data.get('commit_message', '')
         branch_name = version_data.get('branch_name', '')
         trusty_agents = version_data.get('trusty_agents', config.general.default_trusty_agents)
-        trusty_agent_configs = version_data.get('trusty_agent_configs', {})
+        trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
         
         # Create and return the ProtoBlock
         return cls(
             block_id=block_id,
             task_description=task_description,
-            pytest_specification=pytest_specification,
-            pytest_data_generation=pytest_data_generation,
             write_files=write_files,
             context_files=context_files,
             commit_message=commit_message,
             branch_name=branch_name,
             trusty_agents=trusty_agents,
-            trusty_agent_configs=trusty_agent_configs
+            trusty_agent_prompts=trusty_agent_prompts
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -119,17 +110,12 @@ class ProtoBlock:
             "task": {
                 "specification": self.task_description
             },
-            "test": {
-                "specification": self.pytest_specification,
-                "data": self.pytest_specification,  # Use the same value for backward compatibility
-                "replacements": write_files
-            },
             "write_files": write_files,
             "context_files": context_files,
             "commit_message": self.commit_message,
             "branch_name": self.branch_name,
             "trusty_agents": self.trusty_agents,
-            "trusty_agent_configs": self.trusty_agent_configs,
+            "trusty_agent_prompts": self.trusty_agent_prompts,
             "timestamp": datetime.now().isoformat()
         }
         
@@ -172,15 +158,11 @@ class ProtoBlock:
             "task": {
                 "specification": self.task_description
             },
-            "test": {
-                "specification": self.pytest_specification,
-                "data": self.pytest_specification  # Use the same value for backward compatibility
-            },
             "write_files": self.write_files,
             "context_files": self.context_files,
             "commit_message": self.commit_message,
             "branch_name": self.branch_name,
             "block_id": self.block_id,
             "trusty_agents": self.trusty_agents,
-            "trusty_agent_configs": self.trusty_agent_configs
+            "trusty_agent_prompts": self.trusty_agent_prompts
         }
