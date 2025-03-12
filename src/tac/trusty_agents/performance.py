@@ -25,6 +25,15 @@ import io
 
 logger = setup_logging('tac.trusty_agents.performance')
 
+# Use the decorator for registration
+from tac.trusty_agents.base import trusty_agent
+
+@trusty_agent(
+    name="performance",
+    description="A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize.",
+    protoblock_prompt="A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize.",
+    prompt_target="performance_optimization"
+)
 class PerformanceTestingAgent(TrustyAgent):
     """Class responsible for optimizing Python code functions."""
     
@@ -943,11 +952,3 @@ The profiling failed, likely because we couldn't determine the correct test data
 You can still proceed with optimization without the profiling results.
 """
                 return error_msg 
-
-# Add agent registration
-PerformanceTestingAgent.agent_name = "performance"
-PerformanceTestingAgent.protoblock_prompt = "A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize."
-PerformanceTestingAgent.description = "A trusty agent that analyzes and optimizes code performance. Requires a function name to optimize."
-
-# Register this agent
-PerformanceTestingAgent.register() 

@@ -1,11 +1,41 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Optional, Dict, Any, TypeVar, cast, ClassVar
+from typing import Tuple, Optional, Dict, Any, TypeVar, cast, ClassVar, Type, Callable
 from functools import wraps
 
 from tac.blocks import ProtoBlock
 from tac.core.log_config import setup_logging
 
 logger = setup_logging('tac.trusty_agents.base')
+
+def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_target: str = ""):
+    """
+    Class decorator for registering TrustyAgent subclasses.
+    
+    This decorator provides a more elegant way to register trusty agents with
+    the registry, setting the agent_name, description, protoblock_prompt, and
+    prompt_target in one step.
+    
+    Args:
+        name: The name of the agent for registration
+        description: Description of the agent for the protoblock genesis prompt
+        protoblock_prompt: Prompt content for the protoblock genesis prompt
+        prompt_target: Target for the prompt (optional)
+        
+    Returns:
+        A decorator function that registers the agent class
+    """
+    def decorator(cls: Type['TrustyAgent']) -> Type['TrustyAgent']:
+        cls.agent_name = name
+        cls.description = description
+        cls.protoblock_prompt = protoblock_prompt
+        cls.prompt_target = prompt_target
+        
+        # Register the agent
+        cls.register()
+        
+        return cls
+    
+    return decorator
 
 class TrustyAgent(ABC):
     """
@@ -19,12 +49,14 @@ class TrustyAgent(ABC):
         agent_name: Name of the agent for registration (defaults to class name)
         protoblock_prompt: Prompt content for the protoblock genesis prompt
         description: Description of the agent for the protoblock genesis prompt
+        prompt_target: Target for the prompt
     """
     
     # Class variables for registration
     agent_name: ClassVar[str] = ""
     protoblock_prompt: ClassVar[str] = ""
     description: ClassVar[str] = ""
+    prompt_target: ClassVar[str] = ""
     
     @classmethod
     def register(cls):
@@ -50,7 +82,8 @@ class TrustyAgent(ABC):
                 name,
                 cls,
                 cls.protoblock_prompt,
-                description
+                description,
+                cls.prompt_target
             )
             
             logger.info(f"Registered trusty agent: {name}")

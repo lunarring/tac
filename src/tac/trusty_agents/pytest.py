@@ -12,11 +12,16 @@ from tac.blocks import ProtoBlock
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.core.log_config import setup_logging
-from tac.trusty_agents.base import TrustyAgent
+from tac.trusty_agents.base import TrustyAgent, trusty_agent
 
 logger = setup_logging('tac.trusty_agents.pytest')
 
-
+@trusty_agent(
+    name="pytest",
+    description="creates and runs new unit tests using pytest. great for verifying isolated functionality.",
+    protoblock_prompt="Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. Furthermore, describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty.",
+    prompt_target = "coding_agent",
+)
 class PytestTestingAgent(TrustyAgent):
     """
     A dedicated class for handling test execution and reporting using pytest.
@@ -334,10 +339,9 @@ You are a senior python software engineer analyzing a failed implementation atte
 
 <protoblock>
 Task Description: {protoblock.task_description}
-Test Specification: {protoblock.pytest_specification}
-Test Data: {protoblock.pytest_data_generation}
 Write Files: {protoblock.write_files}
 Context Files: {protoblock.context_files}
+Test Specification: {protoblock.trusty_agent_prompts["pytest"]}
 </protoblock>
 
 <test_results>
@@ -397,10 +401,4 @@ class CustomReporter:
         if hasattr(report, 'longrepr'):
             if report.longrepr:
                 self.output_lines.append(str(report.longrepr))
-
-# Register this agent
-PytestTestingAgent.agent_name = "pytest"
-PytestTestingAgent.description = "creates and runs new unit tests using pytest. great for verifying isolated functionality."
-PytestTestingAgent.protoblock_prompt = "Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. Furthermore, describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty."
-PytestTestingAgent.register()
 

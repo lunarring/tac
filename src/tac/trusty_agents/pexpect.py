@@ -11,7 +11,7 @@ from pexpect import spawn, TIMEOUT, EOF
 import traceback
 
 from tac.blocks import ProtoBlock
-from tac.trusty_agents.base import TrustyAgent
+from tac.trusty_agents.base import TrustyAgent, trusty_agent
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 
@@ -287,6 +287,11 @@ class E2ETestRunner:
         return "\n".join(report)
 
 
+@trusty_agent(
+    name="pexpect",
+    description="A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verifies the functionality of the entire program through the command line interface.",
+    protoblock_prompt="""Define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here."""
+)
 class PexpectTestingAgent(TrustyAgent):
     """
     A trusty agent that performs end-to-end testing using Pexpect.
@@ -695,9 +700,3 @@ Each test should include:
             str: Formatted test report
         """
         return self.report 
-
-# Register this agent
-PexpectTestingAgent.agent_name = "pexpect"
-PexpectTestingAgent.protoblock_prompt = """Define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here."""
-PexpectTestingAgent.description = "A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verifies the functionality of the entire program through the command line interface."
-PexpectTestingAgent.register() 

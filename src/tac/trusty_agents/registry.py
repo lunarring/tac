@@ -9,13 +9,15 @@ class TrustyAgentRegistry:
     _protoblock_prompts = {}
     _descriptions = {}
     _prompt_sections = {}
+    _prompt_targets = {}
     
     @classmethod
-    def register(cls, name, agent_class, protoblock_prompt=None, description=None):
+    def register(cls, name, agent_class, protoblock_prompt=None, description=None, prompt_target=None):
         """Register a trusty agent with the system."""
         cls._registry[name] = agent_class
         cls._protoblock_prompts[name] = protoblock_prompt or ""
         cls._descriptions[name] = description or f"'{name}': A trusty agent for verification"
+        cls._prompt_targets[name] = prompt_target or ""
         
         # Register any prompt sections defined by the agent
         if hasattr(agent_class, "get_prompt_sections") and callable(getattr(agent_class, "get_prompt_sections")):
@@ -35,6 +37,11 @@ class TrustyAgentRegistry:
     def get_protoblock_prompt(cls, name):
         """Get the protoblock prompt for an agent."""
         return cls._protoblock_prompts.get(name, "")
+    
+    @classmethod
+    def get_prompt_target(cls, name):
+        """Get the prompt target for an agent."""
+        return cls._prompt_targets.get(name, "")
     
     @classmethod
     def get_all_agents(cls):

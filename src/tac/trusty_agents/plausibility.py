@@ -4,10 +4,15 @@ from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
-from tac.trusty_agents.base import TrustyAgent
+from tac.trusty_agents.base import TrustyAgent, trusty_agent
 
 logger = setup_logging('tac.trusty_agents.plausibility')
 
+@trusty_agent(
+    name="plausibility",
+    description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility.",
+    protoblock_prompt="Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description."
+)
 class PlausibilityTestingAgent(TrustyAgent):
     """
     Checks if the implemented changes match the promised functionality by analyzing
@@ -69,9 +74,9 @@ Here a summary of the codebase:
 And here the description of the task:
 <protoblock>
 Task Description: {protoblock.task_description}
-Test Specification: {protoblock.pytest_specification}
 Write Files: {protoblock.write_files}
 Context Files: {protoblock.context_files}
+Plausibility Prompt: {protoblock.trusty_agent_prompts["plausibility"]}
 </protoblock>
 
 <implemented_changes>
@@ -157,10 +162,4 @@ PLAUSIBILITY SCORE RATING:
             
         except Exception as e:
             logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)
-            return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception"
-
-# Register this agent
-PlausibilityTestingAgent.agent_name = "plausibility"
-PlausibilityTestingAgent.protoblock_prompt = "Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description."
-PlausibilityTestingAgent.description = "A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility."
-PlausibilityTestingAgent.register() 
+            return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception" 

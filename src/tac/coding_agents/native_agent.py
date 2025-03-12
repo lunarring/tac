@@ -8,6 +8,7 @@ from tac.core.llm import LLMClient, Message
 import select
 import time
 import sys
+from tac.trusty_agents.registry import TrustyAgentRegistry
 
 logger = setup_logging('tac.coding_agents.native')
 
@@ -131,6 +132,7 @@ class NativeAgent(Agent):
         task_description: str,
         context_files_section: str,
         write_files_section: str,
+        coding_agent_prompts: dict = None,
     ) -> str:
         """Create the implementation prompt for the LLM.
         
@@ -138,7 +140,7 @@ class NativeAgent(Agent):
             task_description: Description of the task to implement
             context_files_section: Formatted string of context files
             write_files_section: Formatted string of write files
-            write_files: List of write file paths for the instruction
+            coding_agent_prompts: Dictionary of coding agent prompts
             
         Returns:
             Complete formatted prompt string
@@ -181,6 +183,12 @@ Additionally, below, you add a small note to the user about the changes you made
 ###END_NOTE
 
 REMEMBER: change as little as possible and ONLY implement functionality that is listed in the task description."""
+        
+        # Add coding agent prompts if available
+        if coding_agent_prompts and len(coding_agent_prompts) > 0:
+            prompt += "\n\nAdditional guidance for implementation:\n"
+            for agent_name, agent_prompt in coding_agent_prompts.items():
+                prompt += f"\n{agent_name} guidance: {agent_prompt}\n"
         
         return prompt
 
@@ -273,8 +281,6 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         self.protoblock = protoblock
         
         task_description = protoblock.task_description
-        pytest_specification = protoblock.pytest_specification
-        pytest_data_generation = protoblock.pytest_data_generation
         
         # Process and validate files
         write_files, context_files = self.process_write_and_context_files(protoblock)
@@ -284,6 +290,14 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         context_file_contents = self._load_file_contents(context_files, "context")
 
         logger.debug(f"Read {len(write_file_contents)} write files and {len(context_file_contents)} context files")
+
+        # GET HERE TRUST AGENT PROMPTS
+        # Filter trusty_agent_prompts for those with "coding_agent" as prompt_target
+        coding_agent_prompts = {}
+        for agent_name, prompt in protoblock.trusty_agent_prompts.items():
+            if TrustyAgentRegistry.get_prompt_target(agent_name) == "coding_agent":
+                coding_agent_prompts[agent_name] = prompt
+                logger.debug(f"Found coding_agent prompt for {agent_name}")
         
         # Format files for prompt
         context_files_prompt = self._format_files_for_prompt(context_file_contents, is_context=True)
@@ -294,6 +308,7 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
             task_description,
             context_files_prompt,
             write_files_prompt,
+            coding_agent_prompts,
         )
         
         # Create message for LLM

@@ -26,6 +26,7 @@ class AiderAgent(Agent):
         Args:
             protoblock: The ProtoBlock instance containing task details and specifications
         """
+        raise NotImplementedError("Aider is not implemented yet...")
         task_description = protoblock.task_description
         pytest_specification = protoblock.pytest_specification
         pytest_data_generation = protoblock.pytest_data_generation
