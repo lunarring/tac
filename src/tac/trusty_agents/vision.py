@@ -637,6 +637,11 @@ class VisionAnalyzer:
         """
         # Get the screenshot path from the program runner
         screenshot_path = program_runner.get_screenshot_path()
+        for i in range(10):
+            time.sleep(0.2)
+            file_size = os.path.getsize(screenshot_path)
+            if file_size > 0:
+                break
         
         # Validate screenshot path
         if not screenshot_path:
@@ -649,16 +654,33 @@ class VisionAnalyzer:
             print(f"Error: {error_msg}")
             return f"Vision analysis failed: {error_msg}"
         
+        # Print file details for debugging
+        file_size = os.path.getsize(screenshot_path)
+        print(f"Screenshot file: {screenshot_path}")
+        print(f"File size: {file_size} bytes")
+        print(f"File exists: {os.path.exists(screenshot_path)}")
+        
         # Send the screenshot to the vision model
         try:
-            # Create messages for the vision model
-            messages = [
+            # Create messages for the vision model - EXACTLY as in the llm.py example
+            vision_messages = [
                 self.Message(role="system", content="You are a helpful assistant that can analyze images"),
                 self.Message(role="user", content=prompt)
             ]
             
-            # Use vision_chat_completion directly
-            return self.client.vision_chat_completion(messages, screenshot_path, temperature)
+            print(f"Analyzing image at: {screenshot_path}")
+            
+            # Verify we can read the file
+            try:
+                with open(screenshot_path, 'rb') as f:
+                    test_read = f.read(100)  # Just read a few bytes to test
+                print(f"Successfully read {len(test_read)} bytes from the file")
+            except Exception as read_error:
+                print(f"Warning: Could not read from file: {read_error}")
+            
+            # Use vision_chat_completion directly - EXACTLY as in the llm.py example
+            response_vision = self.client.vision_chat_completion(vision_messages, screenshot_path, temperature)
+            return response_vision
         except Exception as e:
             error_msg = f"Error during vision analysis: {str(e)}"
             print(f"Error: {error_msg}")
@@ -696,13 +718,21 @@ def main():
         if screenshot_path and os.path.exists(screenshot_path):
             print(f"Screenshot was saved to: {screenshot_path}")
             
+            # Verify the file exists and has content
+            if os.path.exists(screenshot_path) and os.path.getsize(screenshot_path) > 0:
+                print(f"Screenshot file verified: {screenshot_path} ({os.path.getsize(screenshot_path)} bytes)")
+            else:
+                print(f"Warning: Screenshot file issue at {screenshot_path}")
+            
             # Create the vision analyzer
             print("Initializing vision analyzer...")
             analyzer = VisionAnalyzer()
             
-            # Analyze the screenshot
+            # Analyze the screenshot - using the exact same approach as in llm.py
             print("\nAnalyzing screenshot...")
-            response = analyzer.analyze_screenshot(
+            
+            # Use the same prompt as in the example
+            response_vision = analyzer.analyze_screenshot(
                 runner,
                 prompt="Do you see a black background and a red dot in the middle?",
                 temperature=0.7
@@ -710,7 +740,7 @@ def main():
             
             print("\nResponse from vision model:")
             print("-" * 50)
-            print(response)
+            print(response_vision)
             print("-" * 50)
         else:
             print("No screenshot was taken or the file doesn't exist.")
