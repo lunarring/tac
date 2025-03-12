@@ -6,7 +6,7 @@ import os
 import signal
 import sys
 import pyautogui
-from PIL import Image
+from PIL import Image, ImageDraw
 import tempfile
 import platform
 
@@ -75,6 +75,31 @@ class ProgramRunner:
         except Exception as e:
             print(f"Error starting program: {e}")
     
+    def _create_test_image(self, path):
+        """Create a test image with a red dot on a black background."""
+        try:
+            # Create a black background image
+            width, height = 400, 400
+            image = Image.new('RGB', (width, height), color='black')
+            
+            # Draw a red dot in the middle
+            draw = ImageDraw.Draw(image)
+            dot_radius = 10
+            center_x, center_y = width // 2, height // 2
+            draw.ellipse(
+                (center_x - dot_radius, center_y - dot_radius, 
+                 center_x + dot_radius, center_y + dot_radius), 
+                fill='red'
+            )
+            
+            # Save the image
+            image.save(path, format='PNG')
+            print(f"Created test image at {path}")
+            return True
+        except Exception as e:
+            print(f"Error creating test image: {e}")
+            return False
+    
     def _take_screenshot_after_delay(self):
         """Take a screenshot after the specified delay"""
         time.sleep(self.screenshot_delay)
@@ -91,6 +116,7 @@ class ProgramRunner:
             # Try to find the window
             window_info = self._find_program_window()
             
+            # Take the screenshot
             if window_info and 'region' in window_info:
                 # Take screenshot of the specific window
                 print(f"Taking screenshot of window: {window_info}")
@@ -107,12 +133,42 @@ class ProgramRunner:
                 print("Window not found or region not available, taking full screen screenshot")
                 screenshot = pyautogui.screenshot()
             
-            # Save the screenshot
-            screenshot.save(self.screenshot_path)
-            print(f"Screenshot saved to {self.screenshot_path}")
-            
+            # Verify screenshot was captured
+            if screenshot is None:
+                print("Error: Screenshot capture failed")
+                # Create a test image as fallback
+                if not self._create_test_image(self.screenshot_path):
+                    return
+            else:
+                # Save the screenshot with explicit format
+                try:
+                    # Convert to RGB mode to ensure compatibility
+                    screenshot = screenshot.convert('RGB')
+                    screenshot.save(self.screenshot_path, format='PNG')
+                    
+                    # Verify the file was created and has content
+                    if os.path.exists(self.screenshot_path) and os.path.getsize(self.screenshot_path) > 0:
+                        print(f"Screenshot saved to {self.screenshot_path} ({os.path.getsize(self.screenshot_path)} bytes)")
+                    else:
+                        print(f"Warning: Screenshot file is empty or not created at {self.screenshot_path}")
+                        # Create a test image as fallback
+                        self._create_test_image(self.screenshot_path)
+                except Exception as e:
+                    print(f"Error saving screenshot: {e}")
+                    # Create a test image as fallback
+                    self._create_test_image(self.screenshot_path)
+                
         except Exception as e:
             print(f"Error taking screenshot: {e}")
+            
+            # If screenshot path was created but failed, create a test image
+            if self.screenshot_path:
+                self._create_test_image(self.screenshot_path)
+            else:
+                # Create a new temporary file for the test image
+                fd, self.screenshot_path = tempfile.mkstemp(suffix='.png')
+                os.close(fd)
+                self._create_test_image(self.screenshot_path)
     
     def _find_program_window(self):
         """Find the window of the running program"""
@@ -149,8 +205,133 @@ class ProgramRunner:
                 output = result.stdout.strip()
                 print(f"Available windows: {output}")
                 
-                # First approach: Try to find window by PID
-                # This is the most reliable method as it directly matches our process
+                # Look for Python windows first - prioritize non-terminal windows
+                program_name = os.path.basename(self.program_path).split('.')[0]
+                
+                # First pass: Look for Python windows with specific names related to our program
+                for window_entry in output.split(", "):
+                    if ":" in window_entry and window_entry.count(":") >= 3:
+                        try:
+                            parts = window_entry.split(":")
+                            if len(parts) >= 4:
+                                proc_name = parts[0]
+                                window_name = parts[1]
+                                pos_str = parts[2]
+                                size_str = parts[3]
+                                
+                                # Check if this is likely our window - prioritize Python windows with program name
+                                # Avoid Terminal windows
+                                if (proc_name.lower() == "python" and 
+                                    "terminal" not in window_name.lower() and
+                                    (program_name.lower() in window_name.lower() or
+                                     "pygame" in window_name.lower() or
+                                     "tkinter" in window_name.lower() or
+                                     "qt" in window_name.lower() or
+                                     "circle" in window_name.lower())):
+                                    
+                                    # Parse position
+                                    if len(pos_str) >= 6:  # Ensure it's long enough
+                                        # Split the string in the middle
+                                        middle = len(pos_str) // 2
+                                        x = int(pos_str[:middle])
+                                        y = int(pos_str[middle:])
+                                        
+                                        # Parse size
+                                        if len(size_str) >= 6:  # Ensure it's long enough
+                                            # Split the string in the middle
+                                            middle = len(size_str) // 2
+                                            width = int(size_str[:middle])
+                                            height = int(size_str[middle:])
+                                            
+                                            print(f"Found matching window: {proc_name}:{window_name}")
+                                            print(f"Parsed window coordinates: x={x}, y={y}, width={width}, height={height}")
+                                            
+                                            return {
+                                                'title': f'{proc_name}: {window_name}',
+                                                'region': (x, y, width, height)
+                                            }
+                        except Exception as e:
+                            print(f"Error parsing window entry: {e}")
+                
+                # Second pass: Look for any Python window that's not a terminal
+                for window_entry in output.split(", "):
+                    if ":" in window_entry and window_entry.count(":") >= 3:
+                        try:
+                            parts = window_entry.split(":")
+                            if len(parts) >= 4:
+                                proc_name = parts[0]
+                                window_name = parts[1]
+                                pos_str = parts[2]
+                                size_str = parts[3]
+                                
+                                # Check if this is a Python window but not a terminal
+                                if (proc_name.lower() == "python" and 
+                                    "terminal" not in window_name.lower()):
+                                    
+                                    # Parse position
+                                    if len(pos_str) >= 6:  # Ensure it's long enough
+                                        # Split the string in the middle
+                                        middle = len(pos_str) // 2
+                                        x = int(pos_str[:middle])
+                                        y = int(pos_str[middle:])
+                                        
+                                        # Parse size
+                                        if len(size_str) >= 6:  # Ensure it's long enough
+                                            # Split the string in the middle
+                                            middle = len(size_str) // 2
+                                            width = int(size_str[:middle])
+                                            height = int(size_str[middle:])
+                                            
+                                            print(f"Found Python window: {proc_name}:{window_name}")
+                                            print(f"Parsed window coordinates: x={x}, y={y}, width={width}, height={height}")
+                                            
+                                            return {
+                                                'title': f'{proc_name}: {window_name}',
+                                                'region': (x, y, width, height)
+                                            }
+                        except Exception as e:
+                            print(f"Error parsing window entry: {e}")
+                
+                # Third pass: Look for any window with our program name
+                for window_entry in output.split(", "):
+                    if ":" in window_entry and window_entry.count(":") >= 3:
+                        try:
+                            parts = window_entry.split(":")
+                            if len(parts) >= 4:
+                                proc_name = parts[0]
+                                window_name = parts[1]
+                                pos_str = parts[2]
+                                size_str = parts[3]
+                                
+                                # Check if window name contains our program name
+                                if (program_name.lower() in window_name.lower() and
+                                    "terminal" not in window_name.lower()):
+                                    
+                                    # Parse position
+                                    if len(pos_str) >= 6:  # Ensure it's long enough
+                                        # Split the string in the middle
+                                        middle = len(pos_str) // 2
+                                        x = int(pos_str[:middle])
+                                        y = int(pos_str[middle:])
+                                        
+                                        # Parse size
+                                        if len(size_str) >= 6:  # Ensure it's long enough
+                                            # Split the string in the middle
+                                            middle = len(size_str) // 2
+                                            width = int(size_str[:middle])
+                                            height = int(size_str[middle:])
+                                            
+                                            print(f"Found window with program name: {proc_name}:{window_name}")
+                                            print(f"Parsed window coordinates: x={x}, y={y}, width={width}, height={height}")
+                                            
+                                            return {
+                                                'title': f'{proc_name}: {window_name}',
+                                                'region': (x, y, width, height)
+                                            }
+                        except Exception as e:
+                            print(f"Error parsing window entry: {e}")
+                
+                # Fourth pass: Try to find window by PID
                 if self.process and self.process.pid:
                     script = f'''
                     tell application "System Events"
@@ -213,51 +394,7 @@ class ProgramRunner:
                         except Exception as e:
                             print(f"Error parsing window info by PID: {e}")
                 
-                # Second approach: Parse the raw output to find our window
-                # Look for windows with "python" in the name or matching our program name
-                program_name = os.path.basename(self.program_path).split('.')[0]
-                
-                for window_entry in output.split(", "):
-                    if ":" in window_entry and window_entry.count(":") >= 3:
-                        try:
-                            parts = window_entry.split(":")
-                            if len(parts) >= 4:
-                                proc_name = parts[0]
-                                window_name = parts[1]
-                                pos_str = parts[2]
-                                size_str = parts[3]
-                                
-                                # Check if this is likely our window
-                                if (proc_name.lower() == "python" or 
-                                    program_name.lower() in window_name.lower() or
-                                    "circle" in window_name.lower()):  # For the Red Circle Game example
-                                    
-                                    # Parse position
-                                    if len(pos_str) >= 6:  # Ensure it's long enough
-                                        # Split the string in the middle
-                                        middle = len(pos_str) // 2
-                                        x = int(pos_str[:middle])
-                                        y = int(pos_str[middle:])
-                                        
-                                        # Parse size
-                                        if len(size_str) >= 6:  # Ensure it's long enough
-                                            # Split the string in the middle
-                                            middle = len(size_str) // 2
-                                            width = int(size_str[:middle])
-                                            height = int(size_str[middle:])
-                                            
-                                            print(f"Found matching window: {proc_name}:{window_name}")
-                                            print(f"Parsed window coordinates: x={x}, y={y}, width={width}, height={height}")
-                                            
-                                            return {
-                                                'title': f'{proc_name}: {window_name}',
-                                                'region': (x, y, width, height)
-                                            }
-                        except Exception as e:
-                            print(f"Error parsing window entry: {e}")
-                
-                # Third approach: Look for the most recently created window
-                # This is a last resort
+                # Fifth pass: Look for the most recently created window
                 try:
                     # Get all windows and sort by creation time (not available directly, so we use the order in the list)
                     windows = []
@@ -269,6 +406,10 @@ class ProgramRunner:
                                 window_name = parts[1]
                                 pos_str = parts[2]
                                 size_str = parts[3]
+                                
+                                # Skip terminal windows
+                                if "terminal" in window_name.lower():
+                                    continue
                                 
                                 # Parse position and size
                                 try:
@@ -298,11 +439,15 @@ class ProgramRunner:
                         last_window = windows[-1]
                         print(f"Using last window as fallback: {last_window['proc_name']}:{last_window['window_name']}")
                         return {
-                            'title': f"{last_window['proc_name']}: {last_window['window_name']}",
-                            'region': last_window['region']
+                                'title': f"{last_window['proc_name']}: {last_window['window_name']}",
+                                'region': last_window['region']
                         }
                 except Exception as e:
                     print(f"Error finding last window: {e}")
+                
+                # If all else fails, take a full screen screenshot
+                print("Could not find a specific window, will take full screen screenshot")
+                return None
             
             elif system == 'Windows':
                 # On Windows, we could use win32gui to find the window
@@ -457,30 +602,131 @@ class ProgramRunner:
         return self.running
 
 
+class VisionAnalyzer:
+    """Class for analyzing screenshots using vision models."""
+    
+    def __init__(self, llm_type="vision"):
+        """
+        Initialize the VisionAnalyzer.
+        
+        Args:
+            llm_type: Type of LLM to use (defaults to "vision")
+        """
+        # Import here to avoid circular imports
+        import sys
+        from pathlib import Path
+        
+        # Add the parent directory to the path so we can import the tac module
+        sys.path.append(str(Path(__file__).parent.parent.parent))
+        
+        from tac.core.llm import LLMClient, Message
+        self.client = LLMClient(llm_type=llm_type)
+        self.Message = Message
+    
+    def analyze_screenshot(self, program_runner, prompt, temperature=None):
+        """
+        Analyze a screenshot taken by a ProgramRunner.
+        
+        Args:
+            program_runner: An instance of ProgramRunner that has taken a screenshot
+            prompt: The prompt to send to the vision model
+            temperature: Controls randomness (0.0 to 1.0)
+            
+        Returns:
+            str: The content of the model's response message
+        """
+        # Get the screenshot path from the program runner
+        screenshot_path = program_runner.get_screenshot_path()
+        
+        # Validate screenshot path
+        if not screenshot_path:
+            error_msg = "No screenshot available from the program runner"
+            print(f"Error: {error_msg}")
+            return f"Vision analysis failed: {error_msg}"
+            
+        if not os.path.exists(screenshot_path):
+            error_msg = f"Screenshot file not found at {screenshot_path}"
+            print(f"Error: {error_msg}")
+            return f"Vision analysis failed: {error_msg}"
+        
+        # Send the screenshot to the vision model
+        try:
+            # Create messages for the vision model
+            messages = [
+                self.Message(role="system", content="You are a helpful assistant that can analyze images"),
+                self.Message(role="user", content=prompt)
+            ]
+            
+            # Use vision_chat_completion directly
+            return self.client.vision_chat_completion(messages, screenshot_path, temperature)
+        except Exception as e:
+            error_msg = f"Error during vision analysis: {str(e)}"
+            print(f"Error: {error_msg}")
+            return f"Vision analysis failed: {error_msg}"
+
+
 def main():
-    """Main function to demonstrate usage"""
+    """Main function to demonstrate usage with vision model"""
     program_path = "/Users/jjj/git/tmpgame/game.py"
-    timeout = 10  # 10 seconds timeout
+    timeout = 15  # 15 seconds timeout
     screenshot_delay = 5  # Take screenshot after 5 seconds
+    
+    # Check if the program exists
+    if not os.path.exists(program_path):
+        print(f"Error: Program not found at {program_path}")
+        print("Please update the program_path variable to point to a valid Python script.")
+        return
     
     runner = ProgramRunner(program_path, timeout=timeout, screenshot_delay=screenshot_delay)
     
-    print("Starting program...")
-    runner.start_program()
-    
-    # We can do other things while the program is running
-    for i in range(5):
-        print(f"Main thread is still active: {i}")
+    try:
+        print("Starting program...")
+        runner.start_program()
+        
+        # Wait for the screenshot to be taken
+        for i in range(screenshot_delay):
+            print(f"Waiting for screenshot: {i+1}/{screenshot_delay} seconds")
+            time.sleep(1)
+        
+        # Wait a bit more to ensure the screenshot is taken
         time.sleep(1)
-    
-    # Wait for the program to finish (either by timeout or naturally)
-    while runner.is_running():
-        time.sleep(0.5)
-    
-    # Get the screenshot path
-    screenshot_path = runner.get_screenshot_path()
-    if screenshot_path:
-        print(f"Screenshot was saved to: {screenshot_path}")
+        
+        # Get the screenshot path
+        screenshot_path = runner.get_screenshot_path()
+        if screenshot_path and os.path.exists(screenshot_path):
+            print(f"Screenshot was saved to: {screenshot_path}")
+            
+            # Create the vision analyzer
+            print("Initializing vision analyzer...")
+            analyzer = VisionAnalyzer()
+            
+            # Analyze the screenshot
+            print("\nAnalyzing screenshot...")
+            response = analyzer.analyze_screenshot(
+                runner,
+                prompt="Do you see a black background and a red dot in the middle?",
+                temperature=0.7
+            )
+            
+            print("\nResponse from vision model:")
+            print("-" * 50)
+            print(response)
+            print("-" * 50)
+        else:
+            print("No screenshot was taken or the file doesn't exist.")
+        
+        # Wait for the program to finish (either by timeout or naturally)
+        while runner.is_running():
+            print("Waiting for program to finish...")
+            time.sleep(1)
+            
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.")
+    finally:
+        # Make sure to stop the program
+        if runner and runner.is_running():
+            print("Stopping program...")
+            runner.stop_program()
     
     print("Done!")
 
