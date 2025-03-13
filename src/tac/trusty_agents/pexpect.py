@@ -20,7 +20,7 @@ logger = setup_logging('tac.trusty_agents.pexpect')
 # Comment: this is a minimalistic implementation, as for testing we are using pytest.
 @trusty_agent(
     name="pexpect",
-    description="A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verifies the functionality of the entire program through the command line interface.",
+    description="A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verifies the functionality of the entire program through the command line interface. use this for testing programs.",
     protoblock_prompt="""On basis of the pexpect library, define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here. Ensure we are using pexpect. Write the test in tests/test_<program_name>.py. Be sure to import and use pexpect.""",
     prompt_target="coding_agent",
 )

@@ -85,13 +85,13 @@ class BlockExecutor:
             
             try:
                 # Log start of task execution
-                logger.info(f"Starting coding agent execution (attempt {idx_attempt + 1})")
+                logger.info(f"Starting coding agent implementation (attempt {idx_attempt + 1})", heading=True)
                 
                 # Pass the previous attempt's analysis to the coding agent
                 self.coding_agent.run(self.protoblock, previous_analysis=analysis)
                 
                 # Log completion of task execution
-                logger.info(f"Coding agent execution completed (attempt {idx_attempt + 1})")
+                logger.info(f"Coding agent implementation completed (attempt {idx_attempt + 1})")
                 
             except Exception as e:
                 error_msg = f"Error during coding agent execution: {type(e).__name__}: {str(e)}"
@@ -129,7 +129,7 @@ class BlockExecutor:
             # Run trusty agents in the sorted order
             for agent_name in sorted_agents:
                 if agent_name in self.trusty_agents:
-                    logger.info(f"Trusty agent: {agent_name} starting...")
+                    logger.info(f"Trusty agent: {agent_name} starting...", heading=True)
                     try:
                         agent_success, agent_error_analysis, agent_failure_type = self.trusty_agents[agent_name].check(
                             self.protoblock, self.codebase, code_diff
@@ -151,7 +151,7 @@ class BlockExecutor:
             
             # If we got here, all required tests passed
             execution_success = True
-            logger.info(f"All trusty agents are happy ({', '.join(self.protoblock.trusty_agents)}). Trust is assured!")
+            logger.info(f"All trusty agents are happy ({', '.join(self.protoblock.trusty_agents)}). Trust is assured!", heading=True)
             return execution_success, None, ""  # Return empty string instead of None
 
             

@@ -315,7 +315,7 @@ class MultiBlockOrchestrator:
         project_files = ProjectFiles()
         
         for i, recipe in enumerate(recipes):
-            logger.info(f"🚀 Executing Protoblock Recipe {i+1}/{len(recipes)}...", heading=True)
+            logger.info(f"🚀 Executing Protoblock Chain {i+1}/{len(recipes)}...", heading=True)
 
             # Update codebase if it's not the first recipe
             if i > 0:
