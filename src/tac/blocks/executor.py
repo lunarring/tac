@@ -120,15 +120,22 @@ class BlockExecutor:
             for agent_name in sorted_agents:
                 if agent_name in self.trusty_agents:
                     logger.info(f"Trusty agent: {agent_name} starting...")
-                    execution_success, error_analysis, failure_type = self.trusty_agents[agent_name].check(
-                        self.protoblock, self.codebase, code_diff
-                    )
-                    
-                    if not execution_success:
-                        logger.error(f"{agent_name} check failed: {failure_type}")
-                        return execution_success, error_analysis, failure_type
-                    else:
-                        logger.info(f"{agent_name} check passed")
+                    try:
+                        agent_success, agent_error_analysis, agent_failure_type = self.trusty_agents[agent_name].check(
+                            self.protoblock, self.codebase, code_diff
+                        )
+                        
+                        if not agent_success:
+                            logger.error(f"{agent_name} check failed: {agent_failure_type}")
+                            # Return the failure information to trigger a retry
+                            return False, agent_error_analysis, agent_failure_type
+                        else:
+                            logger.info(f"{agent_name} check passed")
+                    except Exception as e:
+                        error_msg = f"Error during {agent_name} check: {type(e).__name__}: {str(e)}"
+                        logger.error(error_msg, exc_info=True)
+                        # Return the exception information to trigger a retry
+                        return False, error_msg, f"Exception in {agent_name} check"
                 else:
                     logger.warning(f"Trusty agent '{agent_name}' specified in protoblock but not available in executor")
             
@@ -142,8 +149,8 @@ class BlockExecutor:
             logger.info("\nExecution interrupted by user")
             return False, "Execution interrupted", ""
         except Exception as e:
-            logger.error(f"Unexpected error during block execution: {e}")
-            return False, "Unexpected error", str(e)
+            logger.error(f"Unexpected error during block execution: {e}", exc_info=True)
+            return False, str(e), "Unexpected error"
 
     def run_tests(self, test_path: str = None) -> bool:
         """
