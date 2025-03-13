@@ -305,24 +305,71 @@ class TACViewer:
             available_height = terminal_height - 3 - 2 - 1
             
             # Use at least 4 lines, at most 40 lines, but stay within available height
-            content_lines = max(4, min(40, available_height))
+            max_display_lines = max(4, min(40, available_height))
             
-            # Calculate page indices
-            start_idx = page * content_lines
-            end_idx = start_idx + content_lines
-            current_lines = log_content[start_idx:end_idx]
-            
-            if not current_lines:
+            if not log_content:
                 self.console.print("[yellow]No log entries to display.[/yellow]")
                 self.console.print("\nPress any key to continue...")
                 get_single_key()
                 return
+            
+            # Calculate pagination based on rendered lines
+            # First, we need to know how many actual lines each log line will take when rendered
+            line_indices = []  # Maps rendered line index to log content index
+            rendered_line_count = 0
+            
+            # Pre-calculate how many rendered lines each log line will take
+            rendered_lines_per_log_line = []
+            for i, item in enumerate(log_content):
+                # Handle search results differently
+                if is_search_result:
+                    line, _ = item
+                else:
+                    line = item
                 
-            total_pages = (len(log_content) + content_lines - 1) // content_lines
+                # Calculate how many lines this will take when rendered
+                # Each line will wrap at terminal_width - 5 (small safety margin)
+                effective_width = terminal_width - 5
+                line_length = len(line.strip())
+                lines_needed = max(1, (line_length + effective_width - 1) // effective_width)
+                rendered_lines_per_log_line.append(lines_needed)
+            
+            # Find the start and end indices for the current page
+            start_idx = 0
+            end_idx = 0
+            current_rendered_lines = 0
+            
+            # Skip to the start of the current page
+            for i in range(len(rendered_lines_per_log_line)):
+                if page > 0 and current_rendered_lines < page * max_display_lines:
+                    current_rendered_lines += rendered_lines_per_log_line[i]
+                    start_idx = i + 1
+                else:
+                    break
+            
+            # Find the end index for the current page
+            current_rendered_lines = 0
+            for i in range(start_idx, len(rendered_lines_per_log_line)):
+                if current_rendered_lines + rendered_lines_per_log_line[i] <= max_display_lines:
+                    current_rendered_lines += rendered_lines_per_log_line[i]
+                    end_idx = i + 1
+                else:
+                    break
+            
+            # Ensure we show at least one line even if it takes more than max_display_lines
+            if start_idx == end_idx and start_idx < len(log_content):
+                end_idx = start_idx + 1
+            
+            # Get the current lines to display
+            current_lines = log_content[start_idx:end_idx]
+            
+            # Calculate total pages
+            total_rendered_lines = sum(rendered_lines_per_log_line)
+            total_pages = (total_rendered_lines + max_display_lines - 1) // max_display_lines
             
             # Print header (3 lines now)
             self.console.print(f"[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
-            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}, Available: {available_height}, Using: {content_lines}")
+            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}, Available: {available_height}")
             
             # Get and display the current heading
             # For search results, we need to handle differently
@@ -333,9 +380,6 @@ class TACViewer:
                 current_heading = self.get_current_heading(start_idx)
                 if current_heading:
                     heading_text = current_heading['text']
-                    # Truncate if too long
-                    if len(heading_text) > terminal_width - 20:
-                        heading_text = heading_text[:terminal_width - 23] + "..."
                     self.console.print(f"[bold yellow]CURRENT HEADING: {heading_text}[/bold yellow]")
                 else:
                     self.console.print("[dim]No current heading[/dim]")
@@ -347,12 +391,6 @@ class TACViewer:
                     line, search_term = item
                 else:
                     line = item
-                
-                # Truncate long lines to fit terminal width
-                # Leave some margin (20 chars) for safety
-                max_line_length = terminal_width - 20
-                if len(line) > max_line_length:
-                    line = line[:max_line_length] + "..."
                 
                 # Determine style based on log level
                 style = None
@@ -399,7 +437,8 @@ class TACViewer:
             # Create navigation text
             nav_text = Text()
             nav_text.append("Navigate: ", style="bold")
-            nav_text.append("[n]ext ", style="cyan" if end_idx < len(log_content) else "dim")
+            nav_text.append("[n]ext ", style="cyan" if page < total_pages - 1 else "dim")
+            nav_text.append("[p]rev ", style="cyan" if page > 0 else "dim")
             nav_text.append("[b]ack ", style="cyan")  # Always show back as available
             nav_text.append("[f]irst ", style="cyan")
             nav_text.append("[l]ast ", style="cyan")
@@ -429,7 +468,9 @@ class TACViewer:
                 else:
                     # If on the first page, return to the log list
                     return
-            elif choice == 'n' and end_idx < len(log_content):
+            elif choice == 'p' and page > 0:
+                page -= 1
+            elif choice == 'n' and page < total_pages - 1:
                 page += 1
             elif choice == 'f':
                 page = 0
@@ -572,11 +613,8 @@ class TACViewer:
         self.console.print(f"[bold cyan]TAC Log Viewer - Headings in {os.path.basename(self.current_log_path)}[/bold cyan]\n")
         
         for i, heading in enumerate(self.headings, 1):
-            # Truncate heading text if too long
+            # Show full heading text
             heading_text = heading['text']
-            if len(heading_text) > 60:
-                heading_text = heading_text[:57] + "..."
-                
             self.console.print(f"{i}. {heading_text} (line {heading['line'] + 1})")
         
         # Get user choice
@@ -596,13 +634,29 @@ class TACViewer:
                 # Get the line number for this heading
                 heading_line = self.headings[choice - 1]['start_line']
                 
-                # Get terminal size to calculate content_lines similar to display_log_content
+                # Get terminal size
                 terminal_height = os.get_terminal_size().lines
-                available_height = terminal_height - 3 - 2 - 1  # Same calculation as in display_log_content
-                content_lines = max(4, min(40, available_height))
+                terminal_width = os.get_terminal_size().columns
                 
-                # Calculate the page number for this heading
-                page = heading_line // content_lines
+                # Calculate available height similar to display_log_content
+                available_height = terminal_height - 3 - 2 - 1
+                max_display_lines = max(4, min(40, available_height))
+                
+                # Calculate how many rendered lines each log line will take
+                rendered_lines_per_log_line = []
+                for line in self.current_log_content:
+                    # Calculate how many lines this will take when rendered
+                    effective_width = terminal_width - 5
+                    line_length = len(line.strip())
+                    lines_needed = max(1, (line_length + effective_width - 1) // effective_width)
+                    rendered_lines_per_log_line.append(lines_needed)
+                
+                # Calculate which page contains the heading
+                rendered_lines_before_heading = 0
+                for i in range(heading_line):
+                    rendered_lines_before_heading += rendered_lines_per_log_line[i]
+                
+                page = rendered_lines_before_heading // max_display_lines
                 
                 # Show a confirmation message
                 self.console.print(f"\n[green]Jumping to heading: {self.headings[choice - 1]['text']}[/green]")
