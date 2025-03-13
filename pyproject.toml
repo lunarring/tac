@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tac"
-version = "0.1.4"
+version = "0.1.5"
 description = "Trusty Agentic Chains combines the methodical approach of tested development with blockchain-inspired interlinking mechanisms, creating a robust framework where AI systems are developed and validated through continuous empirical testing."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -14,7 +14,6 @@ dependencies = [
     "pytest-benchmark>=4.0.0",
     "pytest-snapshot>=0.9.0",
     "line_profiler>=4.1.0",
-    "snapshottest>=0.6.0",
     "numpy>=1.24.0",
     "GitPython>=3.1.40",
     "tqdm>=4.66.0",
