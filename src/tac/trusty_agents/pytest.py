@@ -479,10 +479,10 @@ class CustomReporter:
             for item in report.result:
                 if hasattr(item, 'nodeid') and item.nodeid not in self.test_functions:
                     self.test_functions.append(item.nodeid)
-    
-    # Add a hook to capture errors during collection
-    def pytest_collectreport_exception(self, report):
-        if hasattr(report, 'longrepr'):
-            self.output_lines.append(f"Collection error: {report.longrepr}")
-            self.results['error'] += 1
+        
+        # Handle collection errors
+        if hasattr(report, 'outcome') and report.outcome == 'failed':
+            if hasattr(report, 'longrepr'):
+                self.output_lines.append(f"Collection error: {report.longrepr}")
+                self.results['error'] += 1
 
