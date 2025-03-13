@@ -93,6 +93,70 @@ class TACLogger(logging.Logger):
         
         # Call the parent info method
         super().info(msg, *args, **kwargs)
+    
+    def debug(self, msg, *args, heading=False, **kwargs):
+        """
+        Log a debug message with optional heading formatting.
+        
+        Args:
+            msg: The message to log
+            heading: If True, add screen-width separators before and after the message
+            *args, **kwargs: Standard logging arguments
+        """
+        if heading:
+            # Store heading flag in extra dict
+            kwargs.setdefault('extra', {})['heading'] = True
+        
+        # Call the parent debug method
+        super().debug(msg, *args, **kwargs)
+    
+    def warning(self, msg, *args, heading=False, **kwargs):
+        """
+        Log a warning message with optional heading formatting.
+        
+        Args:
+            msg: The message to log
+            heading: If True, add screen-width separators before and after the message
+            *args, **kwargs: Standard logging arguments
+        """
+        if heading:
+            # Store heading flag in extra dict
+            kwargs.setdefault('extra', {})['heading'] = True
+        
+        # Call the parent warning method
+        super().warning(msg, *args, **kwargs)
+    
+    def error(self, msg, *args, heading=False, **kwargs):
+        """
+        Log an error message with optional heading formatting.
+        
+        Args:
+            msg: The message to log
+            heading: If True, add screen-width separators before and after the message
+            *args, **kwargs: Standard logging arguments
+        """
+        if heading:
+            # Store heading flag in extra dict
+            kwargs.setdefault('extra', {})['heading'] = True
+        
+        # Call the parent error method
+        super().error(msg, *args, **kwargs)
+    
+    def critical(self, msg, *args, heading=False, **kwargs):
+        """
+        Log a critical message with optional heading formatting.
+        
+        Args:
+            msg: The message to log
+            heading: If True, add screen-width separators before and after the message
+            *args, **kwargs: Standard logging arguments
+        """
+        if heading:
+            # Store heading flag in extra dict
+            kwargs.setdefault('extra', {})['heading'] = True
+        
+        # Call the parent critical method
+        super().critical(msg, *args, **kwargs)
 
 # Register our custom logger class
 logging.setLoggerClass(TACLogger)
@@ -340,6 +404,9 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
 
     # Store the configured logger
     _configured_loggers[name] = logger
+    
+    # Ensure all loggers are using our custom TACLogger class
+    ensure_tac_logger_for_all()
 
     return logger
 
@@ -352,6 +419,8 @@ def reset_execution_context():
     execution_context.reset()
     # Also clear configured loggers to force recreation
     _configured_loggers.clear()
+    # Ensure all loggers are using our custom TACLogger class
+    ensure_tac_logger_for_all()
 
 def update_all_loggers(log_level: str = 'INFO'):
     """Update all existing loggers with a new log level.
@@ -360,6 +429,9 @@ def update_all_loggers(log_level: str = 'INFO'):
         log_level: The new log level to set for console handlers
     """
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    
+    # Ensure all loggers are using our custom TACLogger class
+    ensure_tac_logger_for_all()
     
     # Update all configured loggers
     for name, logger in _configured_loggers.items():
@@ -377,5 +449,37 @@ def update_all_loggers(log_level: str = 'INFO'):
             if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
                 handler.setLevel(numeric_level)
 
+def ensure_tac_logger_for_all():
+    """
+    Ensure all existing loggers are using our custom TACLogger class.
+    This is needed because setLoggerClass only affects loggers created after it's called.
+    """
+    # Get all existing loggers from the logging manager
+    for name, logger in logging.Logger.manager.loggerDict.items():
+        # Only process actual logger instances, not PlaceHolders
+        if isinstance(logger, logging.Logger) and not isinstance(logger, TACLogger):
+            # Create a new logger with our custom class
+            new_logger = TACLogger(name)
+            
+            # Copy configuration from the old logger
+            new_logger.setLevel(logger.level)
+            new_logger.propagate = logger.propagate
+            
+            # Copy handlers
+            for handler in logger.handlers:
+                new_logger.addHandler(handler)
+            
+            # Clear old logger's handlers to avoid duplicate logging
+            logger.handlers.clear()
+            
+            # Replace the old logger in the manager's dictionary
+            logging.Logger.manager.loggerDict[name] = new_logger
+            
+            # Also update our configured_loggers dict if it's there
+            if name in _configured_loggers:
+                _configured_loggers[name] = new_logger
+
 # Create and expose the default logger
-logger = setup_logging() 
+logger = setup_logging()
+
+# The ensure_tac_logger_for_all() call is now inside setup_logging 
