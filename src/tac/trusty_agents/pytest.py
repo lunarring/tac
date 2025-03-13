@@ -150,7 +150,8 @@ class PytestTestingAgent(TrustyAgent):
             else:
                 # FIXED: Don't do a separate collection step, just run all tests directly
                 # This ensures we always pick up newly created test files
-                if config.general.get('exclude_performance_tests', True):
+                exclude_performance_tests = getattr(config.general, 'exclude_performance_tests', True)
+                if exclude_performance_tests:
                     args.extend(['-m', 'not performance and not transient', test_target])
                 else:
                     args.append(test_target)
