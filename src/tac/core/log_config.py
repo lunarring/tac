@@ -75,6 +75,24 @@ class ExecutionContext:
 # Create a singleton instance
 execution_context = ExecutionContext()
 
+# Monkey patch the standard Logger class to add heading parameter to all log methods
+# This is a simpler approach than trying to replace all loggers
+original_log = logging.Logger._log
+
+def _patched_log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1, heading=False, **kwargs):
+    """
+    Patched _log method that handles the heading parameter.
+    """
+    if heading:
+        if extra is None:
+            extra = {}
+        extra['heading'] = True
+    
+    return original_log(self, level, msg, args, exc_info, extra, stack_info, stacklevel)
+
+# Apply the monkey patch
+logging.Logger._log = _patched_log
+
 class TACLogger(logging.Logger):
     """Custom logger class that extends the standard Logger with additional features."""
     
@@ -404,9 +422,6 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
 
     # Store the configured logger
     _configured_loggers[name] = logger
-    
-    # Ensure all loggers are using our custom TACLogger class
-    ensure_tac_logger_for_all()
 
     return logger
 
@@ -419,8 +434,6 @@ def reset_execution_context():
     execution_context.reset()
     # Also clear configured loggers to force recreation
     _configured_loggers.clear()
-    # Ensure all loggers are using our custom TACLogger class
-    ensure_tac_logger_for_all()
 
 def update_all_loggers(log_level: str = 'INFO'):
     """Update all existing loggers with a new log level.
@@ -429,9 +442,6 @@ def update_all_loggers(log_level: str = 'INFO'):
         log_level: The new log level to set for console handlers
     """
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
-    
-    # Ensure all loggers are using our custom TACLogger class
-    ensure_tac_logger_for_all()
     
     # Update all configured loggers
     for name, logger in _configured_loggers.items():
@@ -449,37 +459,5 @@ def update_all_loggers(log_level: str = 'INFO'):
             if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
                 handler.setLevel(numeric_level)
 
-def ensure_tac_logger_for_all():
-    """
-    Ensure all existing loggers are using our custom TACLogger class.
-    This is needed because setLoggerClass only affects loggers created after it's called.
-    """
-    # Get all existing loggers from the logging manager
-    for name, logger in logging.Logger.manager.loggerDict.items():
-        # Only process actual logger instances, not PlaceHolders
-        if isinstance(logger, logging.Logger) and not isinstance(logger, TACLogger):
-            # Create a new logger with our custom class
-            new_logger = TACLogger(name)
-            
-            # Copy configuration from the old logger
-            new_logger.setLevel(logger.level)
-            new_logger.propagate = logger.propagate
-            
-            # Copy handlers
-            for handler in logger.handlers:
-                new_logger.addHandler(handler)
-            
-            # Clear old logger's handlers to avoid duplicate logging
-            logger.handlers.clear()
-            
-            # Replace the old logger in the manager's dictionary
-            logging.Logger.manager.loggerDict[name] = new_logger
-            
-            # Also update our configured_loggers dict if it's there
-            if name in _configured_loggers:
-                _configured_loggers[name] = new_logger
-
 # Create and expose the default logger
-logger = setup_logging()
-
-# The ensure_tac_logger_for_all() call is now inside setup_logging 
+logger = setup_logging() 
