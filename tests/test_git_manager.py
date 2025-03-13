@@ -2,8 +2,10 @@ import os
 import subprocess
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 from src.tac.utils.git_manager import GitManager
+from src.tac.blocks.processor import BlockProcessor
 
 class TestGitManager(unittest.TestCase):
     def setUp(self):
@@ -64,7 +66,7 @@ class TestGitManager(unittest.TestCase):
         # Start from a non-primary branch, e.g., 'develop'
         subprocess.run(["git", "checkout", "-b", "develop"], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         gm = GitManager(repo_path=self.repo_path)
-        tac_id = "tac_feature123"
+        tac_id = "tac/feature123"
         # Create new tac branch
         result = gm.create_or_switch_to_tac_branch(tac_id)
         self.assertTrue(result, msg="Failed to create or switch to TAC branch")
@@ -74,7 +76,7 @@ class TestGitManager(unittest.TestCase):
 
     def test_switch_existing_tac_branch(self):
         # Create a tac branch first
-        tac_id = "tac_existing"
+        tac_id = "tac/existing"
         subprocess.run(["git", "checkout", "-b", tac_id], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         # Switch to a different branch (create 'develop' if necessary)
         subprocess.run(["git", "checkout", "-b", "develop"], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -86,8 +88,8 @@ class TestGitManager(unittest.TestCase):
         self.assertEqual(active_branch, tac_id, msg="Active branch is not the expected existing TAC branch")
 
     def test_no_new_tac_branch_if_already_on_tac(self):
-        # Start on a tac branch
-        tac_id = "tac_feature123"
+        # Start on a tac branch that starts with 'tac/' to trigger the shortcut in BlockProcessor as well as GitManager
+        tac_id = "tac/feature123"
         subprocess.run(["git", "checkout", "-b", tac_id], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         gm = GitManager(repo_path=self.repo_path)
         # Call create_or_switch_to_tac_branch with the same tac_id while already on a tac branch
@@ -120,6 +122,33 @@ class TestGitManager(unittest.TestCase):
         with open(gitignore_path, "r", encoding="utf-8") as f:
             content = f.read()
         self.assertEqual(initial_content, content, msg="'.gitignore' should remain unchanged when '.tac_*' is already present.")
+
+    def test_handle_git_branch_setup_already_on_tac(self):
+        # Create a tac branch that starts with 'tac/' to simulate branch already in tac namespace
+        tac_branch = "tac/already"
+        subprocess.run(["git", "checkout", "-b", tac_branch], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Instantiate BlockProcessor with dummy protoblock using a different branch name
+        processor = BlockProcessor(task_instructions="dummy", codebase={})
+        # Overwrite the git_manager to use our test repo
+        processor.git_manager = GitManager(repo_path=self.repo_path)
+        # Create a dummy protoblock using SimpleNamespace
+        processor.protoblock = SimpleNamespace(branch_name="tac/newbranch", commit_message="dummy", block_id="dummy")
+        # Monkey-patch get_current_branch to simulate that we're on a branch starting with 'tac/'
+        original_get_current_branch = processor.git_manager.get_current_branch
+        processor.git_manager.get_current_branch = lambda: tac_branch
+        
+        # Capture log output to verify message
+        with self.assertLogs(level="INFO") as log_cm:
+            setup_result = processor.handle_git_branch_setup()
+        self.assertTrue(setup_result, msg="handle_git_branch_setup should return True when on a TAC branch.")
+        # Verify that active branch remains unchanged
+        active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
+        self.assertEqual(active_branch, tac_branch, msg="Active branch should remain unchanged when already on a TAC branch.")
+        # Verify log message indicates bypassing branch switching
+        log_messages = "\n".join(log_cm.output)
+        self.assertIn("Already on a TAC branch:", log_messages, msg="Log should indicate that branch switching was bypassed.")
+        # Restore original method
+        processor.git_manager.get_current_branch = original_get_current_branch
 
 if __name__ == "__main__":
     unittest.main()

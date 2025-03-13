@@ -114,9 +114,9 @@ class BlockProcessor:
             current_git_branch = self.git_manager.get_current_branch() or ""
             tac_branch = self.protoblock.branch_name
 
-            # If already on a TAC branch (branch name starts with 'tac', e.g. 'tac/' or 'tac_'),
+            # If already on a TAC branch (branch name starts with 'tac/'),
             # then skip branch creation or switching, and use the current branch.
-            if current_git_branch.startswith("tac"):
+            if current_git_branch.startswith("tac/"):
                 logger.info(f"Already on a TAC branch: {current_git_branch}. No branch switching necessary.")
                 tac_branch = current_git_branch
             else:
@@ -131,6 +131,7 @@ class BlockProcessor:
                 return False
         else:
             logger.info("Git operations disabled")
+        return True
 
     def run_loop(self):
 
@@ -162,8 +163,8 @@ class BlockProcessor:
 
             # Handle git branch setup first if git is enabled
             if idx_attempt == 0:
-                self.handle_git_branch_setup()
-
+                if not self.handle_git_branch_setup():
+                    return False
 
             # Execute the protoblock using the builder
             execution_success, error_analysis, failure_type  = self.executor.execute_block(self.protoblock, idx_attempt)
