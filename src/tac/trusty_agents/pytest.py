@@ -58,6 +58,9 @@ class PytestTestingAgent(TrustyAgent):
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
             
+            # Reload modules to ensure we're using the latest code
+            self._reload_modules()
+            
             test_success = self.run_tests(test_path)
             test_results = self.get_test_results()
         except Exception as e:
@@ -116,11 +119,9 @@ class PytestTestingAgent(TrustyAgent):
         try:
             test_target = test_path or 'tests'
             full_path = test_target
-            if os.path.exists('.pytest_cache'):
-                shutil.rmtree('.pytest_cache')
-                logger.debug("Removed pytest cache")
-            else:
-                logger.debug("Did not remove any pytest cache")
+            
+            # Clear pytest cache to ensure fresh test discovery
+            self._clear_pytest_cache()
 
             if not os.path.exists(full_path):
                 error_msg = f"Error: Test path not found: {full_path}"
@@ -128,6 +129,9 @@ class PytestTestingAgent(TrustyAgent):
                 self.test_results = error_msg
                 self.had_execution_error = True
                 return False
+
+            # Reload modules to ensure we're using the latest code
+            self._reload_modules()
 
             reporter = CustomReporter()
             plugins = [reporter]
@@ -144,13 +148,17 @@ class PytestTestingAgent(TrustyAgent):
             if os.path.isfile(test_target):
                 args.append(test_target)
             else:
-                # Use a more explicit pattern to find all test files
-                args.extend([test_target, '--collect-only'])
-                # First collect all tests to ensure we're finding everything
-                collection_exit_code = pytest.main(args, plugins=[])
-                # Then run the actual tests
-                args = ['-v', '--disable-warnings', '-m', 'not performance and not transient', test_target]
+                # FIXED: Don't do a separate collection step, just run all tests directly
+                # This ensures we always pick up newly created test files
+                if config.general.get('exclude_performance_tests', True):
+                    args.extend(['-m', 'not performance and not transient', test_target])
+                else:
+                    args.append(test_target)
             
+            # Log the pytest command we're about to run
+            logger.info(f"Running pytest with args: {' '.join(args)}")
+            
+            # Run the tests
             exit_code = pytest.main(args, plugins=plugins)
             
             # Process results
@@ -233,6 +241,7 @@ class PytestTestingAgent(TrustyAgent):
 
     def get_test_functions(self) -> list:
         """Get the list of collected test function names, extracting function names after '::' if present"""
+        # Extract the function name from the nodeid (last part after ::)
         return [s.split("::")[-1].strip() if "::" in s else s for s in self.test_functions]
 
     def collect_all_tests(self, tests_dir: str = "tests") -> list:
@@ -266,6 +275,68 @@ class PytestTestingAgent(TrustyAgent):
                     except Exception as e:
                         logger.error(f"Failed to process file {filepath}: {e}")
         return modified_tests
+
+    def _reload_modules(self):
+        """
+        Reload Python modules to ensure we're using the latest code.
+        This helps when new tests have been added or existing tests modified.
+        """
+        try:
+            # Get a list of loaded modules
+            loaded_modules = list(sys.modules.keys())
+            
+            # Identify test modules
+            test_modules = [m for m in loaded_modules if 'test_' in m or m.endswith('_test')]
+            
+            # Reload test modules
+            for module_name in test_modules:
+                try:
+                    if module_name in sys.modules:
+                        logger.debug(f"Reloading module: {module_name}")
+                        module = sys.modules[module_name]
+                        import importlib
+                        importlib.reload(module)
+                except Exception as e:
+                    logger.debug(f"Error reloading module {module_name}: {e}")
+                    
+            logger.debug(f"Reloaded {len(test_modules)} test modules")
+        except Exception as e:
+            logger.debug(f"Error during module reload: {e}")
+            # Continue even if reloading fails
+
+    def _clear_pytest_cache(self):
+        """
+        Clear pytest cache to ensure fresh test discovery.
+        This helps when new tests have been added or existing tests modified.
+        """
+        try:
+            # Clear .pytest_cache directory
+            if os.path.exists('.pytest_cache'):
+                shutil.rmtree('.pytest_cache')
+                logger.debug("Removed pytest cache directory")
+            
+            # Clear __pycache__ directories in test directories
+            test_dir = config.general.test_path or 'tests'
+            if os.path.isdir(test_dir):
+                for root, dirs, files in os.walk(test_dir):
+                    if '__pycache__' in dirs:
+                        pycache_path = os.path.join(root, '__pycache__')
+                        shutil.rmtree(pycache_path)
+                        logger.debug(f"Removed {pycache_path}")
+            
+            # Clear .pyc files in test directories
+            if os.path.isdir(test_dir):
+                for root, dirs, files in os.walk(test_dir):
+                    for file in files:
+                        if file.endswith('.pyc'):
+                            pyc_path = os.path.join(root, file)
+                            os.remove(pyc_path)
+                            logger.debug(f"Removed {pyc_path}")
+                            
+            logger.debug("Cleared pytest cache")
+        except Exception as e:
+            logger.debug(f"Error clearing pytest cache: {e}")
+            # Continue even if clearing cache fails
 
 class ErrorAnalyzer:
     """Analyzes test failures and implementation errors to provide insights using LLM"""
@@ -387,7 +458,10 @@ class CustomReporter:
         
     def pytest_runtest_logreport(self, report: TestReport):
         if report.when == 'call' or (report.when == 'setup' and report.outcome == 'skipped'):
-            self.test_functions.append(report.nodeid.split("::")[-1])
+            # Add the full nodeid to ensure we capture all tests
+            if report.nodeid not in self.test_functions:
+                self.test_functions.append(report.nodeid)
+            
             if report.passed:
                 self.results['passed'] += 1
             elif report.failed:
@@ -397,4 +471,17 @@ class CustomReporter:
         if hasattr(report, 'longrepr'):
             if report.longrepr:
                 self.output_lines.append(str(report.longrepr))
+    
+    # Add a hook to capture test collection
+    def pytest_collectreport(self, report):
+        if report.result:
+            for item in report.result:
+                if hasattr(item, 'nodeid') and item.nodeid not in self.test_functions:
+                    self.test_functions.append(item.nodeid)
+    
+    # Add a hook to capture errors during collection
+    def pytest_collectreport_exception(self, report):
+        if hasattr(report, 'longrepr'):
+            self.output_lines.append(f"Collection error: {report.longrepr}")
+            self.results['error'] += 1
 
