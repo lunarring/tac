@@ -9,9 +9,9 @@ from tac.utils.project_files import ProjectFiles
 logger = setup_logging('tac.blocks.orchestrator')
 
 
-class Chunk:
+class ProtoBlockRecipe:
     """
-    Represents a single chunk of a task to be implemented.
+    Represents a single recipe for creating a ProtoBlock from a task to be implemented.
     """
     def __init__(self, 
                  title: str, 
@@ -24,17 +24,17 @@ class Chunk:
         self.dependencies = dependencies or []
         
     @classmethod
-    def from_text(cls, text: str) -> 'Chunk':
+    def from_text(cls, text: str) -> 'ProtoBlockRecipe':
         """
-        Create a Chunk object from a text representation.
+        Create a ProtoBlockRecipe object from a text representation.
         
         Args:
-            text: The text representation of the chunk
+            text: The text representation of the recipe
             
         Returns:
-            Chunk: A new Chunk object
+            ProtoBlockRecipe: A new ProtoBlockRecipe object
         """
-        title = "Untitled Chunk"
+        title = "Untitled Recipe"
         description_lines = []
         branch_name = None
         dependencies = []
@@ -71,35 +71,35 @@ class Chunk:
         )
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], branch_name: str = None) -> 'Chunk':
+    def from_dict(cls, data: Dict[str, Any], branch_name: str = None) -> 'ProtoBlockRecipe':
         """
-        Create a Chunk object from a dictionary.
+        Create a ProtoBlockRecipe object from a dictionary.
         
         Args:
-            data: The dictionary containing chunk data
+            data: The dictionary containing recipe data
             branch_name: Optional branch name to use if not in the data
             
         Returns:
-            Chunk: A new Chunk object
+            ProtoBlockRecipe: A new ProtoBlockRecipe object
         """
-        title = data.get("title", "Untitled Chunk")
+        title = data.get("title", "Untitled Recipe")
         description = data.get("description", "")
-        chunk_branch_name = data.get("branch_name", branch_name)
+        recipe_branch_name = data.get("branch_name", branch_name)
         dependencies = data.get("dependencies", [])
         
         return cls(
             title=title,
             description=description,
-            branch_name=chunk_branch_name,
+            branch_name=recipe_branch_name,
             dependencies=dependencies
         )
     
     def to_text(self) -> str:
         """
-        Convert the chunk to a text representation.
+        Convert the recipe to a text representation.
         
         Returns:
-            str: The text representation of the chunk
+            str: The text representation of the recipe
         """
         text = f"# {self.title}\n\n{self.description}"
         
@@ -113,10 +113,10 @@ class Chunk:
     
     def to_dict(self) -> Dict[str, Any]:
         """
-        Convert the chunk to a dictionary representation.
+        Convert the recipe to a dictionary representation.
         
         Returns:
-            Dict[str, Any]: The dictionary representation of the chunk
+            Dict[str, Any]: The dictionary representation of the recipe
         """
         return {
             "title": self.title,
@@ -127,7 +127,7 @@ class Chunk:
     
     def get_commit_message(self) -> str:
         """
-        Generate a commit message for this chunk.
+        Generate a commit message for this recipe.
         
         Returns:
             str: The commit message
@@ -144,35 +144,35 @@ class Chunk:
         return self.description
 
 
-class ChunkingResult:
+class ProtoBlockRecipeResult:
     """
     Represents the complete result of a task chunking operation.
     """
     def __init__(self, 
-                 chunks: List[Chunk], 
+                 recipes: List[ProtoBlockRecipe], 
                  branch_name: str, 
                  analysis: str = None,
                  strategy: str = None,
-                 num_chunks: int = None,
+                 num_recipes: int = None,
                  raw_data: Dict[str, Any] = None):
-        self.chunks = chunks
+        self.recipes = recipes
         self.branch_name = branch_name
         self.analysis = analysis
         self.strategy = strategy or analysis  # Use strategy if provided, otherwise fall back to analysis
-        self.num_chunks = num_chunks or len(chunks)
+        self.num_recipes = num_recipes or len(recipes)
         self.raw_data = raw_data or {}
         # Extract violated tests from raw_data if available
         self.violated_tests = self.raw_data.get("list_of_violated_tests", []) if self.raw_data else []
         
     @property
-    def text_chunks(self) -> List[str]:
+    def text_recipes(self) -> List[str]:
         """
-        Get the chunks as text representations for backward compatibility.
+        Get the recipes as text representations for backward compatibility.
         
         Returns:
-            List[str]: The chunks as text
+            List[str]: The recipes as text
         """
-        return [chunk.to_text() for chunk in self.chunks]
+        return [recipe.to_text() for recipe in self.recipes]
         
     def to_dict(self) -> Dict[str, Any]:
         """Convert the chunking result to a dictionary representation."""
@@ -180,19 +180,35 @@ class ChunkingResult:
             "branch_name": self.branch_name,
             "analysis": self.analysis,
             "strategy": self.strategy,
-            "num_chunks": self.num_chunks,
-            "chunks": [chunk.to_dict() for chunk in self.chunks],
+            "num_recipes": self.num_recipes,
+            "recipes": [recipe.to_dict() for recipe in self.recipes],
             "violated_tests": self.violated_tests,
             "raw_data": self.raw_data
         }
     
-    def get_chunk_titles(self) -> List[str]:
-        """Extract titles from chunks."""
-        return [chunk.title for chunk in self.chunks]
+    def get_recipe_titles(self) -> List[str]:
+        """Extract titles from recipes."""
+        return [recipe.title for recipe in self.recipes]
         
     def get_commit_messages(self) -> List[str]:
-        """Generate commit messages for each chunk."""
-        return [chunk.get_commit_message() for chunk in self.chunks]
+        """Generate commit messages for each recipe."""
+        return [recipe.get_commit_message() for recipe in self.recipes]
+
+    # For backward compatibility
+    @property
+    def chunks(self):
+        return self.recipes
+    
+    @property
+    def text_chunks(self):
+        return self.text_recipes
+    
+    @property
+    def num_chunks(self):
+        return self.num_recipes
+    
+    def get_chunk_titles(self):
+        return self.get_recipe_titles()
 
 
 class MultiBlockOrchestrator:
@@ -227,64 +243,54 @@ class MultiBlockOrchestrator:
             raise NotImplementedError("Voice UI is not supported with orchestrator")
             
         # Chunk the task instructions
-        logger.info("Using orchestrator to chunk task instructions")
-        chunking_result = self.chunk(task_instructions, codebase)
+        logger.info("Using orchestrator to chunk instructions into multiple protoblocks")
+        recipe_result = self.chunk(task_instructions, codebase)
         
-        # Get the chunks from the result
-        chunks = chunking_result.chunks
+        # Get the recipes from the result
+        recipes = recipe_result.recipes
         
-        logger.info(f"Task chunked into {len(chunks)} potential blocks (chunks)")
+        logger.info(f"Instructions chunked into {len(recipes)} potential protoblocks (recipes)")
         
         # Get branch name directly from the result
-        branch_name = chunking_result.branch_name
+        branch_name = recipe_result.branch_name
         
-        # Get commit messages for each chunk
-        commit_messages = chunking_result.get_commit_messages()
+        # Get commit messages for each recipe
+        commit_messages = recipe_result.get_commit_messages()
         
         # Display the chunked tasks with commit messages
-        print("\n🔍 Task Analysis Complete")
-        if chunking_result.strategy:
-            print(f"Strategy: {chunking_result.strategy}")
-            logger.info(f"Chunking strategy: {chunking_result.strategy}")
-        print(f"The task has been divided into {len(chunks)} parts")
-        logger.info(f"Task divided into {len(chunks)} chunks")
+        logger.info("🔍 Task Analysis Complete")
+        if recipe_result.strategy:
+            logger.info(f"Strategy: {recipe_result.strategy}")
+        logger.info(f"The task has been divided into {len(recipes)} parts that will be executed one by one", heading=True)
         if branch_name:
-            print(f"🌿 Git Branch: {branch_name}")
-            logger.info(f"Using Git branch: {branch_name}")
+            logger.info(f"🌿 Git Branch: {branch_name}")
         
         # Display violated tests if any
-        if hasattr(chunking_result, 'violated_tests') and chunking_result.violated_tests:
-            logger.warning("Some tests may be violated by this chunking")
-            print("\n⚠️ Tests that may be violated by this chunking:")
-            for test in chunking_result.violated_tests:
-                print(f"  - {test}")
-                logger.warning(f"Potentially violated test: {test}")
+        if hasattr(recipe_result, 'violated_tests') and recipe_result.violated_tests:
+            logger.warning("⚠️ Tests that may be violated by this chunking:")
+            for test in recipe_result.violated_tests:
+                logger.warning(f"  - {test}")
         else:
-            logger.info("No tests will be violated by this chunking")
-            print("\n✅ No tests will be violated by this chunking")
+            logger.info("✅ No tests will be violated by this chunking")
         
-        # Display chunks with 1-based indexing for user-friendly output
-        for i, chunk in enumerate(chunks):
-            # Display chunk with commit message but without branch name
-            logger.info(f"Displaying chunk {i+1}/{len(chunks)}")
-            print(f"--- Chunk {i+1} ---")
-            # Display the chunk content without title and branch name
-            print(chunk.get_display_content())
-            print(f"📝 Commit: {commit_messages[i]}")
-            logger.info(f"Chunk {i+1} commit message: {commit_messages[i]}")
-            print()
+        # Display recipes with 1-based indexing for user-friendly output
+        for i, recipe in enumerate(recipes):
+            # Display recipe with commit message but without branch name
+            logger.info(f"Showing Protoblock recipe {i+1}/{len(recipes)} ---")
+            # Display the recipe content without title and branch name
+            logger.info(recipe.get_display_content())
+            logger.info(f"📝 Commit: {commit_messages[i]}")
         
         # Ask user if they want to proceed with execution only if confirm_multiblock_execution is enabled
         if config.general.confirm_multiblock_execution:
-            logger.info("Confirmation required before execution (confirm_multiblock_execution is enabled)")
-            proceed = input("\nDo you want to proceed with execution? (y/n): ").lower().strip()
+            logger.info("Confirmation required before execution")
+            proceed = input("Do you want to proceed with execution? (y/n): ").lower().strip()
             
             if proceed != 'y':
                 logger.info("Execution cancelled by user")
-                print("Execution cancelled by user.")
                 return False
         else:
-            logger.info("Proceeding with execution automatically (confirm_multiblock_execution is disabled)")
+            logger.info("Proceeding with execution automatically")
             print("\nProceeding with execution automatically.")
         
         logger.info(f"Using branch name: {branch_name}")
@@ -294,18 +300,11 @@ class MultiBlockOrchestrator:
         if config.git.enabled and branch_name and git_manager:
             original_branch = git_manager.get_current_branch()
             logger.info(f"Switching from branch '{original_branch}' to '{branch_name}'")
-            print(f"\n🔄 Switching to branch: {branch_name}")
+            logger.info(f"🔄 Switching to branch: {branch_name}")
             if not git_manager.checkout_branch(branch_name, create=True):
                 logger.warning(f"Failed to switch to branch {branch_name}, continuing in current branch")
-                print(f"Failed to switch to branch {branch_name}, continuing in current branch")
-            
-            # Inform user about commit behavior
-            logger.info("Git behavior: Changes will be committed after each chunk but NOT pushed")
-            print("\n📝 Git behavior: Changes will be committed after each chunk but NOT pushed")
-            print("   You can push changes manually after execution completes")
-            print("   You will remain on the feature branch after execution completes")
         
-        # Execute each chunk sequentially with 0-based indexing
+        # Execute each recipe sequentially with 0-based indexing
         success = True
         
         # Disable auto-push for orchestrator mode
@@ -315,38 +314,38 @@ class MultiBlockOrchestrator:
         
         project_files = ProjectFiles()
         
-        for i, chunk in enumerate(chunks):
-            print(f"\n🚀 Executing Chunk {i+1}/{len(chunks)}...")
+        for i, recipe in enumerate(recipes):
+            logger.info(f"🚀 Executing Protoblock Recipe {i+1}/{len(recipes)}...", heading=True)
 
-            # Update codebase if it's not the first chunk
+            # Update codebase if it's not the first recipe
             if i > 0:
                 project_files.update_summaries()
                 codebase = project_files.get_codebase_summary()
             
-            # Convert the chunk to text for the BlockProcessor
-            chunk_text = chunk.to_text()
+            # Convert the recipe to text for the BlockProcessor
+            recipe_text = recipe.to_text()
             
-            # Execute the chunk
+            # Execute the recipe
             protoblock = None
             if args and hasattr(args, 'json') and args.json:
                 from tac.blocks.model import ProtoBlock
                 protoblock = ProtoBlock.load(args.json)
-                print(f"\n📄 Loaded protoblock from: {args.json}")
+                logger.info(f"📄 Loaded protoblock from: {args.json}")
             
-            block_processor = BlockProcessor(chunk_text, codebase, protoblock=protoblock)
-            chunk_success = block_processor.run_loop()
+            block_processor = BlockProcessor(recipe_text, codebase, protoblock=protoblock)
+            recipe_success = block_processor.run_loop()
             
-            if not chunk_success:
-                print(f"\n❌ Chunk {i+1} execution failed.")
+            if not recipe_success:
+                logger.error(f"❌ Protoblock {i+1}/{len(recipes)} execution failed.")
                 success = False
                 break
             else:
-                print(f"\n✅ Chunk {i+1} completed successfully!")
+                logger.info(f"✅ Protoblock {i+1}/{len(recipes)} completed successfully!")
                 
-                # Create a commit for this chunk if git is enabled
+                # Create a commit for this recipe if git is enabled
                 if config.git.enabled and git_manager:
                     commit_message = commit_messages[i]
-                    print(f"\n📝 Creating commit: {commit_message}")
+                    logger.info(f"📝 Creating commit: {commit_message}")
                     git_manager.commit(commit_message)
         
         # Don't switch back to original branch - stay on feature branch
@@ -355,26 +354,26 @@ class MultiBlockOrchestrator:
         #     git_manager.checkout_branch(original_branch)
         
         if success:
-            print("\n✅ Task completed successfully!")
-            print("Each chunk included its own tests, so no additional integration tests are needed.")
+            logger.info("✅ Task completed successfully!", heading=True)
+            logger.info("Each recipe included its own tests, so no additional integration tests are needed.")
             
             # Add instructions for pushing changes if git is enabled
             if config.git.enabled and branch_name and git_manager:
-                print(f"\n📝 Git status: All changes have been committed to branch '{branch_name}'")
-                print(f"   You are now on the feature branch '{branch_name}' with all changes")
-                print(f"   To push changes manually, run: git push origin {branch_name}")
+                logger.info(f"📝 Git status:")
+                logger.info(f"- All changes have been committed to branch '{branch_name}'")
+                logger.info(f"- You are now on the feature branch '{branch_name}' with all changes")
+                logger.info(f"- To push changes manually, run: git push origin {branch_name}")
                 if original_branch:
-                    print(f"   To switch back to your original branch, run: git checkout {original_branch}")
+                    logger.info(f"- To switch back to your original branch, run: git checkout {original_branch}")
             
-            logger.info("Task completed successfully with per-chunk tests.")
+            logger.info("Task completed successfully with per-recipe tests.")
         else:
-            print("\n❌ Task execution failed.")
-            logger.error("Task execution failed.")
+            logger.error("❌ Task execution failed.", heading=True)
             return False
             
         return success
     
-    def chunk(self, task_instructions: str, codebase: str) -> ChunkingResult:
+    def chunk(self, task_instructions: str, codebase: str) -> ProtoBlockRecipeResult:
         """
         Analyzes the task instructions and splits them into appropriate chunks.
         
@@ -383,9 +382,9 @@ class MultiBlockOrchestrator:
             codebase: A summary of the codebase for context
             
         Returns:
-            ChunkingResult: A structured result containing all chunks and metadata
+            ProtoBlockRecipeResult: A structured result containing all recipes and metadata
         """
-        logger.info("Starting LLM-based task chunking")
+        logger.info("Starting LLM-based chunking of the task instructions into protoblocks")
         logger.debug(f"Task instructions length: {len(task_instructions)}")
         
         try:
@@ -444,14 +443,14 @@ Provide your analysis in the following JSON format:
                 Message(role="user", content=chunking_prompt)
             ]
             
-            logger.info("Task chunking starting, sending request to LLM")
+            logger.debug("Task chunking starting, sending request to LLM")
             response = self.llm_client.chat_completion(messages)
             
             if not response or not response.strip():
                 logger.error("Received empty response from LLM")
                 return self._create_default_result(task_instructions)
             
-            logger.info("Successfully received LLM response")
+            logger.debug("Successfully received LLM response")
 
             # Extract JSON from response
             json_content = self._extract_json(response)
@@ -482,39 +481,39 @@ Provide your analysis in the following JSON format:
                         feature_name = "task-implementation"
                     branch_name = f"tac/feature/{feature_name}"
                 
-                logger.info(f"Using branch name for all chunks: {branch_name}")
+                logger.info(f"Using branch name for all protoblock recipes: {branch_name}")
                 
-                # Extract the chunk descriptions and create Chunk objects
-                chunks = []
+                # Extract the chunk descriptions and create ProtoBlockRecipe objects
+                recipes = []
                 for chunk_dict in chunk_data["chunks"]:
                     if "title" in chunk_dict and "description" in chunk_dict:
-                        # Create a Chunk object using from_dict
-                        chunk = Chunk.from_dict(chunk_dict, branch_name=branch_name)
-                        chunks.append(chunk)
+                        # Create a ProtoBlockRecipe object using from_dict
+                        recipe = ProtoBlockRecipe.from_dict(chunk_dict, branch_name=branch_name)
+                        recipes.append(recipe)
                 
-                if not chunks:
-                    logger.warning("No valid chunks found, returning original as single chunk")
+                if not recipes:
+                    logger.warning("No valid recipes found, returning original as single recipe")
                     return self._create_default_result(task_instructions)
                 
-                # Create and return the ChunkingResult
+                # Create and return the ProtoBlockRecipeResult
                 analysis = chunk_data.get("analysis", "Task chunked successfully")
                 strategy = chunk_data.get("strategy", analysis)
-                num_chunks = chunk_data.get("num_chunks", len(chunks))
+                num_recipes = chunk_data.get("num_chunks", len(recipes))
                 
                 # Ensure raw_data contains list_of_violated_tests if present in the response
                 if "list_of_violated_tests" not in chunk_data:
                     chunk_data["list_of_violated_tests"] = []
                 
-                result = ChunkingResult(
-                    chunks=chunks,
+                result = ProtoBlockRecipeResult(
+                    recipes=recipes,
                     branch_name=branch_name,
                     analysis=analysis,
                     strategy=strategy,
-                    num_chunks=num_chunks,
+                    num_recipes=num_recipes,
                     raw_data=chunk_data
                 )
                     
-                logger.info(f"Successfully chunked task into {len(chunks)} parts")
+                logger.info(f"Successfully chunked task into {len(recipes)} protoblocks")
                 return result
                 
             except json.JSONDecodeError as e:
@@ -525,15 +524,15 @@ Provide your analysis in the following JSON format:
             logger.error(f"Error during task chunking: {str(e)}", exc_info=True)
             return self._create_default_result(task_instructions)
     
-    def _create_default_result(self, task_instructions: str) -> ChunkingResult:
+    def _create_default_result(self, task_instructions: str) -> ProtoBlockRecipeResult:
         """
-        Creates a default ChunkingResult with a single chunk containing the original task.
+        Creates a default ProtoBlockRecipeResult with a single recipe containing the original task.
         
         Args:
             task_instructions: The original task instructions
             
         Returns:
-            ChunkingResult: A default chunking result with one chunk
+            ProtoBlockRecipeResult: A default chunking result with one recipe
         """
         # Create a default branch name
         words = task_instructions.split()[:5]
@@ -542,20 +541,20 @@ Provide your analysis in the following JSON format:
             feature_name = "task-implementation"
         branch_name = f"tac/feature/{feature_name}"
         
-        # Create a single chunk with the original task
-        chunk = Chunk(
+        # Create a single recipe with the original task
+        recipe = ProtoBlockRecipe(
             title="Complete Task Implementation",
             description=task_instructions,
             branch_name=branch_name
         )
         
         # Create and return the result
-        return ChunkingResult(
-            chunks=[chunk],
+        return ProtoBlockRecipeResult(
+            recipes=[recipe],
             branch_name=branch_name,
             analysis="Task was not chunked due to processing error or invalid response",
             strategy="Task was not chunked due to processing error or invalid response",
-            num_chunks=1,
+            num_recipes=1,
             raw_data={"error": "Failed to process task chunking", "list_of_violated_tests": []}
         )
     

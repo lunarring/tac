@@ -33,7 +33,7 @@ class GeneralConfig:
     test_path: str = "tests/"  # Add default test path
     save_protoblock: bool = False  # Whether to save protoblocks to disk
     default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
-    use_orchestrator: bool = False
+    use_orchestrator: bool = True
     confirm_multiblock_execution: bool = False  # Whether to ask for confirmation before executing multiblock chunks
     vision_timeout: int = 15  # Timeout in seconds for vision agent program execution
     vision_screenshot_delay: int = 5  # Delay in seconds before taking a screenshot
@@ -71,7 +71,7 @@ class LLMConfig:
 @dataclass
 class LoggingConfig:
     tac: Dict[str, Any] = field(default_factory=lambda: {
-        "level": "DEBUG",
+        "level": "INFO",
         "color": "green"
     })
     other_packages: Dict[str, Any] = field(default_factory=lambda: {

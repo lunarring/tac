@@ -164,6 +164,8 @@ TAC uses a hierarchical configuration system (in `src/tac/core/config.py`) with 
 
 TAC provides a comprehensive set of command-line options for customizing behavior. Here are the key options available for the main `make` command:
 
+- `--use-orchestrator`: Enable/disable the task orchestrator for complex tasks (default: false)
+- `--confirm-multiblock-execution`: Prompt for confirmation before executing multi-block tasks (default: true)
 - `--coding-agent`: Choose between "aider" or "native" coding agents (default: native)
 - `--reasoning-effort`: Set reasoning effort level ("low", "medium", "high") (default: medium)
 - `--minimum-plausibility-score`: Set the minimum grade (A-F) for plausibility tests (default: B)
@@ -171,7 +173,6 @@ TAC provides a comprehensive set of command-line options for customizing behavio
 - `--max-retries-block-creation`: Maximum number of retry attempts for block creation (default: 4)
 - `--max-retries-protoblock-creation`: Maximum number of retry attempts for protoblock creation (default: 4)
 - `--total-timeout`: Maximum total execution time in seconds (default: 600)
-- `--use-orchestrator`: Enable/disable the task orchestrator for complex tasks (default: false)
 - `--no-git`: Disable all git operations (branch checks, commits, etc.)
 - `--log-level`: Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
 
