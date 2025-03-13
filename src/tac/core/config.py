@@ -19,7 +19,7 @@ class GitConfig:
 
 @dataclass
 class GeneralConfig:
-    agent_type: str = "native"
+    coding_agent: str = "native"
     reasoning_effort: str = "medium"
     use_file_summaries: bool = True
     minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)

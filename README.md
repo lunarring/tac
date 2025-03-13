@@ -71,43 +71,32 @@ tac make "your instructions here"
 # Examples:
 tac make "refactor this spaghetti code into something a human might understand"
 
-# Optional: Specify a different directory (default is current directory)
-tac make "your instructions" --dir ./your/code/directory
 
-# Optional: Load from a JSON protoblock file
-tac make --json path/to/protoblock.json
 
 # Optional: Choose a specific coding agent
-tac make "your instructions" --agent native
+tac make "your instructions" 
 ```
 
-### Selecting Agents
-
-TAC allows you to choose which agents to use for your tasks:
-
-```bash
-# Use the native coding agent
-tac make "your task" --agent native
-
-# Use the aider coding agent (default)
-tac make "your task" --agent aider
-
-# Disable plausibility testing
-tac make "your task" --plausibility-test false
-
-# Set minimum plausibility score
-tac make "your task" --minimum-plausibility-score B
-```
 
 ### Git Integration
 
-TAC will create a new branch with an id (e.g., tac/buxfix/refactor_spaghetti_code) where it will commit all changes IF everything worked out. If not, you'll have to manually switch back to your previous branch. 
+tac will create a new branch with an id (e.g., tac/buxfix/refactor_spaghetti_code) where it will commit all changes, provideded everything worked out. If not, you'll have to manually switch back to your previous branch. 
 
-If you don't want to use the git integration, tac will switch to a FakeGitManager that emulates git in temp directories. 
+If you don't want to use the git integration or want to use tac outside of a git repo, tac will automatically switch to a FakeGitManager that emulates git in temp directories under the hood.
+
+### Performance Optimization
+
+Optimize specific functions in your codebase using the Performance Trusty Agent:
+
+```bash
+# Optimize a specific function
+tac optimize function_name
+```
+
 
 ### Voice Interface (Experimental)
 
-TAC now includes an experimental voice interface that allows you to interact with the system using speech:
+tac now includes an experimental voice interface that allows you to interact with the system using speech:
 
 ```bash
 tac voice
@@ -124,12 +113,10 @@ tac view
 ```
 
 This command provides an interactive interface to:
-- Browse and read log files from previous TAC executions
-- View log entries with syntax highlighting based on log level
-- Navigate through logs with an easy-to-use interface
+- Browse and read log files from previous tac executions
 - Search for specific text within logs
 - Jump to section headings for easier navigation
-- See the current section heading while browsing logs
+
 
 
 ### Test Management
@@ -145,14 +132,6 @@ tac test list [--directory tests]
 
 ```
 
-### Performance Optimization
-
-Optimize specific functions in your codebase using the Performance Trusty Agent:
-
-```bash
-# Optimize a specific function
-tac optimize function_name
-```
 
 ### Code Summarization
 
@@ -177,52 +156,38 @@ tac make "your task" --plausibility-test false --max-retries 5
 
 ### Configuration System
 
-TAC uses a hierarchical configuration system (in `src/tac/core/config.py`) with several categories:
+TAC uses a hierarchical configuration system (in `src/tac/core/config.py`) with several categories.
 
-- **GeneralConfig**: Core settings like agent type, orchestration, and testing parameters
-  ```python
-  agent_type: str = "native"           # Which coding agent to use
-  use_orchestrator: bool = True        # Whether to use the task orchestrator
-  plausibility_test: bool = True       # Enable/disable plausibility testing
-  minimum_plausibility_score: str = "B" # Minimum grade for plausibility
-  max_retries_block_creation: int = 4  # Maximum retry attempts for block creation
-  max_retries_protoblock_creation: int = 4  # Maximum retry attempts for protoblock creation
-  ```
 
-- **GitConfig**: Version control settings
-  ```python
-  enabled: bool = True                 # Enable/disable git integration
-  auto_commit_if_success: bool = True  # Auto-commit successful changes
-  auto_push_if_success: bool = True    # Auto-push successful changes
-  ```
-
-- **LLMConfig**: Language model settings for different strength levels
-  ```python
-  provider: str = "openai"             # LLM provider (openai, anthropic)
-  model: str = "o3-mini"               # Model name
-  ```
-
-- **AiderConfig**: Settings specific to the Aider coding agent
-  ```python
-  model: str = "openai/o3-mini"        # Model used by Aider
-  reasoning_effort: str = "high"       # Reasoning level for Aider
-  ```
 
 ### Command-line Options
 
-Key configuration options include:
-- `--agent`: Choose between "aider" or "native" coding agents
-- `--plausibility-test`: Enable/disable plausibility testing
-- `--max-retries`: Maximum number of retry attempts
-- `--git-enabled`: Enable/disable git integration
-- `--model`: Specify the LLM model to use
-- `--minimum-plausibility-score`: Set the minimum grade (A-F) for plausibility tests
-- `--use-orchestrator`: Enable/disable the task orchestrator
-- `--reasoning-effort`: Set reasoning effort level (low, medium, high)
+TAC provides a comprehensive set of command-line options for customizing behavior. Here are the key options available for the main `make` command:
 
-All configuration options are documented in the command help:
+- `--coding-agent`: Choose between "aider" or "native" coding agents (default: native)
+- `--reasoning-effort`: Set reasoning effort level ("low", "medium", "high") (default: medium)
+- `--minimum-plausibility-score`: Set the minimum grade (A-F) for plausibility tests (default: B)
+
+- `--max-retries-block-creation`: Maximum number of retry attempts for block creation (default: 4)
+- `--max-retries-protoblock-creation`: Maximum number of retry attempts for protoblock creation (default: 4)
+- `--total-timeout`: Maximum total execution time in seconds (default: 600)
+- `--use-orchestrator`: Enable/disable the task orchestrator for complex tasks (default: false)
+- `--no-git`: Disable all git operations (branch checks, commits, etc.)
+- `--log-level`: Set logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+Each command (`make`, `gather`, `test`, `optimize`, `view`, `voice`) has its own specific options. For a complete list of options for any command:
+
 ```bash
-tac --help
+tac <command> --help
+```
+
+For example:
+```bash
+# See all options for the make command
+tac make --help
+
+# See all options for the gather command
+tac gather --help
 ```
 
 ## ✍️ Contributing

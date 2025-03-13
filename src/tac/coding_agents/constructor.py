@@ -11,12 +11,12 @@ class CodingAgentConstructor:
     """
     
     @staticmethod
-    def create_agent(agent_type: Optional[str] = None, config_override: Optional[Dict] = None) -> Agent:
+    def create_agent(coding_agent: Optional[str] = None, config_override: Optional[Dict] = None) -> Agent:
         """
         Create and return an agent instance based on the specified type and configuration.
         
         Args:
-            agent_type: The type of agent to create. If None, uses the type from config.
+            coding_agent: The type of agent to create. If None, uses the type from config.
             config_override: Optional configuration overrides.
             
         Returns:
@@ -26,8 +26,8 @@ class CodingAgentConstructor:
             ValueError: If the agent type is invalid.
         """
         # Use type from config if not explicitly provided
-        if agent_type is None:
-            agent_type = config.general.agent_type
+        if coding_agent is None:
+            coding_agent = config.general.coding_agent
             
         # Prepare configuration
         agent_config = config.raw_config.copy()
@@ -36,9 +36,9 @@ class CodingAgentConstructor:
             config.override_with_dict(config_override)
         
         # Create the appropriate agent
-        if agent_type == "aider":
+        if coding_agent == "aider":
             return AiderAgent(agent_config)
-        elif agent_type == "native":
+        elif coding_agent == "native":
             return NativeAgent(agent_config)
         else:
-            raise ValueError(f"Invalid agent type: {agent_type}") 
+            raise ValueError(f"Invalid coding agent: {coding_agent}") 

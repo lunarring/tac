@@ -9,7 +9,7 @@ def test_override_with_args():
     # Create a Config instance with test values
     cm._config = Config(
         general=GeneralConfig(
-            agent_type="aider",
+            coding_agent="aider",
             use_file_summaries=False,
             summarizer_timeout=30,
             max_retries_block_creation=3,
@@ -24,13 +24,13 @@ def test_override_with_args():
     )
 
     # Create dummy CLI arguments; note that other_arg should not affect the configuration
-    args = Namespace(general_agent_type="new_aider", git_enabled=False, other_arg=None)
+    args = Namespace(general_coding_agent="new_aider", git_enabled=False, other_arg=None)
     
     # Test the override
     cm.override_with_args(vars(args))
     
     # Verify the changes
-    assert cm.general.agent_type == "new_aider"
+    assert cm.general.coding_agent == "new_aider"
     assert cm.git.enabled is False
     # Verify unchanged values
     assert cm.general.default_trusty_agents == ["pytest"]
@@ -46,7 +46,7 @@ def test_override_with_dict():
     
     config_dict = {
         'general': {
-            'agent_type': 'custom',
+            'coding_agent': 'custom',
             'max_retries_block_creation': 3,
             'run_error_analysis': False
         },
@@ -58,7 +58,7 @@ def test_override_with_dict():
     cm.override_with_dict(config_dict)
     
     # Verify overrides were applied
-    assert cm.general.agent_type == 'custom'
+    assert cm.general.coding_agent == 'custom'
     assert cm.general.max_retries_block_creation == 3
     assert cm.general.run_error_analysis is False
     assert cm.git.enabled is False

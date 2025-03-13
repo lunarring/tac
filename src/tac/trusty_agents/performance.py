@@ -116,18 +116,18 @@ class PerformanceTestingAgent(TrustyAgent):
             self.temp_dir = self.git_manager.temp_dir
 
             # Create coding agent directly
-            if config.general.agent_type == "aider":
+            if config.general.coding_agent == "aider":
                 self.agent = AiderAgent(config.raw_config.copy())
                 # Inject FakeGitManager into the agent
                 if hasattr(self.agent, 'git_manager'):
                     self.agent.git_manager = self.git_manager
-            elif config.general.agent_type == "native":
+            elif config.general.coding_agent == "native":
                 self.agent = NativeAgent(config.raw_config.copy())
                 # Inject FakeGitManager into the agent
                 if hasattr(self.agent, 'git_manager'):
                     self.agent.git_manager = self.git_manager
             else:
-                raise ValueError(f"Invalid agent type: {config.general.agent_type}")
+                raise ValueError(f"Invalid coding agent: {config.general.coding_agent}")
             
             # List to store test statistics from multiple runs
             self.test_stats: List[Dict[str, Any]] = []
