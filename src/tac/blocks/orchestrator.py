@@ -404,17 +404,15 @@ Here are the full task instructions:
 </task_instructions>
 
 <chunking_rules>
-1. Analyze the complexity and scope of the task and 
-2. identify logical boundaries where the task can be split, considering dependencies between different parts of the task
-3. Ensure each chunk is self-contained and can be reasonably implemented
-4. Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
-5. For simple tasks, it's perfectly acceptable to have just 1 chunk, for very complex tasks, don't exceed 10 chunks to maintain manageability
-6. Each chunk should include its own tests where appropriate - no separate integration test is needed, and don't create chunks that only contain tests
-7. mention the files that we are creating on the way and where they should be placed, e.g. src/tac/blocks/orchestrator.py and use them throughout the task
-8. Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces)
-   - This branch name should be prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication')
-   - The branch name should be descriptive of the overall task, not individual chunks
-9. If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
+- Think through first the task and then determine what is the set of complete features that are required to complete the task.
+- Analyze the complexity and scope of the task and identify logical boundaries where the task can be split, considering dependencies between different parts of the task
+- Ensure each chunk is self-contained and can be reasonably implemented
+- Prioritize chunks based on dependencies (what needs to be done first), each chunk should build on the previous one!
+- For simple tasks, it's perfectly acceptable to have just 1 chunk, for very complex tasks, don't exceed 10 chunks to maintain manageability
+- Each chunk should include its own tests where appropriate - no separate integration test is needed, and don't create chunks that only contain tests
+- mention the files that we are creating on the way and where they should be placed, e.g. src/tac/blocks/orchestrator.py and use them throughout the task
+- Create a single descriptive git branch name for the ENTIRE task (lowercase with hyphens, no spaces), prefixed with 'tac/feature/' (e.g., 'tac/feature/add-user-authentication'), descriptive of the overall task, not individual chunks.
+- If there are tests that are violated by the chunking, list them in the 'list_of_violated_tests' field
 </chunking_rules>
 
 <output_format>
