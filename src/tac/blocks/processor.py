@@ -113,9 +113,11 @@ class BlockProcessor:
         if config.git.enabled:
             current_git_branch = self.git_manager.get_current_branch() or ""
             tac_branch = self.protoblock.branch_name
-            
-            if current_git_branch.startswith("tac/"):
-                logger.info(f"Already on a tac branch: {current_git_branch}. No branch switching necessary.")
+
+            # If already on a TAC branch (branch name starts with 'tac', e.g. 'tac/' or 'tac_'),
+            # then skip branch creation or switching, and use the current branch.
+            if current_git_branch.startswith("tac"):
+                logger.info(f"Already on a TAC branch: {current_git_branch}. No branch switching necessary.")
                 tac_branch = current_git_branch
             else:
                 if not self.git_manager.create_or_switch_to_tac_branch(tac_branch):
