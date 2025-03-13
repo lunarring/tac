@@ -34,8 +34,18 @@ class BlockExecutor:
         self.protoblock = None
         self.codebase = codebase  # Store codebase internally
         
-        # Use the CodingAgentConstructor to create the appropriate coding agent
-        self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
+        # Log configuration information
+        logger.info(f"Initializing BlockExecutor with config_override: {config_override}")
+        logger.info(f"Current config.general.coding_agent: {config.general.coding_agent}")
+        
+        try:
+            # Use the CodingAgentConstructor to create the appropriate coding agent
+            self.coding_agent = CodingAgentConstructor.create_agent(config_override=config_override)
+            logger.info(f"Successfully created coding agent of type: {type(self.coding_agent).__name__}")
+        except ValueError as e:
+            logger.error(f"Failed to create coding agent: {str(e)}")
+            # Re-raise the exception to maintain the original behavior
+            raise
         
         # Use the appropriate git manager based on config
         self.git_manager = create_git_manager()
@@ -161,11 +171,9 @@ class BlockExecutor:
         try:
             test_path = test_path or config.general.test_path
             logger.info("Test Execution Details:")
-            logger.info("="*50)
             logger.info(f"Test path: {test_path}")
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
-            logger.info("="*50)
             
             success = self.test_runner.run_tests(test_path)
             self.test_results = self.test_runner.get_test_results()

@@ -3,7 +3,10 @@ from tac.coding_agents.aider import AiderAgent
 from tac.coding_agents.native_agent import NativeAgent
 from tac.core.config import config
 from typing import Optional, Dict
+import logging
 
+# Get logger for this module
+logger = logging.getLogger('tac.coding_agents.constructor')
 
 class CodingAgentConstructor:
     """
@@ -28,12 +31,19 @@ class CodingAgentConstructor:
         # Use type from config if not explicitly provided
         if coding_agent is None:
             coding_agent = config.general.coding_agent
+            logger.debug(f"Using coding agent from config: {coding_agent}")
+        else:
+            logger.debug(f"Using explicitly provided coding agent: {coding_agent}")
             
         # Prepare configuration
         agent_config = config.raw_config.copy()
         if config_override:
+            logger.debug(f"Applying config override: {config_override}")
             agent_config.update(config_override)
             config.override_with_dict(config_override)
+        
+        # Log the final coding agent type being used
+        logger.info(f"Attempting to create coding agent of type: {coding_agent}")
         
         # Create the appropriate agent
         if coding_agent == "aider":
@@ -41,4 +51,14 @@ class CodingAgentConstructor:
         elif coding_agent == "native":
             return NativeAgent(agent_config)
         else:
-            raise ValueError(f"Invalid coding agent: {coding_agent}") 
+            available_agents = ["aider", "native"]
+            error_msg = (
+                f"Invalid coding agent: '{coding_agent}'. "
+                f"Available agents are: {', '.join(available_agents)}. "
+                f"Check your configuration or override parameters."
+            )
+            logger.error(error_msg)
+            if config_override and 'general' in config_override and 'coding_agent' in config_override['general']:
+                logger.error(f"Config override contains coding_agent: {config_override['general']['coding_agent']}")
+            logger.error(f"Current config.general.coding_agent: {config.general.coding_agent}")
+            raise ValueError(error_msg) 
