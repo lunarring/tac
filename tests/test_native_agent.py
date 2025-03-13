@@ -11,6 +11,9 @@ class DummyProtoBlock:
         self.write_files = write_files
         self.context_files = context_files
         self.trusty_agent_prompts = trusty_agent_prompts or {}
+        # Adding trusty_agents attribute for compatibility (if needed)
+        # This attribute is used by the executor, though not by NativeAgent directly.
+        self.trusty_agents = []
 
 # A dummy LLM client to stub the chat_completion method with a controlled response.
 class DummyLLMClient:
@@ -30,7 +33,6 @@ def temp_dir(tmp_path):
     os.chdir(tmp_path)
     yield tmp_path
     os.chdir(orig_dir)
-
 
 def test_load_file_contents(temp_dir):
     agent = NativeAgent(config={})
