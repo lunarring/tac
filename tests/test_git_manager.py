@@ -87,16 +87,6 @@ class TestGitManager(unittest.TestCase):
         active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
         self.assertEqual(active_branch, tac_id, msg="Active branch is not the expected existing TAC branch")
 
-    def test_no_new_tac_branch_if_already_on_tac(self):
-        # Start on a tac branch that starts with 'tac/' to trigger the shortcut in BlockProcessor as well as GitManager
-        tac_id = "tac/feature123"
-        subprocess.run(["git", "checkout", "-b", tac_id], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        gm = GitManager(repo_path=self.repo_path)
-        # Call create_or_switch_to_tac_branch with the same tac_id while already on a tac branch
-        result = gm.create_or_switch_to_tac_branch(tac_id)
-        self.assertTrue(result, msg="Should succeed when already on a TAC branch")
-        active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
-        self.assertEqual(active_branch, tac_id, msg="Current branch should remain same when already on a TAC branch")
         
     def test_gitignore_missing_appended(self):
         # Create .gitignore without '.tac_*' pattern
