@@ -99,10 +99,7 @@ And here a bit more detailed explanation of the output format:
     "commit_message": "Brief commit message about your changes.",
     "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
     "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}"],
-    "trusty_agent_prompts": {{
-        "agent_name1": "... fill in here the prompt for the trusty agent 1",
-        "agent_name2": "... fill in here the prompt for the trusty agent 2",
-    }}
+    "trusty_agent_prompts": {{"agent_name1": "... fill in here the prompt for the trusty agent 1", "agent_name2": "... fill in here the prompt for the trusty agent 2"}}
 }}
 
 To fill in the trusty_agent_prompts, it really depends on your choice of trusty agents. When you know which trusty agents you are using, you can use the following guidelines to obtain the prompt for the trusty agents.
