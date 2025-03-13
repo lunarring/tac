@@ -189,6 +189,12 @@ tac make --help
 
 # See all options for the gather command
 tac gather --help
+
+# Enable the orchestrator
+tac make "your task" --use-orchestrator
+
+# Disable the orchestrator
+tac make "your task" --no-use-orchestrator
 ```
 
 ## ✍️ Contributing
