@@ -51,7 +51,7 @@ class ProtoBlockGenerator:
         trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
 
         return f"""<purpose>
-    You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
+You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
 </purpose>
 
 <codebase>
