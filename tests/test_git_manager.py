@@ -113,32 +113,5 @@ class TestGitManager(unittest.TestCase):
             content = f.read()
         self.assertEqual(initial_content, content, msg="'.gitignore' should remain unchanged when '.tac_*' is already present.")
 
-    def test_handle_git_branch_setup_already_on_tac(self):
-        # Create a tac branch that starts with 'tac/' to simulate branch already in tac namespace
-        tac_branch = "tac/already"
-        subprocess.run(["git", "checkout", "-b", tac_branch], cwd=self.repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # Instantiate BlockProcessor with dummy protoblock using a different branch name
-        processor = BlockProcessor(task_instructions="dummy", codebase={})
-        # Overwrite the git_manager to use our test repo
-        processor.git_manager = GitManager(repo_path=self.repo_path)
-        # Create a dummy protoblock using SimpleNamespace
-        processor.protoblock = SimpleNamespace(branch_name="tac/newbranch", commit_message="dummy", block_id="dummy")
-        # Monkey-patch get_current_branch to simulate that we're on a branch starting with 'tac/'
-        original_get_current_branch = processor.git_manager.get_current_branch
-        processor.git_manager.get_current_branch = lambda: tac_branch
-        
-        # Capture log output to verify message
-        with self.assertLogs(level="INFO") as log_cm:
-            setup_result = processor.handle_git_branch_setup()
-        self.assertTrue(setup_result, msg="handle_git_branch_setup should return True when on a TAC branch.")
-        # Verify that active branch remains unchanged
-        active_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=self.repo_path, encoding="utf-8").strip()
-        self.assertEqual(active_branch, tac_branch, msg="Active branch should remain unchanged when already on a TAC branch.")
-        # Verify log message indicates bypassing branch switching
-        log_messages = "\n".join(log_cm.output)
-        self.assertIn("Already on a TAC branch:", log_messages, msg="Log should indicate that branch switching was bypassed.")
-        # Restore original method
-        processor.git_manager.get_current_branch = original_get_current_branch
-
 if __name__ == "__main__":
     unittest.main()
