@@ -288,6 +288,8 @@ class TACViewer:
     def display_log_content(self, log_content, title="Log Contents", is_search_result=False):
         """Display log content in a paged view with single-key navigation."""
         page = 0
+        # Maximum lines any single entry can take
+        max_entry_height = 15
         
         while True:
             # Clear screen first
@@ -299,10 +301,10 @@ class TACViewer:
             
             # Calculate optimal number of content lines based on terminal height
             # Account for:
-            # - Header: 3 lines (title, info, and current heading)
+            # - Header: 4 lines (title, info, debug info, and current heading)
             # - Footer: 2 lines (blank line + navigation)
             # - Safety buffer: 1 line (minimal buffer)
-            available_height = terminal_height - 3 - 2 - 1
+            available_height = terminal_height - 4 - 2 - 1
             
             # Use at least 4 lines, at most 40 lines, but stay within available height
             max_display_lines = max(4, min(40, available_height))
@@ -313,15 +315,9 @@ class TACViewer:
                 get_single_key()
                 return
             
-            # Calculate pagination based on rendered lines
-            # First, we need to know how many actual lines each log line will take when rendered
-            line_indices = []  # Maps rendered line index to log content index
-            rendered_line_count = 0
-            
-            # Pre-calculate how many rendered lines each log line will take
-            rendered_lines_per_log_line = []
+            # Calculate how many actual terminal lines each log entry will take
+            entry_heights = []
             for i, item in enumerate(log_content):
-                # Handle search results differently
                 if is_search_result:
                     line, _ = item
                 else:
@@ -332,87 +328,118 @@ class TACViewer:
                 effective_width = terminal_width - 5
                 line_length = len(line.strip())
                 lines_needed = max(1, (line_length + effective_width - 1) // effective_width)
-                rendered_lines_per_log_line.append(lines_needed)
+                
+                # Limit the height of any single entry to prevent very long entries from taking over
+                lines_needed = min(lines_needed, max_entry_height)
+                
+                entry_heights.append((i, line, lines_needed))
             
-            # Find the start and end indices for the current page
-            start_idx = 0
-            end_idx = 0
-            current_rendered_lines = 0
+            # Calculate page boundaries based on actual rendered heights
+            page_boundaries = []
+            current_page_start = 0
+            current_height = 0
             
-            # Skip to the start of the current page
-            for i in range(len(rendered_lines_per_log_line)):
-                if page > 0 and current_rendered_lines < page * max_display_lines:
-                    current_rendered_lines += rendered_lines_per_log_line[i]
-                    start_idx = i + 1
+            for i, (idx, line, height) in enumerate(entry_heights):
+                # If adding this entry would exceed the max display lines,
+                # mark the end of the current page and start a new one
+                if current_height + height > max_display_lines and current_height > 0:
+                    page_boundaries.append((current_page_start, i - 1))
+                    current_page_start = i
+                    current_height = height
                 else:
-                    break
+                    current_height += height
             
-            # Find the end index for the current page
-            current_rendered_lines = 0
-            for i in range(start_idx, len(rendered_lines_per_log_line)):
-                if current_rendered_lines + rendered_lines_per_log_line[i] <= max_display_lines:
-                    current_rendered_lines += rendered_lines_per_log_line[i]
-                    end_idx = i + 1
-                else:
-                    break
-            
-            # Ensure we show at least one line even if it takes more than max_display_lines
-            if start_idx == end_idx and start_idx < len(log_content):
-                end_idx = start_idx + 1
-            
-            # Get the current lines to display
-            current_lines = log_content[start_idx:end_idx]
+            # Add the last page if there are any remaining entries
+            if current_page_start < len(entry_heights):
+                page_boundaries.append((current_page_start, len(entry_heights) - 1))
             
             # Calculate total pages
-            total_rendered_lines = sum(rendered_lines_per_log_line)
-            total_pages = (total_rendered_lines + max_display_lines - 1) // max_display_lines
+            total_pages = len(page_boundaries)
             
-            # Print header (3 lines now)
+            # Ensure page is within valid range
+            page = max(0, min(page, total_pages - 1))
+            
+            # Get the content for the current page
+            if total_pages > 0 and page < total_pages:
+                page_start, page_end = page_boundaries[page]
+                current_page_entries = entry_heights[page_start:page_end + 1]
+            else:
+                current_page_entries = []
+            
+            # Print header
             self.console.print(f"[bold cyan]{title} (Page {page + 1}/{total_pages})[/bold cyan]")
-            self.console.print(f"Showing lines {start_idx + 1}-{min(end_idx, len(log_content))} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}, Available: {available_height}")
+            
+            # Show range of entries being displayed
+            if current_page_entries:
+                first_idx = current_page_entries[0][0]
+                last_idx = current_page_entries[-1][0]
+                total_lines_on_page = sum(height for _, _, height in current_page_entries)
+                self.console.print(f"Showing entries {first_idx + 1}-{last_idx + 1} of {len(log_content)} | Terminal: {terminal_height}x{terminal_width}")
+            else:
+                self.console.print(f"No entries to display | Terminal: {terminal_height}x{terminal_width}")
+            
+            # Add debug info
+            if current_page_entries:
+                total_lines_on_page = sum(height for _, _, height in current_page_entries)
+                debug_info = f"Page: {page+1}/{total_pages}, Available lines: {max_display_lines}, Used lines: {total_lines_on_page}, Items on page: {len(current_page_entries)}"
+            else:
+                debug_info = f"Page: {page+1}/{total_pages}, Available lines: {max_display_lines}, No items on page"
+            self.console.print(f"[dim]{debug_info}[/dim]")
             
             # Get and display the current heading
-            # For search results, we need to handle differently
             if is_search_result:
                 # For search results, we don't have line numbers, so we can't determine the heading
                 self.console.print("[dim]Heading not available in search results[/dim]")
-            else:
-                current_heading = self.get_current_heading(start_idx)
+            elif current_page_entries:
+                current_heading = self.get_current_heading(first_idx)
                 if current_heading:
                     heading_text = current_heading['text']
                     self.console.print(f"[bold yellow]CURRENT HEADING: {heading_text}[/bold yellow]")
                 else:
                     self.console.print("[dim]No current heading[/dim]")
+            else:
+                self.console.print("[dim]No current heading[/dim]")
             
             # Display log lines with syntax highlighting based on log level
-            for item in current_lines:
+            for idx, line, height in current_page_entries:
                 # Handle search results differently
                 if is_search_result:
-                    line, search_term = item
+                    # For search results, line is actually a tuple (line, search_term)
+                    original_line = log_content[idx][0]
+                    search_term = log_content[idx][1]
                 else:
-                    line = item
+                    original_line = line
                 
                 # Determine style based on log level
                 style = None
-                if line.startswith("DEBUG"):
+                if original_line.startswith("DEBUG"):
                     style = "blue"
-                elif line.startswith("INFO"):
+                elif original_line.startswith("INFO"):
                     style = "green"
-                elif line.startswith("WARNING"):
+                elif original_line.startswith("WARNING"):
                     style = "yellow"
-                elif line.startswith("ERROR"):
+                elif original_line.startswith("ERROR"):
                     style = "red"
-                elif line.startswith("CRITICAL"):
+                elif original_line.startswith("CRITICAL"):
                     style = "red bold"
+                
+                # Calculate if we need to truncate the line
+                effective_width = terminal_width - 5
+                max_chars = effective_width * max_entry_height
                 
                 # For search results, highlight the search term
                 if is_search_result:
-                    text = Text(line.strip())
+                    # Truncate if necessary
+                    display_line = original_line
+                    if len(display_line) > max_chars:
+                        display_line = display_line[:max_chars] + "... [dim](truncated)[/dim]"
+                    
+                    text = Text(display_line.strip())
                     if style:
                         text.stylize(style)
                     
                     # Find all occurrences of the search term (case insensitive)
-                    line_lower = line.lower()
+                    line_lower = display_line.lower()
                     term_lower = search_term.lower()
                     start = 0
                     while True:
@@ -425,11 +452,16 @@ class TACViewer:
                     
                     self.console.print(text)
                 else:
+                    # Truncate if necessary
+                    display_line = original_line
+                    if len(display_line) > max_chars:
+                        display_line = display_line[:max_chars] + "... [dim](truncated)[/dim]"
+                    
                     # Print normal line with style if set
                     if style:
-                        self.console.print(line.strip(), style=style)
+                        self.console.print(display_line.strip(), style=style)
                     else:
-                        self.console.print(line.strip())
+                        self.console.print(display_line.strip())
             
             # Add a single blank line before navigation
             self.console.print("")
