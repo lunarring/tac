@@ -400,8 +400,16 @@ class TACViewer:
             else:
                 self.console.print("[dim]No current heading[/dim]")
             
+            # Calculate the maximum content area height (leave room for navigation at bottom)
+            max_content_height = terminal_height - 6  # 4 for header, 2 for navigation
+            
             # Display log lines with syntax highlighting based on log level
+            lines_displayed = 0
             for idx, line, height in current_page_entries:
+                # Stop if we've reached the maximum content height
+                if lines_displayed + height > max_content_height:
+                    break
+                    
                 # Handle search results differently
                 if is_search_result:
                     # For search results, line is actually a tuple (line, search_term)
@@ -462,9 +470,12 @@ class TACViewer:
                         self.console.print(display_line.strip(), style=style)
                     else:
                         self.console.print(display_line.strip())
+                
+                lines_displayed += height
             
-            # Add a single blank line before navigation
-            self.console.print("")
+            # Move cursor to the bottom of the terminal for fixed navigation bar
+            # Use ANSI escape sequence to position cursor at specific row
+            print(f"\033[{terminal_height-2};1H", end="")
             
             # Create navigation text
             nav_text = Text()
@@ -634,7 +645,7 @@ class TACViewer:
         """Show a list of headings and jump to the selected one."""
         if not hasattr(self, 'headings') or not self.headings:
             self.console.print("[yellow]No headings found in the log file.[/yellow]")
-            self.console.print("\nPress any key to continue...")
+            self.console.print("\nPress any other key to cancel...")
             get_single_key()
             return 0  # Return to first page
             
