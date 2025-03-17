@@ -63,7 +63,7 @@ class PlausibilityTestingAgent(TrustyAgent):
         try:
             # Prepare prompt
             analysis_prompt = f"""<purpose>
-You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. Critically, you need to determine if the implemented changes are also actively used in the codebase and integrated properly, especially when existing functionality is replaced with new one. However keep in mind, the implementation was done by a junior developer and we don't want to scare them off.
+You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. Critically, you need to determine if the implemented changes are also actively used in the codebase and integrated properly, especially when existing functionality is replaced with new one. However keep in mind, the implementation was done by a junior developer and we don't want to scare them off. Furthermore, the codebase passed all tests already, but here we are interested if the changes are making sense in what we want to achieve.
 </purpose>
 
 Here a summary of the codebase:
@@ -120,6 +120,8 @@ PLAUSIBILITY SCORE RATING:
 "D" is the minimum passing score, not a nice implementation but it will work
 "F" is failed, because the implementation is not even close to the requirements, or because it probably will not work or breaks something.)
 
+HUMAN VERIFICATION:
+Provide me here briefly how I can run the code myself to verify the changes. This could be for instance "python main.py" or "python -m tests.test_piano_trainer_main" or similar.
 </output_format>"""
 
             logger.debug(f"Prompt for plausibility check: {analysis_prompt}")
@@ -137,6 +139,14 @@ PLAUSIBILITY SCORE RATING:
                 return False, "Error: Unable to generate plausibility analysis", "Plausibility check failed"
             
             logger.info("Successfully received LLM analysis")
+
+            # Extract HUMAN VERIFICATION section if present
+            human_verification = ""
+            if "HUMAN VERIFICATION:" in analysis:
+                human_verification_parts = analysis.split("HUMAN VERIFICATION:")
+                if len(human_verification_parts) > 1:
+                    human_verification = human_verification_parts[1].strip()
+                    logger.info(f"Human Verification: {human_verification}", heading=True)
 
             final_plausibility_score = ""
             if "PLAUSIBILITY SCORE RATING:" in analysis:

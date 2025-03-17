@@ -102,7 +102,7 @@ And here a bit more detailed explanation of the output format:
     "trusty_agent_prompts": {{"agent_name1": "... fill in here the prompt for the trusty agent 1", "agent_name2": "... fill in here the prompt for the trusty agent 2"}}
 }}
 
-To fill in the trusty_agent_prompts, it really depends on your choice of trusty agents. When you know which trusty agents you are using, you can use the following guidelines to obtain the prompt for the trusty agents.
+Now you have to decide which trusty agent you are using. Since we are using trusty agents to generate TRUST in the code that was made by the coding agent, we need to select the most appropriate trusty agent for the task. This really depends on the task at hand and how we can best verify it. We have the following trusty agents available:
 {trusty_agents_prompts}
 </output_format_explained>"""
 
