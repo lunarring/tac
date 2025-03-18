@@ -219,7 +219,17 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         # Convert write_files to set for faster lookup
         allowed_files = set(write_files)
         
+        # Special handling for HTML and other non-Python files
+        is_html_file = False
+        
         for line in response.split('\n'):
+            # Special handling for file markers in code blocks or comments
+            # This helps with HTML files where markers might be embedded in content
+            if current_file is not None and (current_file.endswith('.html') or current_file.endswith('.css') or current_file.endswith('.js')):
+                is_html_file = True
+            else:
+                is_html_file = False
+                
             # Check for note start marker
             if line.strip() == '###NOTE:':
                 in_note = True
@@ -241,7 +251,17 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
             if line.startswith('###FILE:'):
                 if current_file is not None:
                     # We found a new file start before closing the previous one
-                    raise ValueError(f"Invalid response format: Found new file marker '{line}' while still processing '{current_file}'")
+                    # Instead of raising an error, automatically close the previous file and log a warning
+                    if is_html_file:
+                        logger.warning(f"HTML file not properly closed: Found new file marker '{line}' while still processing '{current_file}'. Auto-closing previous file.")
+                    else:
+                        logger.warning(f"Invalid response format: Found new file marker '{line}' while still processing '{current_file}'. Auto-closing previous file.")
+                    
+                    if current_file in allowed_files:
+                        updated_write_files[current_file] = '\n'.join(current_content)
+                    current_file = None
+                    current_content = []
+                    is_html_file = False
                 
                 file_path = line.replace('###FILE:', '').strip()
                 if file_path not in allowed_files:
@@ -250,6 +270,11 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
                 else:
                     current_file = file_path
                     current_content = []
+                    # Check if this is an HTML file
+                    if current_file.endswith('.html') or current_file.endswith('.css') or current_file.endswith('.js'):
+                        is_html_file = True
+                    else:
+                        is_html_file = False
                 
             # Check for file end marker
             elif line.strip() == '###END_FILE':
@@ -260,6 +285,7 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
                     updated_write_files[current_file] = '\n'.join(current_content)
                 current_file = None
                 current_content = []
+                is_html_file = False
                 
             # Content lines
             elif current_file is not None:
@@ -267,7 +293,13 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         
         # Check if we have any unclosed markers for allowed files
         if current_file is not None and current_file in allowed_files:
-            raise ValueError(f"Invalid response format: Unclosed marker for file {current_file}")
+            # Instead of raising an error, automatically handle the unclosed file and log a warning
+            if is_html_file:
+                logger.warning(f"HTML file not properly closed: Unclosed marker for file {current_file}. Auto-closing file.")
+            else:
+                logger.warning(f"Invalid response format: Unclosed marker for file {current_file}. Auto-closing file.")
+            
+            updated_write_files[current_file] = '\n'.join(current_content)
             
         return updated_write_files, note
 
