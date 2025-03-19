@@ -53,7 +53,7 @@ except ImportError:
 @trusty_agent(
     name="threejs_vision",
     description="Use this trusty agent to verify the visual output of web applications. Use it for anything visual with web content like html, threejs, or webgl.",
-    protoblock_prompt="For this visual test, you describe the 3D scene you expect to see. Describe the visual elements such as shapes, colors, lighting, camera angle etc. The idea is that given an image of the scene and this description of yours, someone should be able to tell if the scene is correct or not.",
+    protoblock_prompt="For this visual test, you describe the 3D scene you expect to see. Describe the visual elements such as shapes, colors, lighting, camera angle etc. Don't describe code changes, only describe what can be SEEN by LOOKING at the scene. The idea is that given an image of the scene and this description of yours, someone should be able to tell if the scene is correct or not.",
     prompt_target="coding_agent"
 )
 class ThreeJSVisionAgent(TrustyAgent):
