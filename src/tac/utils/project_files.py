@@ -18,6 +18,15 @@ class ProjectFiles:
         self.project_root = os.path.abspath(project_root)
         self.summary_file = os.path.join(self.project_root, ".tac_project_files.json")
         self.summarizer = FileSummarizer()
+        # File extensions supported for Three.js projects
+        self.supported_extensions = [
+            '.py',               # Python files
+            '.js', '.mjs',       # JavaScript files
+            '.ts', '.tsx',       # TypeScript files
+            '.json',             # JSON files for models/configurations
+            '.html',             # HTML files for web pages
+            '.glsl', '.vert', '.frag', '.shader'  # GLSL shader files
+        ]
         
     def _compute_file_hash(self, file_path: str) -> str:
         """Compute SHA-256 hash of file contents"""
@@ -41,7 +50,7 @@ class ProjectFiles:
     
     def update_summaries(self, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True) -> Dict:
         """
-        Update summaries for all Python files in the project.
+        Update summaries for all supported files in the project.
         Only updates files that have changed since last run.
         Saves progress after each file.
         
@@ -53,7 +62,7 @@ class ProjectFiles:
             Dict containing stats about the update
         """
         if exclusions is None:
-            exclusions = [".git", "__pycache__", "venv", "env", "build"]
+            exclusions = [".git", "__pycache__", "venv", "env", "build", "node_modules", "dist"]
             
         # Load existing data
         data = self._load_existing_summaries()
@@ -61,16 +70,17 @@ class ProjectFiles:
         current_files = set()
         stats = {"added": 0, "updated": 0, "unchanged": 0, "removed": 0}
         
-        # First pass: collect all Python files
+        # First pass: collect all supported files
         all_files = []
         for root, dirs, files in os.walk(self.project_root):
             # Filter directories: exclude specified, dot-files, and ignore_paths from config
             dirs[:] = [d for d in dirs if d not in exclusions and d not in config.general.ignore_paths and not (exclude_dot_files and d.startswith('.'))]
             
             for file in files:
-                if (file.endswith('.py') and 
-                    not file.startswith('.#') and 
-                    not (exclude_dot_files and file.startswith('.'))):
+                # Check if file has a supported extension
+                if any(file.endswith(ext) for ext in self.supported_extensions) and \
+                   not file.startswith('.#') and \
+                   not (exclude_dot_files and file.startswith('.')):
                     
                     file_path = os.path.join(root, file)
                     abs_file_path = os.path.abspath(file_path)
@@ -238,6 +248,36 @@ class ProjectFiles:
                                 if isinstance(node, ast.FunctionDef) and node.name == function_name:
                                     rel_path = os.path.relpath(file_path, self.project_root)
                                     found_locations.append(rel_path)
+                    except Exception as e:
+                        logger.warning(f"Error parsing {file_path}: {str(e)}")
+                        continue
+                
+                # Search for JavaScript/TypeScript functions for Three.js projects
+                elif file.endswith(('.js', '.mjs', '.ts', '.tsx')):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            # Simple pattern matching for JS/TS function definitions
+                            # This is a basic implementation - for more robust parsing, 
+                            # consider using a JavaScript parser library
+                            patterns = [
+                                f"function {function_name}\\s*\\(",  # function declaration
+                                f"const {function_name}\\s*=\\s*function",  # function expression
+                                f"let {function_name}\\s*=\\s*function",
+                                f"var {function_name}\\s*=\\s*function",
+                                f"const {function_name}\\s*=\\s*\\(",  # arrow function
+                                f"let {function_name}\\s*=\\s*\\(",
+                                f"var {function_name}\\s*=\\s*\\(",
+                                f"{function_name}\\s*=\\s*function",   # object method
+                                f"{function_name}\\s*\\([^)]*\\)\\s*\\{{"  # method shorthand
+                            ]
+                            import re
+                            for pattern in patterns:
+                                if re.search(pattern, content):
+                                    rel_path = os.path.relpath(file_path, self.project_root)
+                                    found_locations.append(rel_path)
+                                    break
                     except Exception as e:
                         logger.warning(f"Error parsing {file_path}: {str(e)}")
                         continue

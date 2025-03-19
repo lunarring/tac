@@ -11,10 +11,7 @@ from typing import Dict, Optional, Tuple
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
-from tac.trusty_agents.pytest import PytestTestingAgent
-from tac.trusty_agents.plausibility import PlausibilityTestingAgent
-from tac.trusty_agents.performance import PerformanceTestingAgent
-from tac.trusty_agents.vision import VisionTestingAgent
+from tac.trusty_agents.registry import TrustyAgentRegistry
 from tac.trusty_agents.base import TrustyAgent
 logger = setup_logging('tac.blocks.executor')
 
@@ -52,14 +49,16 @@ class BlockExecutor:
             
         # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
 
-        # Initialize trusty agents
+        # Initialize trusty agents from registry
         self.trusty_agents = {}
-        self.trusty_agents['pytest'] = PytestTestingAgent()
-        self.trusty_agents['plausibility'] = PlausibilityTestingAgent()
-        # Initialize PerformanceTestingAgent with no arguments for the base implementation
-        self.trusty_agents['performance'] = PerformanceTestingAgent()
-        # Initialize VisionTestingAgent
-        self.trusty_agents['vision'] = VisionTestingAgent()
+        for agent_name in TrustyAgentRegistry.get_all_agents():
+            agent_class = TrustyAgentRegistry.get_agent(agent_name)
+            if agent_class:
+                try:
+                    self.trusty_agents[agent_name] = agent_class()
+                    logger.info(f"Initialized trusty agent: {agent_name}")
+                except Exception as e:
+                    logger.error(f"Failed to initialize trusty agent {agent_name}: {str(e)}")
 
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
@@ -116,7 +115,7 @@ class BlockExecutor:
             sorted_agents = []
             
             # Add pytest first if it exists in the list (hard fixed. we always want pytest first)
-            sorted_agents.append("pytest")
+            # sorted_agents.append("pytest")
             
             # Add all other agents except pytest and plausibility
             for agent_name in self.protoblock.trusty_agents:

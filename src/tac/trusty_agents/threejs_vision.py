@@ -51,7 +51,7 @@ except ImportError:
 
 @trusty_agent(
     name="threejs_vision",
-    description="Use this trusty agent to verify the Three.js application's visual output. It launches a web browser with Selenium, loads the Three.js application, captures a screenshot, and analyzes it to ensure the 3D rendering matches the expectations.",
+    description="Use this trusty agent to verify the visual output of web applications. Use it for anything visual with web content like html, threejs, or webgl.",
     protoblock_prompt="Describe the 3D scene you expect to see in the Three.js application. Be specific about visual elements such as shapes, colors, lighting, camera angle, animations, and any UI elements. Detail what a successful rendering would look like and any specific aspects that must be visible to confirm correct implementation.",
     prompt_target="coding_agent"
 )

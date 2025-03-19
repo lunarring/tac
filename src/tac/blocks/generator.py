@@ -243,7 +243,8 @@ Now you have to decide which trusty agent you are using. Since we are using trus
             for file_path in validated_data["write_files"]:
                 if file_path.startswith("tests/"):
                     # Test files must follow pattern 'test_*.py'
-                    if not file_path.startswith("tests/test_") or not file_path.endswith(".py"):
+                    if not file_path.startswith("tests/test_"):
+                    # if not file_path.startswith("tests/test_") or not file_path.endswith(".py"):
                         return False, f"Files in tests/ directory must follow pattern 'test_*.py', found: {file_path}", None
                     # No subfolders allowed in tests/
                     if file_path.count("/") > 1:

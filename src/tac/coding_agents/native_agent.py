@@ -2,7 +2,6 @@ import os
 import subprocess
 from tac.coding_agents.base import Agent
 from tac.core.log_config import setup_logging
-from tac.utils.file_gatherer import gather_python_files
 from tac.blocks import ProtoBlock
 from tac.core.llm import LLMClient, Message
 import select
