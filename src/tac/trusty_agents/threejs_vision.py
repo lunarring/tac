@@ -240,7 +240,9 @@ class ThreeJSVisionAgent(TrustyAgent):
             """
             
             self.analysis_result = self._analyze_screenshot(prompt)
-            logger.info(f"Analysis result: {self.analysis_result} (for prompt: {prompt.strip().replace('\\n', ' ')})")
+            # Format the prompt for logging (outside the f-string)
+            formatted_prompt = prompt.strip().replace('\n', ' ')
+            logger.info(f"Analysis result: {self.analysis_result} (for prompt: {formatted_prompt})")
             
             # Determine success based on the analysis result
             success = self._determine_success(self.analysis_result)
