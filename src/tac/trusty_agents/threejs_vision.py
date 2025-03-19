@@ -111,7 +111,7 @@ class ThreeJSVisionAgent(TrustyAgent):
             screenshot_delay = config.general.vision_screenshot_delay or 3  # Default to 3 seconds
             
             # Check if headless mode is enabled in config, defaulting to True if not set
-            headless = False
+            headless = True  # Default to True for consistency with main()
             if hasattr(config.general, 'vision_headless'):
                 headless = bool(getattr(config.general, 'vision_headless'))
             
@@ -1604,7 +1604,7 @@ def main():
     parser.add_argument('--timeout', type=int, default=10, help='Timeout in seconds (default: 10)')
     parser.add_argument('--delay', type=int, default=3, help='Screenshot delay in seconds (default: 3)')
     parser.add_argument('--headless', action='store_true', help='Run browser in headless mode with advanced WebGL support')
-    parser.add_argument('--no-headless', dest='headless', action='store_false', help='Run browser in visible mode')
+    parser.add_argument('--no-headless', dest='headless', action='store_false', help='Run browser in visible mode (use this if you want to see the browser window)')
     parser.add_argument('--use-playwright', action='store_true', help='Use Playwright instead of Selenium (better WebGL support)')
     parser.add_argument('--use-selenium', dest='use_playwright', action='store_false', help='Force the use of Selenium instead of Playwright')
     
@@ -1666,7 +1666,7 @@ def main():
             self.write_files = [html_file]
             self.context_files = []
             self._trusty_agent_prompts = {
-                "threejs_vision": "A red wireframe structure should be visible in the 3D scene. The scene should have a black background to make the red wireframe stand out."
+                "threejs_vision": " Review the updated Three.js scene ensuring that there are now two cubes rendered."
             }
             
         @property
@@ -1678,7 +1678,11 @@ def main():
     
     # Print configuration messages
     print(f"Testing Three.js vision agent with {html_file}")
-    print(f"Looking for a red wireframe cube...")
+    prompt_text = protoblock.trusty_agent_prompts.get('threejs_vision', '').strip()
+    if prompt_text:
+        print(f"Checking: {prompt_text[:70]}...")
+    else:
+        print(f"Checking Three.js scene rendering...")
     print(f"Timeout: {args.timeout} seconds, Screenshot delay: {args.delay} seconds")
     print(f"Mode: {'Headless' if headless_mode else 'Visible'}")
     print(f"Engine: {'Playwright' if args.use_playwright else 'Selenium'}")
@@ -1720,7 +1724,13 @@ def main():
             print("\nError Analysis:")
             print(error_analysis)
         else:
-            print("\nSuccess! The red wireframe cube was verified.")
+            # Get a more specific success message from the protoblock prompt
+            prompt_text = protoblock.trusty_agent_prompts.get('threejs_vision', '').strip()
+            if prompt_text:
+                success_message = f"Success! The Three.js scene was verified: {prompt_text[:50]}..."
+            else:
+                success_message = "Success! The Three.js scene was verified."
+            print(f"\n{success_message}")
         
         # Print the screenshot path
         if agent.screenshot_path:
