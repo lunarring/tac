@@ -240,7 +240,7 @@ class ThreeJSVisionAgent(TrustyAgent):
             """
             
             self.analysis_result = self._analyze_screenshot(prompt)
-            logger.info(f"Analysis result: {self.analysis_result}")
+            logger.info(f"Analysis result: {self.analysis_result} (for prompt: {prompt.strip()})")
             
             # Determine success based on the analysis result
             success = self._determine_success(self.analysis_result)
