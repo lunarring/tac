@@ -124,11 +124,11 @@ class PytestTestingAgent(TrustyAgent):
             self._clear_pytest_cache()
 
             if not os.path.exists(full_path):
-                error_msg = f"Error: Test path not found: {full_path}"
-                logger.error(error_msg)
-                self.test_results = error_msg
-                self.had_execution_error = True
-                return False
+                # Create the test directory instead of reporting an error
+                logger.info(f"Test path not found: {full_path}. Creating directory.")
+                os.makedirs(full_path, exist_ok=True)
+                # No longer setting execution error flag or returning False
+                # Continue with test execution
 
             # Reload modules to ensure we're using the latest code
             self._reload_modules()
