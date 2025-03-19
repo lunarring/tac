@@ -274,10 +274,20 @@ class GitManager:
             # Print manual git commands with more visibility
             logger.info(f"✅ Changes successfully committed to branch '{current_branch}'")
             logger.info("📋 Manual Git Commands:")
-            logger.info(f"  To merge these changes from the terminal:")
-            logger.info(f"    git switch {base_branch} && git merge {current_branch}")
-            logger.info(f"  To merge and delete the branch after:")
-            logger.info(f"    git switch {base_branch} && git merge {current_branch} && git branch -D {current_branch}")
+            
+            # Check if we were already on a tac/ branch before the execution
+            if current_branch == self.base_branch and current_branch.startswith("tac/"):
+                # We didn't switch branches because we were already on a tac/ branch
+                logger.info(f"  To preserve your changes, you can stay on this branch.")
+                logger.info(f"  If you want to merge to main branch:")
+                logger.info(f"    git switch main && git merge {current_branch}")
+            else:
+                # We created or switched to a new branch for this task
+                logger.info(f"  To merge these changes from the terminal:")
+                logger.info(f"    git switch {base_branch} && git merge {current_branch}")
+                logger.info(f"  To merge and delete the branch after:")
+                logger.info(f"    git switch {base_branch} && git merge {current_branch} && git branch -D {current_branch}")
+            
             logger.info(f"  To create a pull request:")
             logger.info(f"    {pr_url}")
             
