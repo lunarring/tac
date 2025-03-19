@@ -483,8 +483,9 @@ class GitManager:
                         logger.warning(f"'.gitignore' was missing '{pattern}' exclusion. The pattern has been automatically appended.")
                         commit_required = True
             else:
+                # Create a minimal .gitignore with only the required pattern rather than overwriting
                 with open(gitignore_path, "w", encoding="utf-8") as f:
-                    f.write(pattern + "\n")
+                    f.write("# TAC generated patterns\n" + pattern + "\n")
                 logger.warning(f"'.gitignore' file did not exist. Created new file with '{pattern}' exclusion.")
                 commit_required = True
             if commit_required:
