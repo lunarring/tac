@@ -53,7 +53,7 @@ except ImportError:
 @trusty_agent(
     name="threejs_vision",
     description="Use this trusty agent to verify the visual output of web applications. Use it for anything visual with web content like html, threejs, or webgl.",
-    protoblock_prompt="Describe the 3D scene you expect to see in the Three.js application. Be specific about visual elements such as shapes, colors, lighting, camera angle, animations, and any UI elements. Detail what a successful rendering would look like and any specific aspects that must be visible to confirm correct implementation.",
+    protoblock_prompt="For this visual test, you describe the 3D scene you expect to see. Describe the visual elements such as shapes, colors, lighting, camera angle etc. The idea is that given an image of the scene and this description of yours, someone should be able to tell if the scene is correct or not.",
     prompt_target="coding_agent"
 )
 class ThreeJSVisionAgent(TrustyAgent):
@@ -240,7 +240,7 @@ class ThreeJSVisionAgent(TrustyAgent):
             """
             
             self.analysis_result = self._analyze_screenshot(prompt)
-            logger.info(f"Analysis result: {self.analysis_result} (for prompt: {prompt.strip()})")
+            logger.info(f"Analysis result: {self.analysis_result} (for prompt: {prompt.strip().replace('\\n', ' ')})")
             
             # Determine success based on the analysis result
             success = self._determine_success(self.analysis_result)
