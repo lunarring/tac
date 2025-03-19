@@ -129,7 +129,8 @@ class LLMClient:
         try:
             logger.debug(f"LLM pre: Params: {params}")
             response = self.client.chat.completions.create(**params)
-            logger.debug(f"LLM post: {response}")
+            # Log a summary of the response instead of the full object
+            logger.debug(f"LLM post: Response received with {len(response.choices)} choices")
             if not response or not response.choices:
                 raise ValueError("Empty response received from API")
             return response.choices[0].message.content
@@ -298,9 +299,22 @@ class LLMClient:
             params["max_tokens"] = max_tokens
             
         try:
-            logger.debug(f"Vision LLM pre: Params: {params}")
+            # Create a sanitized copy of params for logging (without the image data)
+            log_params = params.copy()
+            if "messages" in log_params:
+                log_params["messages"] = [
+                    m if isinstance(m.get("content", ""), str) else 
+                    {**m, "content": [
+                        c if c.get("type") != "image_url" else {"type": "image_url", "image_url": {"url": "[BASE64_IMAGE_DATA_REMOVED]"}}
+                        for c in m.get("content", [])
+                    ]}
+                    for m in log_params["messages"]
+                ]
+            
+            logger.debug(f"Vision LLM pre: Params: {log_params}")
             response = self.client.chat.completions.create(**params)
-            logger.debug(f"Vision LLM post: {response}")
+            # Don't log the full response object which might contain image data
+            logger.debug(f"Vision LLM post: Response received with {len(response.choices)} choices")
             if not response or not response.choices:
                 raise ValueError("Empty response received from API")
             return response.choices[0].message.content
