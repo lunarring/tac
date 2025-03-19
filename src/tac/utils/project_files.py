@@ -1,6 +1,7 @@
 import os
 import json
 import hashlib
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union
 from tac.utils.file_summarizer import FileSummarizer
@@ -272,7 +273,6 @@ class ProjectFiles:
                                 f"{function_name}\\s*=\\s*function",   # object method
                                 f"{function_name}\\s*\\([^)]*\\)\\s*\\{{"  # method shorthand
                             ]
-                            import re
                             for pattern in patterns:
                                 if re.search(pattern, content):
                                     rel_path = os.path.relpath(file_path, self.project_root)
