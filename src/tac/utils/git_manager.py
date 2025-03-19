@@ -248,8 +248,22 @@ class GitManager:
             # Push changes if configured
             if config.get('git', {}).get('auto_push_if_success', False):
                 try:
-                    self.repo.git.push('origin', current_branch)
-                    logger.info(f"Successfully pushed changes to origin/{current_branch}")
+                    # First, check if 'origin' remote exists
+                    has_origin = False
+                    try:
+                        remotes = [remote.name for remote in self.repo.remotes]
+                        has_origin = 'origin' in remotes
+                    except Exception as remote_error:
+                        logger.debug(f"Unable to check for remote 'origin': {remote_error}")
+                        has_origin = False
+                    
+                    # Only try to push if 'origin' exists
+                    if has_origin:
+                        self.repo.git.push('origin', current_branch)
+                        logger.info(f"Successfully pushed changes to origin/{current_branch}")
+                    else:
+                        logger.warning("No 'origin' remote found. Skipping push operation.")
+                        logger.info("To add a remote, use: git remote add origin <repository-url>")
                 except git.exc.GitCommandError as e:
                     logger.error(f"Failed to push changes: {e}")
                     # Continue execution even if push fails
@@ -424,7 +438,17 @@ class GitManager:
     def get_github_web_url(self) -> str:
         """Get the GitHub web URL for the repository"""
         try:
-            remote_url = self.repo.remotes.origin.url
+            # Check if 'origin' remote exists
+            if not hasattr(self.repo, 'remotes') or not self.repo.remotes:
+                logger.debug("No remotes found in repository")
+                return None
+                
+            try:
+                remote_url = self.repo.remotes.origin.url
+            except AttributeError:
+                logger.debug("No 'origin' remote found in repository")
+                return None
+                
             # Handle SSH or HTTPS URLs
             if remote_url.startswith('git@github.com:'):
                 # Convert SSH URL to HTTPS format

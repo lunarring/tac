@@ -28,9 +28,13 @@ def load_all_agents():
             # Import the module to trigger registration
             importlib.import_module(f"tac.trusty_agents.{name}")
             logger.info(f"Loaded trusty agent module: {name}")
+        except ImportError as e:
+            # This is an expected error - module might not exist
+            logger.debug(f"Skipping optional trusty agent module '{name}': {e}")
         except Exception as e:
             # Print the full traceback for better debugging
             logger.error(f"Error loading trusty agent module {name}: {e}")
+            logger.debug(traceback.format_exc())
     
     # Then load any remaining modules
     for _, name, _ in pkgutil.iter_modules(agents_pkg.__path__):
@@ -41,9 +45,13 @@ def load_all_agents():
             # Import the module to trigger registration
             importlib.import_module(f"tac.trusty_agents.{name}")
             logger.info(f"Loaded trusty agent module: {name}")
+        except ImportError as e:
+            # This is an expected error - module might not exist or have missing dependencies
+            logger.debug(f"Skipping optional trusty agent module '{name}': {e}")
         except Exception as e:
             # Print the full traceback for better debugging
             logger.error(f"Error loading trusty agent module {name}: {e}")
+            logger.debug(traceback.format_exc())
 
 # Load all agents when the package is imported
 try:
