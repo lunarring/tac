@@ -38,6 +38,17 @@ except ImportError:
     logger.warning("Playwright not found, will use Selenium for screenshots")
     logger.warning("For better WebGL support, install Playwright: pip install playwright")
 
+# Check if Selenium is available
+SELENIUM_AVAILABLE = False
+try:
+    import selenium
+    from selenium import webdriver
+    SELENIUM_AVAILABLE = True
+    logger.info("Selenium is available for basic screenshot support")
+except ImportError:
+    logger.warning("Selenium not found. If Playwright is also unavailable, screenshots won't work")
+    logger.warning("For basic support, install Selenium: pip install selenium webdriver-manager")
+
 @trusty_agent(
     name="threejs_vision",
     description="Use this trusty agent to verify the Three.js application's visual output. It launches a web browser with Selenium, loads the Three.js application, captures a screenshot, and analyzes it to ensure the 3D rendering matches the expectations.",
@@ -92,14 +103,23 @@ class ThreeJSVisionAgent(TrustyAgent):
             timeout = config.general.vision_timeout or 10  # Default to 10 seconds
             screenshot_delay = config.general.vision_screenshot_delay or 1  # Default to 1 second
             
-            # Check if headless mode is enabled in config
-            headless = bool(getattr(config.general, 'vision_headless', False))
+            # Check if headless mode is enabled in config, defaulting to True if not set
+            headless = True
+            if hasattr(config.general, 'vision_headless'):
+                headless = bool(getattr(config.general, 'vision_headless'))
             
-            # Check if playwright should be used
-            use_playwright = bool(getattr(config.general, 'use_playwright', False))
+            # Check if playwright should be used, defaulting to True if available and not explicitly disabled
+            use_playwright = PLAYWRIGHT_AVAILABLE
+            if hasattr(config.general, 'use_playwright'):
+                use_playwright = bool(getattr(config.general, 'use_playwright'))
+            
             if use_playwright and not PLAYWRIGHT_AVAILABLE:
                 logger.warning("Playwright was requested but is not available. Falling back to Selenium.")
                 use_playwright = False
+                
+                # Verify Selenium is available
+                if not SELENIUM_AVAILABLE:
+                    return False, "Neither Playwright nor Selenium are available. Cannot take screenshots.", "Browser not available"
             
             logger.info(f"Browser config: timeout={timeout}s, screenshot_delay={screenshot_delay}s, headless={headless}, use_playwright={use_playwright}")
             
@@ -604,7 +624,7 @@ class BrowserRunner:
                     logger.warning(f"Could not analyze HTML content: {e}")
                 
                 # Set up extra event listeners for better debugging
-                page.on("console", lambda msg: logger.info(f"CONSOLE {msg.type}: {msg.text}"))
+                page.on("console", lambda msg: logger.debug(f"CONSOLE {msg.type}: {msg.text}"))
                 page.on("pageerror", lambda err: logger.error(f"PAGE ERROR: {err}"))
                 
                 # Navigate to page and wait for load
@@ -1737,8 +1757,12 @@ def main():
     parser.add_argument('--timeout', type=int, default=10, help='Timeout in seconds (default: 10)')
     parser.add_argument('--delay', type=int, default=3, help='Screenshot delay in seconds (default: 3)')
     parser.add_argument('--headless', action='store_true', help='Run browser in headless mode with advanced WebGL support')
-    parser.add_argument('--force-visible', action='store_true', help='Force visible browser mode (overrides headless flag)')
+    parser.add_argument('--no-headless', dest='headless', action='store_false', help='Run browser in visible mode')
     parser.add_argument('--use-playwright', action='store_true', help='Use Playwright instead of Selenium (better WebGL support)')
+    parser.add_argument('--use-selenium', dest='use_playwright', action='store_false', help='Force the use of Selenium instead of Playwright')
+    
+    # Set headless and playwright to true by default
+    parser.set_defaults(headless=True, use_playwright=True)
     
     args = parser.parse_args()
     
@@ -1746,8 +1770,13 @@ def main():
     if args.use_playwright and not PLAYWRIGHT_AVAILABLE:
         print("ERROR: Playwright was requested but is not installed.")
         print("Install with: pip install playwright")
-        print("Then: playwright install")
-        return
+        print("Then: playwright install chromium")
+        
+        if SELENIUM_AVAILABLE:
+            print("Falling back to Selenium...")
+            args.use_playwright = False
+        else:
+            return
     
     # Ensure Playwright browsers are installed if needed
     if args.use_playwright and PLAYWRIGHT_AVAILABLE:
@@ -1756,10 +1785,6 @@ def main():
             import subprocess
             import sys
             try:
-                # Try to import playwright.sync_api.__version__
-                from playwright import __version__ as playwright_version
-                print(f"Playwright version: {playwright_version}")
-                
                 # Check if browsers are already installed
                 with sync_playwright() as p:
                     if p.chromium:
@@ -1773,7 +1798,7 @@ def main():
                 print("Playwright browsers installed successfully")
         except Exception as e:
             print(f"Warning: Could not verify or install Playwright browsers: {e}")
-            print("If you encounter errors, run 'playwright install' manually")
+            print("If you encounter errors, run 'playwright install chromium' manually")
     
     html_file = args.html_file
     
@@ -1801,24 +1826,18 @@ def main():
         def trusty_agent_prompts(self):
             return self._trusty_agent_prompts
     
-    # Handle force-visible mode flag (overrides headless)
-    if args.force_visible:
-        headless_mode = False
-        print("Using visible browser mode (headless disabled)")
-    else:
-        headless_mode = bool(args.headless)
+    # Set print messages based on settings
+    headless_mode = bool(args.headless)
     
-    if headless_mode:
-        print("Using headless mode with enhanced WebGL support")
-        if PLAYWRIGHT_AVAILABLE:
-            print("Playwright is available for better WebGL support in headless mode")
-            if not args.use_playwright:
-                print("Tip: Add --use-playwright for better WebGL rendering in headless mode")
-        
+    # Print configuration messages
     print(f"Testing Three.js vision agent with {html_file}")
     print(f"Looking for a green wireframe cube...")
     print(f"Timeout: {args.timeout} seconds, Screenshot delay: {args.delay} seconds")
-    print(f"Headless mode: {'Enabled' if headless_mode else 'Disabled'}")
+    print(f"Mode: {'Headless' if headless_mode else 'Visible'}")
+    print(f"Engine: {'Playwright' if args.use_playwright else 'Selenium'}")
+    
+    if args.use_playwright and headless_mode and platform.system() == 'Darwin':
+        print("NOTE: Using specialized WebGL settings for macOS headless mode")
     
     # Initialize the agent
     agent = ThreeJSVisionAgent()
