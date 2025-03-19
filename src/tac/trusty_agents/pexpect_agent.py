@@ -6,6 +6,7 @@ import json
 import tempfile
 from typing import Dict, Tuple, List, Optional, Any
 from dataclasses import dataclass, field
+# Now we can import pexpect normally since we renamed the file
 import pexpect
 from pexpect import spawn, TIMEOUT, EOF
 import traceback
@@ -15,11 +16,11 @@ from tac.trusty_agents.base import TrustyAgent, trusty_agent
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 
-logger = setup_logging('tac.trusty_agents.pexpect')
+logger = setup_logging('tac.trusty_agents.pexpect_agent')
 
 # Comment: this is a minimalistic implementation, as for testing we are using pytest.
 @trusty_agent(
-    name="pexpect",
+    name="pexpect_agent",
     description="A trusty agent that performs end-to-end testing using Pexpect. Great for running and end-to-end test that verify the flow of the entire program. This is a very important test for making sure the program as a whole is working as expected. Also we can use this agent to make actions on the command line and interact with a program.",
     protoblock_prompt="""On basis of the pexpect library, define end-to-end tests to verify the functionality through the command line interface. These tests will use pexpect to interact with the program as a user would. Select on a high level what kind of test should be constructed here. Ensure we are using pexpect. Write the test in tests/test_<program_name>.py. Be sure to import and use pexpect.""",
     prompt_target="coding_agent",

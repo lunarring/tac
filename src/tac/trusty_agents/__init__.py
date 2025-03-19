@@ -20,7 +20,7 @@ def load_all_agents():
     import tac.trusty_agents as agents_pkg
     
     # Define the order of modules to load to avoid circular imports
-    ordered_modules = ['base', 'registry', 'pytest', 'plausibility', 'pexpect', 'vision']
+    ordered_modules = ['base', 'registry', 'pytest', 'plausibility', 'pexpect_agent', 'vision', 'threejs_unit_test', 'threejs_vision']
     
     # First load the ordered modules
     for name in ordered_modules:

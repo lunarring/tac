@@ -22,7 +22,7 @@ logger = setup_logging('tac.trusty_agents.vision')
 
 @trusty_agent(
     name="vision",
-    description="A trusty agent that runs a program, takes a screenshot, and analyzes it using a vision model to verify visual output.",
+    description="Use this vision agent for general purpose visual verification of the output of a program. Do not use for threejs.",
     protoblock_prompt="Describe what visual elements you would expect to see in the program's output that would verify the implementation is correct. Be specific about colors, shapes, text, or UI elements that should be visible.",
     prompt_target="coding_agent",
 )
