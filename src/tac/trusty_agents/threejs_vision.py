@@ -10,6 +10,7 @@ from typing import Dict, Tuple, Optional, Union, Any
 import signal
 import platform
 import shutil
+import uuid
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -84,6 +85,12 @@ class ThreeJSVisionAgent(TrustyAgent):
             - str: Failure type description (empty string if success is True)
         """
         try:
+            logger.info("========== STARTING NEW THREEJS VISUAL TEST ==========")
+            logger.info(f"Test initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            # Ensure we're not using cached screenshots by clearing temporary files
+            self.screenshot_path = None
+            self.analysis_result = None
+            
             # Get the HTML file path to run from the protoblock directly
             app_file_path = self._get_app_file_path(protoblock)
             if not app_file_path:
@@ -100,11 +107,11 @@ class ThreeJSVisionAgent(TrustyAgent):
             
             # Run the browser and take a screenshot
             logger.info(f"Running browser for: {app_file_path}")
-            timeout = config.general.vision_timeout or 10  # Default to 10 seconds
-            screenshot_delay = config.general.vision_screenshot_delay or 1  # Default to 1 second
+            timeout = config.general.vision_timeout or 15  # Default to 15 seconds
+            screenshot_delay = config.general.vision_screenshot_delay or 3  # Default to 3 seconds
             
             # Check if headless mode is enabled in config, defaulting to True if not set
-            headless = True
+            headless = False
             if hasattr(config.general, 'vision_headless'):
                 headless = bool(getattr(config.general, 'vision_headless'))
             
@@ -136,6 +143,14 @@ class ThreeJSVisionAgent(TrustyAgent):
                         logger.info("Found Three.js script tag in HTML content")
                     else:
                         logger.warning("No Three.js script tag found in HTML content")
+                    
+                    # Check for specific color references in the code
+                    if "0xff0000" in html_content or "red" in html_content.lower():
+                        logger.info("Found RED color references in the HTML content")
+                    if "0x00ff00" in html_content or "green" in html_content.lower():
+                        logger.info("Found GREEN color references in the HTML content")
+                    if "0x0000ff" in html_content or "blue" in html_content.lower():
+                        logger.info("Found BLUE color references in the HTML content")
                     
                     # Check for external JS files that might need time to load
                     import re
@@ -439,6 +454,15 @@ class BrowserRunner:
         self.playwright_page = None
         logger.info(f"BrowserRunner initialized with headless={self.headless}, use_playwright={self.use_playwright}")
         
+    def _generate_unique_screenshot_path(self):
+        """Generate a unique path for the screenshot to prevent reusing old screenshots"""
+        timestamp = int(time.time())
+        unique_id = str(uuid.uuid4())[:8]
+        fd, path = tempfile.mkstemp(prefix=f"screenshot_{timestamp}_{unique_id}_", suffix='.png')
+        os.close(fd)
+        logger.info(f"Generated unique screenshot path: {path}")
+        return path
+        
     def start_browser(self):
         """Start the browser and navigate to the HTML file"""
         if self.running:
@@ -477,8 +501,7 @@ class BrowserRunner:
         logger.info("Starting browser with Playwright (no-thread mode)")
         
         # Create a temporary file for the screenshot
-        fd, self.screenshot_path = tempfile.mkstemp(suffix='.png')
-        os.close(fd)
+        self.screenshot_path = self._generate_unique_screenshot_path()
         
         file_url = f"file://{os.path.abspath(self.html_file_path)}"
         logger.info(f"Target URL: {file_url}")
@@ -887,70 +910,10 @@ class BrowserRunner:
                 
                 # Create a basic Three.js scene if still no renderer found
                 if not threejs_status.get('hasRenderer', False):
-                    logger.info("Creating a basic Three.js scene as fallback")
-                    try:
-                        # Create a basic scene with a green wireframe cube
-                        create_result = page.evaluate("""() => {
-                            try {
-                                if (typeof THREE !== 'undefined') {
-                                    console.log('Creating basic Three.js scene');
-                                    
-                                    // Get container
-                                    const container = document.querySelector('#canvas-container') || document.body;
-                                    
-                                    // Create or get canvas
-                                    let canvas = document.querySelector('canvas');
-                                    if (!canvas) {
-                                        canvas = document.createElement('canvas');
-                                        canvas.width = 800;
-                                        canvas.height = 600;
-                                        container.appendChild(canvas);
-                                    }
-                                    
-                                    // Force a proper WebGL context
-                                    const gl = window.createForcedWebGLContext ? 
-                                        window.createForcedWebGLContext(canvas) : 
-                                        (canvas.getContext('webgl2') || canvas.getContext('webgl'));
-                                    
-                                    if (!gl) {
-                                        return "Failed to create WebGL context";
-                                    }
-                                    
-                                    // Create basic Three.js scene
-                                    window.renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true, context: gl});
-                                    window.renderer.setSize(canvas.width, canvas.height);
-                                    window.renderer.setClearColor(0x000000);
-                                    
-                                    window.scene = new THREE.Scene();
-                                    window.scene.background = new THREE.Color(0x000000);
-                                    
-                                    window.camera = new THREE.PerspectiveCamera(75, canvas.width/canvas.height, 0.1, 1000);
-                                    window.camera.position.z = 5;
-                                    
-                                    // Add a green wireframe cube
-                                    const geometry = new THREE.BoxGeometry(1, 1, 1);
-                                    const material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
-                                    const cube = new THREE.Mesh(geometry, material);
-                                    window.scene.add(cube);
-                                    
-                                    // Add ambient light
-                                    const light = new THREE.AmbientLight(0xffffff, 1);
-                                    window.scene.add(light);
-                                    
-                                    // Render the scene
-                                    window.renderer.render(window.scene, window.camera);
-                                    
-                                    return 'Created basic Three.js scene successfully';
-                                }
-                                
-                                return 'THREE is not defined, cannot create scene';
-                            } catch(e) {
-                                return `Error creating basic scene: ${e.message}`;
-                            }
-                        }""")
-                        logger.info(f"Basic scene creation result: {create_result}")
-                    except Exception as e:
-                        logger.error(f"Error creating basic scene: {e}")
+                    logger.info("No renderer detected - NOT creating a fallback scene")
+                    # We no longer create a fallback scene as it interferes with testing
+                    # Instead, we'll let the test fail naturally if the renderer is missing
+                    logger.info("If renderer is missing, this likely indicates a problem with the Three.js code")
                 
                 # Prepare the scene for rendering with more aggressive approach
                 logger.info("Preparing scene for rendering...")
@@ -1031,89 +994,64 @@ class BrowserRunner:
                 }""")
                 logger.info(f"Final render results: {render_result}")
                 
-                # Try a canvas-based screenshot first to capture WebGL content directly
-                logger.info("Taking direct canvas screenshot first...")
-                canvas_data = page.evaluate("""() => {
-                    try {
-                        const canvas = document.querySelector('canvas');
-                        if (!canvas) {
-                            return { success: false, reason: 'No canvas found' };
-                        }
-                        
-                        // Force a final render
-                        if (window.renderer && window.scene && window.camera) {
-                            window.renderer.render(window.scene, window.camera);
-                        }
-                        
-                        // Try to get the canvas data
+                # Add a special WebGL rendering enforcer before taking the screenshot
+                logger.info("Applying WebGL render enforcement for better page screenshots...")
+                try:
+                    # Force more aggressive rendering with direct WebGL commands
+                    page.evaluate("""() => {
                         try {
-                            return { 
-                                success: true, 
-                                dataUrl: canvas.toDataURL('image/png'),
-                                width: canvas.width,
-                                height: canvas.height
-                            };
-                        } catch (e) {
-                            return { 
-                                success: false, 
-                                reason: 'Canvas data extraction failed',
-                                error: e.toString() 
-                            };
-                        }
-                    } catch (e) {
-                        return { success: false, error: e.toString() };
-                    }
-                }""")
-                
-                # If we got canvas data successfully, save it
-                canvas_screenshot_path = None
-                if isinstance(canvas_data, dict) and canvas_data.get('success') and 'dataUrl' in canvas_data:
-                    try:
-                        import base64
-                        # Create a temp file for canvas screenshot
-                        fd_canvas, canvas_screenshot_path = tempfile.mkstemp(suffix='.png')
-                        os.close(fd_canvas)
-                        
-                        # Extract and save the image data
-                        img_data = canvas_data['dataUrl'].split(',')[1]
-                        image_bytes = base64.b64decode(img_data)
-                        
-                        with open(canvas_screenshot_path, "wb") as f:
-                            f.write(image_bytes)
+                            // Try multiple rendering techniques
+                            const canvases = document.querySelectorAll('canvas');
+                            canvases.forEach(canvas => {
+                                try {
+                                    // Ensure canvas is visible and sized properly
+                                    canvas.style.visibility = 'visible';
+                                    canvas.style.opacity = '1';
+                                    canvas.style.display = 'block';
+                                    
+                                    // Make sure it has size if needed
+                                    if (canvas.width === 0 || canvas.height === 0) {
+                                        canvas.width = Math.max(canvas.clientWidth, 800);
+                                        canvas.height = Math.max(canvas.clientHeight, 600);
+                                    }
+                                    
+                                    // Try to force a render
+                                    if (window.renderer && window.renderer.render) {
+                                        window.renderer.render(window.scene, window.camera);
+                                    }
+                                } catch (e) {
+                                    console.error('Error preparing canvas:', e);
+                                }
+                            });
                             
-                        logger.info(f"Canvas screenshot saved: {canvas_screenshot_path} ({len(image_bytes)} bytes)")
-                    except Exception as e:
-                        logger.error(f"Error saving canvas screenshot: {e}")
-                else:
-                    logger.warning(f"Could not get canvas data: {canvas_data}")
+                            // Add a slight delay to ensure the render completes
+                            return new Promise(resolve => {
+                                setTimeout(() => {
+                                    // Force one final animation frame
+                                    requestAnimationFrame(() => {
+                                        requestAnimationFrame(() => {
+                                            resolve('WebGL rendering enforced');
+                                        });
+                                    });
+                                }, 500);
+                            });
+                        } catch (e) {
+                            return `Error enforcing WebGL render: ${e.message}`;
+                        }
+                    }""")
+                    
+                    # Small wait after enforcing
+                    time.sleep(0.5)
+                except Exception as e:
+                    logger.warning(f"Error in WebGL render enforcement: {e}")
                 
-                # Take the regular screenshot as well
-                logger.info("Taking regular page screenshot...")
+                # Skip canvas screenshot and just take page screenshot directly
+                logger.info("Taking page screenshot (skipping canvas screenshot attempt)...")
                 try:
                     page.screenshot(path=self.screenshot_path)
                     logger.info(f"Page screenshot saved: {self.screenshot_path}")
                 except Exception as e:
                     logger.error(f"Error taking page screenshot: {e}")
-                
-                # If we have both screenshots, check which one is better
-                if canvas_screenshot_path and os.path.exists(canvas_screenshot_path) and os.path.getsize(canvas_screenshot_path) > 1000:
-                    # Check if canvas screenshot is not empty/black
-                    try:
-                        from PIL import Image, ImageStat
-                        with Image.open(canvas_screenshot_path) as img:
-                            stat = ImageStat.Stat(img)
-                            # Check if image has content (not all black)
-                            has_content = not all(x < 20 for x in stat.mean[:3])
-                            
-                            if has_content:
-                                # Canvas screenshot is good, use it instead
-                                logger.info("Canvas screenshot has content, using it instead of page screenshot")
-                                # Replace the regular screenshot with the canvas one
-                                shutil.copy2(canvas_screenshot_path, self.screenshot_path)
-                            else:
-                                logger.warning("Canvas screenshot appears to be blank, using page screenshot")
-                    except Exception as e:
-                        logger.error(f"Error analyzing canvas screenshot: {e}")
                 
                 # Close the browser
                 logger.info("Closing Playwright browser...")
@@ -1236,8 +1174,7 @@ class BrowserRunner:
                 return
             
             # Create a temporary file for the screenshot
-            fd, self.screenshot_path = tempfile.mkstemp(suffix='.png')
-            os.close(fd)
+            self.screenshot_path = self._generate_unique_screenshot_path()
             
             # Wait for any animations or resources to load
             logger.info("Taking screenshot of Three.js application")
@@ -1307,20 +1244,15 @@ class BrowserRunner:
                 
                 try:
                     if self.headless:
-                        # Use a multi-step approach for headless WebGL screenshots
+                        # Use CDP screenshot if available (with GPU surface)
                         logger.info("Taking WebGL-optimized CDP screenshot in headless mode")
                         
-                        # Method 1: CDP with GPU surface
+                        # Use CDP screenshot method
                         success = self._take_cdp_screenshot(from_surface=True)
                         
-                        # Method 2: If Method 1 fails, try canvas screenshot
+                        # Fall back to standard screenshot if CDP fails
                         if not success or os.path.getsize(self.screenshot_path) < 10000:
-                            logger.info("CDP screenshot may have failed, trying canvas screenshot")
-                            success = self._take_canvas_screenshot()
-                        
-                        # Method 3: Standard screenshot as last resort
-                        if not success:
-                            logger.warning("Canvas screenshot failed, trying standard screenshot")
+                            logger.info("CDP screenshot may have failed, using standard screenshot")
                             success = self.driver.save_screenshot(self.screenshot_path)
                     else:
                         # For visible mode, just use standard screenshot
@@ -1399,22 +1331,8 @@ class BrowserRunner:
                     // If THREE is available, try to create a new renderer
                     if (window.THREE && !canvas.processed) {
                         try {
-                            const tmpRenderer = new THREE.WebGLRenderer({canvas, antialias: true});
-                            tmpRenderer.setSize(canvas.width, canvas.height);
-                            const tmpScene = new THREE.Scene();
-                            const tmpCamera = new THREE.PerspectiveCamera(75, canvas.width/canvas.height, 0.1, 1000);
-                            tmpCamera.position.z = 5;
-                            
-                            // Add a simple cube to the scene
-                            const tmpGeometry = new THREE.BoxGeometry();
-                            const tmpMaterial = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
-                            const tmpCube = new THREE.Mesh(tmpGeometry, tmpMaterial);
-                            tmpScene.add(tmpCube);
-                            
-                            // Render
-                            tmpRenderer.render(tmpScene, tmpCamera);
-                            canvas.processed = true;
-                            renderResults.push({canvas: i, rendered: true, new: true});
+                            logger.info("Not creating a temporary scene for this canvas - removed fallback");
+                            renderResults.push({canvas: i, notProcessed: true, reason: "Fallback disabled"});
                         } catch (e) {
                             renderResults.push({canvas: i, error: e.toString()});
                         }
@@ -1482,77 +1400,6 @@ class BrowserRunner:
                 
         except Exception as e:
             logger.error(f"CDP screenshot failed: {e}")
-            return False
-    
-    def _take_canvas_screenshot(self):
-        """Take a screenshot directly from the canvas element using JavaScript"""
-        try:
-            canvas_script = """
-            try {
-                // Find all canvases
-                const canvases = document.querySelectorAll('canvas');
-                if (canvases.length === 0) {
-                    return {error: 'No canvas elements found'};
-                }
-                
-                // Use the largest canvas or the first canvas with content
-                let targetCanvas = canvases[0];
-                let maxArea = targetCanvas.width * targetCanvas.height;
-                
-                for (let i = 1; i < canvases.length; i++) {
-                    const canvas = canvases[i];
-                    const area = canvas.width * canvas.height;
-                    if (area > maxArea) {
-                        targetCanvas = canvas;
-                        maxArea = area;
-                    }
-                }
-                
-                // Ensure the canvas has a size
-                if (targetCanvas.width === 0 || targetCanvas.height === 0) {
-                    targetCanvas.width = 800;
-                    targetCanvas.height = 600;
-                }
-                
-                // Force a render before capturing
-                try {
-                    if (window.renderer && window.renderer.render) {
-                        window.renderer.render(window.scene, window.camera);
-                    }
-                } catch (e) { }
-                
-                // Convert canvas to data URL
-                const dataURL = targetCanvas.toDataURL('image/png');
-                
-                // Return info about the canvas and the data URL
-                return {
-                    width: targetCanvas.width,
-                    height: targetCanvas.height,
-                    dataURL: dataURL
-                };
-            } catch (e) {
-                return {error: e.toString()};
-            }
-            """
-            
-            result = self.driver.execute_script(canvas_script)
-            
-            if isinstance(result, dict) and 'dataURL' in result:
-                # Save the data URL as an image
-                import base64
-                # Remove the "data:image/png;base64," prefix
-                data = result['dataURL'].split(',')[1]
-                image_data = base64.b64decode(data)
-                with open(self.screenshot_path, "wb") as f:
-                    f.write(image_data)
-                logger.info(f"Canvas screenshot saved: {result['width']}x{result['height']} ({len(image_data)} bytes)")
-                return True
-            else:
-                logger.error(f"Canvas screenshot failed: {result}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Canvas screenshot failed: {e}")
             return False
     
     def _prepare_scene_for_rendering(self):
@@ -1819,7 +1666,7 @@ def main():
             self.write_files = [html_file]
             self.context_files = []
             self._trusty_agent_prompts = {
-                "threejs_vision": "A green wireframe cube-like structure should be visible in the 3D scene.  The scene should have a black background to make the green wireframe stand out."
+                "threejs_vision": "A red wireframe structure should be visible in the 3D scene. The scene should have a black background to make the red wireframe stand out."
             }
             
         @property
@@ -1831,7 +1678,7 @@ def main():
     
     # Print configuration messages
     print(f"Testing Three.js vision agent with {html_file}")
-    print(f"Looking for a green wireframe cube...")
+    print(f"Looking for a red wireframe cube...")
     print(f"Timeout: {args.timeout} seconds, Screenshot delay: {args.delay} seconds")
     print(f"Mode: {'Headless' if headless_mode else 'Visible'}")
     print(f"Engine: {'Playwright' if args.use_playwright else 'Selenium'}")
@@ -1873,7 +1720,7 @@ def main():
             print("\nError Analysis:")
             print(error_analysis)
         else:
-            print("\nSuccess! The green wireframe cube was verified.")
+            print("\nSuccess! The red wireframe cube was verified.")
         
         # Print the screenshot path
         if agent.screenshot_path:

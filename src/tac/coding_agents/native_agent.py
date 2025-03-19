@@ -156,7 +156,9 @@ Write files, these are the ones you need to modify:
 For importing modules in your implementation, assume we are running everything from the root of the project and that the project is not installed as package.
 
 Make sure your implementation passes the tests, if listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
-You edit the code carefully, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task. For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. The response format is:
+You edit the code carefully, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task. For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. 
+
+THE RESPONSE FORMAT IS CRITICAL: You MUST always include BOTH the start marker ###FILE: [filepath] AND end marker ###END_FILE for EACH file you modify. Always ensure that each file section is properly closed with ###END_FILE before starting a new file section with ###FILE:
 
 ###FILE: /path/to/first/file.py
 # insert the full code here
@@ -221,7 +223,29 @@ REMEMBER: change as little as possible and ONLY implement functionality that is 
         # Special handling for HTML and other non-Python files
         is_html_file = False
         
-        for line in response.split('\n'):
+        # Pre-process the response to ensure all file blocks are properly closed
+        # This helps mitigate issues with LLMs that forget to add ###END_FILE markers
+        preprocessed_lines = []
+        lines = response.split('\n')
+        for i, line in enumerate(lines):
+            preprocessed_lines.append(line)
+            # If we see a new file marker and the previous one wasn't closed, add an end marker
+            if line.startswith('###FILE:') and i > 0:
+                prev_line = lines[i-1].strip()
+                if prev_line != '###END_FILE' and '###END_FILE' not in prev_line:
+                    # Check if any of the previous lines had a file marker
+                    has_previous_file = False
+                    for j in range(i-1, -1, -1):
+                        if lines[j].startswith('###FILE:'):
+                            has_previous_file = True
+                            break
+                    if has_previous_file:
+                        # Insert an end marker before the new file marker
+                        preprocessed_lines.insert(len(preprocessed_lines)-1, '###END_FILE')
+                        logger.info(f"Auto-inserted missing ###END_FILE marker before {line}")
+        
+        # Now process the preprocessed response
+        for line in preprocessed_lines:
             # Special handling for file markers in code blocks or comments
             # This helps with HTML files where markers might be embedded in content
             if current_file is not None and (current_file.endswith('.html') or current_file.endswith('.css') or current_file.endswith('.js')):
