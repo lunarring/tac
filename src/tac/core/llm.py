@@ -130,7 +130,7 @@ class LLMClient:
             logger.debug(f"LLM pre: Params: {params}")
             response = self.client.chat.completions.create(**params)
             # Log a summary of the response instead of the full object
-            logger.debug(f"LLM post: Response received with {len(response.choices)} choices")
+            logger.debug(f"LLM post: Response received: {response}")
             if not response or not response.choices:
                 raise ValueError("Empty response received from API")
             return response.choices[0].message.content
@@ -314,7 +314,7 @@ class LLMClient:
             logger.debug(f"Vision LLM pre: Params: {log_params}")
             response = self.client.chat.completions.create(**params)
             # Don't log the full response object which might contain image data
-            logger.debug(f"Vision LLM post: Response received with {len(response.choices)} choices")
+            logger.debug(f"Vision LLM post: Response received: {response}")
             if not response or not response.choices:
                 raise ValueError("Empty response received from API")
             return response.choices[0].message.content
