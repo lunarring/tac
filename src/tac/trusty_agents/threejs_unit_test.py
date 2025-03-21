@@ -12,7 +12,8 @@ import os
 class ThreeJS(TrustyAgent):
     def _check_impl(self, protoblock: ProtoBlock, codebase: dict, code_diff: str):
         try:
-            result = subprocess.run(["npm", "run", "test:threejs"], capture_output=True, text=True)
+            result = subprocess.run(["npm", "test"], capture_output=True, text=True)
+            print(f"npm test result: {result.stdout}")
         except Exception as e:
             return False, str(e), "subprocess_exception"
         
