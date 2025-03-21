@@ -153,28 +153,26 @@ Context Files, please do not edit these files:
 Write files, these are the ones you need to modify:
 {write_files_section}
 
-For importing modules in your implementation, assume we are running everything from the root of the project and that the project is not installed as package.
-
 Make sure your implementation passes the tests, if listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
 You edit the code carefully, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task. For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. 
 
 THE RESPONSE FORMAT IS CRITICAL: You MUST always include BOTH the start marker ###FILE: [filepath] AND end marker ###END_FILE for EACH file you modify. Always ensure that each file section is properly closed with ###END_FILE before starting a new file section with ###FILE:
 
-###FILE: /path/to/first/file.py
+###FILE: src/file1.py
 # insert the full code here
 ###END_FILE
 
-###FILE: /path/to/second/file.py
+###FILE: file2.py
 # insert the full code here
 ###END_FILE
 
 FOR EXAMPLE:
-###FILE: /home/users/git/project/first_file.py
+###FILE: src/file1.py
 import time
 time.sleep(1)
 ###END_FILE
 
-###FILE: /home/users/git/project/second_file.py
+###FILE: file2.py
 import numpy as np
 a = np.random.randn(10, 10)
 ###END_FILE
@@ -185,7 +183,15 @@ Additionally, below, you add a small note to the user about the changes you made
 # insert the note here
 ###END_NOTE
 
-REMEMBER: change as little as possible and ONLY implement functionality that is listed in the task description."""
+REMEMBER: don't break existing code that does not need to be changed and ONLY implement functionality that is listed in the task description.
+
+Here are language specific instructions:
+Python: 
+- For importing modules in your implementation, assume we are running everything from the root of the project and that the project is not installed as package.
+
+Three.js:
+- Always make a package.json file in the root of the project, in there be sure to specify   "test": "mocha tests/*.js" (since we use tests/ folder for tests)
+"""
         
         # Add coding agent prompts if available
         if coding_agent_prompts and len(coding_agent_prompts) > 0:
