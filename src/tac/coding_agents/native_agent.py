@@ -191,6 +191,7 @@ Python:
 
 Three.js:
 - Always make a package.json file in the root of the project, in there be sure to specify   "test": "mocha tests/*.js" (since we use tests/ folder for tests)
+- Always include all dependencies in the package.json file, including all necessary dependencies.
 """
         
         # Add coding agent prompts if available
