@@ -439,113 +439,123 @@ class BrowserRunner:
                 ]
                 
                 # Try with Chromium first (best WebGL support)
-                browser = playwright.chromium.launch(**launch_options)
+                try:
+                    browser = playwright.chromium.launch(**launch_options)
+                except Exception as e:
+                    logger.error(f"Failed to launch Chromium browser: {str(e)}")
+                    logger.error("Browser launch error details:")
+                    logger.error(f"Launch options: {launch_options}")
+                    logger.error(f"Platform: {platform.system()} {platform.release()}")
+                    logger.error(f"Python version: {sys.version}")
+                    raise Exception(f"Browser launch failed: {str(e)}")
                 
                 # Create context with enhanced browser settings
-                context = browser.new_context(
-                    viewport={"width": 1920, "height": 1080},
-                    device_scale_factor=1,
-                    is_mobile=False,
-                    has_touch=False,
-                    locale="en-US",
-                    color_scheme="dark",  # Dark scheme for better WebGL visibility
-                    forced_colors="none",
-                    reduced_motion="no-preference"
-                )
+                try:
+                    context = browser.new_context(
+                        viewport={"width": 1920, "height": 1080},
+                        device_scale_factor=1,
+                        is_mobile=False,
+                        has_touch=False,
+                        locale="en-US",
+                        color_scheme="dark",  # Dark scheme for better WebGL visibility
+                        forced_colors="none",
+                        reduced_motion="no-preference"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to create browser context: {str(e)}")
+                    browser.close()
+                    raise Exception(f"Browser context creation failed: {str(e)}")
                 
-                # Set additional permissions
-                context.grant_permissions(['clipboard-read', 'clipboard-write'])
-                
+                # Set up error handlers before creating the page
                 page = context.new_page()
                 
-                # Add extra JavaScript helpers for debugging and WebGL support
-                page.add_init_script("""
-                    // Add WebGL debugging
-                    window.webGLDebug = {
-                        errors: [],
-                        logging: true
-                    };
-                    
-                    // Override the console.error to capture WebGL errors
-                    const originalConsoleError = console.error;
-                    console.error = function() {
-                        if (window.webGLDebug && window.webGLDebug.logging) {
-                            window.webGLDebug.errors.push(Array.from(arguments).join(' '));
-                        }
-                        originalConsoleError.apply(console, arguments);
-                    };
-                    
-                    // Helper to create a working WebGL context if needed
-                    window.createForcedWebGLContext = function(canvas) {
-                        const contextNames = ['webgl2', 'webgl', 'experimental-webgl'];
-                        let gl = null;
-                        
-                        for (const name of contextNames) {
-                            try {
-                                gl = canvas.getContext(name, {
-                                    alpha: true,
-                                    antialias: true,
-                                    depth: true,
-                                    failIfMajorPerformanceCaveat: false,
-                                    powerPreference: 'high-performance',
-                                    premultipliedAlpha: true,
-                                    preserveDrawingBuffer: true,
-                                    stencil: true
-                                });
-                                if (gl) {
-                                    console.log('Created WebGL context with', name);
-                                    break;
-                                }
-                            } catch (e) {
-                                console.error('Error creating WebGL context with', name, e);
-                            }
-                        }
-                        
-                        return gl;
-                    };
-                """)
+                # Enhanced error logging for page events with better categorization
+                def handle_console(msg):
+                    if msg.type == "error":
+                        logger.error(f"CONSOLE ERROR: {msg.text}")
+                        # Check for common critical errors
+                        if any(x in msg.text.lower() for x in [
+                            "is not defined", "undefined", "cannot read properties",
+                            "syntax error", "reference error", "type error"
+                        ]):
+                            raise Exception(f"Critical JavaScript error detected: {msg.text}")
+                    else:
+                        logger.debug(f"CONSOLE {msg.type}: {msg.text}")
 
-                # Read file content to check for external resources
+                def handle_page_error(err):
+                    logger.error(f"PAGE ERROR: {err}")
+                    # Check for common critical errors
+                    if any(x in str(err).lower() for x in [
+                        "is not defined", "undefined", "cannot read properties",
+                        "syntax error", "reference error", "type error"
+                    ]):
+                        # Stop the browser and context before raising the exception
+                        try:
+                            context.close()
+                            browser.close()
+                        except:
+                            pass
+                        raise Exception(f"Critical JavaScript error detected: {err}")
+
+                def handle_request_failed(request):
+                    error_text = request.failure.get('errorText', 'Unknown error')
+                    logger.error(f"REQUEST FAILED: {request.url} - {error_text}")
+                    # Only raise for critical resource failures
+                    if request.resource_type in ["script", "stylesheet"]:
+                        raise Exception(f"Critical resource failed to load: {request.url} - {error_text}")
+
+                page.on("console", handle_console)
+                page.on("pageerror", handle_page_error)
+                page.on("requestfailed", handle_request_failed)
+                
+                # Navigate to page and wait for load with enhanced error handling
                 try:
-                    with open(self.html_file_path, 'r') as f:
-                        html_content = f.read()
-                        
-                    # Extract external JS files to ensure they're properly loaded
-                    import re
-                    js_files = re.findall(r'<script.*?src=[\'"](.+?)[\'"]', html_content)
-                    logger.info(f"Detected external JS files: {js_files}")
-                    
-                    # Check if main.js is referenced and try to read its content
-                    has_main_js = any('main.js' in js for js in js_files)
-                    main_js_content = None
-                    
-                    if has_main_js:
-                        # Get the path to main.js
-                        html_dir = os.path.dirname(os.path.abspath(self.html_file_path))
-                        main_js_path = None
-                        
-                        for js in js_files:
-                            if 'main.js' in js and not js.startswith('http'):
-                                main_js_path = os.path.join(html_dir, js)
-                                break
-                            
-                        if main_js_path and os.path.exists(main_js_path):
-                            logger.info(f"Reading main.js content from {main_js_path}")
-                            with open(main_js_path, 'r') as f:
-                                main_js_content = f.read()
-                                logger.info(f"main.js content preview: {main_js_content[:200]}...")
-                
+                    logger.info(f"Navigating to: {file_url}")
+                    resp = page.goto(file_url, wait_until="networkidle", timeout=30000)
+                    if not resp:
+                        raise Exception("Page navigation failed - no response received")
+                    if resp.status >= 400:
+                        raise Exception(f"Page navigation failed with status {resp.status}")
+                    logger.info(f"Page loaded with status: {resp.status}")
+
+                    # Check for JavaScript errors after page load
+                    js_errors = page.evaluate("""() => {
+                        const errors = [];
+                        if (window.onerror) {
+                            const originalOnError = window.onerror;
+                            window.onerror = function(msg, url, line, col, error) {
+                                errors.push({
+                                    message: msg,
+                                    url: url,
+                                    line: line,
+                                    column: col,
+                                    error: error ? error.toString() : null,
+                                    stack: error ? error.stack : null
+                                });
+                                return originalOnError.apply(this, arguments);
+                            };
+                        }
+                        return errors;
+                    }""")
+
+                    if js_errors:
+                        logger.error("JavaScript errors detected after page load:")
+                        for error in js_errors:
+                            logger.error(f"Error: {error.get('message')}")
+                            logger.error(f"Location: {error.get('url')}:{error.get('line')}:{error.get('column')}")
+                            if error.get('stack'):
+                                logger.error(f"Stack trace:\n{error.get('stack')}")
+                        raise Exception("JavaScript errors detected - cannot proceed with visual test")
+
                 except Exception as e:
-                    logger.warning(f"Could not analyze HTML content: {e}")
-                
-                # Set up extra event listeners for better debugging
-                page.on("console", lambda msg: logger.debug(f"CONSOLE {msg.type}: {msg.text}"))
-                page.on("pageerror", lambda err: logger.error(f"PAGE ERROR: {err}"))
-                
-                # Navigate to page and wait for load
-                logger.info(f"Navigating to: {file_url}")
-                resp = page.goto(file_url, wait_until="networkidle", timeout=30000)
-                logger.info(f"Page loaded with status: {resp.status}")
+                    logger.error(f"Page navigation or JavaScript error: {str(e)}")
+                    logger.error("Error details:")
+                    logger.error(f"URL: {file_url}")
+                    logger.error(f"File exists: {os.path.exists(self.html_file_path)}")
+                    logger.error(f"File permissions: {oct(os.stat(self.html_file_path).st_mode)[-3:]}")
+                    context.close()
+                    browser.close()
+                    raise Exception(f"Critical error detected: {str(e)}")
                 
                 # Extended wait for external scripts
                 logger.info(f"Waiting {self.screenshot_delay + 2} seconds for page to render...")
@@ -756,23 +766,6 @@ class BrowserRunner:
                 }""")
                 logger.info(f"Three.js status: {threejs_status}")
                 self.threejs_status = threejs_status
-                
-                # Try to manually execute main.js content if detected
-                if main_js_content and 'hasThree' in threejs_status and threejs_status['hasThree'] and not threejs_status.get('hasRenderer'):
-                    logger.info("Injecting and executing main.js content directly")
-                    try:
-                        # Inject and execute the main.js content directly
-                        page.evaluate(f"""() => {{ 
-                            try {{
-                                // Execute the main.js content directly
-                                {main_js_content}
-                                return "Executed main.js content directly";
-                            }} catch(e) {{
-                                return `Error executing main.js content: ${{e.message}}`;
-                            }}
-                        }}""")
-                    except Exception as e:
-                        logger.error(f"Error injecting main.js content: {e}")
                 
                 # Execute common Three.js initialization functions
                 if 'hasThree' in threejs_status and threejs_status['hasThree'] and not threejs_status.get('hasRenderer'):
