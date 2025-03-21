@@ -23,7 +23,7 @@ class TrustyAgentConfig:
     minimum_plausibility_score: str = "B"  # Minimum passing score (A, B, C, D, F)
     
     # ThreeJS Vision agent settings
-    minimum_vision_score: str = "B"  # Minimum passing score (A, B, C, D, F)
+    minimum_vision_score: str = "C"  # Minimum passing score (A, B, C, D, F)
     vision_timeout: int = 15  # Timeout in seconds for vision agent program execution
     vision_screenshot_delay: int = 5  # Delay in seconds before taking a screenshot
     
