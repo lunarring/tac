@@ -33,92 +33,10 @@ from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager
+from tac.cli.gather import cli_gather_files, gather_files_command
 
 # Initialize logger at module level but don't use it as a global in functions
 _module_logger = setup_logging('tac.cli.main')
-
-def cli_gather_python_files(directory, formatting_options, exclusions, exclude_dot_files=True):
-    """
-    Gather Python files from directory and load file contents without extra summarization.
-    
-    Args:
-        directory: Directory to scan.
-        formatting_options: Dictionary with formatting options.
-        exclusions: List of directories to exclude.
-        exclude_dot_files: Whether to exclude files/directories starting with a dot.
-        
-    Returns:
-        Dictionary with file paths as keys and file contents as values.
-    """
-    MAX_FILE_SIZE = 100 * 1024  
-    CHUNK_SIZE = 40 * 1024
-
-    directory_tree = []
-    file_contents = []
-    seen_files = set()  # Track unique files by their absolute path
-
-    directory = str(directory)  # Ensure directory is a string
-    abs_directory = os.path.abspath(directory)  # Get absolute path of base directory
-
-    for root, dirs, files in os.walk(directory):
-        # Exclude specified directories and optionally dot directories
-        dirs[:] = [d for d in dirs if d not in exclusions and not (exclude_dot_files and d.startswith('.'))]
-        rel_root = os.path.relpath(root, directory)
-        level = root.replace(directory, '').count(os.sep)
-        indent = ' ' * 4 * level
-        # Add the root folder name only if it's not the base directory
-        if rel_root == '.':
-            directory_tree.append(f"{os.path.basename(root)}/")
-        else:
-            directory_tree.append(f"{indent}{os.path.basename(root)}/")
-
-        for file in files:
-            if file.endswith('.py') and not file.startswith('.#') and not (exclude_dot_files and file.startswith('.')):
-                file_path = os.path.join(root, file)
-                abs_file_path = os.path.abspath(file_path)
-                real_path = os.path.realpath(abs_file_path)  # Resolve any symlinks
-                
-                # Skip if we've seen this file before (either directly or through a symlink)
-                if real_path in seen_files:
-                    continue
-                
-                # Skip if file is outside the target directory
-                if not real_path.startswith(abs_directory):
-                    continue
-                
-                seen_files.add(real_path)
-                directory_tree.append(f"{indent}    {file}")
-
-                # Gather file info
-                file_size = os.path.getsize(file_path)
-                file_info = f"Size: {file_size} bytes, Last Modified: {datetime.fromtimestamp(os.path.getmtime(file_path))}"
-
-                # Load file content
-                if file_size > MAX_FILE_SIZE:
-                    with open(file_path, 'r') as f:
-                        content = f.read()
-                    content = (
-                        f"# First {CHUNK_SIZE//1024}KB of file:\n"
-                        f"{content[:CHUNK_SIZE]}\n\n"
-                        f"# ... [{(file_size - 2*CHUNK_SIZE)//1024}KB truncated] ...\n\n"
-                        f"# Last {CHUNK_SIZE//1024}KB of file:\n"
-                        f"{content[-CHUNK_SIZE:]}"
-                    )
-                else:
-                    with open(file_path, 'r') as f:
-                        content = f.read()
-
-                # Format content
-                header = f"{formatting_options['header']}{os.path.relpath(file_path, directory)}"
-                if formatting_options.get('use_code_fences'):
-                    content = f"```python\n{content}\n```"
-                
-                file_contents.append(f"{header}\n{file_info}\n{content}")
-
-    if not file_contents:
-        return "No Python files found."
-
-    return "\n".join(directory_tree) + formatting_options['separator'] + "\n".join(file_contents)
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -180,7 +98,7 @@ def gather_files_command(args):
                 print(f"Error: {args.directory} is not a directory or Python file")
                 sys.exit(1)
             exclusions = args.exclusions.split(',') if args.exclusions else None
-            result = cli_gather_python_files(args.directory, formatting_options, exclusions)
+            result = cli_gather_files(args.directory, formatting_options, exclusions)
             print(result)
 
 def run_tests_command(args):
