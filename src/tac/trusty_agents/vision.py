@@ -71,8 +71,8 @@ class VisionTestingAgent(TrustyAgent):
             
             # Run the program and take a screenshot
             logger.info(f"Running program: {program_path}")
-            timeout = config.general.vision_timeout or 15  # Default to 15 seconds
-            screenshot_delay = config.general.vision_screenshot_delay or 5  # Default to 5 seconds
+            timeout = config.general.trusty_agents.vision_timeout or 15  # Default to 15 seconds
+            screenshot_delay = config.general.trusty_agents.vision_screenshot_delay or 5  # Default to 5 seconds
             
             self.program_runner = ProgramRunner(program_path, timeout=timeout, screenshot_delay=screenshot_delay)
             self.program_runner.start_program()
