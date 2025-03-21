@@ -107,8 +107,8 @@ class ThreeJSVisionAgent(TrustyAgent):
             
             # Run the browser and take a screenshot
             logger.info(f"Running browser for: {app_file_path}")
-            timeout = config.general.vision_timeout or 15  # Default to 15 seconds
-            screenshot_delay = config.general.vision_screenshot_delay or 3  # Default to 3 seconds
+            timeout = config.general.trusty_agents.vision_timeout or 15  # Default to 15 seconds
+            screenshot_delay = config.general.trusty_agents.vision_screenshot_delay or 3  # Default to 3 seconds
             
             # Check if headless mode is enabled in config, defaulting to True if not set
             headless = True  # Default to True for consistency with main()
@@ -225,18 +225,27 @@ class ThreeJSVisionAgent(TrustyAgent):
             
             Expected 3D visualization elements: {expected_visual}
 
-            Please verify if the expected visual elements are present in the screenshot.
-            Be specific about what you see in the 3D scene and whether it matches the expectations.
-            If there are any discrepancies, explain them in detail.
+            Please grade the visualization on a scale from A to F and provide a detailed analysis.
             
-            You answer with a clear YES or NO verdict in the first line of response. In case of NO, explain why in the following lines.
-
-            Example:
-
-            YES
-
-            NO
-            The 3D cube is not visible, I only see a blank canvas instead.
+            Remember:
+            A: Perfect match with all expected elements present and correctly rendered
+            B: Good match with minor visual discrepancies
+            C: Acceptable but with noticeable issues
+            D: Minimum passing grade - basic elements present but with significant issues
+            F: Failed - major elements missing or severe rendering problems
+            
+            Provide your analysis in this format:
+            
+            GRADE: [A-F]
+            
+            ANALYSIS:
+            (Detailed analysis of what matches or doesn't match expectations)
+            
+            ISSUES:
+            (List any visual issues or missing elements)
+            
+            RECOMMENDATIONS:
+            (Suggestions for improvement if needed)
             """
             
             self.analysis_result = self._analyze_screenshot(prompt)
@@ -251,7 +260,7 @@ class ThreeJSVisionAgent(TrustyAgent):
                 return True, "", ""
             else:
                 failure_type = "Three.js visual verification failed"
-                error_analysis = f"The Three.js application's visual output did not match expectations:\n\n{self.analysis_result}"
+                error_analysis = f"The Three.js application's visual output did not meet minimum requirements:\n\n{self.analysis_result}"
                 return False, error_analysis, failure_type
             
         except Exception as e:
@@ -319,9 +328,28 @@ class ThreeJSVisionAgent(TrustyAgent):
                 
             logger.info(f"Screenshot file verified: {self.screenshot_path} ({file_size} bytes)")
             
-            # Create messages for the vision model
+            # Create messages for the vision model with updated grading system
             vision_messages = [
-                Message(role="system", content="You are a helpful assistant that can analyze 3D visualizations created with Three.js"),
+                Message(role="system", content="""You are a helpful assistant that can analyze 3D visualizations created with Three.js.
+                You will grade the visualization on a scale from A to F where:
+                A: Perfect match with all expected elements present and correctly rendered
+                B: Good match with minor visual discrepancies
+                C: Acceptable but with noticeable issues
+                D: Minimum passing grade - basic elements present but with significant issues
+                F: Failed - major elements missing or severe rendering problems
+                
+                Provide your analysis in this format:
+                
+                GRADE: [A-F]
+                
+                ANALYSIS:
+                (Detailed analysis of what matches or doesn't match expectations)
+                
+                ISSUES:
+                (List any visual issues or missing elements)
+                
+                RECOMMENDATIONS:
+                (Suggestions for improvement if needed)"""),
                 Message(role="user", content=prompt)
             ]
             
@@ -335,60 +363,48 @@ class ThreeJSVisionAgent(TrustyAgent):
 
     def _determine_success(self, analysis_result: str) -> bool:
         """
-        Determine if the vision analysis indicates success.
+        Determine if the vision analysis indicates success based on the grade.
         
         Args:
             analysis_result: The result of the vision analysis
             
         Returns:
-            bool: True if the analysis indicates success, False otherwise
+            bool: True if the grade meets or exceeds the minimum required grade from config
         """
-        # Check if the result is in the expected format with YES/NO on the first line
-        lines = analysis_result.strip().split('\n')
-        if lines and lines[0].strip().upper() in ["YES", "NO"]:
-            return lines[0].strip().upper() == "YES"
-        
-        # If not in the expected format, look for positive/negative indicators
-        positive_indicators = [
-            "matches expectations",
-            "matches the expectations",
-            "visual elements are present",
-            "expected elements are present",
-            "successfully displays",
-            "correctly displays",
-            "correctly implemented",
-            "successfully implemented",
-            "3d scene looks good",
-            "three.js visualization is correct"
-        ]
-        
-        for indicator in positive_indicators:
-            if indicator.lower() in analysis_result.lower():
-                return True
-        
-        negative_indicators = [
-            "does not match",
-            "doesn't match",
-            "not match",
-            "missing",
-            "absent",
-            "not present",
-            "not found",
-            "not visible",
-            "cannot see",
-            "can't see",
-            "failed to display",
-            "failed to render",
-            "rendering issue",
-            "3d elements are missing"
-        ]
-        
-        for indicator in negative_indicators:
-            if indicator.lower() in analysis_result.lower():
-                return False
-        
-        # If no clear indicators, default to False
-        return False
+        try:
+            # Get minimum passing grade from config
+            min_grade = config.general.trusty_agents.minimum_vision_score.upper()
+            if min_grade not in {"A", "B", "C", "D", "F"}:
+                logger.warning(f"Invalid minimum_vision_score in config: {min_grade}, defaulting to 'B'")
+                min_grade = "B"
+            
+            # Define grade values (A=4, B=3, C=2, D=1, F=0)
+            grade_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
+            min_grade_value = grade_values[min_grade]
+            
+            # Extract grade from the analysis
+            if "GRADE:" in analysis_result:
+                grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                grade = grade_line[0].upper()  # Take first character as grade
+                
+                if grade not in grade_values:
+                    logger.error(f"Invalid grade found in analysis: {grade}")
+                    return False
+                
+                # Compare grade values
+                return grade_values[grade] >= min_grade_value
+            
+            # Fallback to old YES/NO format if no grade found
+            lines = analysis_result.strip().split('\n')
+            if lines and lines[0].strip().upper() in ["YES", "NO"]:
+                logger.warning("Using legacy YES/NO format - treating YES as grade 'B' and NO as grade 'F'")
+                return lines[0].strip().upper() == "YES"
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error determining success from grade: {e}")
+            return False
 
     def _is_blank_screenshot(self, screenshot_path):
         """Check if a screenshot is blank or just black"""
@@ -1661,6 +1677,15 @@ def main():
                 print(f" - {file}")
         return
     
+    # Print configuration messages
+    print(f"Testing Three.js vision agent with {html_file}")
+    print(f"Timeout: {args.timeout} seconds, Screenshot delay: {args.delay} seconds")
+    print(f"Mode: {'Headless' if args.headless else 'Visible'}")
+    print(f"Engine: {'Playwright' if args.use_playwright else 'Selenium'}")
+    
+    if args.use_playwright and args.headless and platform.system() == 'Darwin':
+        print("NOTE: Using specialized WebGL settings for macOS headless mode")
+    
     # Create a dummy ProtoBlock
     class DummyProtoBlock:
         def __init__(self, html_file):
@@ -1668,54 +1693,36 @@ def main():
             self.write_files = [html_file]
             self.context_files = []
             self._trusty_agent_prompts = {
-                "threejs_vision": " Review the updated Three.js scene ensuring that there are now two cubes rendered."
+                "threejs_vision": " Review the updated Three.js scene ensuring that there is one cube rendered above a water surface."
             }
             
         @property
         def trusty_agent_prompts(self):
             return self._trusty_agent_prompts
     
-    # Set print messages based on settings
-    headless_mode = bool(args.headless)
+    # Initialize the agent
+    agent = ThreeJSVisionAgent()
     
-    # Print configuration messages
-    print(f"Testing Three.js vision agent with {html_file}")
+    # Set the config values before agent initialization
+    config.general.trusty_agents.vision_timeout = args.timeout
+    config.general.trusty_agents.vision_screenshot_delay = args.delay
+    config.general.vision_headless = args.headless
+    config.general.use_playwright = args.use_playwright
+    
+    # Run the check directly using the agent's method
+    protoblock = DummyProtoBlock(html_file)
+    
+    # Print prompt text after protoblock creation
     prompt_text = protoblock.trusty_agent_prompts.get('threejs_vision', '').strip()
     if prompt_text:
         print(f"Checking: {prompt_text[:70]}...")
     else:
         print(f"Checking Three.js scene rendering...")
-    print(f"Timeout: {args.timeout} seconds, Screenshot delay: {args.delay} seconds")
-    print(f"Mode: {'Headless' if headless_mode else 'Visible'}")
-    print(f"Engine: {'Playwright' if args.use_playwright else 'Selenium'}")
-    
-    if args.use_playwright and headless_mode and platform.system() == 'Darwin':
-        print("NOTE: Using specialized WebGL settings for macOS headless mode")
-    
-    # Initialize the agent
-    agent = ThreeJSVisionAgent()
-    
-    # Set the config values before agent initialization
-    config.general.vision_timeout = args.timeout
-    config.general.vision_screenshot_delay = args.delay
-    config.general.vision_headless = headless_mode
-    config.general.use_playwright = args.use_playwright
-    
-    # Run the check directly using the agent's method
-    protoblock = DummyProtoBlock(html_file)
-    try:
-        codebase = open(html_file, 'r').read()
-        print(f"Successfully read HTML file: {html_file} ({len(codebase)} bytes)")
-    except Exception as e:
-        print(f"Error reading HTML file: {str(e)}")
-        codebase = ""
-    
-    code_diff = ""
     
     try:
         # Run the actual check
         print("Starting browser and taking screenshot...")
-        success, error_analysis, failure_type = agent._check_impl(protoblock, codebase, code_diff)
+        success, error_analysis, failure_type = agent._check_impl(protoblock, "", "")
         
         # Display results
         print("\nTest Results:")

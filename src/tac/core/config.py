@@ -18,12 +18,28 @@ class GitConfig:
 
 
 @dataclass
+class TrustyAgentConfig:
+    # Plausibility agent settings
+    minimum_plausibility_score: str = "B"  # Minimum passing score (A, B, C, D, F)
+    
+    # ThreeJS Vision agent settings
+    minimum_vision_score: str = "C"  # Minimum passing score (A, B, C, D, F)
+    vision_timeout: int = 15  # Timeout in seconds for vision agent program execution
+    vision_screenshot_delay: int = 5  # Delay in seconds before taking a screenshot
+    
+    # Pytest agent settings
+    run_error_analysis: bool = True  # Whether to run error analysis after failures
+    
+    # General trusty agent settings
+    default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
+
+
+@dataclass
 class GeneralConfig:
     coding_agent: str = "native"
     reasoning_effort: str = "medium"
     use_file_summaries: bool = True
-    minimum_plausibility_score: str = "B"  # Minimum passing score for plausibility check (A, B, C, D, F)
-    run_error_analysis: bool = True  # Whether to run error analysis after failures
+    trusty_agents: TrustyAgentConfig = field(default_factory=TrustyAgentConfig)
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
     max_retries_block_creation: int = 4
     max_retries_protoblock_creation: int = 4
@@ -32,11 +48,8 @@ class GeneralConfig:
     ignore_paths: List[str] = field(default_factory=lambda: [".git", "__pycache__", "build"])
     test_path: str = "tests/"  # Add default test path
     save_protoblock: bool = False  # Whether to save protoblocks to disk
-    default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
     use_orchestrator: bool = False
     confirm_multiblock_execution: bool = False  # Whether to ask for confirmation before executing multiblock chunks
-    vision_timeout: int = 15  # Timeout in seconds for vision agent program execution
-    vision_screenshot_delay: int = 5  # Delay in seconds before taking a screenshot
 
 
 @dataclass
