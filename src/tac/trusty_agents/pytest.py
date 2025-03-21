@@ -89,7 +89,7 @@ class PytestTestingAgent(TrustyAgent):
             error_analysis = ""  # Initialize as empty string instead of "None"
             logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
 
-            if config.general.run_error_analysis:
+            if config.general.trusty_agents.run_error_analysis:
                 error_analysis = self.error_analyzer.analyze_failure(
                     protoblock, 
                     test_results,
@@ -150,7 +150,7 @@ class PytestTestingAgent(TrustyAgent):
             else:
                 # FIXED: Don't do a separate collection step, just run all tests directly
                 # This ensures we always pick up newly created test files
-                exclude_performance_tests = getattr(config.general, 'exclude_performance_tests', True)
+                exclude_performance_tests = getattr(config.general.trusty_agents, 'exclude_performance_tests', True)
                 if exclude_performance_tests:
                     args.extend(['-m', 'not performance and not transient', test_target])
                 else:

@@ -23,12 +23,13 @@ class TrustyAgentConfig:
     minimum_plausibility_score: str = "B"  # Minimum passing score (A, B, C, D, F)
     
     # ThreeJS Vision agent settings
-    minimum_vision_score: str = "C"  # Minimum passing score (A, B, C, D, F)
+    minimum_vision_score: str = "B"  # Minimum passing score (A, B, C, D, F)
     vision_timeout: int = 15  # Timeout in seconds for vision agent program execution
     vision_screenshot_delay: int = 5  # Delay in seconds before taking a screenshot
     
     # Pytest agent settings
     run_error_analysis: bool = True  # Whether to run error analysis after failures
+    exclude_performance_tests: bool = True  # Whether to exclude performance and transient tests
     
     # General trusty agent settings
     default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
