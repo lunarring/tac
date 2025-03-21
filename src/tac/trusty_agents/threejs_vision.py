@@ -19,6 +19,7 @@ from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.trusty_agents.base import TrustyAgent, trusty_agent
+from tac.trusty_agents.pytest import ErrorAnalyzer
 
 logger = setup_logging('tac.trusty_agents.threejs_vision')
 
@@ -51,6 +52,7 @@ class ThreeJSVisionAgent(TrustyAgent):
         self.browser_runner = None
         self.screenshot_path = None
         self.analysis_result = None
+        self.error_analyzer = ErrorAnalyzer()  # Add error analyzer
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
         """
@@ -67,6 +69,7 @@ class ThreeJSVisionAgent(TrustyAgent):
             - str: Error analysis (empty string if success is True)
             - str: Failure type description (empty string if success is True)
         """
+        collected_errors = []
         try:
             logger.info("========== STARTING NEW THREEJS VISUAL TEST ==========")
             logger.info(f"Test initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -99,6 +102,15 @@ class ThreeJSVisionAgent(TrustyAgent):
             
             logger.info("Starting browser with Playwright...")
             self.browser_runner.start_browser()
+            
+            # Check for collected errors from browser runner
+            if self.browser_runner.collected_errors:
+                error_analysis = self.error_analyzer.analyze_failure(
+                    protoblock,
+                    "\n".join(self.browser_runner.collected_errors),
+                    codebase
+                )
+                return False, error_analysis, "Browser errors detected"
             
             # Get the screenshot path
             self.screenshot_path = self.browser_runner.get_screenshot_path()
@@ -175,9 +187,18 @@ class ThreeJSVisionAgent(TrustyAgent):
             
         except Exception as e:
             logger.exception(f"Error in Three.js vision testing: {str(e)}")
+            collected_errors.append(str(e))
             if self.browser_runner and self.browser_runner.is_running():
                 self.browser_runner.stop_browser()
-            return False, f"Error during Three.js vision testing: {str(e)}", "Three.js vision testing exception"
+            
+            # Use error analyzer to analyze the collected errors
+            error_analysis = self.error_analyzer.analyze_failure(
+                protoblock,
+                "\n".join(collected_errors),
+                codebase
+            )
+            
+            return False, error_analysis, "Three.js vision testing exception"
 
     def _get_app_file_path(self, protoblock: ProtoBlock) -> Optional[str]:
         """
@@ -372,6 +393,7 @@ class BrowserRunner:
         self.screenshot_delay = screenshot_delay
         self.screenshot_path = None
         self.threejs_status = None
+        self.collected_errors = []  # Add list to collect errors
         logger.info("BrowserRunner initialized")
         
     def _generate_unique_screenshot_path(self):
@@ -442,12 +464,14 @@ class BrowserRunner:
                 try:
                     browser = playwright.chromium.launch(**launch_options)
                 except Exception as e:
-                    logger.error(f"Failed to launch Chromium browser: {str(e)}")
+                    error_msg = f"Failed to launch Chromium browser: {str(e)}"
+                    logger.error(error_msg)
+                    self.collected_errors.append(error_msg)
                     logger.error("Browser launch error details:")
                     logger.error(f"Launch options: {launch_options}")
                     logger.error(f"Platform: {platform.system()} {platform.release()}")
                     logger.error(f"Python version: {sys.version}")
-                    raise Exception(f"Browser launch failed: {str(e)}")
+                    return
                 
                 # Create context with enhanced browser settings
                 try:
@@ -462,9 +486,11 @@ class BrowserRunner:
                         reduced_motion="no-preference"
                     )
                 except Exception as e:
-                    logger.error(f"Failed to create browser context: {str(e)}")
+                    error_msg = f"Failed to create browser context: {str(e)}"
+                    logger.error(error_msg)
+                    self.collected_errors.append(error_msg)
                     browser.close()
-                    raise Exception(f"Browser context creation failed: {str(e)}")
+                    return
                 
                 # Set up error handlers before creating the page
                 page = context.new_page()
@@ -476,33 +502,65 @@ class BrowserRunner:
                         # Check for common critical errors
                         if any(x in msg.text.lower() for x in [
                             "is not defined", "undefined", "cannot read properties",
-                            "syntax error", "reference error", "type error"
+                            "syntax error", "reference error", "type error",
+                            "failed to load resource", "refused to execute script",
+                            "mime type", "three is not defined"
                         ]):
-                            raise Exception(f"Critical JavaScript error detected: {msg.text}")
+                            self.collected_errors.append(f"Critical JavaScript error detected: {msg.text}")
+                            # Close browser and context on critical error
+                            try:
+                                context.close()
+                                browser.close()
+                            except:
+                                pass
+                            return False  # Signal to stop processing
                     else:
                         logger.debug(f"CONSOLE {msg.type}: {msg.text}")
+                    return True
 
                 def handle_page_error(err):
                     logger.error(f"PAGE ERROR: {err}")
                     # Check for common critical errors
                     if any(x in str(err).lower() for x in [
                         "is not defined", "undefined", "cannot read properties",
-                        "syntax error", "reference error", "type error"
+                        "syntax error", "reference error", "type error",
+                        "three is not defined"
                     ]):
-                        # Stop the browser and context before raising the exception
+                        self.collected_errors.append(f"Critical JavaScript error detected: {err}")
+                        # Close browser and context on critical error
                         try:
                             context.close()
                             browser.close()
                         except:
                             pass
-                        raise Exception(f"Critical JavaScript error detected: {err}")
+                        return False  # Signal to stop processing
+                    return True
 
                 def handle_request_failed(request):
-                    error_text = request.failure.get('errorText', 'Unknown error')
-                    logger.error(f"REQUEST FAILED: {request.url} - {error_text}")
-                    # Only raise for critical resource failures
-                    if request.resource_type in ["script", "stylesheet"]:
-                        raise Exception(f"Critical resource failed to load: {request.url} - {error_text}")
+                    try:
+                        error_text = request.failure.get('errorText', 'Unknown error')
+                        logger.error(f"REQUEST FAILED: {request.url} - {error_text}")
+                        # Only collect for critical resource failures
+                        if request.resource_type in ["script", "stylesheet"]:
+                            self.collected_errors.append(f"Critical resource failed to load: {request.url} - {error_text}")
+                            # Close browser and context on critical error
+                            try:
+                                context.close()
+                                browser.close()
+                            except:
+                                pass
+                            return False  # Signal to stop processing
+                    except Exception as e:
+                        logger.error(f"Error handling request failure: {str(e)}")
+                        self.collected_errors.append(f"Critical resource failed to load: {request.url}")
+                        # Close browser and context on critical error
+                        try:
+                            context.close()
+                            browser.close()
+                        except:
+                            pass
+                        return False  # Signal to stop processing
+                    return True
 
                 page.on("console", handle_console)
                 page.on("pageerror", handle_page_error)
@@ -513,9 +571,11 @@ class BrowserRunner:
                     logger.info(f"Navigating to: {file_url}")
                     resp = page.goto(file_url, wait_until="networkidle", timeout=30000)
                     if not resp:
-                        raise Exception("Page navigation failed - no response received")
+                        self.collected_errors.append("Page navigation failed - no response received")
+                        return
                     if resp.status >= 400:
-                        raise Exception(f"Page navigation failed with status {resp.status}")
+                        self.collected_errors.append(f"Page navigation failed with status {resp.status}")
+                        return
                     logger.info(f"Page loaded with status: {resp.status}")
 
                     # Check for JavaScript errors after page load
@@ -539,24 +599,38 @@ class BrowserRunner:
                     }""")
 
                     if js_errors:
-                        logger.error("JavaScript errors detected after page load:")
                         for error in js_errors:
-                            logger.error(f"Error: {error.get('message')}")
-                            logger.error(f"Location: {error.get('url')}:{error.get('line')}:{error.get('column')}")
+                            error_msg = f"Error: {error.get('message')}"
+                            if error.get('url'):
+                                error_msg += f" at {error.get('url')}:{error.get('line')}:{error.get('column')}"
                             if error.get('stack'):
-                                logger.error(f"Stack trace:\n{error.get('stack')}")
-                        raise Exception("JavaScript errors detected - cannot proceed with visual test")
+                                error_msg += f"\nStack trace:\n{error.get('stack')}"
+                            self.collected_errors.append(error_msg)
+                            logger.error(error_msg)
+                            # If it's a critical error, stop processing
+                            if any(x in error_msg.lower() for x in [
+                                "is not defined", "undefined", "cannot read properties",
+                                "syntax error", "reference error", "type error",
+                                "three is not defined"
+                            ]):
+                                return
 
                 except Exception as e:
-                    logger.error(f"Page navigation or JavaScript error: {str(e)}")
+                    error_msg = f"Page navigation or JavaScript error: {str(e)}"
+                    logger.error(error_msg)
                     logger.error("Error details:")
                     logger.error(f"URL: {file_url}")
                     logger.error(f"File exists: {os.path.exists(self.html_file_path)}")
                     logger.error(f"File permissions: {oct(os.stat(self.html_file_path).st_mode)[-3:]}")
+                    self.collected_errors.append(error_msg)
                     context.close()
                     browser.close()
-                    raise Exception(f"Critical error detected: {str(e)}")
+                    return
                 
+                # If we have collected errors, don't proceed with screenshot
+                if self.collected_errors:
+                    return
+
                 # Extended wait for external scripts
                 logger.info(f"Waiting {self.screenshot_delay + 2} seconds for page to render...")
                 time.sleep(self.screenshot_delay + 2)
@@ -1054,6 +1128,7 @@ def main():
             self.block_id = "test"
             self.write_files = [html_file]
             self.context_files = []
+            self.task_description = "Visual test of Three.js scene"
             self._trusty_agent_prompts = {
                 "threejs_vision": " Review the updated Three.js scene ensuring that there is one cube rendered above a water surface."
             }
