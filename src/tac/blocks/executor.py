@@ -7,12 +7,12 @@ import sys
 import os
 from datetime import datetime
 from tac.utils.file_gatherer import gather_python_files
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, List
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
 from tac.trusty_agents.registry import TrustyAgentRegistry
-from tac.trusty_agents.base import TrustyAgent
+from tac.trusty_agents.base import TrustyAgent, ComparativeTrustyAgent
 logger = setup_logging('tac.blocks.executor')
 
 class BlockExecutor:
@@ -60,6 +60,90 @@ class BlockExecutor:
                 except Exception as e:
                     logger.error(f"Failed to initialize trusty agent {agent_name}: {str(e)}")
 
+    def _prepare_trusty_agents(self) -> Tuple[List[TrustyAgent], List[TrustyAgent]]:
+        """
+        Prepare and categorize trusty agents for execution.
+        
+        Returns:
+            Tuple containing:
+            - List of standard trusty agents
+            - List of comparative trusty agents
+        """
+        standard_agents = []
+        comparative_agents = []
+        
+        # Sort agents: pytest first, plausibility last, others in between
+        sorted_agent_names = []
+        
+        # Add all other agents except pytest and plausibility
+        for agent_name in self.protoblock.trusty_agents:
+            if agent_name != "plausibility":
+                sorted_agent_names.append(agent_name)
+        
+        # Add plausibility last
+        sorted_agent_names.append("plausibility")
+        
+        # Categorize agents
+        for agent_name in sorted_agent_names:
+            if agent_name in self.trusty_agents:
+                agent = self.trusty_agents[agent_name]
+                if isinstance(agent, ComparativeTrustyAgent):
+                    comparative_agents.append(agent)
+                else:
+                    standard_agents.append(agent)
+            else:
+                logger.warning(f"Trusty agent '{agent_name}' specified in protoblock but not available in executor")
+        
+        return standard_agents, comparative_agents
+
+    def _capture_initial_states(self, comparative_agents: List[TrustyAgent]) -> None:
+        """
+        Capture initial states for all comparative agents.
+        
+        Args:
+            comparative_agents: List of comparative trusty agents
+        """
+        for agent in comparative_agents:
+            try:
+                logger.info(f"Capturing initial state for {agent.__class__.__name__}")
+                agent.capture_before_state()
+            except Exception as e:
+                logger.error(f"Failed to capture initial state for {agent.__class__.__name__}: {e}")
+                raise
+
+    def _run_trusty_agents(self, agents: List[TrustyAgent], code_diff: str) -> Tuple[bool, str, str]:
+        """
+        Run a list of trusty agents and return the first failure if any.
+        
+        Args:
+            agents: List of trusty agents to run
+            code_diff: The git diff showing implemented changes
+            
+        Returns:
+            Tuple containing:
+            - bool: Success status
+            - str: Error analysis
+            - str: Failure type
+        """
+        for agent in agents:
+            logger.info(f"Running trusty agent: {agent.__class__.__name__}", heading=True)
+            try:
+                success, error_analysis, failure_type = agent.check(
+                    self.protoblock, self.codebase, code_diff
+                )
+                
+                if not success:
+                    logger.error(f"{agent.__class__.__name__} check failed: {failure_type}")
+                    return False, error_analysis, failure_type
+                else:
+                    logger.info(f"{agent.__class__.__name__} check passed")
+                    
+            except Exception as e:
+                error_msg = f"Error during {agent.__class__.__name__} check: {type(e).__name__}: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                return False, error_msg, f"Exception in {agent.__class__.__name__} check"
+        
+        return True, "", ""
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
         """
@@ -78,81 +162,42 @@ class BlockExecutor:
         self.protoblock = protoblock
 
         try:
-            # First run the coding agent
-            execution_success = False
-            analysis = ""  # Initialize as empty string instead of None
+            # Prepare and categorize trusty agents
+            standard_agents, comparative_agents = self._prepare_trusty_agents()
             
+            # Capture initial states for comparative agents
+            if comparative_agents:
+                self._capture_initial_states(comparative_agents)
+            
+            # Run the coding agent
+            logger.info(f"Starting coding agent implementation (attempt {idx_attempt + 1})", heading=True)
             try:
-                # Log start of task execution
-                logger.info(f"Starting coding agent implementation (attempt {idx_attempt + 1})", heading=True)
-                
-                # Pass the previous attempt's analysis to the coding agent
-                self.coding_agent.run(self.protoblock, previous_analysis=analysis)
-                
-                # Log completion of task execution
+                # Pass empty string as previous_analysis for first attempt
+                self.coding_agent.run(self.protoblock, previous_analysis="")
                 logger.info(f"Coding agent implementation completed (attempt {idx_attempt + 1})")
-                
             except Exception as e:
                 error_msg = f"Error during coding agent execution: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg)
-
-                error_analysis= error_msg
-                execution_success = False
-                failure_type = "Exception during agent execution"
-                
-                # Log failure with analysis
-                logger.error(f"Execution failed (attempt {idx_attempt + 1}): {error_msg}")
-                if error_analysis:
-                    logger.debug(f"Error analysis: {error_analysis}")
-                
-                return execution_success, error_analysis, failure_type 
-
+                return False, error_msg, "Exception during agent execution"
 
             # Cycle through trusty agents, gather materials first
             code_diff = self.git_manager.get_complete_diff()
             
-            # Sort trusty agents: pytest first, plausibility last, others in between
-            sorted_agents = []
+            # Run comparative agents 
+            if comparative_agents:
+                success, error_analysis, failure_type = self._run_trusty_agents(comparative_agents, code_diff)
+                if not success:
+                    return False, error_analysis, failure_type
+                
+            # Run standard trusty agents 
+            success, error_analysis, failure_type = self._run_trusty_agents(standard_agents, code_diff)
+            if not success:
+                return False, error_analysis, failure_type
             
-            # Add pytest first if it exists in the list (hard fixed. we always want pytest first)
-            # sorted_agents.append("pytest")
             
-            # Add all other agents except pytest and plausibility
-            for agent_name in self.protoblock.trusty_agents:
-                if agent_name != "plausibility":
-                    sorted_agents.append(agent_name)
-            
-            # Add plausibility last, hard fixed. we always want plausibility last.
-            sorted_agents.append("plausibility")
-            
-            # Run trusty agents in the sorted order
-            for agent_name in sorted_agents:
-                if agent_name in self.trusty_agents:
-                    logger.info(f"Trusty agent: {agent_name} starting...", heading=True)
-                    try:
-                        agent_success, agent_error_analysis, agent_failure_type = self.trusty_agents[agent_name].check(
-                            self.protoblock, self.codebase, code_diff
-                        )
-                        
-                        if not agent_success:
-                            logger.error(f"{agent_name} check failed: {agent_failure_type}")
-                            # Return the failure information to trigger a retry
-                            return False, agent_error_analysis, agent_failure_type
-                        else:
-                            logger.info(f"{agent_name} check passed")
-                    except Exception as e:
-                        error_msg = f"Error during {agent_name} check: {type(e).__name__}: {str(e)}"
-                        logger.error(error_msg, exc_info=True)
-                        # Return the exception information to trigger a retry
-                        return False, error_msg, f"Exception in {agent_name} check"
-                else:
-                    logger.warning(f"Trusty agent '{agent_name}' specified in protoblock but not available in executor")
-            
-            # If we got here, all required tests passed
-            execution_success = True
+            # If we got here, all agents passed
             logger.info(f"All trusty agents are happy ({', '.join(self.protoblock.trusty_agents)}). Trust is assured!", heading=True)
-            return execution_success, None, ""  # Return empty string instead of None
-
+            return True, None, ""
             
         except KeyboardInterrupt:
             logger.info("\nExecution interrupted by user")

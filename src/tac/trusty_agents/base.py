@@ -197,3 +197,46 @@ class TrustyAgent(ABC):
         return {
             name: cls.protoblock_prompt
         } 
+
+class ComparativeTrustyAgent(TrustyAgent):
+    """Base class for agents that compare states before and after changes."""
+    
+    def __init__(self):
+        super().__init__()
+        self.before_state = None
+        
+    def capture_before_state(self):
+        """Capture the initial state before any changes."""
+        self.before_state = self._capture_state()
+    
+    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
+        """Implementation of the comparative check."""
+        try:
+            # Verify we have the before state
+            if self.before_state is None:
+                return False, "No initial state captured", "Missing before state"
+            
+            # Capture after state
+            after_state = self._capture_state()
+            
+            # Get comparison criteria from protoblock
+            criteria = protoblock.trusty_agent_prompts.get(self.name, "")
+            
+            # Compare states
+            success, analysis = self._compare_states(self.before_state, after_state, criteria)
+            
+            if success:
+                return True, "", ""
+            else:
+                return False, analysis, "Comparison failed"
+                
+        except Exception as e:
+            return False, str(e), "Comparison error"
+    
+    def _capture_state(self) -> Any:
+        """Override this to capture the state for comparison."""
+        raise NotImplementedError
+        
+    def _compare_states(self, before: Any, after: Any, criteria: str) -> Tuple[bool, str]:
+        """Override this to implement the comparison logic."""
+        raise NotImplementedError 
