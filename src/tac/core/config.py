@@ -71,6 +71,7 @@ class LLMSettings:
     max_tokens: Optional[int] = None
     verify_ssl: bool = True
     timeout: int = 120
+    max_image_dimension: int = 1200  # Maximum dimension for image downscaling
 
 
 @dataclass

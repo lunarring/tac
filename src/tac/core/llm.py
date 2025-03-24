@@ -237,8 +237,9 @@ class LLMClient:
         try:
             with Image.open(image_path) as img:
                 width, height = img.size
-                if width > 800 or height > 800:
-                    scale = 800 / max(width, height)
+                max_dimension = self.config.settings.max_image_dimension
+                if width > max_dimension or height > max_dimension:
+                    scale = max_dimension / max(width, height)
                     new_width = int(width * scale)
                     new_height = int(height * scale)
                     img = img.resize((new_width, new_height))
