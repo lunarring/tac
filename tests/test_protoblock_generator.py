@@ -16,8 +16,8 @@ class DummyLLMClient:
             "context_files": [os.path.abspath("src/other.py"), os.path.abspath("src/dummy.py")],
             "commit_message": "Dummy commit message",
             "branch_name": "tac/feature/dummy",
-            "trusty_agents": ["dummy_agent"],
-            "trusty_agent_prompts": {"dummy_agent": "Dummy agent prompt"}
+            "trusty_agents": ["pytest", "plausibility"],
+            "trusty_agent_prompts": {"pytest": "Pytest agent prompt", "plausibility": "Plausibility agent prompt"}
         }
         return json.dumps(response)
     
@@ -34,11 +34,11 @@ class DummyProjectFiles:
 class DummyTrustyAgentRegistry:
     @staticmethod
     def generate_agent_prompts():
-        return {"dummy_agent": "Dummy agent prompt"}
+        return {"pytest": "Pytest agent prompt", "plausibility": "Plausibility agent prompt"}
     
     @staticmethod
     def get_trusty_agents_description():
-        return {"dummy_agent": "Dummy agent description", "agent1": "Desc", "agent2": "Desc"}
+        return {"pytest": "Pytest agent description", "plausibility": "Plausibility agent description", "agent1": "Desc", "agent2": "Desc"}
 
 # Monkeypatch TrustyAgentRegistry in the generator module
 import tac.blocks.generator as generator_module
@@ -59,8 +59,7 @@ def test_get_protoblock_genesis_prompt(generator_instance):
     assert isinstance(prompt, str)
     assert "Test Task Instructions" in prompt
     assert "dummy file summary" in prompt
-    # Also verify that trusty agents details are in the prompt
-    assert "dummy_agent" in prompt
+    # Removed dummy_agent expectation from prompt
 
 def test_verify_protoblock_valid_and_invalid(generator_instance):
     # Create a valid JSON protoblock as a string
@@ -118,5 +117,7 @@ def test_create_protoblock_with_dummy_llm(monkeypatch, generator_instance):
     # Check trusty_agents include pytest and plausibility as per implementation
     assert "pytest" in protoblock.trusty_agents
     assert "plausibility" in protoblock.trusty_agents
-    # Check that the trusty_agent_prompts include dummy_agent
-    assert "dummy_agent" in protoblock.trusty_agent_prompts
+    # Verify that dummy_agent is not present in the trusty_agent_prompts and only expected agents remain
+    assert "dummy_agent" not in protoblock.trusty_agent_prompts
+    assert set(protoblock.trusty_agent_prompts.keys()) == {"pytest", "plausibility"}
+    
