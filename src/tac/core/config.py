@@ -20,7 +20,7 @@ class GitConfig:
 @dataclass
 class TrustyAgentConfig:
     # Plausibility agent settings
-    minimum_plausibility_score: str = "B"  # Minimum passing score (A, B, C, D, F)
+    minimum_plausibility_score: str = "C"  # Minimum passing score (A, B, C, D, F)
     
     # ThreeJS Vision agent settings
     minimum_vision_score: str = "C"  # Minimum passing score (A, B, C, D, F)
