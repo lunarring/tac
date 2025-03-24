@@ -70,8 +70,8 @@ class BlockProcessor:
         else:
             # Create protoblock using generator
             
-            if error_analysis and config.general.trusty_agents.run_error_analysis:
-                genesis_prompt = f"{self.task_instructions} \n Last time we tried this, it failed, here is the error analysis, try to do it better this time! For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Here is the full report: {error_analysis}"
+            if error_analysis:
+                genesis_prompt = f"{self.task_instructions} \n You have tried to implement this before and it failed, here is the error analysis. In your next attempt, really dig into this and be explicit and do your best to AVOID the error. For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Or if there is a parameter that is undefined and throwing an error, mention it. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
             else:
                 genesis_prompt = self.task_instructions
