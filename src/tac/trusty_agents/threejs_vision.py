@@ -4,12 +4,9 @@ import sys
 import time
 import tempfile
 import subprocess
-import threading
 import logging
 from typing import Dict, Tuple, Optional, Union, Any
-import signal
 import platform
-import shutil
 import uuid
 
 from playwright.sync_api import sync_playwright
@@ -20,7 +17,13 @@ from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.trusty_agents.base import TrustyAgent, trusty_agent
 from tac.trusty_agents.pytest import ErrorAnalyzer
-from tac.utils.web_utils import verify_page_load
+from tac.utils.web_utils import (
+    verify_page_load, 
+    take_threejs_screenshot,
+    generate_unique_screenshot_path,
+    analyze_screenshot,
+    determine_vision_success
+)
 
 logger = setup_logging('tac.trusty_agents.threejs_vision')
 
@@ -50,10 +53,9 @@ class ThreeJSVisionAgent(TrustyAgent):
     def __init__(self):
         logger.info("Initializing ThreeJSVisionAgent")
         self.llm_client = LLMClient(llm_type="vision")
-        self.browser_runner = None
         self.screenshot_path = None
         self.analysis_result = None
-        self.error_analyzer = ErrorAnalyzer()  # Add error analyzer
+        self.error_analyzer = ErrorAnalyzer()
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
         """
@@ -74,9 +76,6 @@ class ThreeJSVisionAgent(TrustyAgent):
         try:
             logger.info("========== STARTING NEW THREEJS VISUAL TEST ==========")
             logger.info(f"Test initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            # Ensure we're not using cached screenshots by clearing temporary files
-            self.screenshot_path = None
-            self.analysis_result = None
             
             # Get the HTML file path to run from the protoblock directly
             app_file_path = self._get_app_file_path(protoblock)
@@ -92,54 +91,34 @@ class ThreeJSVisionAgent(TrustyAgent):
                 logger.warning("No threejs_vision prompt found in protoblock")
                 expected_visual = "Analyze what you see in the 3D scene and describe the Three.js visualization in detail."
             
-            # Run the browser and take a screenshot
-            logger.info(f"Running browser for: {app_file_path}")
-            timeout = config.general.trusty_agents.vision_timeout or 15  # Default to 15 seconds
-            screenshot_delay = config.general.trusty_agents.vision_screenshot_delay or 3  # Default to 3 seconds
+            # Create a temporary file for the screenshot
+            self.screenshot_path = generate_unique_screenshot_path()
+            file_url = f"file://{os.path.abspath(app_file_path)}"
             
-            # Create browser runner with the current settings
-            self.browser_runner = BrowserRunner(app_file_path, timeout=timeout, 
-                                                screenshot_delay=screenshot_delay)
-            
-            logger.info("Starting browser with Playwright...")
-            self.browser_runner.start_browser()
-            
-            # Check for collected errors from browser runner
-            if self.browser_runner.collected_errors:
+            # First verify the page loads correctly
+            success, errors, page = verify_page_load(file_url, timeout=30000)
+            if not success:
+                self.collected_errors.extend(errors)
                 error_analysis = self.error_analyzer.analyze_failure(
                     protoblock,
-                    "\n".join(self.browser_runner.collected_errors),
+                    "\n".join(self.collected_errors),
                     codebase
                 )
                 return False, error_analysis, "Browser errors detected"
             
-            # Get the screenshot path
-            self.screenshot_path = self.browser_runner.get_screenshot_path()
-            logger.info(f"Screenshot path: {self.screenshot_path}")
-            
-            # Delay to ensure file is fully written
-            time.sleep(1)
-            
-            # Stop the browser before checking the screenshot - prevents race conditions
-            if self.browser_runner and self.browser_runner.is_running():
-                self.browser_runner.stop_browser()
-            
-            # Check if screenshot was captured successfully
-            if not self.screenshot_path or not os.path.exists(self.screenshot_path):
-                logger.error(f"Screenshot file not found: {self.screenshot_path}")
-                return False, "Failed to capture a screenshot", "Screenshot failed"
-            
-            file_size = os.path.getsize(self.screenshot_path)
-            if file_size == 0:
-                logger.error(f"Screenshot file is empty: {self.screenshot_path}")
-                return False, f"Screenshot file is empty: {self.screenshot_path}", "Screenshot failed"
-            
-            # Log information about the screenshot
-            if hasattr(self.browser_runner, 'threejs_status'):
-                threejs_status = self.browser_runner.threejs_status
-                logger.info(f"Three.js status captured: {threejs_status}")
-            
-            logger.info(f"Screenshot file verified: {self.screenshot_path} ({file_size} bytes)")
+            # Take Three.js screenshot
+            logger.info("Taking Three.js screenshot...")
+            try:
+                self.screenshot_path = take_threejs_screenshot(page)
+                logger.info(f"Three.js screenshot saved: {self.screenshot_path}")
+            except Exception as e:
+                logger.error(f"Error taking Three.js screenshot: {e}")
+                error_analysis = self.error_analyzer.analyze_failure(
+                    protoblock,
+                    f"Failed to take screenshot: {str(e)}",
+                    codebase
+                )
+                return False, error_analysis, "Screenshot failed"
             
             # Analyze the screenshot
             logger.info("Analyzing screenshot with vision model...")
@@ -171,13 +150,13 @@ class ThreeJSVisionAgent(TrustyAgent):
             (Suggestions for improvement if needed)
             """
             
-            self.analysis_result = self._analyze_screenshot(prompt)
+            self.analysis_result = analyze_screenshot(self.screenshot_path, prompt, self.llm_client)
             # Format the prompt for logging (outside the f-string)
             formatted_prompt = prompt.strip().replace('\n', ' ')
             logger.info(f"Analysis result: {self.analysis_result} (for prompt: {formatted_prompt})")
             
             # Determine success based on the analysis result
-            success = self._determine_success(self.analysis_result)
+            success = determine_vision_success(self.analysis_result, config.general.trusty_agents.minimum_vision_score.upper())
             
             if success:
                 return True, "", ""
@@ -189,8 +168,6 @@ class ThreeJSVisionAgent(TrustyAgent):
         except Exception as e:
             logger.exception(f"Error in Three.js vision testing: {str(e)}")
             collected_errors.append(str(e))
-            if self.browser_runner and self.browser_runner.is_running():
-                self.browser_runner.stop_browser()
             
             # Use error analyzer to analyze the collected errors
             error_analysis = self.error_analyzer.analyze_failure(
@@ -338,625 +315,6 @@ class ThreeJSVisionAgent(TrustyAgent):
             logger.error(f"Error determining success from grade: {e}")
             return False
 
-    def _is_blank_screenshot(self, screenshot_path):
-        """Check if a screenshot is blank or just black"""
-        try:
-            from PIL import Image, ImageStat
-            with Image.open(screenshot_path) as img:
-                # Check if image is black or mostly black
-                stat = ImageStat.Stat(img)
-                
-                # Get image statistics
-                is_black = all(x < 20 for x in stat.mean[:3])  # RGB values very low = black
-                
-                # Sample more pixels to see if there's variation
-                sample_pixels = []
-                width, height = img.size
-                for x in range(0, width, width//20):  # Sample more points
-                    for y in range(0, height, height//20):
-                        try:
-                            sample_pixels.append(img.getpixel((x, y)))
-                        except:
-                            pass
-                
-                unique_colors = len(set(sample_pixels))
-                std_dev = stat.stddev
-                has_variation = any(x > 15 for x in std_dev[:3])  # Check for color variation
-                
-                logger.info(f"Screenshot check: is_black={is_black}, unique_colors={unique_colors}, std_dev={std_dev[:3]}, has_variation={has_variation}")
-                
-                # More sophisticated blank detection
-                # Only consider it blank if:
-                # 1. It's very dark (black) AND
-                # 2. It has very few unique colors AND
-                # 3. It has very little color variation
-                return is_black and unique_colors < 4 and not has_variation
-        except Exception as e:
-            logger.warning(f"Error checking blank screenshot: {e}")
-            return False
-
-
-class BrowserRunner:
-    def __init__(self, html_file_path, timeout=None, screenshot_delay=5):
-        """
-        Initialize the BrowserRunner with the path to the HTML file.
-        
-        Args:
-            html_file_path (str): Path to the HTML file to open
-            timeout (int, optional): Timeout in seconds after which the browser will be closed.
-                                    None means no timeout (run indefinitely until stopped manually).
-            screenshot_delay (int, optional): Delay in seconds before taking a screenshot.
-        """
-        self.html_file_path = html_file_path
-        self.running = False
-        self.timeout = timeout
-        self.timeout_thread = None
-        self.screenshot_delay = screenshot_delay
-        self.screenshot_path = None
-        self.threejs_status = None
-        self.collected_errors = []  # Add list to collect errors
-        logger.info("BrowserRunner initialized")
-        
-    def _generate_unique_screenshot_path(self):
-        """Generate a unique path for the screenshot to prevent reusing old screenshots"""
-        timestamp = int(time.time())
-        unique_id = str(uuid.uuid4())[:8]
-        fd, path = tempfile.mkstemp(prefix=f"screenshot_{timestamp}_{unique_id}_", suffix='.png')
-        os.close(fd)
-        logger.info(f"Generated unique screenshot path: {path}")
-        return path
-        
-    def start_browser(self):
-        """Start the browser and navigate to the HTML file"""
-        if self.running:
-            logger.info("Browser is already running")
-            return
-        
-        try:
-            self._start_playwright_no_thread()
-            self.running = True
-            logger.info(f"Browser started for {self.html_file_path}")
-            
-        except Exception as e:
-            logger.error(f"Error starting browser: {e}")
-            self.stop_browser()
-            self.running = False
-
-    def _start_playwright_no_thread(self):
-        """Start the browser using Playwright - thread-safe implementation"""
-        logger.info("Starting browser with Playwright (no-thread mode)")
-        
-        # Create a temporary file for the screenshot
-        self.screenshot_path = self._generate_unique_screenshot_path()
-        
-        file_url = f"file://{os.path.abspath(self.html_file_path)}"
-        logger.info(f"Target URL: {file_url}")
-        logger.info(f"Screenshot path: {self.screenshot_path}")
-        
-        try:
-            # Use a with block to ensure proper cleanup
-            with sync_playwright() as playwright:
-                # Configure launch options with much more aggressive WebGL support
-                launch_options = {
-                    "headless": True,
-                }
-                
-                # Add extreme WebGL support flags for headless mode
-                launch_options["args"] = [
-                    "--use-gl=angle",  # Try ANGLE instead of EGL
-                    "--use-angle=default",  # Default ANGLE backend
-                    "--enable-webgl",
-                    "--ignore-gpu-blocklist",
-                    "--enable-gpu-rasterization",
-                    "--enable-oop-rasterization",
-                    "--enable-zero-copy",
-                    "--disable-features=IsolateOrigins,site-per-process",
-                    "--enable-features=Vulkan",
-                    "--force-color-profile=srgb", 
-                    "--force-webgl-msaa-sample-count=4",
-                    "--force-gpu-mem-available-mb=1024",
-                    "--force-max-texture-size=16384",
-                    "--no-sandbox",
-                    "--disable-background-timer-throttling",
-                    "--disable-web-security"
-                ]
-                
-                # Try with Chromium first (best WebGL support)
-                try:
-                    browser = playwright.chromium.launch(**launch_options)
-                except Exception as e:
-                    error_msg = f"Failed to launch Chromium browser: {str(e)}"
-                    logger.error(error_msg)
-                    self.collected_errors.append(error_msg)
-                    logger.error("Browser launch error details:")
-                    logger.error(f"Launch options: {launch_options}")
-                    logger.error(f"Platform: {platform.system()} {platform.release()}")
-                    logger.error(f"Python version: {sys.version}")
-                    return
-                
-                # Create context with enhanced browser settings
-                try:
-                    context = browser.new_context(
-                        viewport={"width": 1920, "height": 1080},
-                        device_scale_factor=1,
-                        is_mobile=False,
-                        has_touch=False,
-                        locale="en-US",
-                        color_scheme="dark",  # Dark scheme for better WebGL visibility
-                        forced_colors="none",
-                        reduced_motion="no-preference"
-                    )
-                except Exception as e:
-                    error_msg = f"Failed to create browser context: {str(e)}"
-                    logger.error(error_msg)
-                    self.collected_errors.append(error_msg)
-                    browser.close()
-                    return
-                
-                # Set up error handlers before creating the page
-                page = context.new_page()
-                
-                # Navigate to page and wait for load with enhanced error handling
-                try:
-                    logger.info(f"Navigating to: {file_url}")
-                    resp = page.goto(file_url, wait_until="networkidle", timeout=30000)
-                    if not resp:
-                        self.collected_errors.append("Page navigation failed - no response received")
-                        return
-                    if resp.status >= 400:
-                        self.collected_errors.append(f"Page navigation failed with status {resp.status}")
-                        return
-                    logger.info(f"Page loaded with status: {resp.status}")
-
-                    # Use the new verify_page_load function
-                    success, errors = verify_page_load(page)
-                    if not success:
-                        self.collected_errors.extend(errors)
-                        context.close()
-                        browser.close()
-                        return
-
-                except Exception as e:
-                    error_msg = f"Page navigation or JavaScript error: {str(e)}"
-                    logger.error(error_msg)
-                    logger.error("Error details:")
-                    logger.error(f"URL: {file_url}")
-                    logger.error(f"File exists: {os.path.exists(self.html_file_path)}")
-                    logger.error(f"File permissions: {oct(os.stat(self.html_file_path).st_mode)[-3:]}")
-                    self.collected_errors.append(error_msg)
-                    context.close()
-                    browser.close()
-                    return
-                
-                # Extended wait for external scripts
-                logger.info(f"Waiting {self.screenshot_delay + 2} seconds for page to render...")
-                time.sleep(self.screenshot_delay + 2)
-                
-                # Check if the page loaded properly and if external scripts were loaded
-                resources_loaded = page.evaluate("""() => {
-                    const scripts = document.querySelectorAll('script[src]');
-                    return Array.from(scripts).map(s => ({
-                        src: s.src,
-                        loaded: s.complete === undefined ? true : s.complete
-                    }));
-                }""")
-                logger.info(f"External resources loaded: {resources_loaded}")
-                
-                # Check WebGL support status
-                webgl_status = page.evaluate("""() => {
-                    const canvas = document.createElement('canvas');
-                    let webgl2 = null;
-                    let webgl1 = null;
-                    
-                    try {
-                        webgl2 = canvas.getContext('webgl2');
-                    } catch (e) {}
-                    
-                    try {
-                        webgl1 = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                    } catch (e) {}
-                    
-                    return {
-                        webgl2Supported: !!webgl2,
-                        webgl1Supported: !!webgl1,
-                        // Get detailed WebGL capabilities if available
-                        capabilities: webgl2 || webgl1 ? {
-                            vendor: (webgl2 || webgl1).getParameter((webgl2 || webgl1).VENDOR),
-                            renderer: (webgl2 || webgl1).getParameter((webgl2 || webgl1).RENDERER),
-                            version: (webgl2 || webgl1).getParameter((webgl2 || webgl1).VERSION),
-                            shadingLanguageVersion: (webgl2 || webgl1).getParameter((webgl2 || webgl1).SHADING_LANGUAGE_VERSION),
-                            unmaskedVendor: getParameter(webgl2 || webgl1, 0x9245), // UNMASKED_VENDOR_WEBGL
-                            unmaskedRenderer: getParameter(webgl2 || webgl1, 0x9246), // UNMASKED_RENDERER_WEBGL
-                            maxTextureSize: (webgl2 || webgl1).getParameter((webgl2 || webgl1).MAX_TEXTURE_SIZE)
-                        } : null
-                    };
-                    
-                    // Helper to safely get extension parameters
-                    function getParameter(gl, param) {
-                        try {
-                            const ext = gl.getExtension('WEBGL_debug_renderer_info');
-                            return ext ? gl.getParameter(param) : null;
-                        } catch (e) {
-                            return null;
-                        }
-                    }
-                }""")
-                logger.info(f"WebGL support status: {webgl_status}")
-                
-                # Evaluate Three.js status with deeper inspection
-                logger.info("Checking Three.js status (enhanced inspection)...")
-                threejs_status = page.evaluate("""() => {
-                    try {
-                        // Check for THREE global object
-                        const hasThree = typeof THREE !== 'undefined';
-                        
-                        // Get the Three.js version if available
-                        const threeVersion = hasThree && THREE.REVISION ? THREE.REVISION : null;
-                        
-                        // Check for canvas elements
-                        const canvases = document.querySelectorAll('canvas');
-                        const canvasCount = canvases.length;
-                        
-                        // Create a map of all WebGL contexts from canvases
-                        const contexts = Array.from(canvases).map(canvas => {
-                            try {
-                                // Try to get or create WebGL context
-                                let gl = canvas.getContext('webgl2') || 
-                                         canvas.getContext('webgl') || 
-                                         canvas.getContext('experimental-webgl');
-                                         
-                                if (!gl && window.createForcedWebGLContext) {
-                                    gl = window.createForcedWebGLContext(canvas);
-                                }
-                                
-                                return {
-                                    hasContext: !!gl,
-                                    isWebGL2: gl && gl instanceof WebGL2RenderingContext,
-                                    size: gl ? [canvas.width, canvas.height] : null,
-                                    contextLost: canvas.classList.contains('OffscreenCanvas') || !!canvas.isContextLost?.()
-                                };
-                            } catch (e) {
-                                return { error: e.toString() };
-                            }
-                        });
-                        
-                        // Get canvas info with more details
-                        const canvasInfo = Array.from(canvases).map((canvas, i) => {
-                            try {
-                                const style = getComputedStyle(canvas);
-                                const rect = canvas.getBoundingClientRect();
-                                
-                                return {
-                                    index: i,
-                                    id: canvas.id || null,
-                                    className: canvas.className || null,
-                                    width: canvas.width,
-                                    height: canvas.height,
-                                    clientWidth: canvas.clientWidth,
-                                    clientHeight: canvas.clientHeight,
-                                    display: style.display,
-                                    visibility: style.visibility,
-                                    opacity: style.opacity,
-                                    inViewport: rect.top < window.innerHeight && rect.bottom > 0,
-                                    empty: isCanvasEmpty(canvas)
-                                };
-                            } catch (e) {
-                                return { index: i, error: e.toString() };
-                            }
-                        });
-                        
-                        // Function to check if canvas is empty
-                        function isCanvasEmpty(canvas) {
-                            try {
-                                const ctx = canvas.getContext('2d');
-                                if (!ctx) return null; // Can't check with 2D context
-                                
-                                const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-                                // Check if all pixels are transparent or black
-                                for (let i = 0; i < data.length; i += 4) {
-                                    // If any pixel is not transparent and not black, canvas is not empty
-                                    if (data[i+3] > 0 && (data[i] > 0 || data[i+1] > 0 || data[i+2] > 0)) {
-                                        return false;
-                                    }
-                                }
-                                return true;
-                            } catch (e) {
-                                return null; // Can't determine if canvas is empty
-                            }
-                        }
-                        
-                        // Create canvas if needed
-                        if (hasThree && canvasCount === 0) {
-                            console.log("THREE exists but no canvas found, creating one");
-                            const container = document.querySelector('#canvas-container') || document.body;
-                            const canvas = document.createElement('canvas');
-                            canvas.width = 800;
-                            canvas.height = 600;
-                            canvas.style.backgroundColor = "#000000";
-                            container.appendChild(canvas);
-                            
-                            canvasInfo.push({
-                                index: 0,
-                                width: canvas.width,
-                                height: canvas.height,
-                                display: 'block',
-                                created: true
-                            });
-                        }
-                        
-                        // Try to find THREE objects in all global properties
-                        let rendererProps = [];
-                        let sceneProps = [];
-                        let cameraProps = [];
-                        
-                        // Inspect window object for THREE.js objects
-                        for (let prop in window) {
-                            try {
-                                const obj = window[prop];
-                                if (obj && typeof obj === 'object') {
-                                    // Enhanced detection of Three.js objects
-                                    if ((obj.type === 'Scene' || (obj.isScene && obj.isScene === true)) ||
-                                        (obj.children && obj.background !== undefined)) {
-                                        sceneProps.push(prop);
-                                    }
-                                    if ((obj.type === 'WebGLRenderer' || 
-                                        (obj.domElement && obj.domElement.tagName === 'CANVAS')) ||
-                                        (obj.render && obj.setSize && obj.domElement)) {
-                                        rendererProps.push(prop);
-                                    }
-                                    if ((obj.type === 'PerspectiveCamera' || 
-                                        (obj.isPerspectiveCamera && obj.isPerspectiveCamera === true)) ||
-                                        (obj.aspect && obj.fov && obj.position && obj.lookAt)) {
-                                        cameraProps.push(prop);
-                                    }
-                                }
-                            } catch (e) { /* ignore errors when accessing properties */ }
-                        }
-                        
-                        // Collect any WebGL errors
-                        const webglErrors = window.webGLDebug ? window.webGLDebug.errors : [];
-                        
-                        return {
-                            hasThree: hasThree,
-                            threeVersion: threeVersion,
-                            hasScene: Boolean(window.scene || document.querySelector('canvas') || sceneProps.length > 0),
-                            hasRenderer: Boolean(window.renderer || rendererProps.length > 0),
-                            hasCamera: Boolean(window.camera || cameraProps.length > 0),
-                            documentReady: document.readyState,
-                            canvasCount: document.querySelectorAll('canvas').length,
-                            canvasInfo: canvasInfo,
-                            contextStatus: contexts,
-                            rendererProps: rendererProps,
-                            sceneProps: sceneProps,
-                            cameraProps: cameraProps,
-                            webglErrors: webglErrors
-                        };
-                    } catch(e) {
-                        return {error: e.message, stack: e.stack};
-                    }
-                }""")
-                logger.info(f"Three.js status: {threejs_status}")
-                self.threejs_status = threejs_status
-                
-                # Execute common Three.js initialization functions
-                if 'hasThree' in threejs_status and threejs_status['hasThree'] and not threejs_status.get('hasRenderer'):
-                    logger.info("THREE.js is loaded but no renderer found, trying to execute init functions")
-                    try:
-                        # Try to execute any animations or init functions
-                        page.evaluate("""() => {
-                            try {
-                                // Look for common function names in Three.js applications
-                                const commonFuncs = ['init', 'animate', 'render', 'start', 'setup', 'main'];
-                                for (let funcName of commonFuncs) {
-                                    if (typeof window[funcName] === 'function') {
-                                        console.log(`Calling ${funcName} function`);
-                                        window[funcName]();
-                                        return `Executed ${funcName} function`;
-                                    }
-                                }
-                                
-                                // If no common functions, create basic scene
-                                return 'No applicable functions found';
-                            } catch(e) {
-                                return `Error executing init functions: ${e.message}`;
-                            }
-                        }""")
-                    except Exception as e:
-                        logger.error(f"Error executing init functions: {e}")
-                
-                # Create a basic Three.js scene if still no renderer found
-                if not threejs_status.get('hasRenderer', False):
-                    logger.info("No renderer detected - NOT creating a fallback scene")
-                    # We no longer create a fallback scene as it interferes with testing
-                    # Instead, we'll let the test fail naturally if the renderer is missing
-                    logger.info("If renderer is missing, this likely indicates a problem with the Three.js code")
-                
-                # Prepare the scene for rendering with more aggressive approach
-                logger.info("Preparing scene for rendering...")
-                scene_info = page.evaluate("""() => {
-                    try {
-                        // Resize any existing canvases
-                        const canvases = document.querySelectorAll('canvas');
-                        canvases.forEach(canvas => {
-                            // Ensure canvas is visible
-                            if (canvas.style.display === 'none') {
-                                canvas.style.display = 'block';
-                            }
-                            // Ensure canvas has dimensions
-                            if (canvas.width === 0 || canvas.height === 0) {
-                                canvas.width = Math.max(canvas.clientWidth, 800);
-                                canvas.height = Math.max(canvas.clientHeight, 600);
-                                console.log(`Resized canvas to ${canvas.width}x${canvas.height}`);
-                            }
-                        });
-                        
-                        // Force animation frame to run
-                        if (window.requestAnimationFrame) {
-                            window.requestAnimationFrame(() => {});
-                        }
-                        
-                        // Try to find renderer, scene, and camera
-                        let rendererFound = false;
-                        
-                        // First try standard global variables
-                        if (window.renderer && window.scene && window.camera) {
-                            console.log('Found standard globals');
-                            window.renderer.render(window.scene, window.camera);
-                            rendererFound = true;
-                        }
-                        
-                        // If not found, try to call animate
-                        if (!rendererFound && typeof window.animate === 'function') {
-                            console.log('Calling animate function');
-                            window.animate();
-                            rendererFound = true;
-                        }
-                        
-                        return {
-                            renderingSucceeded: rendererFound,
-                            canvasCount: document.querySelectorAll('canvas').length,
-                            hasGlobalRenderer: Boolean(window.renderer),
-                            hasGlobalScene: Boolean(window.scene),
-                            hasGlobalCamera: Boolean(window.camera)
-                        };
-                    } catch(e) {
-                        return {error: e.message, stack: e.stack};
-                    }
-                }""")
-                logger.info(f"Scene preparation: {scene_info}")
-                
-                # Wait for rendering to complete
-                logger.info("Waiting for rendering to complete...")
-                time.sleep(2)
-                
-                # Force a final render with multiple attempts
-                logger.info("Forcing final render...")
-                render_result = page.evaluate("""() => {
-                    const results = {};
-                    
-                    // Approach 1: Standard render
-                    try {
-                        if (window.renderer && window.scene && window.camera) {
-                            window.renderer.render(window.scene, window.camera);
-                            results.standardRender = true;
-                        } else {
-                            results.standardRender = false;
-                        }
-                    } catch(e) {
-                        results.standardRenderError = e.message;
-                    }
-                    
-                    return results;
-                }""")
-                logger.info(f"Final render results: {render_result}")
-                
-                # Add a special WebGL rendering enforcer before taking the screenshot
-                logger.info("Applying WebGL render enforcement for better page screenshots...")
-                try:
-                    # Force more aggressive rendering with direct WebGL commands
-                    page.evaluate("""() => {
-                        try {
-                            // Try multiple rendering techniques
-                            const canvases = document.querySelectorAll('canvas');
-                            canvases.forEach(canvas => {
-                                try {
-                                    // Ensure canvas is visible and sized properly
-                                    canvas.style.visibility = 'visible';
-                                    canvas.style.opacity = '1';
-                                    canvas.style.display = 'block';
-                                    
-                                    // Make sure it has size if needed
-                                    if (canvas.width === 0 || canvas.height === 0) {
-                                        canvas.width = Math.max(canvas.clientWidth, 800);
-                                        canvas.height = Math.max(canvas.clientHeight, 600);
-                                    }
-                                    
-                                    // Try to force a render
-                                    if (window.renderer && window.renderer.render) {
-                                        window.renderer.render(window.scene, window.camera);
-                                    }
-                                } catch (e) {
-                                    console.error('Error preparing canvas:', e);
-                                }
-                            });
-                            
-                            // Add a slight delay to ensure the render completes
-                            return new Promise(resolve => {
-                                setTimeout(() => {
-                                    // Force one final animation frame
-                                    requestAnimationFrame(() => {
-                                        requestAnimationFrame(() => {
-                                            resolve('WebGL rendering enforced');
-                                        });
-                                    });
-                                }, 500);
-                            });
-                        } catch (e) {
-                            return `Error enforcing WebGL render: ${e.message}`;
-                        }
-                    }""")
-                    
-                    # Small wait after enforcing
-                    time.sleep(0.5)
-                except Exception as e:
-                    logger.warning(f"Error in WebGL render enforcement: {e}")
-                
-                # Skip canvas screenshot and just take page screenshot directly
-                logger.info("Taking page screenshot (skipping canvas screenshot attempt)...")
-                try:
-                    page.screenshot(path=self.screenshot_path)
-                    logger.info(f"Page screenshot saved: {self.screenshot_path}")
-                except Exception as e:
-                    logger.error(f"Error taking page screenshot: {e}")
-                
-                # Close the browser
-                logger.info("Closing Playwright browser...")
-                context.close()
-                browser.close()
-                
-                # Set screenshot complete flag
-                self.screenshot_complete = True
-                
-        except Exception as e:
-            logger.error(f"Error in Playwright session: {e}")
-            self.screenshot_complete = True  # Mark as complete even on error
-
-    def get_screenshot_path(self):
-        """Get the path to the saved screenshot"""
-        return self.screenshot_path
-    
-    def _timeout_monitor(self):
-        """Monitor the timeout and stop the browser when reached"""
-        if self.timeout is None:
-            return
-            
-        time.sleep(self.timeout)
-        if self.running:
-            logger.info(f"Timeout of {self.timeout} seconds reached. Stopping browser...")
-            self.stop_browser()
-    
-    def stop_browser(self):
-        """Stop the browser"""
-        if not self.running:
-            logger.info("No browser is running")
-            return
-        
-        try:
-            logger.info("Stopping browser...")
-            
-            # For Playwright with no-thread approach, browser is already closed
-            logger.info("Playwright browser already closed (no thread mode)")
-            self.running = False
-            logger.info("Browser stopped")
-            
-        except Exception as e:
-            logger.error(f"Error stopping browser: {e}")
-            self.running = False
-    
-    def is_running(self):
-        """Check if the browser is currently running"""
-        return self.running
-
 
 def main():
     """Main function to demonstrate usage"""
@@ -1090,11 +448,6 @@ def main():
         print(f"Error running test: {str(e)}")
         import traceback
         traceback.print_exc()
-    finally:
-        # Ensure browser is stopped
-        if agent.browser_runner and agent.browser_runner.is_running():
-            print("Stopping browser...")
-            agent.browser_runner.stop_browser()
     
     print("Done!")
 

@@ -5,6 +5,9 @@ import os
 import sys
 import platform
 import subprocess
+import tempfile
+import uuid
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -45,216 +48,235 @@ def get_browser_context_options() -> Dict:
         "reduced_motion": "no-preference"
     }
 
-def verify_page_load(url: str, timeout: int = 30000) -> Tuple[bool, List[str], Optional[Page]]:
+def verify_page_load(page: Page, timeout: int = 30000) -> Tuple[bool, List[str], Optional[Page]]:
     """
-    Verify if a webpage has loaded correctly by checking for JavaScript errors,
-    resource loading failures, and page status.
+    Verify that a page loads correctly and is ready for interaction.
     
     Args:
-        url: URL or file path to load
-        timeout: Timeout in milliseconds (default: 30000)
+        page: The Playwright Page object to verify
+        timeout: Maximum time to wait for page load in milliseconds
         
     Returns:
-        tuple containing:
-        - bool: True if page loaded successfully, False otherwise
-        - list[str]: List of collected errors if any
+        Tuple containing:
+        - bool: True if page loaded successfully
+        - List[str]: Any errors encountered
         - Optional[Page]: The page object if successful, None otherwise
     """
     collected_errors = []
-    page = None
-    browser = None
-    context = None
-    playwright = None
-
     try:
-        playwright = sync_playwright().start()
-        # Launch browser with enhanced WebGL support
-        browser = playwright.chromium.launch(**get_browser_launch_options())
-        context = browser.new_context(**get_browser_context_options())
-        page = context.new_page()
-
-        def handle_console(msg):
-            if msg.type == "error":
-                error_msg = f"Console error: {msg.text}"
-                logger.error(error_msg)
-                if any(x in msg.text.lower() for x in [
-                    "is not defined", "undefined", "cannot read properties",
-                    "syntax error", "reference error", "type error",
-                    "failed to load resource", "refused to execute script",
-                    "mime type"
-                ]):
-                    collected_errors.append(error_msg)
-                    return False
-            return True
-
-        def handle_page_error(err):
-            error_msg = f"Page error: {err}"
-            logger.error(error_msg)
-            if any(x in str(err).lower() for x in [
-                "is not defined", "undefined", "cannot read properties",
-                "syntax error", "reference error", "type error"
-            ]):
-                collected_errors.append(error_msg)
-                return False
-            return True
-
-        def handle_request_failed(request):
-            try:
-                error_text = request.failure.get('errorText', 'Unknown error')
-                error_msg = f"Request failed: {request.url} - {error_text}"
-                logger.error(error_msg)
-                if request.resource_type in ["script", "stylesheet"]:
-                    collected_errors.append(error_msg)
-                    return False
-            except Exception as e:
-                error_msg = f"Error handling request failure: {str(e)}"
-                logger.error(error_msg)
-                collected_errors.append(error_msg)
-                return False
-            return True
-
-        # Set up error handlers
-        page.on("console", handle_console)
-        page.on("pageerror", handle_page_error)
-        page.on("requestfailed", handle_request_failed)
-
-        # Navigate to the page
-        logger.info(f"Navigating to: {url}")
-        resp = page.goto(url, wait_until="networkidle", timeout=timeout)
+        # Wait for the page to be ready
+        page.wait_for_load_state("networkidle", timeout=timeout)
         
-        if not resp:
-            collected_errors.append("Page navigation failed - no response received")
-            return False, collected_errors, None
-            
-        if resp.status >= 400:
-            collected_errors.append(f"Page navigation failed with status {resp.status}")
-            return False, collected_errors, None
-
         # Check for JavaScript errors
         js_errors = page.evaluate("""() => {
-            const errors = [];
-            if (window.onerror) {
-                const originalOnError = window.onerror;
-                window.onerror = function(msg, url, line, col, error) {
-                    errors.push({
-                        message: msg,
-                        url: url,
-                        line: line,
-                        column: col,
-                        error: error ? error.toString() : null,
-                        stack: error ? error.stack : null
-                    });
-                    return originalOnError.apply(this, arguments);
-                };
-            }
-            return errors;
+            return window.errors || [];
         }""")
-
         if js_errors:
-            for error in js_errors:
-                error_msg = f"JavaScript error: {error.get('message')}"
-                if error.get('url'):
-                    error_msg += f" at {error.get('url')}:{error.get('line')}:{error.get('column')}"
-                if error.get('stack'):
-                    error_msg += f"\nStack trace:\n{error.get('stack')}"
-                collected_errors.append(error_msg)
-
+            collected_errors.extend(js_errors)
+            
+        # Check for failed requests
+        failed_requests = page.evaluate("""() => {
+            return window.failedRequests || [];
+        }""")
+        if failed_requests:
+            collected_errors.extend(failed_requests)
+            
+        # Check if the page is responsive
+        try:
+            page.evaluate("""() => {
+                return document.readyState === 'complete';
+            }""")
+        except Exception as e:
+            collected_errors.append(f"Page not fully loaded: {str(e)}")
+            
         return len(collected_errors) == 0, collected_errors, page
-
+        
     except Exception as e:
-        error_msg = f"Error during page verification: {str(e)}"
+        error_msg = f"Error verifying page load: {str(e)}"
         logger.error(error_msg)
         collected_errors.append(error_msg)
         return False, collected_errors, None
 
+def take_page_screenshot(page: Page, output_dir: Optional[str] = None) -> str:
+    """
+    Take a screenshot of a webpage and return the file path.
+    
+    Args:
+        page: Playwright Page object
+        output_dir: Optional directory to save the screenshot in. If not provided,
+                   a temporary directory will be used.
+        
+    Returns:
+        str: Path to the saved screenshot file
+        
+    Raises:
+        Exception: If screenshot fails to be taken
+    """
+    try:
+        # Generate unique filename
+        timestamp = int(time.time())
+        unique_id = str(uuid.uuid4())[:8]
+        
+        # Create output directory if specified
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+            screenshot_path = os.path.join(output_dir, f"screenshot_{timestamp}_{unique_id}.png")
+        else:
+            fd, screenshot_path = tempfile.mkstemp(prefix=f"screenshot_{timestamp}_{unique_id}_", suffix='.png')
+            os.close(fd)
+        
+        logger.info(f"Taking screenshot, saving to: {screenshot_path}")
+        
+        # Take the screenshot
+        page.screenshot(path=screenshot_path)
+        
+        # Verify the screenshot was created and has content
+        if not os.path.exists(screenshot_path):
+            raise Exception(f"Screenshot file was not created at {screenshot_path}")
+            
+        file_size = os.path.getsize(screenshot_path)
+        if file_size == 0:
+            raise Exception(f"Screenshot file is empty: {screenshot_path}")
+            
+        logger.info(f"Screenshot saved successfully: {screenshot_path} ({file_size} bytes)")
+        return screenshot_path
+        
+    except Exception as e:
+        error_msg = f"Failed to take screenshot: {str(e)}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
+def verify_page_load_with_browser(url: str, timeout: int = 30000) -> Tuple[bool, List[str], Optional[Page]]:
+    """
+    Launch a browser, navigate to a URL, and verify the page load.
+    
+    Args:
+        url: The URL to navigate to
+        timeout: Maximum time to wait for page load in milliseconds
+        
+    Returns:
+        Tuple containing:
+        - bool: True if page loaded successfully
+        - List[str]: Any errors encountered
+        - Optional[Page]: The page object if successful, None otherwise
+    """
+    playwright = None
+    browser = None
+    context = None
+    page = None
+    
+    try:
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+        
+        # Navigate to the URL
+        response = page.goto(url, wait_until="networkidle", timeout=timeout)
+        if not response:
+            return False, ["Failed to get response from page"], None
+            
+        if not response.ok:
+            return False, [f"Page returned status code {response.status}"], None
+            
+        # Verify the page load
+        return verify_page_load(page, timeout)
+        
+    except Exception as e:
+        error_msg = f"Failed to load page: {str(e)}"
+        logger.error(error_msg)
+        return False, [error_msg], None
+        
     finally:
-        # Clean up resources in reverse order of creation
+        # Clean up resources in reverse order
         if context:
             try:
                 context.close()
             except Exception as e:
-                logger.warning(f"Error closing context: {e}")
+                logger.error(f"Error closing context: {e}")
+                
         if browser:
             try:
                 browser.close()
             except Exception as e:
-                logger.warning(f"Error closing browser: {e}")
+                logger.error(f"Error closing browser: {e}")
+                
         if playwright:
             try:
                 playwright.stop()
             except Exception as e:
-                logger.warning(f"Error stopping playwright: {e}")
+                logger.error(f"Error stopping playwright: {e}")
 
 if __name__ == "__main__":
-    """Example usage of verify_page_load"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Test webpage loading verification')
-    parser.add_argument('--html_file', default='index.html', 
-                       help='Path to the HTML file to test')
-    parser.add_argument('--timeout', type=int, default=10, 
-                       help='Timeout in seconds (default: 10)')
+    parser = argparse.ArgumentParser(description='Test webpage loading and screenshot functionality')
+    parser.add_argument('--html_file', required=True, help='Path to HTML file to test')
+    parser.add_argument('--timeout', type=int, default=30000, help='Timeout in milliseconds (default: 30000)')
+    parser.add_argument('--output_dir', help='Directory to save screenshot (optional)')
     
     args = parser.parse_args()
     
-    # Check if Playwright is available
-    try:
-        from playwright.sync_api import sync_playwright
-        print("Playwright is available")
-    except ImportError:
-        print("ERROR: Playwright is not installed.")
-        print("Install with: pip install playwright")
-        print("Then: playwright install chromium")
-        sys.exit(1)
+    # Convert file path to URL
+    file_url = f"file://{os.path.abspath(args.html_file)}"
     
-    # Ensure Playwright browsers are installed
+    playwright = None
+    browser = None
+    context = None
+    page = None
+    
     try:
-        print("Ensuring Playwright browsers are installed...")
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+        
+        # Navigate to the URL
+        response = page.goto(file_url, wait_until="networkidle", timeout=args.timeout)
+        if not response:
+            print("Failed to get response from page")
+            sys.exit(1)
+            
+        if not response.ok:
+            print(f"Page returned status code {response.status}")
+            sys.exit(1)
+            
+        # Verify the page load
+        success, errors, page = verify_page_load(page, args.timeout)
+        if not success:
+            print("Failed to load page:")
+            for error in errors:
+                print(f"- {error}")
+            sys.exit(1)
+        
+        # Take screenshot
         try:
-            with sync_playwright() as p:
-                if p.chromium:
-                    print("Playwright browsers already installed")
-                else:
-                    raise Exception("Playwright browsers not installed")
+            screenshot_path = take_page_screenshot(page, args.output_dir)
+            print(f"Screenshot saved to: {screenshot_path}")
         except Exception as e:
-            print(f"Installing Playwright browsers: {e}")
-            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
-            print("Playwright browsers installed successfully")
+            print(f"Failed to take screenshot: {e}")
+            sys.exit(1)
+            
     except Exception as e:
-        print(f"Warning: Could not verify or install Playwright browsers: {e}")
-        print("If you encounter errors, run 'playwright install chromium' manually")
-    
-    html_file = args.html_file
-    
-    # Check if the HTML file exists
-    if not os.path.exists(html_file):
-        print(f"Error: HTML file not found at {html_file}")
-        print(f"Current working directory: {os.getcwd()}")
-        print("Available files in current directory:")
-        for file in os.listdir('.'):
-            if file.endswith('.html'):
-                print(f" - {file}")
+        print(f"Error: {e}")
         sys.exit(1)
-    
-    # Print configuration messages
-    print(f"Testing webpage loading verification with {html_file}")
-    print(f"Timeout: {args.timeout} seconds")
-    print("Mode: Headless")
-    print("Engine: Playwright")
-    
-    if platform.system() == 'Darwin':
-        print("NOTE: Using specialized WebGL settings for macOS headless mode")
-    
-    # Use the verify_page_load function
-    file_url = f"file://{os.path.abspath(html_file)}"
-    success, errors, page = verify_page_load(file_url, timeout=args.timeout * 1000)
-    
-    if success:
-        print("\nSuccess! Page loaded correctly with no errors.")
-    else:
-        print("\nError: Page loaded with issues:")
-        for error in errors:
-            print(f"- {error}")
-        sys.exit(1)
-    
-    print("\nDone!") 
+        
+    finally:
+        # Clean up resources in reverse order
+        if context:
+            try:
+                context.close()
+            except Exception as e:
+                logger.error(f"Error closing context: {e}")
+                
+        if browser:
+            try:
+                browser.close()
+            except Exception as e:
+                logger.error(f"Error closing browser: {e}")
+                
+        if playwright:
+            try:
+                playwright.stop()
+            except Exception as e:
+                logger.error(f"Error stopping playwright: {e}") 
