@@ -462,17 +462,18 @@ class CustomReporter:
             if report.nodeid not in self.test_functions:
                 self.test_functions.append(report.nodeid)
             
+            # Update results based on the report outcome
             if report.passed:
                 self.results['passed'] += 1
             elif report.failed:
                 self.results['failed'] += 1
             elif report.skipped:
                 self.results['skipped'] += 1
-        if hasattr(report, 'longrepr'):
-            if report.longrepr:
+                
+            # Add the report to output lines if it has a longrepr
+            if hasattr(report, 'longrepr') and report.longrepr:
                 self.output_lines.append(str(report.longrepr))
     
-    # Add a hook to capture test collection
     def pytest_collectreport(self, report):
         if report.result:
             for item in report.result:
