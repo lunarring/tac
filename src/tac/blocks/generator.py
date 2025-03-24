@@ -244,7 +244,6 @@ Now you have to decide which trusty agent you are using. Since we are using trus
                 if file_path.startswith("tests/"):
                     # Test files must follow pattern 'test_*.py'
                     if not file_path.startswith("tests/test_"):
-                    # if not file_path.startswith("tests/test_") or not file_path.endswith(".py"):
                         return False, f"Files in tests/ directory must follow pattern 'test_*.py', found: {file_path}", None
                     # No subfolders allowed in tests/
                     if file_path.count("/") > 1:
@@ -353,7 +352,7 @@ Now you have to decide which trusty agent you are using. Since we are using trus
                     logger.info(f"📚 Context Files: {', '.join(protoblock.context_files)}")
                     logger.info(f"💬 Commit Message: {protoblock.commit_message}")
                     logger.info(f"🤖 Trusty Agents: {', '.join(protoblock.trusty_agents)}")
-                    logger.info(f"🔍 Trusty Agent Prompts: {len(protoblock.trusty_agent_prompts)} prompts defined")
+                    logger.info(f"🔍 Trusty Agent Prompts: {json.dumps(protoblock.trusty_agent_prompts, indent=2)}")
                     logger.info("🚀 Starting protoblock execution...\n")
                     return protoblock
                 except KeyError as e:
