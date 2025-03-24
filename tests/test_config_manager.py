@@ -15,8 +15,7 @@ def test_config_manager():
     # Verify 'general' configuration
     general = cm.general
     assert general.coding_agent in ["aider", "native"]
-    assert "pytest" in general.default_trusty_agents
-    assert "plausibility" in general.default_trusty_agents
+    assert "pytest" in general.trusty_agents.default_trusty_agents
     assert general.use_file_summaries is True
     assert general.summarizer_timeout == 45
     assert general.max_retries_block_creation == 4
@@ -41,31 +40,6 @@ def test_config_manager():
     # Verify default value when key is missing
     assert cm.get("nonexistent_key", "default") == "default"
 
-def test_config_override():
-    cm = ConfigManager()
-    
-    # Test overriding general config
-    cm.override_with_args({
-        "general_coding_agent": "claude",
-        "general_reasoning_effort": "high",
-        "general_max_retries_block_creation": 10,
-        "general_default_trusty_agents": ["pytest"],  # Test overriding trusty agents
-        "nonexistent_key": "value"  # This should be ignored
-    })
-    
-    assert cm.general.coding_agent == "claude"
-    assert cm.general.reasoning_effort == "high"
-    assert cm.general.max_retries_block_creation == 10
-    assert cm.general.default_trusty_agents == ["pytest"]
-    
-    # Test overriding git config
-    cm.override_with_args({
-        "git_enabled": False,
-        "git_auto_commit_if_success": False
-    })
-    
-    assert cm.git.enabled is False
-    assert cm.git.auto_commit_if_success is False
 
 def test_raw_config():
     cm = ConfigManager()

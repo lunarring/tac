@@ -34,7 +34,7 @@ class ProtoBlock:
     def __post_init__(self):
         # Set default value for trusty_agents from config if None
         if self.trusty_agents is None:
-            self.trusty_agents = config.general.default_trusty_agents
+            self.trusty_agents = config.general.trusty_agents.default_trusty_agents
         
         # Set default empty dict for trusty_agent_prompts if None
         if self.trusty_agent_prompts is None:
@@ -77,7 +77,7 @@ class ProtoBlock:
         context_files = version_data.get('context_files', [])
         commit_message = version_data.get('commit_message', '')
         branch_name = version_data.get('branch_name', '')
-        trusty_agents = version_data.get('trusty_agents', config.general.default_trusty_agents)
+        trusty_agents = version_data.get('trusty_agents', config.general.trusty_agents.default_trusty_agents)
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
         
         # Create and return the ProtoBlock
