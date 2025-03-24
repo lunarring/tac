@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import logging
 import requests
 from PIL import Image
+from io import BytesIO
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 from tac.core.log_config import setup_logging
@@ -232,28 +233,42 @@ class LLMClient:
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
-        # Encode image to base64
+        # Process image with downscaling if needed and encode to base64
         try:
-            # Read the image directly without processing
-            with open(image_path, "rb") as image_file:
-                image_bytes = image_file.read()
+            with Image.open(image_path) as img:
+                width, height = img.size
+                if width > 800 or height > 800:
+                    scale = 800 / max(width, height)
+                    new_width = int(width * scale)
+                    new_height = int(height * scale)
+                    img = img.resize((new_width, new_height), Image.ANTIALIAS)
+                    logger.info(f"Image downscaled from ({width}x{height}) to ({new_width}x{new_height}).")
+                else:
+                    logger.info(f"Image size ({width}x{height}) within limits, no downscaling applied.")
                 
-            # Determine image format from file extension
-            image_ext = os.path.splitext(image_path)[1].lower()
-            if image_ext in ['.jpg', '.jpeg']:
-                mime_type = 'image/jpeg'
-            elif image_ext == '.png':
-                mime_type = 'image/png'
-            else:
-                # Default to JPEG if unknown
-                mime_type = 'image/jpeg'
+                # Determine image format from file extension
+                image_ext = os.path.splitext(image_path)[1].lower()
+                if image_ext in ['.jpg', '.jpeg']:
+                    mime_type = 'image/jpeg'
+                    image_format = 'JPEG'
+                elif image_ext == '.png':
+                    mime_type = 'image/png'
+                    image_format = 'PNG'
+                else:
+                    # Default to JPEG if unknown
+                    mime_type = 'image/jpeg'
+                    image_format = 'JPEG'
+                
+                buffer = BytesIO()
+                img.save(buffer, format=image_format)
+                image_bytes = buffer.getvalue()
                 
             # Encode to base64
             base64_image = base64.b64encode(image_bytes).decode('utf-8')
             logger.info(f"Image encoded successfully: {image_path} as {mime_type}")
             
         except Exception as e:
-            error_msg = f"Failed to encode image: {str(e)}"
+            error_msg = f"Failed to process and encode image: {str(e)}"
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
