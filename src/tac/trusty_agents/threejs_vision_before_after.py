@@ -59,6 +59,38 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
         """Set the protoblock for use in state capture."""
         self.protoblock = protoblock
 
+    def _ensure_browser(self):
+        """Ensure browser resources are available and properly initialized."""
+        try:
+            if not self.playwright:
+                self.playwright = sync_playwright().start()
+                self.browser = self.playwright.chromium.launch(headless=True)
+                self.context = self.browser.new_context()
+                self.page = self.context.new_page()
+            elif not self.page:
+                # If page is closed but other resources exist, create a new page
+                self.page = self.context.new_page()
+        except Exception as e:
+            logger.error(f"Error ensuring browser: {e}")
+            self._cleanup_browser()
+            raise
+
+    def _cleanup_browser(self):
+        """Clean up browser resources."""
+        try:
+            if self.context:
+                self.context.close()
+                self.context = None
+            if self.browser:
+                self.browser.close()
+                self.browser = None
+            if self.playwright:
+                self.playwright.stop()
+                self.playwright = None
+            self.page = None
+        except Exception as e:
+            logger.error(f"Error cleaning up browser: {e}")
+
     def _capture_state(self) -> str:
         """
         Capture a screenshot of the current state.
@@ -75,12 +107,8 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             if not os.path.exists(app_file_path):
                 raise ValueError(f"HTML file not found: {app_file_path}")
             
-            # Launch browser if not already running
-            if not self.playwright:
-                self.playwright = sync_playwright().start()
-                self.browser = self.playwright.chromium.launch(headless=True)
-                self.context = self.browser.new_context()
-                self.page = self.context.new_page()
+            # Ensure browser is ready
+            self._ensure_browser()
             
             # Navigate to URL
             file_url = f"file://{os.path.abspath(app_file_path)}"
@@ -102,6 +130,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             
         except Exception as e:
             logger.exception(f"Error capturing state: {str(e)}")
+            self._cleanup_browser()  # Clean up on error
             raise
 
     def capture_before_state(self) -> None:
@@ -157,16 +186,34 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             if not expected_changes:
                 expected_changes = "Analyze the visual differences between the before and after states."
             
-            # Analyze the comparison
-            prompt = f"The left side is the before state and the right side is the after state. Analyze this side-by-side comparison with the expected changes: {expected_changes}"
+            # Create a detailed prompt for analysis
+            prompt = f"""Analyze this side-by-side comparison of a Three.js application:
+- Left side shows the before state
+- Right side shows the after state
+- Expected changes: {expected_changes}
+
+Please provide:
+1. GRADE: [A-F] - Overall grade for the implementation
+2. ANALYSIS: Detailed explanation of what changed and why the grade was given
+3. IMPROVEMENTS: Specific suggestions for improvement if grade is below A
+
+Focus on:
+- Visual accuracy of the changes
+- Implementation completeness
+- Quality of the visual elements
+- Any unexpected or missing changes"""
+            
             logger.info(f"Analyzing comparison with prompt: {prompt}")
             self.analysis_result = analyze_screenshot(self.comparison_path, prompt, self.llm_client)
             
-            # Determine success
-            success = determine_vision_success(self.analysis_result, config.general.trusty_agents.minimum_vision_score.upper())
+            # Log the detailed analysis
+            logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
+            
+            # Determine success with minimum grade B
+            success = determine_vision_success(self.analysis_result, "B")
             
             if success:
-                return True, "", ""
+                return True, self.analysis_result, ""
             else:
                 return False, self.analysis_result, "Visual comparison failed"
             
@@ -175,24 +222,8 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             return False, str(e), "Visual comparison error"
             
         finally:
-            # Clean up resources
-            if self.context:
-                try:
-                    self.context.close()
-                except Exception as e:
-                    logger.error(f"Error closing context: {e}")
-                    
-            if self.browser:
-                try:
-                    self.browser.close()
-                except Exception as e:
-                    logger.error(f"Error closing browser: {e}")
-                    
-            if self.playwright:
-                try:
-                    self.playwright.stop()
-                except Exception as e:
-                    logger.error(f"Error stopping playwright: {e}")
+            # Clean up browser resources
+            self._cleanup_browser()
 
     def _get_app_file_path(self, protoblock: ProtoBlock) -> Optional[str]:
         """
