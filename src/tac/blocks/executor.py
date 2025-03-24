@@ -106,6 +106,8 @@ class BlockExecutor:
         for agent in comparative_agents:
             try:
                 logger.info(f"Capturing initial state for {agent.__class__.__name__}")
+                if hasattr(agent, 'set_protoblock'):
+                    agent.set_protoblock(self.protoblock)
                 agent.capture_before_state()
             except Exception as e:
                 logger.error(f"Failed to capture initial state for {agent.__class__.__name__}: {e}")
