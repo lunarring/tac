@@ -12,6 +12,46 @@ from tac.core.llm import Message
 
 logger = logging.getLogger(__name__)
 
+# Check if Playwright is installed
+PLAYWRIGHT_AVAILABLE = False
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+    logger.info("Playwright is available for WebGL screenshot support")
+except ImportError:
+    logger.error("Playwright not found. Cannot take screenshots.")
+    logger.error("Install Playwright: pip install playwright")
+    logger.error("Then: playwright install chromium")
+
+def ensure_playwright_installed():
+    """Ensure Playwright browsers are installed."""
+    if not PLAYWRIGHT_AVAILABLE:
+        print("ERROR: Playwright is not installed.")
+        print("Install with: pip install playwright")
+        print("Then: playwright install chromium")
+        return False
+        
+    try:
+        print("Ensuring Playwright browsers are installed...")
+        try:
+            # Check if browsers are already installed
+            with sync_playwright() as p:
+                if p.chromium:
+                    print("Playwright browsers already installed")
+                    return True
+                else:
+                    raise Exception("Playwright browsers not installed")
+            
+        except Exception as e:
+            print(f"Installing Playwright browsers: {e}")
+            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+            print("Playwright browsers installed successfully")
+            return True
+    except Exception as e:
+        print(f"Warning: Could not verify or install Playwright browsers: {e}")
+        print("If you encounter errors, run 'playwright install chromium' manually")
+        return False
+
 def get_browser_launch_options() -> Dict:
     """Get browser launch options with enhanced WebGL support"""
     return {

@@ -23,21 +23,12 @@ from tac.utils.web_utils import (
     generate_unique_screenshot_path,
     analyze_screenshot,
     determine_vision_success,
-    verify_page_load_with_browser
+    verify_page_load_with_browser,
+    PLAYWRIGHT_AVAILABLE,
+    ensure_playwright_installed
 )
 
 logger = setup_logging('tac.trusty_agents.threejs_vision')
-
-# Check if Playwright is installed
-PLAYWRIGHT_AVAILABLE = False
-try:
-    from playwright.sync_api import sync_playwright
-    PLAYWRIGHT_AVAILABLE = True
-    logger.info("Playwright is available for WebGL screenshot support")
-except ImportError:
-    logger.error("Playwright not found. Cannot take screenshots.")
-    logger.error("Install Playwright: pip install playwright")
-    logger.error("Then: playwright install chromium")
 
 @trusty_agent(
     name="threejs_vision",
@@ -295,33 +286,9 @@ def main():
     
     args = parser.parse_args()
     
-    # Check if Playwright is available
-    if not PLAYWRIGHT_AVAILABLE:
-        print("ERROR: Playwright is not installed.")
-        print("Install with: pip install playwright")
-        print("Then: playwright install chromium")
+    # Check if Playwright is available and installed
+    if not ensure_playwright_installed():
         return
-    
-    # Ensure Playwright browsers are installed
-    try:
-        print("Ensuring Playwright browsers are installed...")
-        import subprocess
-        import sys
-        try:
-            # Check if browsers are already installed
-            with sync_playwright() as p:
-                if p.chromium:
-                    print("Playwright browsers already installed")
-                else:
-                    raise Exception("Playwright browsers not installed")
-            
-        except Exception as e:
-            print(f"Installing Playwright browsers: {e}")
-            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
-            print("Playwright browsers installed successfully")
-    except Exception as e:
-        print(f"Warning: Could not verify or install Playwright browsers: {e}")
-        print("If you encounter errors, run 'playwright install chromium' manually")
     
     html_file = args.html_file
     
@@ -420,7 +387,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()
 else:
     # This ensures the agent is only registered once when imported
     __all__ = ["ThreeJSVisionAgent"] 
