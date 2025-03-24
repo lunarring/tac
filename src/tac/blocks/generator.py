@@ -67,9 +67,11 @@ You are a senior python software engineer. You are specialized in updating codeb
 - We will need to supply two kinds of files to the coding agent:
     - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context! Test files should only be created in tests/test_*.py e.g. tests/test_piano_trainer_main.py.
     - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! 
+- If we have an error analysis from the last implementation attempt, you should include it in the task instructions, expand them and make them longer to include as much detail as possible.
 - Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
 - Here a description of what each trusty agent is capable of {trusty_agents_description}
 - Select the most appropriate trusty agents for the task. Select only one agent!
+-
 - The output format is a single JSON object, you need to follow the format as described below.
 </planning_rules>
 
