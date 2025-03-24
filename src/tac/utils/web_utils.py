@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Any
 from playwright.sync_api import Page, sync_playwright, Browser, BrowserContext
 import os
 import sys
@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import uuid
 import time
+from tac.core.llm import Message
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,231 @@ def verify_page_load_with_browser(url: str, timeout: int = 30000) -> Tuple[bool,
                 playwright.stop()
             except Exception as e:
                 logger.error(f"Error stopping playwright: {e}")
+
+def take_threejs_screenshot(page: Page, output_dir: Optional[str] = None) -> str:
+    """
+    Take a screenshot of a Three.js scene after ensuring it's properly rendered.
+    
+    Args:
+        page: Playwright Page object
+        output_dir: Optional directory to save the screenshot in
+        
+    Returns:
+        str: Path to the saved screenshot file
+        
+    Raises:
+        Exception: If screenshot fails to be taken
+    """
+    try:
+        # Check WebGL support
+        webgl_support = page.evaluate("""() => {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+            } catch (e) {
+                return false;
+            }
+        }""")
+        
+        if not webgl_support:
+            raise Exception("WebGL is not supported in this browser")
+            
+        # Check Three.js status
+        threejs_status = page.evaluate("""() => {
+            if (typeof THREE === 'undefined') {
+                return { success: false, error: 'THREE is not defined' };
+            }
+            
+            // Check for common initialization functions
+            const initFunctions = [
+                'init',
+                'animate',
+                'render',
+                'setupScene',
+                'createScene',
+                'setupThreeJS'
+            ];
+            
+            const foundFunctions = initFunctions.filter(fn => typeof window[fn] === 'function');
+            if (foundFunctions.length === 0) {
+                return { success: false, error: 'No Three.js initialization functions found' };
+            }
+            
+            // Try to find the renderer
+            const renderer = window.renderer || document.querySelector('canvas')?.__threejs_renderer;
+            if (!renderer) {
+                return { success: false, error: 'No Three.js renderer found' };
+            }
+            
+            return { success: true };
+        }""")
+        
+        if not threejs_status.get('success'):
+            raise Exception(f"Three.js scene not properly initialized: {threejs_status.get('error')}")
+            
+        # Prepare scene for rendering
+        page.evaluate("""() => {
+            // Try common initialization functions
+            const initFunctions = [
+                'init',
+                'animate',
+                'render',
+                'setupScene',
+                'createScene',
+                'setupThreeJS'
+            ];
+            
+            for (const fn of initFunctions) {
+                if (typeof window[fn] === 'function') {
+                    try {
+                        window[fn]();
+                    } catch (e) {
+                        console.error(`Error in ${fn}:`, e);
+                    }
+                }
+            }
+            
+            // Force a render if we have a renderer
+            if (window.renderer) {
+                window.renderer.render(window.scene, window.camera);
+            }
+            
+            // Ensure canvas is visible and properly sized
+            const canvas = document.querySelector('canvas');
+            if (canvas) {
+                canvas.style.display = 'block';
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
+            }
+        }""")
+        
+        # Take the screenshot
+        return take_page_screenshot(page, output_dir)
+        
+    except Exception as e:
+        error_msg = f"Failed to take Three.js screenshot: {str(e)}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
+def generate_unique_screenshot_path() -> str:
+    """
+    Generate a unique path for the screenshot to prevent reusing old screenshots.
+    
+    Returns:
+        str: Path to the screenshot file
+    """
+    timestamp = int(time.time())
+    unique_id = str(uuid.uuid4())[:8]
+    fd, path = tempfile.mkstemp(prefix=f"screenshot_{timestamp}_{unique_id}_", suffix='.png')
+    os.close(fd)
+    logger.info(f"Generated unique screenshot path: {path}")
+    return path
+
+def analyze_screenshot(screenshot_path: str, prompt: str, llm_client: Any) -> str:
+    """
+    Analyze a screenshot using the vision model.
+    
+    Args:
+        screenshot_path: Path to the screenshot file
+        prompt: Prompt to use for analysis
+        llm_client: The LLM client to use for analysis
+        
+    Returns:
+        str: The analysis result
+        
+    Raises:
+        Exception: If analysis fails
+    """
+    try:
+        # Verify screenshot exists and has content
+        if not os.path.exists(screenshot_path):
+            raise Exception(f"Screenshot file not found: {screenshot_path}")
+            
+        file_size = os.path.getsize(screenshot_path)
+        if file_size == 0:
+            raise Exception(f"Screenshot file is empty: {screenshot_path}")
+            
+        # Create messages for the vision model
+        messages = [
+            Message(role="system", content="""You are a helpful assistant that can analyze 3D visualizations created with Three.js.
+            You will grade the visualization on a scale from A to F where:
+            A: Perfect match with all expected elements present and correctly rendered
+            B: Good match with minor visual discrepancies
+            C: Acceptable but with noticeable issues
+            D: Minimum passing grade - basic elements present but with significant issues
+            F: Failed - major elements missing or severe rendering problems
+            
+            Provide your analysis in this format:
+            
+            GRADE: [A-F]
+            
+            ANALYSIS:
+            (Detailed analysis of what matches or doesn't match expectations)
+            
+            ISSUES:
+            (List any visual issues or missing elements)
+            
+            RECOMMENDATIONS:
+            (Suggestions for improvement if needed)"""),
+            Message(role="user", content=prompt)
+        ]
+            
+        # Use vision_chat_completion with the screenshot path
+        response = llm_client.vision_chat_completion(messages, screenshot_path)
+        if not response:
+            raise Exception("No response from vision model")
+            
+        return response
+        
+    except Exception as e:
+        error_msg = f"Failed to analyze screenshot: {str(e)}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
+def determine_vision_success(analysis_result: str, min_grade: str = "B") -> bool:
+    """
+    Determine if the vision analysis indicates success based on the grade.
+    
+    Args:
+        analysis_result: The result of the vision analysis
+        min_grade: Minimum passing grade (A, B, C, D, or F)
+        
+    Returns:
+        bool: True if the grade meets or exceeds the minimum required grade
+    """
+    try:
+        # Validate minimum grade
+        if min_grade not in {"A", "B", "C", "D", "F"}:
+            logger.warning(f"Invalid minimum grade: {min_grade}, defaulting to 'B'")
+            min_grade = "B"
+        
+        # Define grade values (A=4, B=3, C=2, D=1, F=0)
+        grade_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
+        min_grade_value = grade_values[min_grade]
+        
+        # Extract grade from the analysis
+        if "GRADE:" in analysis_result:
+            grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+            grade = grade_line[0].upper()  # Take first character as grade
+            
+            if grade not in grade_values:
+                logger.error(f"Invalid grade found in analysis: {grade}")
+                return False
+            
+            # Compare grade values
+            return grade_values[grade] >= min_grade_value
+        
+        # Fallback to old YES/NO format if no grade found
+        lines = analysis_result.strip().split('\n')
+        if lines and lines[0].strip().upper() in ["YES", "NO"]:
+            logger.warning("Using legacy YES/NO format - treating YES as grade 'B' and NO as grade 'F'")
+            return lines[0].strip().upper() == "YES"
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error determining success from grade: {e}")
+        return False
 
 if __name__ == "__main__":
     import argparse

@@ -19,10 +19,11 @@ from tac.trusty_agents.base import TrustyAgent, trusty_agent
 from tac.trusty_agents.pytest import ErrorAnalyzer
 from tac.utils.web_utils import (
     verify_page_load, 
-    take_threejs_screenshot,
+    take_page_screenshot,
     generate_unique_screenshot_path,
     analyze_screenshot,
-    determine_vision_success
+    determine_vision_success,
+    verify_page_load_with_browser
 )
 
 logger = setup_logging('tac.trusty_agents.threejs_vision')
@@ -56,28 +57,21 @@ class ThreeJSVisionAgent(TrustyAgent):
         self.screenshot_path = None
         self.analysis_result = None
         self.error_analyzer = ErrorAnalyzer()
+        self.collected_errors = []  # Initialize collected_errors list
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
         """
         Launch a browser with Playwright, navigate to the Three.js app, take a screenshot, and analyze it.
-        
-        Args:
-            protoblock: The ProtoBlock containing task specifications
-            codebase: Summary string of the codebase 
-            code_diff: The git diff showing implemented changes
-            
-        Returns:
-            Tuple containing:
-            - bool: Success status (True if visual verification passed, False otherwise)
-            - str: Error analysis (empty string if success is True)
-            - str: Failure type description (empty string if success is True)
         """
-        collected_errors = []
+        playwright = None
+        browser = None
+        context = None
+        page = None
+        
         try:
             logger.info("========== STARTING NEW THREEJS VISUAL TEST ==========")
-            logger.info(f"Test initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             
-            # Get the HTML file path to run from the protoblock directly
+            # Get the HTML file path
             app_file_path = self._get_app_file_path(protoblock)
             if not app_file_path:
                 return False, "Could not determine which HTML file to run", "No HTML file found"
@@ -85,98 +79,71 @@ class ThreeJSVisionAgent(TrustyAgent):
             if not os.path.exists(app_file_path):
                 return False, f"HTML file not found: {app_file_path}", "HTML file not found"
             
-            # Get the expected visual elements from the protoblock
+            # Launch browser and navigate
+            playwright = sync_playwright().start()
+            browser = playwright.chromium.launch(headless=True)
+            context = browser.new_context()
+            page = context.new_page()
+            
+            # Navigate to URL
+            file_url = f"file://{os.path.abspath(app_file_path)}"
+            logger.info(f"Navigating to: {file_url}")
+            response = page.goto(file_url, wait_until="networkidle", timeout=30000)
+            if not response or not response.ok:
+                return False, f"Failed to load page: {response.status if response else 'No response'}", "Browser errors detected"
+            
+            # Verify page load
+            success, errors, _ = verify_page_load(page, timeout=30000)
+            if not success:
+                return False, "\n".join(errors), "Browser errors detected"
+            
+            # Take screenshot
+            try:
+                self.screenshot_path = take_page_screenshot(page)
+                logger.info(f"Screenshot saved: {self.screenshot_path}")
+            except Exception as e:
+                return False, f"Failed to take screenshot: {str(e)}", "Screenshot failed"
+            
+            # Get expected visual elements
             expected_visual = protoblock.trusty_agent_prompts.get("threejs_vision", "")
             if not expected_visual:
-                logger.warning("No threejs_vision prompt found in protoblock")
                 expected_visual = "Analyze what you see in the 3D scene and describe the Three.js visualization in detail."
             
-            # Create a temporary file for the screenshot
-            self.screenshot_path = generate_unique_screenshot_path()
-            file_url = f"file://{os.path.abspath(app_file_path)}"
-            
-            # First verify the page loads correctly
-            success, errors, page = verify_page_load(file_url, timeout=30000)
-            if not success:
-                self.collected_errors.extend(errors)
-                error_analysis = self.error_analyzer.analyze_failure(
-                    protoblock,
-                    "\n".join(self.collected_errors),
-                    codebase
-                )
-                return False, error_analysis, "Browser errors detected"
-            
-            # Take Three.js screenshot
-            logger.info("Taking Three.js screenshot...")
-            try:
-                self.screenshot_path = take_threejs_screenshot(page)
-                logger.info(f"Three.js screenshot saved: {self.screenshot_path}")
-            except Exception as e:
-                logger.error(f"Error taking Three.js screenshot: {e}")
-                error_analysis = self.error_analyzer.analyze_failure(
-                    protoblock,
-                    f"Failed to take screenshot: {str(e)}",
-                    codebase
-                )
-                return False, error_analysis, "Screenshot failed"
-            
-            # Analyze the screenshot
-            logger.info("Analyzing screenshot with vision model...")
-            prompt = f"""
-            Analyze this screenshot of a Three.js application's output. 
-            
-            Expected 3D visualization elements: {expected_visual}
-
-            Please grade the visualization on a scale from A to F and provide a detailed analysis.
-            
-            Remember:
-            A: Perfect match with all expected elements present and correctly rendered
-            B: Good match with minor visual discrepancies
-            C: Acceptable but with noticeable issues
-            D: Minimum passing grade - basic elements present but with significant issues
-            F: Failed - major elements missing or severe rendering problems
-            
-            Provide your analysis in this format:
-            
-            GRADE: [A-F]
-            
-            ANALYSIS:
-            (Detailed analysis of what matches or doesn't match expectations)
-            
-            ISSUES:
-            (List any visual issues or missing elements)
-            
-            RECOMMENDATIONS:
-            (Suggestions for improvement if needed)
-            """
-            
+            # Analyze screenshot
+            prompt = f"Analyze this screenshot of a Three.js application's output. Expected: {expected_visual}"
             self.analysis_result = analyze_screenshot(self.screenshot_path, prompt, self.llm_client)
-            # Format the prompt for logging (outside the f-string)
-            formatted_prompt = prompt.strip().replace('\n', ' ')
-            logger.info(f"Analysis result: {self.analysis_result} (for prompt: {formatted_prompt})")
             
-            # Determine success based on the analysis result
+            # Determine success
             success = determine_vision_success(self.analysis_result, config.general.trusty_agents.minimum_vision_score.upper())
             
             if success:
                 return True, "", ""
             else:
-                failure_type = "Three.js visual verification failed"
-                error_analysis = f"The Three.js application's visual output did not meet minimum requirements:\n\n{self.analysis_result}"
-                return False, error_analysis, failure_type
+                return False, self.analysis_result, "Three.js visual verification failed"
             
         except Exception as e:
             logger.exception(f"Error in Three.js vision testing: {str(e)}")
-            collected_errors.append(str(e))
+            return False, str(e), "Three.js vision testing exception"
             
-            # Use error analyzer to analyze the collected errors
-            error_analysis = self.error_analyzer.analyze_failure(
-                protoblock,
-                "\n".join(collected_errors),
-                codebase
-            )
-            
-            return False, error_analysis, "Three.js vision testing exception"
+        finally:
+            # Clean up resources in reverse order
+            if context:
+                try:
+                    context.close()
+                except Exception as e:
+                    logger.error(f"Error closing context: {e}")
+                    
+            if browser:
+                try:
+                    browser.close()
+                except Exception as e:
+                    logger.error(f"Error closing browser: {e}")
+                    
+            if playwright:
+                try:
+                    playwright.stop()
+                except Exception as e:
+                    logger.error(f"Error stopping playwright: {e}")
 
     def _get_app_file_path(self, protoblock: ProtoBlock) -> Optional[str]:
         """
