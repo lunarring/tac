@@ -118,6 +118,5 @@ def test_create_protoblock_with_dummy_llm(monkeypatch, generator_instance):
     assert "pytest" in protoblock.trusty_agents
     assert "plausibility" in protoblock.trusty_agents
     # Verify that dummy_agent is not present in the trusty_agent_prompts and only expected agents remain
-    assert "dummy_agent" not in protoblock.trusty_agent_prompts
     assert set(protoblock.trusty_agent_prompts.keys()) == {"pytest", "plausibility"}
     
