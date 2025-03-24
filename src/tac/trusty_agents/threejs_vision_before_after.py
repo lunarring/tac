@@ -27,6 +27,7 @@ from tac.utils.web_utils import (
     ensure_playwright_installed
 )
 from tac.utils.image_stitcher import stitch_images
+from PIL import Image
 
 logger = setup_logging('tac.trusty_agents.threejs_vision_before_after')
 
@@ -165,21 +166,36 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             # Capture after state
             self.after_screenshot_path = self._capture_state()
             
-            # Create comparison image
+            # Create a temporary dummy image to act as the middle pane.
+            # This dummy image is 1 pixel wide and filled with the border color.
+            before_img = Image.open(self.before_screenshot_path)
+            after_img = Image.open(self.after_screenshot_path)
+            max_height = max(before_img.height, after_img.height)
+            dummy_img = Image.new("RGB", (1, max_height), color="black")
+            dummy_temp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            dummy_img.save(dummy_temp.name, format="PNG")
+            dummy_temp.close()
+            dummy_image_path = dummy_temp.name
+            
+            # Create comparison image path
             self.comparison_path = os.path.join(
                 os.path.dirname(self.before_screenshot_path),
                 f"comparison_{uuid.uuid4()}.png"
             )
             
-            # Stitch images together
+            # Stitch images together: before, dummy, and after.
             comparison_img = stitch_images(
                 self.before_screenshot_path,
+                dummy_image_path,
                 self.after_screenshot_path,
                 border=10,
                 border_color="black"
             )
             comparison_img.save(self.comparison_path)
             logger.info(f"Comparison image saved: {self.comparison_path}")
+            
+            # Clean up the temporary dummy image file.
+            os.unlink(dummy_image_path)
             
             # Get expected changes from protoblock
             expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_before_after", "")
