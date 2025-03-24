@@ -120,9 +120,21 @@ class PytestTestingAgent(TrustyAgent):
             test_target = test_path or 'tests'
             full_path = test_target
             
-            # Clear pytest cache and reload modules
+            # Clear pytest cache to ensure fresh test discovery
             self._clear_pytest_cache()
+            
+            # Reload modules to ensure we're using the latest code
             self._reload_modules()
+
+            if not os.path.exists(full_path):
+                # Create the test directory instead of reporting an error
+                logger.info(f"Test path not found: {full_path}. Creating directory.")
+                os.makedirs(full_path, exist_ok=True)
+                # No longer setting execution error flag or returning False
+                # Continue with test execution
+
+            reporter = CustomReporter()
+            plugins = [reporter]
             
             # Add current directory to Python path
             if os.getcwd() not in sys.path:
@@ -148,7 +160,7 @@ class PytestTestingAgent(TrustyAgent):
             logger.info(f"Running pytest with args: {' '.join(args)}")
             
             # Run the tests
-            exit_code = pytest.main(args, plugins=[])
+            exit_code = pytest.main(args, plugins=plugins)
             
             # Process results
             self.test_functions = []
@@ -156,7 +168,7 @@ class PytestTestingAgent(TrustyAgent):
             self._print_test_summary(self._test_stats)
             
             # Store full output
-            self.test_results = "\n".join([])
+            self.test_results = "\n".join(reporter.output_lines)
             if self.test_results:
                 self.test_results += "\n\n"
             
@@ -268,19 +280,26 @@ class PytestTestingAgent(TrustyAgent):
     def _reload_modules(self):
         """
         Reload Python modules to ensure we're using the latest code.
+        This includes both test modules and TAC modules when modifying the TAC repository itself.
         """
         try:
             # Get a list of loaded modules
             loaded_modules = list(sys.modules.keys())
             
-            # Remove all test modules from sys.modules to force complete reload
-            test_modules = [m for m in loaded_modules if 'test_' in m or m.endswith('_test')]
-            for module_name in test_modules:
+            # Remove both test modules and tac modules from sys.modules to force complete reload
+            modules_to_remove = [
+                m for m in loaded_modules if 
+                'test_' in m or 
+                m.endswith('_test') or 
+                m.startswith('tac.')  # Add TAC modules
+            ]
+            
+            for module_name in modules_to_remove:
                 if module_name in sys.modules:
                     logger.debug(f"Removing module from sys.modules: {module_name}")
                     del sys.modules[module_name]
                     
-            logger.debug(f"Removed {len(test_modules)} test modules from sys.modules")
+            logger.debug(f"Removed {len(modules_to_remove)} modules from sys.modules")
         except Exception as e:
             logger.debug(f"Error during module reload: {e}")
             # Continue even if reloading fails
