@@ -119,7 +119,7 @@ class BlockExecutor:
             
             # Add all other agents except pytest and plausibility
             for agent_name in self.protoblock.trusty_agents:
-                if agent_name != "pytest" and agent_name != "plausibility":
+                if agent_name != "plausibility":
                     sorted_agents.append(agent_name)
             
             # Add plausibility last, hard fixed. we always want plausibility last.
