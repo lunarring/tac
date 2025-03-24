@@ -1,10 +1,15 @@
 import time
-import lunar_tools as lt
+
 from tac.core.log_config import setup_logging
 from tac.utils.project_files import ProjectFiles
 
 logger = setup_logging('tac.cli.voice')
 
+try:
+    import lunar_tools as lt
+except ImportError:
+    logger.error("lunar_tools is not installed. Please install it with 'python -m pip install git+https://github.com/lunarring/lunar_tools'")  
+    raise
 
 class VoiceUI:
     def __init__(self):
