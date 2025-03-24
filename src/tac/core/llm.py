@@ -241,7 +241,7 @@ class LLMClient:
                     scale = 800 / max(width, height)
                     new_width = int(width * scale)
                     new_height = int(height * scale)
-                    img = img.resize((new_width, new_height), Image.ANTIALIAS)
+                    img = img.resize((new_width, new_height))
                     logger.info(f"Image downscaled from ({width}x{height}) to ({new_width}x{new_height}).")
                 else:
                     logger.info(f"Image size ({width}x{height}) within limits, no downscaling applied.")
@@ -373,7 +373,7 @@ class LLMClient:
         scale = min(target_width / orig_width, target_height / orig_height)
         new_width = int(orig_width * scale)
         new_height = int(orig_height * scale)
-        return image.resize((new_width, new_height), Image.ANTIALIAS)
+        return image.resize((new_width, new_height))
 
 # Example usage:
 if __name__ == "__main__":
