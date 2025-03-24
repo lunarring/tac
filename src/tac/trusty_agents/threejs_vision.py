@@ -20,6 +20,7 @@ from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.trusty_agents.base import TrustyAgent, trusty_agent
 from tac.trusty_agents.pytest import ErrorAnalyzer
+from tac.utils.web_utils import verify_page_load
 
 logger = setup_logging('tac.trusty_agents.threejs_vision')
 
@@ -495,77 +496,6 @@ class BrowserRunner:
                 # Set up error handlers before creating the page
                 page = context.new_page()
                 
-                # Enhanced error logging for page events with better categorization
-                def handle_console(msg):
-                    if msg.type == "error":
-                        logger.error(f"CONSOLE ERROR: {msg.text}")
-                        # Check for common critical errors
-                        if any(x in msg.text.lower() for x in [
-                            "is not defined", "undefined", "cannot read properties",
-                            "syntax error", "reference error", "type error",
-                            "failed to load resource", "refused to execute script",
-                            "mime type", "three is not defined"
-                        ]):
-                            self.collected_errors.append(f"Critical JavaScript error detected: {msg.text}")
-                            # Close browser and context on critical error
-                            try:
-                                context.close()
-                                browser.close()
-                            except:
-                                pass
-                            return False  # Signal to stop processing
-                    else:
-                        logger.debug(f"CONSOLE {msg.type}: {msg.text}")
-                    return True
-
-                def handle_page_error(err):
-                    logger.error(f"PAGE ERROR: {err}")
-                    # Check for common critical errors
-                    if any(x in str(err).lower() for x in [
-                        "is not defined", "undefined", "cannot read properties",
-                        "syntax error", "reference error", "type error",
-                        "three is not defined"
-                    ]):
-                        self.collected_errors.append(f"Critical JavaScript error detected: {err}")
-                        # Close browser and context on critical error
-                        try:
-                            context.close()
-                            browser.close()
-                        except:
-                            pass
-                        return False  # Signal to stop processing
-                    return True
-
-                def handle_request_failed(request):
-                    try:
-                        error_text = request.failure.get('errorText', 'Unknown error')
-                        logger.error(f"REQUEST FAILED: {request.url} - {error_text}")
-                        # Only collect for critical resource failures
-                        if request.resource_type in ["script", "stylesheet"]:
-                            self.collected_errors.append(f"Critical resource failed to load: {request.url} - {error_text}")
-                            # Close browser and context on critical error
-                            try:
-                                context.close()
-                                browser.close()
-                            except:
-                                pass
-                            return False  # Signal to stop processing
-                    except Exception as e:
-                        logger.error(f"Error handling request failure: {str(e)}")
-                        self.collected_errors.append(f"Critical resource failed to load: {request.url}")
-                        # Close browser and context on critical error
-                        try:
-                            context.close()
-                            browser.close()
-                        except:
-                            pass
-                        return False  # Signal to stop processing
-                    return True
-
-                page.on("console", handle_console)
-                page.on("pageerror", handle_page_error)
-                page.on("requestfailed", handle_request_failed)
-                
                 # Navigate to page and wait for load with enhanced error handling
                 try:
                     logger.info(f"Navigating to: {file_url}")
@@ -578,42 +508,13 @@ class BrowserRunner:
                         return
                     logger.info(f"Page loaded with status: {resp.status}")
 
-                    # Check for JavaScript errors after page load
-                    js_errors = page.evaluate("""() => {
-                        const errors = [];
-                        if (window.onerror) {
-                            const originalOnError = window.onerror;
-                            window.onerror = function(msg, url, line, col, error) {
-                                errors.push({
-                                    message: msg,
-                                    url: url,
-                                    line: line,
-                                    column: col,
-                                    error: error ? error.toString() : null,
-                                    stack: error ? error.stack : null
-                                });
-                                return originalOnError.apply(this, arguments);
-                            };
-                        }
-                        return errors;
-                    }""")
-
-                    if js_errors:
-                        for error in js_errors:
-                            error_msg = f"Error: {error.get('message')}"
-                            if error.get('url'):
-                                error_msg += f" at {error.get('url')}:{error.get('line')}:{error.get('column')}"
-                            if error.get('stack'):
-                                error_msg += f"\nStack trace:\n{error.get('stack')}"
-                            self.collected_errors.append(error_msg)
-                            logger.error(error_msg)
-                            # If it's a critical error, stop processing
-                            if any(x in error_msg.lower() for x in [
-                                "is not defined", "undefined", "cannot read properties",
-                                "syntax error", "reference error", "type error",
-                                "three is not defined"
-                            ]):
-                                return
+                    # Use the new verify_page_load function
+                    success, errors = verify_page_load(page)
+                    if not success:
+                        self.collected_errors.extend(errors)
+                        context.close()
+                        browser.close()
+                        return
 
                 except Exception as e:
                     error_msg = f"Page navigation or JavaScript error: {str(e)}"
@@ -627,10 +528,6 @@ class BrowserRunner:
                     browser.close()
                     return
                 
-                # If we have collected errors, don't proceed with screenshot
-                if self.collected_errors:
-                    return
-
                 # Extended wait for external scripts
                 logger.info(f"Waiting {self.screenshot_delay + 2} seconds for page to render...")
                 time.sleep(self.screenshot_delay + 2)
