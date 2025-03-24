@@ -345,6 +345,35 @@ class LLMClient:
                     pass
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
+    
+    def downscale_image(self, image: Image, target_width: int, target_height: int) -> Image:
+        """
+        Downscale the given image to fit within target dimensions while preserving aspect ratio.
+        Only downscales if the image is larger than the target dimensions.
+        
+        Args:
+            image: PIL Image object to be resized.
+            target_width: Maximum allowed width.
+            target_height: Maximum allowed height.
+        
+        Returns:
+            PIL Image object resized to fit within the target dimensions.
+            
+        Raises:
+            ValueError: If target dimensions are not positive.
+        """
+        if target_width <= 0 or target_height <= 0:
+            raise ValueError("Target dimensions must be positive")
+        
+        orig_width, orig_height = image.size
+        # If image is smaller or equal to the target dimensions, return the original image.
+        if orig_width <= target_width and orig_height <= target_height:
+            return image
+        
+        scale = min(target_width / orig_width, target_height / orig_height)
+        new_width = int(orig_width * scale)
+        new_height = int(orig_height * scale)
+        return image.resize((new_width, new_height), Image.ANTIALIAS)
 
 # Example usage:
 if __name__ == "__main__":
