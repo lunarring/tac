@@ -190,7 +190,8 @@ Python:
 - For importing modules in your implementation, assume we are running everything from the root of the project and that the project is not installed as package.
 
 Three.js:
-- Always make a package.json file in the root of the project, in there be sure to specify   "test": "mocha tests/*.js" (since we use tests/ folder for tests)
+- do not make a unit tests
+- be sure to produce valid threejs code and be careful about imports and that everything is contained. make something simple and reliable and that has good chances of working and not producing errors.
 - Always include all dependencies in the package.json file, including all necessary dependencies.
 """
         
