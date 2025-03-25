@@ -148,8 +148,6 @@ class PytestTestingAgent(TrustyAgent):
             if os.path.isfile(test_target):
                 args.append(test_target)
             else:
-                # FIXED: Don't do a separate collection step, just run all tests directly
-                # This ensures we always pick up newly created test files
                 exclude_performance_tests = getattr(config.general.trusty_agents, 'exclude_performance_tests', True)
                 if exclude_performance_tests:
                     args.extend(['-m', 'not performance and not transient', test_target])
@@ -162,9 +160,9 @@ class PytestTestingAgent(TrustyAgent):
             # Run the tests
             exit_code = pytest.main(args, plugins=plugins)
             
-            # Process results
-            self.test_functions = []
-            self._test_stats = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
+            # Aggregate results from the custom reporter
+            self.test_functions = reporter.test_functions
+            self._test_stats = reporter.results
             self._print_test_summary(self._test_stats)
             
             # Store full output
@@ -183,7 +181,7 @@ class PytestTestingAgent(TrustyAgent):
             # - exit_code 5: no tests found (considered ok)
             # - failed_tests == 0: no test failures
             execution_ok = exit_code in [0, 5]
-            no_test_failures = self._test_stats['failed'] == 0
+            no_test_failures = self._test_stats['failed'] == 0 and self._test_stats['error'] == 0
             test_success = execution_ok and no_test_failures
             
             # Update execution error state for other parts of the system
@@ -242,7 +240,6 @@ class PytestTestingAgent(TrustyAgent):
 
     def get_test_functions(self) -> list:
         """Get the list of collected test function names, extracting function names after '::' if present"""
-        # Extract the function name from the nodeid (last part after ::)
         return [s.split("::")[-1].strip() if "::" in s else s for s in self.test_functions]
 
     def collect_all_tests(self, tests_dir: str = "tests") -> list:
@@ -283,15 +280,12 @@ class PytestTestingAgent(TrustyAgent):
         This includes both test modules and TAC modules when modifying the TAC repository itself.
         """
         try:
-            # Get a list of loaded modules
             loaded_modules = list(sys.modules.keys())
-            
-            # Remove both test modules and tac modules from sys.modules to force complete reload
             modules_to_remove = [
                 m for m in loaded_modules if 
                 'test_' in m or 
                 m.endswith('_test') or 
-                m.startswith('tac.')  # Add TAC modules
+                m.startswith('tac.')
             ]
             
             for module_name in modules_to_remove:
@@ -302,7 +296,6 @@ class PytestTestingAgent(TrustyAgent):
             logger.debug(f"Removed {len(modules_to_remove)} modules from sys.modules")
         except Exception as e:
             logger.debug(f"Error during module reload: {e}")
-            # Continue even if reloading fails
 
     def _clear_pytest_cache(self):
         """
@@ -310,12 +303,10 @@ class PytestTestingAgent(TrustyAgent):
         This helps when new tests have been added or existing tests modified.
         """
         try:
-            # Clear .pytest_cache directory
             if os.path.exists('.pytest_cache'):
                 shutil.rmtree('.pytest_cache')
                 logger.debug("Removed pytest cache directory")
             
-            # Clear __pycache__ directories in test directories
             test_dir = config.general.test_path or 'tests'
             if os.path.isdir(test_dir):
                 for root, dirs, files in os.walk(test_dir):
@@ -324,7 +315,6 @@ class PytestTestingAgent(TrustyAgent):
                         shutil.rmtree(pycache_path)
                         logger.debug(f"Removed {pycache_path}")
             
-            # Clear .pyc files in test directories
             if os.path.isdir(test_dir):
                 for root, dirs, files in os.walk(test_dir):
                     for file in files:
@@ -336,7 +326,6 @@ class PytestTestingAgent(TrustyAgent):
             logger.debug("Cleared pytest cache")
         except Exception as e:
             logger.debug(f"Error clearing pytest cache: {e}")
-            # Continue even if clearing cache fails
 
 class ErrorAnalyzer:
     """Analyzes test failures and implementation errors to provide insights using LLM"""
@@ -345,8 +334,6 @@ class ErrorAnalyzer:
         logger.info("Initializing ErrorAnalyzer")
         self.llm_client = LLMClient(llm_type="strong")
         self.project_files = ProjectFiles()
-
-
 
     def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
         """
@@ -365,24 +352,18 @@ class ErrorAnalyzer:
         logger.debug(f"Test results length: {len(test_results) if test_results else 'None'}")
         
         try:
-            # Use centralized config
             use_summaries = config.general.use_file_summaries
             logger.info(f"Using file summaries: {use_summaries}")
-            
-            # Format codebase for prompt
             logger.info("Formatting codebase for LLM prompt")
             codebase_content = []
             
-            # Handle string codebase
             if isinstance(codebase, str):
                 codebase_content.append(f"Codebase Content:\n```python\n{codebase}\n```")
             else:
-                # Handle dictionary codebase
                 logger.debug(f"Codebase files to analyze: {list(codebase.keys())}")
                 for path, content in codebase.items():
                     logger.debug(f"Processing file: {path}")
                     if use_summaries:
-                        # Use existing summaries instead of generating new ones
                         summary = self.project_files._load_existing_summaries().get(path, {}).get('summary')
                         if summary:
                             file_content = f"File Summary:\n{summary}"
@@ -395,7 +376,6 @@ class ErrorAnalyzer:
             codebase_str = "\n\n".join(codebase_content)
             logger.debug(f"Formatted codebase length: {len(codebase_str)} characters")
             
-            # Prepare prompt
             analysis_prompt = f"""<purpose>
 You are a senior python software engineer analyzing a failed implementation attempt. Your goal is to provide a clear and detailed analysis of what went wrong and suggest specific improvements. The information for the junior software engineer who failed at their attempt is given in the <protoblock> section, the codebase in <codebase_str>, the test results in <test_results>. Your concrete analysis rules are given in <analysis_rules>.
 </purpose>
@@ -432,7 +412,6 @@ NEW STRATEGY FOR SOLVING THE TASK:
 MISSING WRITE FILES:
 (so far it was possible to modify these files: {protoblock.write_files}. However, given youn analysis, do we need to edit more files? If there are files missing, directly mention them here in a list, without any additional text e.g. your reply is ["tests/test_piano_trainer_main.py"])
 </output_format>"""
-
             messages = [
                 Message(role="system", content="You are a coding assistant specialized in analyzing test failures and implementation errors. Provide clear, actionable analysis."),
                 Message(role="user", content=analysis_prompt)
@@ -457,22 +436,20 @@ class CustomReporter:
         self.output_lines = []
         
     def pytest_runtest_logreport(self, report: TestReport):
-        if report.when == 'call' or (report.when == 'setup' and report.outcome == 'skipped'):
-            # Add the full nodeid to ensure we capture all tests
-            if report.nodeid not in self.test_functions:
-                self.test_functions.append(report.nodeid)
-            
-            # Update results based on the report outcome
+        if report.nodeid not in self.test_functions:
+            self.test_functions.append(report.nodeid)
+        if report.when == 'call':
             if report.passed:
                 self.results['passed'] += 1
             elif report.failed:
                 self.results['failed'] += 1
-            elif report.skipped:
+        elif report.when in ['setup', 'teardown']:
+            if report.outcome == 'failed':
+                self.results['error'] += 1
+            elif report.outcome == 'skipped':
                 self.results['skipped'] += 1
-                
-            # Add the report to output lines if it has a longrepr
-            if hasattr(report, 'longrepr') and report.longrepr:
-                self.output_lines.append(str(report.longrepr))
+        if hasattr(report, 'longrepr') and report.longrepr:
+            self.output_lines.append(str(report.longrepr))
     
     def pytest_collectreport(self, report):
         if report.result:
@@ -480,9 +457,8 @@ class CustomReporter:
                 if hasattr(item, 'nodeid') and item.nodeid not in self.test_functions:
                     self.test_functions.append(item.nodeid)
         
-        # Handle collection errors
         if hasattr(report, 'outcome') and report.outcome == 'failed':
             if hasattr(report, 'longrepr'):
                 self.output_lines.append(f"Collection error: {report.longrepr}")
                 self.results['error'] += 1
-
+                      
