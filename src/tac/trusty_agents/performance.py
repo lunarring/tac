@@ -524,10 +524,10 @@ class PerformanceTestingAgent(TrustyAgent):
             # Add benchmark JSON output
             cmd.extend(["--benchmark-json", json_output_path])
             
-            # # Add snapshot update flag if requested
-            # if update_snapshots:
-            #     cmd.append("--snapshot-update")
-            #     logger.info("Running tests with snapshot update")
+            # Add snapshot update flag if requested
+            if update_snapshots:
+                cmd.append("--snapshot-update")
+                logger.info("Running tests with snapshot update")
             
             # Only suppress stdout if we're not updating snapshots
             if not update_snapshots:
