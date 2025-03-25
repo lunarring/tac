@@ -197,7 +197,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default='.',
         help='Directory to analyze and create block from (default: current directory)'
     )
-
+    run_parser.add_argument(
+        '--image',
+        type=str,
+        help='Image URL to be associated with the task'
+    )
     
     # Dynamically add arguments from general config
     general_config = config.general
@@ -434,7 +438,7 @@ def main():
     
     # Command line args have second highest priority
     # Check both global and subcommand log-level arguments
-    cmd_log_level = args.log_level if hasattr(args, 'log_level') and args.log_level else None
+    cmd_log_level = args.log_level if hasattr(args, 'log-level') and args.log_level else None
     
     # Config has lowest priority
     config_log_level = config.logging.get_tac('level', 'INFO')
@@ -560,29 +564,6 @@ def main():
             if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
                 sys.exit(1)
 
-            # if config.git.enabled:
-            #     git_manager = GitManager()
-            #     if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
-            #         sys.exit(1)
-            # else:
-            #     # Use FakeGitManager when git is disabled
-            #     from tac.utils.git_manager import FakeGitManager
-            #     git_manager = FakeGitManager()
-            #     # Check if any generated protoblocks will have plausibility checks but git is disabled
-            #     if "plausibility" in config.general.default_trusty_agents:
-            #         print("\nWarning: Default trusty agents include plausibility checks, but git is disabled.")
-            #         print("Plausibility checks require git to be enabled.")
-            #         print("To proceed, either:")
-            #         print("1. Enable git by removing --no-git flag")
-            #         print("2. Remove 'plausibility' from default_trusty_agents in your configuration")
-            #         print("Continuing without plausibility checks...")
-                    
-            #         # Remove plausibility from default trusty agents if git is disabled
-            #         config.general.default_trusty_agents = [
-            #             agent for agent in config.general.default_trusty_agents 
-            #             if agent != "plausibility"
-            #         ]
-
             # First of all: run tests, do they all pass
             logger.info("Test Execution Details:", heading=True)
             logger.info(f"Working directory: {os.getcwd()}")
@@ -605,7 +586,20 @@ def main():
                 # Ensure instructions are properly joined when using nargs='+'
                 task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
 
-        
+            protoblock = None
+            # Load protoblock from JSON file if provided
+            if args.json:
+                from tac.blocks.model import ProtoBlock
+                protoblock = ProtoBlock.load(args.json)
+                print(f"\n📄 Loaded protoblock from: {args.json}")
+            
+            # If an image URL was provided via the CLI, update the protoblock if it exists
+            if args.image is not None:
+                # Also store it in args in case it is used later for protoblock generation
+                setattr(args, "image_url", args.image)
+                if protoblock is not None:
+                    protoblock.image_url = args.image
+
             if config.general.use_orchestrator:
                 if voice_ui is not None:
                     raise NotImplementedError("Voice UI is not supported with orchestrator")
@@ -622,13 +616,6 @@ def main():
                     logger.error("Multi-block orchestrator execution failed.")
                     sys.exit(1)
             else:
-                
-                # Load protoblock from JSON file if provided
-                protoblock = None
-                if args.json:
-                    from tac.blocks.model import ProtoBlock
-                    protoblock = ProtoBlock.load(args.json)
-                    print(f"\n📄 Loaded protoblock from: {args.json}")
                 
                 block_processor = BlockProcessor(task_instructions, codebase, protoblock=protoblock)
                 success = block_processor.run_loop()
