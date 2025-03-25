@@ -124,7 +124,8 @@ def test_proto_block_to_dict():
         "branch_name": "dict_branch",
         "block_id": "dictTest",
         "trusty_agents": ["agent_dict"],
-        "trusty_agent_prompts": {"agent_dict": "dict prompt"}
+        "trusty_agent_prompts": {"agent_dict": "dict prompt"},
+        "image_url": None
     }
     assert d == expected
 
@@ -193,4 +194,3 @@ def test_load_invalid_json(tmp_path):
         f.write("{invalid json")
     with pytest.raises(ValueError):
         ProtoBlock.load(str(file_path))
-        

@@ -30,6 +30,7 @@ class ProtoBlock:
     trusty_agent_prompts: Dict[str, str] = None
     branch_name: str = None
     commit_message: str = None
+    image_url: Optional[str] = None
 
     def __post_init__(self):
         # Set default value for trusty_agents from config if None
@@ -39,6 +40,10 @@ class ProtoBlock:
         # Set default empty dict for trusty_agent_prompts if None
         if self.trusty_agent_prompts is None:
             self.trusty_agent_prompts = {}
+        
+        # Ensure image_url is set to None if not provided
+        if self.image_url is None:
+            self.image_url = None
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -72,13 +77,13 @@ class ProtoBlock:
         
         # Extract data from the version
         task_description = version_data.get('task', {}).get('specification', '')
-        
         write_files = version_data.get('write_files', [])
         context_files = version_data.get('context_files', [])
         commit_message = version_data.get('commit_message', '')
         branch_name = version_data.get('branch_name', '')
         trusty_agents = version_data.get('trusty_agents', config.general.trusty_agents.default_trusty_agents)
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
+        image_url = version_data.get('image_url', None)
         
         # Create and return the ProtoBlock
         return cls(
@@ -89,7 +94,8 @@ class ProtoBlock:
             commit_message=commit_message,
             branch_name=branch_name,
             trusty_agents=trusty_agents,
-            trusty_agent_prompts=trusty_agent_prompts
+            trusty_agent_prompts=trusty_agent_prompts,
+            image_url=image_url
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -116,7 +122,8 @@ class ProtoBlock:
             "branch_name": self.branch_name,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "image_url": self.image_url
         }
         
         # Use provided filename or generate default one
@@ -164,5 +171,6 @@ class ProtoBlock:
             "branch_name": self.branch_name,
             "block_id": self.block_id,
             "trusty_agents": self.trusty_agents,
-            "trusty_agent_prompts": self.trusty_agent_prompts
+            "trusty_agent_prompts": self.trusty_agent_prompts,
+            "image_url": self.image_url
         }
