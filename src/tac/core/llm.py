@@ -60,6 +60,19 @@ class LLMClient:
             
         return OpenAI(**kwargs)
     
+    def _inject_reasoning_into_system(self, messages: List[Message]) -> List[Message]:
+        """
+        For reasoning models, incorporate the reasoning strength into the system prompt messages.
+        For non-reasoning (e.g., vision model 'gpt-4o'), do nothing.
+        """
+        # Assuming vision model is identified by 'gpt-4o'
+        if self.config.model == "gpt-4o":
+            return messages
+        for msg in messages:
+            if msg.role == "system":
+                msg.content = f"{msg.content}\n(Reasoning Effort: {self.config.settings.reasoning_effort})"
+        return messages
+
     def chat_completion(
         self,
         messages: List[Message],
@@ -79,6 +92,9 @@ class LLMClient:
         Returns:
             str: The content of the model's response message
         """
+        # Inject reasoning effort into system prompts for reasoning models.
+        messages = self._inject_reasoning_into_system(messages)
+        
         # Convert messages to the format expected by the API
         formatted_messages = []
         
@@ -106,13 +122,12 @@ class LLMClient:
                 for msg in messages
             ]
         
-        # Prepare completion parameters
+        # Prepare completion parameters without passing 'reasoning_effort'
         params = {
             "model": self.config.model,
             "messages": formatted_messages,
             "stream": stream,
             "timeout": self.config.settings.timeout,
-            "reasoning_effort": self.config.settings.reasoning_effort,
         }
         
         # Models that don't support temperature parameter
@@ -297,13 +312,12 @@ class LLMClient:
                     "content": msg.content
                 })
         
-        # Prepare completion parameters
+        # Prepare completion parameters without passing 'reasoning_effort'
         params = {
             "model": self.config.model,
             "messages": formatted_messages,
             "stream": False,
             "timeout": self.config.settings.timeout,
-            "reasoning_effort": self.config.settings.reasoning_effort,
         }
         
         # Use settings from config if not overridden
