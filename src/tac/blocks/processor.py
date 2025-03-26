@@ -146,16 +146,24 @@ class BlockProcessor:
         for idx_attempt in range(max_retries):
             logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
 
-            # Halt execution? Also revert the changes on the feature branch if git is enabled
+            # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
             if idx_attempt > 0:
-                # Only show pause prompt if halt_after_fail is true in config
                 if config.general.halt_after_fail:
-                    input("Execution paused: press Enter to continue with the next attempt, or Ctrl+C to abort...")
-
-                # Revert changes on the feature branch if git is enabled
-                if config.git.enabled:
-                    logger.info("Reverting changes while staying on feature branch...")
-                    self.git_manager.revert_changes()
+                    user_input = input("Execution paused after failure. Enter 'r' to revert to last commit (clean state), or 'c' to continue with current state: ").strip().lower()
+                    if user_input in ['r', 'revert']:
+                        if config.git.enabled:
+                            logger.info("Reverting changes as per user selection...")
+                            self.git_manager.revert_changes()
+                        else:
+                            logger.info("Git is disabled; cannot revert changes.")
+                    elif user_input in ['c', 'continue']:
+                        logger.info("Continuing with current state as per user selection...")
+                    else:
+                        logger.info("Invalid selection, defaulting to continue without reverting.")
+                else:
+                    if config.git.enabled:
+                        logger.info("Reverting changes while staying on feature branch...")
+                        self.git_manager.revert_changes()
 
             # Generate a protoblock
             try:
