@@ -577,6 +577,12 @@ def main():
                 task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
 
             # HERE WE INJECT THE UI PROMPT
+            from tac.prompt_injector import UIPromptInjector
+            ui_injector = UIPromptInjector()
+            ui_injector.start()
+            ui_prompt = ui_injector.wait_until_prompt(timeout=5)
+            if ui_prompt:
+                task_instructions = ui_prompt
 
             protoblock = None
             if args.json:
