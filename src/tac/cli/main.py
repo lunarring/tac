@@ -167,6 +167,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    parser.add_argument('--ui', action='store_true', help='Launch a UI server with WebSocket and serve a Three.js Hello World page')
     
     # Add global arguments
     parser.add_argument(
@@ -189,7 +190,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     run_parser.add_argument(
         'instructions',
-        nargs='+',  # Changed from REMAINDER to + to ensure it doesn't capture --log-level
+        nargs='+',
         help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
     )
     run_parser.add_argument(
@@ -218,14 +219,14 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
             group.add_argument(
                 positive_name,
                 action='store_true',
-                default=None,  # Don't override config default
+                default=None,
                 help=f'Enable {key.replace("_", " ").title()} (default: {value})'
             )
             group.add_argument(
                 negative_name,
                 action='store_false',
                 dest=key.replace("-", "_"),
-                default=None,  # Don't override config default
+                default=None,
                 help=f'Disable {key.replace("_", " ").title()} (default: {value})'
             )
         else:
@@ -428,6 +429,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
 
 def main():
     parser, args = parse_args()
+
+    if args.ui:
+        from web.ui_launcher import launch_ui
+        launch_ui()
+        sys.exit(0)
     
     # Initialize config before any logging
     config.override_with_args(vars(args))
@@ -503,11 +509,7 @@ def main():
         # First do a pre-run, setting up the test and getting baseline performance
         optimizer.optimize(nmb_runs=5) 
 
-        # Now do the optimization
-        # optimizer.optimize_function()
-        # optimizer.run_test_function()
-
-        sys.exit(0) # Call the optimize method
+        sys.exit(0)
 
     voice_ui = None
     if args.command == 'voice':
@@ -521,19 +523,15 @@ def main():
             voice_instructions = voice_ui.task_instructions
             
             # Set up all necessary args that make command uses
-            # Create a new Namespace with all the make command arguments
             make_args = argparse.Namespace()
-            # Required arguments
             make_args.dir = '.'
             make_args.no_git = getattr(args, 'no_git', False)
             make_args.json = None
-            make_args.instructions = None  # Will be set from voice_instructions later
+            make_args.instructions = None
             
-            # Add all config-based arguments with their defaults
             for key in vars(config.general):
                 setattr(make_args, key.replace('-', '_'), getattr(config.general, key))
             
-            # Merge the new arguments into the existing args namespace
             for attr in vars(make_args):
                 setattr(args, attr, getattr(make_args, attr))
             
@@ -542,29 +540,24 @@ def main():
             sys.exit(0)
 
     if args.command == 'make' or voice_ui is not None:
-        # Initialize git manager and check status only if git is enabled
         git_manager = None
         
         try:
-            # Override config values with command line arguments if provided
             config_override = {}
             for key in vars(config.general):
-                arg_key = key.replace('-', '_')  # Convert CLI arg format back to config format
+                arg_key = key.replace('-', '_')
                 if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
                     config_override[key] = getattr(args, arg_key)
                 
-            # Add no_git flag to config
             if args.no_git:
                 config_override['git'] = {'enabled': False}
-                # Apply the override immediately to ensure it takes effect
                 config.override_with_dict(config_override)
                 logger.info("Git operations disabled via --no-git flag")
 
             git_manager = create_git_manager()
-            if not git_manager.check_status()[0]:  # Only check the status boolean, ignore branch name
+            if not git_manager.check_status()[0]:
                 sys.exit(1)
 
-            # First of all: run tests, do they all pass
             logger.info("Test Execution Details:", heading=True)
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
@@ -574,28 +567,22 @@ def main():
                 logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
                 sys.exit(1)
 
-            # Get codebase content
             project_files = ProjectFiles()
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
 
-            # Get task instructions directly from args.instructions or voice_instructions
             if voice_ui is not None:
                 task_instructions = voice_ui.wait_until_prompt()
             else:
-                # Ensure instructions are properly joined when using nargs='+'
                 task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
 
             protoblock = None
-            # Load protoblock from JSON file if provided
             if args.json:
                 from tac.blocks.model import ProtoBlock
                 protoblock = ProtoBlock.load(args.json)
                 print(f"\n📄 Loaded protoblock from: {args.json}")
             
-            # If an image URL was provided via the CLI, update the protoblock if it exists
             if args.image is not None:
-                # Also store it in args in case it is used later for protoblock generation
                 setattr(args, "image_url", args.image)
                 if protoblock is not None:
                     protoblock.image_url = args.image
@@ -604,7 +591,6 @@ def main():
                 if voice_ui is not None:
                     raise NotImplementedError("Voice UI is not supported with orchestrator")
                 
-                # Instantiate the MultiBlockOrchestrator and execute the task
                 multi_block_orchestrator = MultiBlockOrchestrator()
                 success = multi_block_orchestrator.execute(task_instructions, codebase, args, voice_ui, git_manager)
                 
@@ -616,7 +602,6 @@ def main():
                     logger.error("Multi-block orchestrator execution failed.")
                     sys.exit(1)
             else:
-                
                 block_processor = BlockProcessor(task_instructions, codebase, protoblock=protoblock)
                 success = block_processor.run_loop()
             
