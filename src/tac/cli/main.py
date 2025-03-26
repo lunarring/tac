@@ -33,7 +33,7 @@ from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager
-from tac.cli.gather import cli_gather_files, gather_files_command
+from types import SimpleNamespace
 
 # Initialize logger at module level but don't use it as a global in functions
 _module_logger = setup_logging('tac.cli.main')
@@ -433,7 +433,27 @@ def main():
     if args.ui:
         from tac.web.ui import launch_ui
         launch_ui()
-        sys.exit(0)
+        from tac.cli.voice import VoiceUI
+        voice_ui = VoiceUI()
+        if hasattr(args, 'temperature'):
+            voice_ui.temperature = args.temperature
+        voice_ui.start()
+        _logger = setup_logging('tac.cli.main')
+        _logger.info("Waiting for prompt from Three.js UI...")
+        task_instructions = voice_ui.wait_until_prompt()
+        # Prepare make command arguments using default settings from config
+        make_args = SimpleNamespace()
+        make_args.dir = '.'
+        make_args.no_git = getattr(args, 'no_git', False)
+        make_args.json = None
+        make_args.instructions = None
+        for key in vars(config.general):
+            setattr(make_args, key.replace('-', '_'), getattr(config.general, key))
+        for attr in vars(make_args):
+            setattr(args, attr, getattr(make_args, attr))
+        args._ui_prompt = task_instructions
+        # Set command to 'make' to reuse common execution logic below
+        args.command = 'make'
     
     # Initialize config before any logging
     config.override_with_args(vars(args))
@@ -520,10 +540,11 @@ def main():
                 voice_ui.temperature = args.temperature
             voice_ui.start()
             logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
-            voice_instructions = voice_ui.task_instructions
+            # Even in voice mode, wait for the prompt transfer
+            task_instructions = voice_ui.wait_until_prompt()
             
-            # Set up all necessary args that make command uses
-            make_args = argparse.Namespace()
+            # Set up all necessary args that the make command uses
+            make_args = SimpleNamespace()
             make_args.dir = '.'
             make_args.no_git = getattr(args, 'no_git', False)
             make_args.json = None
@@ -571,7 +592,9 @@ def main():
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
 
-            if voice_ui is not None:
+            if voice_ui is not None and hasattr(args, '_ui_prompt'):
+                task_instructions = args._ui_prompt
+            elif voice_ui is not None:
                 task_instructions = voice_ui.wait_until_prompt()
             else:
                 task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
