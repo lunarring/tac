@@ -112,7 +112,7 @@ class LLMClient:
             "messages": formatted_messages,
             "stream": stream,
             "timeout": self.config.settings.timeout,
-            "reasoning_effort": config.general.reasoning_effort,
+            "reasoning_effort": self.config.settings.reasoning_effort,
         }
         
         # Models that don't support temperature parameter
@@ -303,6 +303,7 @@ class LLMClient:
             "messages": formatted_messages,
             "stream": False,
             "timeout": self.config.settings.timeout,
+            "reasoning_effort": self.config.settings.reasoning_effort,
         }
         
         # Use settings from config if not overridden

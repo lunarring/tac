@@ -38,7 +38,6 @@ class TrustyAgentConfig:
 @dataclass
 class GeneralConfig:
     coding_agent: str = "native"
-    reasoning_effort: str = "medium"
     use_file_summaries: bool = True
     trusty_agents: TrustyAgentConfig = field(default_factory=TrustyAgentConfig)
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
@@ -72,6 +71,7 @@ class LLMSettings:
     verify_ssl: bool = True
     timeout: int = 120
     max_image_dimension: int = 1200  # Maximum dimension for image downscaling
+    reasoning_effort: str = "medium"  # Added reasoning_effort
 
 
 @dataclass
@@ -114,7 +114,8 @@ class Config:
             temperature=0.7,
             max_tokens=None,
             verify_ssl=True,
-            timeout=120
+            timeout=120,
+            reasoning_effort="medium"
         )
     ))
     llm_weak: LLMConfig = field(default_factory=lambda: LLMConfig(
@@ -124,7 +125,8 @@ class Config:
             temperature=0.7,
             max_tokens=None,
             verify_ssl=True,
-            timeout=120
+            timeout=120,
+            reasoning_effort="low"
         )
     ))
     llm_vision: LLMConfig = field(default_factory=lambda: LLMConfig(
@@ -134,7 +136,8 @@ class Config:
             temperature=0.7,
             max_tokens=None,
             verify_ssl=True,
-            timeout=180
+            timeout=180,
+            reasoning_effort="medium"
         )
     ))
     logging: LoggingConfig = field(default_factory=LoggingConfig)

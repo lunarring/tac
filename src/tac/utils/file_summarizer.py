@@ -13,7 +13,7 @@ class FileSummarizer:
     """Class for summarizing code files using LLM analysis"""
     
     def __init__(self):
-        self.llm_client = LLMClient()
+        self.llm_client = LLMClient(llm_type="weak")
         self.timeout = config.general.summarizer_timeout
 
     def _generate_detailed_summary(self, code: str, functions: list, classes: list, file_type: str = "python") -> str:
