@@ -21,11 +21,11 @@
       left: 10px;
       width: calc(100% - 20px);
       max-width: 600px;
-      height: 100px; /* increased height for more text lines */
-      font-size: 16px; /* smaller font size */
+      height: 100px;
+      font-size: 16px;
       padding: 5px 10px;
-      background-color: #333333; /* dark grey background */
-      color: #ffffff; /* white text color */
+      background-color: #333333;
+      color: #ffffff;
       z-index: 10;
     }
   </style>
@@ -76,6 +76,20 @@
     socket.onclose = function() {
       console.log("WebSocket connection closed");
     };
+
+    // Expose the socket for testing purposes
+    window.socket = socket;
+
+    // Add event listener for the text entry field to send message on Enter key press
+    const userInput = document.getElementById("userInput");
+    userInput.addEventListener("keydown", function(event) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        const text = userInput.value;
+        socket.send(text);
+        userInput.value = "";
+      }
+    });
   </script>
 </body>
 </html>
