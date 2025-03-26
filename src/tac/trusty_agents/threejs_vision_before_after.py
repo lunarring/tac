@@ -34,7 +34,7 @@ logger = setup_logging('tac.trusty_agents.threejs_vision_before_after')
 @trusty_agent(
     name="threejs_vision_before_after",
     description="For comparisons between the current and the planned implementation. Compares visual changes in Three.js applications before and after code changes. Shows before/after screenshots side by side.",
-    protoblock_prompt="Describe the expected visual changes between the before and after states. Focus on what should be different, like new elements, changed colors, or different layouts.",
+    protoblock_prompt="Describe the expected visual changes that you would expect given the task instructions.",
     prompt_target="coding_agent"
 )
 class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
