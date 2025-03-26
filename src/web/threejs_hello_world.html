@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Three.js Live Updates</title>
+    <style>
+      body { margin: 0; overflow: hidden; }
+      #overlay {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: Arial, sans-serif;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay">Waiting for messages...</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      // Create Three.js scene
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Add a rotating cube to the scene
+      var geometry = new THREE.BoxGeometry();
+      var material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+      var cube = new THREE.Mesh(geometry, material);
+      scene.add(cube);
+
+      camera.position.z = 5;
+
+      function animate() {
+        requestAnimationFrame(animate);
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // Setup WebSocket connection for live updates
+      var socket = new WebSocket("ws://localhost:8080/ws");
+      var overlay = document.getElementById("overlay");
+      // Predefined random messages to simulate Python-sent random updates
+      var messages = [
+        "Hello from Python!",
+        "Keep calm and code on.",
+        "Random update incoming...",
+        "Python says hi!",
+        "Did you know? Python is awesome!"
+      ];
+
+      socket.onopen = function(event) {
+        console.log("WebSocket connection opened");
+        // Send a message every 3 seconds to prompt the server response.
+        setInterval(function(){
+          socket.send("get update");
+        }, 3000);
+      };
+
+      socket.onmessage = function(event) {
+        console.log("Message from server: " + event.data);
+        // On receiving any message, choose a random message from the list and update the overlay.
+        var randomIndex = Math.floor(Math.random() * messages.length);
+        var randomMessage = messages[randomIndex];
+        overlay.innerText = randomMessage;
+      };
+
+      socket.onerror = function(error) {
+        console.log("WebSocket error: ", error);
+      };
+
+      socket.onclose = function() {
+        console.log("WebSocket connection closed");
+      };
+
+      // Adjust camera and renderer on window resize.
+      window.addEventListener('resize', function() {
+        camera.aspect = window.innerWidth/window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }, false);
+    </script>
+  </body>
+</html>
