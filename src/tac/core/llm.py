@@ -297,13 +297,12 @@ class LLMClient:
                     "content": msg.content
                 })
         
-        # Prepare completion parameters
+        # Prepare completion parameters without the reasoning_effort parameter for vision LLM
         params = {
             "model": self.config.model,
             "messages": formatted_messages,
             "stream": False,
             "timeout": self.config.settings.timeout,
-            "reasoning_effort": self.config.settings.reasoning_effort,
         }
         
         # Use settings from config if not overridden
