@@ -1,21 +1,21 @@
 import pytest
-from src.tac.communication import PromptTransfer
+from tac.web.comms import Web2PythonTransfer
 
 def test_set_and_get_prompt():
-    pt = PromptTransfer()
+    pt = Web2PythonTransfer()
     test_prompt = "This is a test prompt."
-    pt.set_prompt(test_prompt)
-    assert pt.get_prompt() == test_prompt
+    pt.set_payload(test_prompt)
+    assert pt.get_payload() == test_prompt
 
 def test_overwrite_prompt():
-    pt = PromptTransfer()
+    pt = Web2PythonTransfer()
     first_prompt = "First prompt."
     second_prompt = "Second prompt."
-    pt.set_prompt(first_prompt)
-    pt.set_prompt(second_prompt)
-    assert pt.get_prompt() == second_prompt
+    pt.set_payload(first_prompt)
+    pt.set_payload(second_prompt)
+    assert pt.get_payload() == second_prompt
 
 def test_empty_prompt():
-    pt = PromptTransfer()
-    pt.set_prompt("")
-    assert pt.get_prompt() == ""
+    pt = Web2PythonTransfer()
+    pt.set_payload("")
+    assert pt.get_payload() == ""
