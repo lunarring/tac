@@ -431,8 +431,7 @@ def main():
     parser, args = parse_args()
 
     if args.ui:
-        from web.ui_launcher import launch_ui
-        launch_ui()
+        print("UI feature has been removed.")
         sys.exit(0)
     
     # Initialize config before any logging
