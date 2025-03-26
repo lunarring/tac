@@ -51,26 +51,29 @@ class ProtoBlockGenerator:
         trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
 
         return f"""<purpose>
-You are a senior python software engineer. You are specialized in updating codebases and precisely formulating instructions for your your junior software engineer employee, who then implements the final code. You have access to the <codebase> and <task_instructions> from the boss. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
+You are a senior python software engineer. You are specialized in figuring out how to phrase precise instructions for your employees who are junior software engineers and implement the  final code. You have access to the <task_instructions> and <codebase>. The important aspect of your work is that you want to make sure that the resulting code can be easily verified. For this we have a palette of trusty agents from which you choose, and they can run an empirical verification of the code. Each trusty agent is specialized in a different aspect that they can test and your coding instructions and thinking should to be phrased in a way that we can maximize this verification process, given the chosen trusty agents. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
 </purpose>
-
-<codebase>
-{codebase}
-</codebase>
 
 <task_instructions>
 {task_instructions}
 </task_instructions>
 
+<codebase>
+{codebase}
+</codebase>
+
 <planning_rules>
 - Examine carefully the codebase and the task instructions, and then develop a plan how this task could be implemented, but stay on the GOAL level and do not describe the exact implementation details.
-- We will need to supply two kinds of files to the coding agent:
-    - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context! Test files should only be created in tests/test_*.py e.g. tests/test_piano_trainer_main.py.
-    - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! 
-- If we have an error analysis from the last implementation attempt, you should include it in the task instructions, expand them and make them longer to include as much detail as possible.
+- Think how this GOAL could be verified by the trusty agents. 
 - Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
 - Here a description of what each trusty agent is capable of {trusty_agents_description}
 - Select the most appropriate trusty agents that is capable of verifying the task. Select only one agent!
+- Furthermore, we will need to supply two kinds of files to the coding agent:
+    - context files: files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context! Test files should only be created in tests/test_*.py e.g. tests/test_piano_trainer_main.py.
+    - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! 
+- If we have an error analysis from the last implementation attempt, you should include it in the task instructions, expand them and make them longer to include as much detail as possible.
+
+
 - The output format is a single JSON object, you need to follow the format as described below.
 </planning_rules>
 
@@ -100,7 +103,7 @@ And here a bit more detailed explanation of the output format:
     "commit_message": "Brief commit message about your changes.",
     "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
     "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}"],
-    "trusty_agent_prompts": {{"agent_name1": "... fill in here the prompt for the trusty agent 1", "agent_name2": "... fill in here the prompt for the trusty agent 2"}}
+    "trusty_agent_prompts": {{"trusty_agent_name": "... fill in here the prompt for the trusty agent that will verify the code"}}
 }}
 
 Now you have to decide which trusty agent you are using. Since we are using trusty agents to generate TRUST in the code that was made by the coding agent, we need to select the most appropriate trusty agent for the task. This really depends on the task at hand and how we can best verify it. We have the following trusty agents available:
