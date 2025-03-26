@@ -576,6 +576,8 @@ def main():
             else:
                 task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
 
+            # HERE WE INJECT THE UI PROMPT
+
             protoblock = None
             if args.json:
                 from tac.blocks.model import ProtoBlock
