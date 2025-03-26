@@ -112,8 +112,10 @@ class LLMClient:
             "messages": formatted_messages,
             "stream": stream,
             "timeout": self.config.settings.timeout,
-            "reasoning_effort": self.config.settings.reasoning_effort,
         }
+        # Include reasoning_effort only for supported models
+        if self.config.model in ["o3-mini", "r1"]:
+            params["reasoning_effort"] = self.config.settings.reasoning_effort
         
         # Models that don't support temperature parameter
         if self.config.model not in ["o1-mini", "deepseek-reasoner", "o3-mini"]:
@@ -303,8 +305,10 @@ class LLMClient:
             "messages": formatted_messages,
             "stream": False,
             "timeout": self.config.settings.timeout,
-            "reasoning_effort": self.config.settings.reasoning_effort,
         }
+        # Include reasoning_effort only for supported models
+        if self.config.model in ["o3-mini", "r1"]:
+            params["reasoning_effort"] = self.config.settings.reasoning_effort
         
         # Use settings from config if not overridden
         if temperature is None:
