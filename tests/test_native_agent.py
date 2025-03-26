@@ -3,6 +3,7 @@ import shutil
 import pytest
 from pathlib import Path
 from tac.coding_agents.native_agent import NativeAgent
+from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
 # A minimal dummy ProtoBlock to simulate the real one
 class DummyProtoBlock:
@@ -35,7 +36,6 @@ def temp_dir(tmp_path):
     os.chdir(orig_dir)
 
 def test_load_file_contents(temp_dir):
-    agent = NativeAgent(config={})
     # Create a write file with content.
     write_file = temp_dir / "write.py"
     content = "print('hello world')"
@@ -45,31 +45,30 @@ def test_load_file_contents(temp_dir):
     
     # Test for a real file.
     files = [str(write_file)]
-    contents = agent._load_file_contents(files, "write")
+    contents = load_file_contents(files, "write")
     assert contents[str(write_file)] == content
     
     # Test for a non-existent write file: should return a placeholder.
     files = [str(non_existent)]
-    contents = agent._load_file_contents(files, "write")
+    contents = load_file_contents(files, "write")
     placeholder = "# This file is empty at the moment."
     assert contents[str(non_existent)] == placeholder
 
 def test_format_files_for_prompt():
-    agent = NativeAgent(config={})
     file_contents = {
         "file1.py": "print('Hello')",
         "dir/file2.py": "def foo(): pass"
     }
     
     # Test for normal write file formatting.
-    prompt_str = agent._format_files_for_prompt(file_contents)
+    prompt_str = format_files_for_prompt(file_contents)
     for file_path, content in file_contents.items():
         assert f"###FILE: {file_path}" in prompt_str
         assert content in prompt_str
         assert "###END_FILE" in prompt_str
     
     # Test for context file formatting (should include the do not edit comment).
-    prompt_context = agent._format_files_for_prompt(file_contents, is_context=True)
+    prompt_context = format_files_for_prompt(file_contents, is_context=True)
     for file_path in file_contents.keys():
         assert f"###FILE: {file_path}" in prompt_context
         assert "# This file is for context only, please do not edit it" in prompt_context
