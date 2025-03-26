@@ -14,6 +14,18 @@
       background: rgba(0,0,0,0.5);
       padding: 10px;
       z-index: 10;
+      display: none;
+    }
+    #statusIndicator {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      color: #ffffff;
+      font-family: sans-serif;
+      background: red;
+      padding: 5px 10px;
+      border-radius: 4px;
+      z-index: 10;
     }
     #userInput {
       position: absolute;
@@ -32,6 +44,7 @@
 </head>
 <body>
   <div id="messageContainer"></div>
+  <div id="statusIndicator">offline</div>
   <textarea id="userInput" placeholder="Enter text here..."></textarea>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
@@ -61,20 +74,27 @@
     }
     animate();
 
-    // Establish websocket connection and display incoming messages
+    // Establish websocket connection and update LED indicator status
+    const statusIndicator = document.getElementById("statusIndicator");
     const socket = new WebSocket("ws://localhost:8765");
     socket.onopen = function() {
       console.log("WebSocket connection opened");
+      statusIndicator.style.background = "green";
+      statusIndicator.innerHTML = "online";
     };
     socket.onmessage = function(event) {
-      const container = document.getElementById("messageContainer");
-      container.innerHTML = "Received: " + event.data;
+      // Incoming messages are logged but not displayed in the UI per new requirements
+      console.log("Received: " + event.data);
     };
     socket.onerror = function(error) {
       console.error("WebSocket error:", error);
+      statusIndicator.style.background = "red";
+      statusIndicator.innerHTML = "offline";
     };
     socket.onclose = function() {
       console.log("WebSocket connection closed");
+      statusIndicator.style.background = "red";
+      statusIndicator.innerHTML = "offline";
     };
 
     // Expose the socket for testing purposes
