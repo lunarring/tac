@@ -56,7 +56,7 @@ class TrustyAgentRegistry:
         Returns:
             dict: A dictionary mapping agent names to their descriptions
         """
-        return {name: desc for name, desc in cls._descriptions.items()}
+        return {name: desc for name, desc in cls._descriptions.items() if name != "plausibility"}
 
     @classmethod
     def get_agent_prompt_sections_for_output_format(cls):
@@ -96,6 +96,10 @@ class TrustyAgentRegistry:
         result = ""
         
         for section_name, content in sections.items():
+            # Exclude plausibility agent sections
+            if "plausibility" in section_name.lower():
+                continue
+                
             # Escape any quotes in the content
             escaped_content = content.replace('"', '\\"')
             result += f'"{section_name}": "{escaped_content}",\n'
