@@ -35,8 +35,17 @@ from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager
 from tac.cli.gather import cli_gather_files, gather_files_command
 
-# Initialize logger at module level but don't use it as a global in functions
+from tac.communication import PromptTransfer
+# Global prompt transfer instance used by the Three.js interface
+prompt_transfer = PromptTransfer()
+
 _module_logger = setup_logging('tac.cli.main')
+
+def wait_for_ui_prompt(pt):
+    import time
+    while pt.get_prompt() is None:
+        time.sleep(0.1)
+    return pt.get_prompt()
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -178,9 +187,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
     
-    # Block command
+    # Block command (make)
     run_parser = subparsers.add_parser('make',
-        help='Execute a task with automated tests based on instructions'
+        help='Execute a task with automated tests based on instructions (waits for a prompt from the Three.js interface)'
     )
     # Also add log-level to the make subcommand to handle both positions
     run_parser.add_argument(
@@ -188,10 +197,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         help='Set the logging level (default: from config)'
     )
+    # The positional instructions argument is kept for backwards compatibility but will be ignored in favor of the UI prompt
     run_parser.add_argument(
         'instructions',
         nargs='+',
-        help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
+        help='Instructions for the task to execute. (Ignored when using the Three.js UI prompt.)'
     )
     run_parser.add_argument(
         '--dir',
@@ -204,7 +214,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Image URL to be associated with the task'
     )
     
-    # Dynamically add arguments from general config
+    # Dynamically add arguments from general config to make command
     general_config = config.general
     for key, value in vars(general_config).items():
             
@@ -248,6 +258,58 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         help='Disable all git operations (branch checks, commits, etc.)'
     )
     
+    # New UI command identical in behavior to 'make'
+    ui_parser = subparsers.add_parser('ui',
+        help='Execute a task with automated tests based on instructions from the Three.js UI prompt'
+    )
+    ui_parser.add_argument(
+        '--dir',
+        default='.',
+        help='Directory to analyze and create block from (default: current directory)'
+    )
+    ui_parser.add_argument(
+        '--image',
+        type=str,
+        help='Image URL to be associated with the task'
+    )
+    ui_parser.add_argument(
+        '--no-git',
+        action='store_true',
+        help='Disable all git operations (branch checks, commits, etc.)'
+    )
+    for key, value in vars(config.general).items():
+        arg_name = f'--{key.replace("_", "-")}'
+        arg_type = type(value)
+        if arg_type == bool:
+            positive_name = arg_name
+            negative_name = f'--no-{key.replace("_", "-")}'
+            group = ui_parser.add_mutually_exclusive_group()
+            group.add_argument(
+                positive_name,
+                action='store_true',
+                default=None,
+                help=f'Enable {key.replace("_", " ").title()} (default: {value})'
+            )
+            group.add_argument(
+                negative_name,
+                action='store_false',
+                dest=key.replace("-", "_"),
+                default=None,
+                help=f'Disable {key.replace("_", " ").title()} (default: {value})'
+            )
+        else:
+            ui_parser.add_argument(
+                arg_name,
+                type=arg_type,
+                default=value,
+                help=f'{key.replace("_", " ").title()} (default: {value})'
+            )
+    ui_parser.add_argument(
+        '--json',
+        type=str,
+        help='Path to a JSON file containing a protoblock definition to execute'
+    )
+
     # File gathering command
     gather_parser = subparsers.add_parser('gather',
         help='Gather and analyze Python files in a directory'
@@ -302,7 +364,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     test_parser = subparsers.add_parser('test',
         help='Run or list tests'
     )
-    # Add log-level to the test subcommand
     test_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -314,7 +375,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     run_test_parser = test_subparsers.add_parser('run',
         help='Run tests'
     )
-    # Add log-level to the run test subcommand
     run_test_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -335,7 +395,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         default='tests',
         help='Directory containing tests (default: tests)'
     )
-    # Add log-level to the list test subcommand
     list_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -365,7 +424,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     view_parser = subparsers.add_parser('view',
         help='View a protoblock in a GUI'
     )
-    # Add log-level to the view subcommand
     view_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -376,7 +434,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     voice_parser = subparsers.add_parser('voice',
         help='Start voice interface'
     )
-    # Add log-level to the voice subcommand
     voice_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -404,7 +461,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     debug_parser = subparsers.add_parser('debug',
         help='Debug commands for development'
     )
-    # Add log-level to the debug subcommand
     debug_parser.add_argument(
         '--log-level',
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -443,7 +499,6 @@ def main():
     env_log_level = os.environ.get('TAC_LOG_LEVEL')
     
     # Command line args have second highest priority
-    # Check both global and subcommand log-level arguments
     cmd_log_level = args.log_level if hasattr(args, 'log-level') and args.log_level else None
     
     # Config has lowest priority
@@ -467,7 +522,6 @@ def main():
     
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
-        # Import and run the viewer without creating log files
         from tac.cli.viewer import TACViewer
         try:
             TACViewer().logs_menu()
@@ -476,7 +530,6 @@ def main():
             sys.exit(0)
         return
     
-    # Configure logging for all other commands
     logger.debug(f"Overriding config with args: {vars(args)}")
     logger.debug(f"Config after override: {config}")
     
@@ -494,21 +547,15 @@ def main():
         return
     
     if args.command == 'optimize':
-        # Set log level explicitly for the optimize command
         if hasattr(args, 'log_level') and args.log_level:
             log_level = args.log_level
-            # Update the logger with the new log level
             logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
-            # Also update the config
             config.override_with_dict({'logging': {'tac': {'level': log_level}}})
-            # Update all existing loggers
             update_all_loggers(log_level)
             
         logger.debug(f"Optimizing function: {args.function_name}")
         optimizer = PerformanceTestingAgent(args.function_name, config)
-        # First do a pre-run, setting up the test and getting baseline performance
         optimizer.optimize(nmb_runs=5) 
-
         sys.exit(0)
 
     voice_ui = None
@@ -520,8 +567,6 @@ def main():
                 voice_ui.temperature = args.temperature
             voice_ui.start()
             logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
-            voice_instructions = voice_ui.task_instructions
-            
             # Set up all necessary args that make command uses
             make_args = argparse.Namespace()
             make_args.dir = '.'
@@ -539,7 +584,13 @@ def main():
             print("\nGoodbye!")
             sys.exit(0)
 
-    if args.command == 'make' or voice_ui is not None:
+    # For 'make', 'ui', and 'voice' commands, wait for the prompt from the UI (or voice) interface.
+    if args.command in ['make', 'ui', 'voice']:
+        if args.command == 'voice':
+            task_instructions = voice_ui.wait_until_prompt()
+        else:
+            task_instructions = wait_for_ui_prompt(prompt_transfer)
+        
         git_manager = None
         
         try:
@@ -571,11 +622,6 @@ def main():
             project_files.update_summaries()
             codebase = project_files.get_codebase_summary()
 
-            if voice_ui is not None:
-                task_instructions = voice_ui.wait_until_prompt()
-            else:
-                task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
-
             protoblock = None
             if args.json:
                 from tac.blocks.model import ProtoBlock
@@ -588,7 +634,7 @@ def main():
                     protoblock.image_url = args.image
 
             if config.general.use_orchestrator:
-                if voice_ui is not None:
+                if args.command == 'voice':
                     raise NotImplementedError("Voice UI is not supported with orchestrator")
                 
                 multi_block_orchestrator = MultiBlockOrchestrator()
@@ -616,7 +662,6 @@ def main():
         except Exception as e:
             logger.error(f"Error during execution: {e}")
             sys.exit(1)
-
     else:
         parser.print_help()
         sys.exit(1)
