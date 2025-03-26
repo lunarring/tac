@@ -431,7 +431,8 @@ def main():
     parser, args = parse_args()
 
     if args.ui:
-        print("UI feature has been removed.")
+        from tac.web.ui import launch_ui
+        launch_ui()
         sys.exit(0)
     
     # Initialize config before any logging
