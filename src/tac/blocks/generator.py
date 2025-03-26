@@ -43,8 +43,6 @@ class ProtoBlockGenerator:
         """
         codebase = self.project_files.get_codebase_summary()
         
-
-        
         # Get all agent-specific sections for the output format explained
         trusty_agents_prompts = TrustyAgentRegistry.generate_agent_prompts()
 
@@ -363,7 +361,8 @@ Now you have to decide which trusty agent you are using. Since we are using trus
                 last_error = e
                 logger.warning(f"Protoblock creation failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
                 if attempt < max_retries - 1:
-                    # Add a small delay before retrying to avoid rate limits
+                    # Add detailed error analysis from previous attempt into the next prompt
+                    messages.append(Message(role="user", content=f"Additional error analysis from previous attempt: {str(e)}"))
                     time.sleep(1)
                     continue
                 
