@@ -19,6 +19,7 @@ async def handle_connection(websocket):
 async def run_server():
     server = await websockets.serve(handle_connection, 'localhost', 8765)
     print("WebSocket server started on ws://localhost:8765")
+    print("Please open 'src/tac/web/index.html' in your browser to view the UI.")
     try:
         await asyncio.Future()  # Run forever
     except asyncio.CancelledError:
