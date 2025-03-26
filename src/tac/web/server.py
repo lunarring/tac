@@ -14,11 +14,13 @@ WEBSOCKET_PORT = 8765
 # Define an asynchronous websocket handler
 async def ws_handler(websocket, path):
     print(f"New websocket connection: {websocket.remote_address}")
+    counter = 0
     try:
         while True:
-            # Send dynamic content - current datetime string
-            message = f"Server time: {datetime.datetime.now()}"
+            # Send dynamic content - a counter value that increments every second
+            message = f"Counter: {counter}"
             await websocket.send(message)
+            counter += 1
             await asyncio.sleep(1)
     except websockets.exceptions.ConnectionClosed:
         print("Websocket connection closed.")
