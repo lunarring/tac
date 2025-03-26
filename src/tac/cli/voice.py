@@ -47,15 +47,12 @@ class VoiceUI:
         logger.debug("Generating instructions")
         return self.prompt_tac + "\n" + self.prompt_codebase
 
-
-
     def start(self):
         """Start the voice UI."""
         logger.info("🎙️ Starting TAC Voice Interface...")
         self.rtv.start()
         self.rtv.inject_message(self.prompt_startup)
         
-
     def stop(self):
         """Stop the voice UI."""
         logger.info("👋 Stopping Voice UI")
@@ -87,8 +84,7 @@ class VoiceUI:
         logger.debug("🔊 AI audio playback completed")
         if self.task_instructions is not None:
             self.stop_ai_audio = True
-        
-
+       
     async def on_user_transcript(self, transcript: str):
         """Callback when user speech is transcribed.
         
@@ -96,6 +92,7 @@ class VoiceUI:
             transcript: The transcribed user speech.
         """
         logger.info(f"👤 User: {transcript}")
+        print(transcript)
         self.task_instructions = transcript
         self.stop_ai_audio = True
 
