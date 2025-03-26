@@ -5,6 +5,7 @@ from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.trusty_agents.base import TrustyAgent, trusty_agent
+from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
 logger = setup_logging('tac.trusty_agents.plausibility')
 
@@ -61,15 +62,25 @@ class PlausibilityTestingAgent(TrustyAgent):
         logger.debug(f"Git diff length: {len(code_diff) if code_diff else 'None'}")
         
         try:
+            # Process write files
+            write_files = list(set(protoblock.write_files))
+            write_file_contents = load_file_contents(write_files, "write")
+            write_files_prompt = format_files_for_prompt(write_file_contents)
+
             # Prepare prompt
             analysis_prompt = f"""<purpose>
 You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. Critically, you need to determine if the implemented changes are also actively used in the codebase and integrated properly, especially when existing functionality is replaced with new one. However keep in mind, the implementation was done by a junior developer and we don't want to scare them off. Furthermore, the codebase passed all tests already, but here we are interested if the changes are making sense in what we want to achieve.
 </purpose>
 
-Here a summary of the codebase:
-<codebase>
-{codebase}
-</codebase>
+Here are the files that were modified:
+<modified_files>
+{write_files_prompt}
+</modified_files>
+
+And here specifically what was changed:
+<code_diff>
+{code_diff}
+</code_diff>
 
 And here the description of the task:
 <protoblock>
@@ -79,9 +90,7 @@ Context Files: {protoblock.context_files}
 Plausibility Prompt: {protoblock.trusty_agent_prompts.get("plausibility", "Use common sense.")}
 </protoblock>
 
-<implemented_changes>
-{code_diff}
-</implemented_changes>
+
 
 <analysis_rules>
 1. Compare the implemented changes against the task description
@@ -127,7 +136,6 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             logger.debug(f"Prompt for plausibility check: {analysis_prompt}")
             
             messages = [
-                Message(role="system", content="You are a coding assistant specialized in reviewing code changes for correctness and completeness. Provide clear, actionable analysis."),
                 Message(role="user", content=analysis_prompt)
             ]
             
