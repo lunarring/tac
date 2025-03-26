@@ -153,13 +153,18 @@ class BlockProcessor:
                     input("Execution paused: press Enter to continue with the next attempt, or Ctrl+C to abort...")
 
                 # Revert changes on the feature branch if git is enabled
-                if config.git.enabled :
+                if config.git.enabled:
                     logger.info("Reverting changes while staying on feature branch...")
                     self.git_manager.revert_changes()
 
-
             # Generate a protoblock
-            self.create_protoblock(idx_attempt, error_analysis)
+            try:
+                self.create_protoblock(idx_attempt, error_analysis)
+            except ValueError as exc:
+                error_analysis = str(exc)
+                logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
+                self.store_previous_protoblock()
+                continue
 
             # Handle git branch setup first if git is enabled
             if idx_attempt == 0:
