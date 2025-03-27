@@ -372,6 +372,13 @@ Agent prompts formatting:
                     # Get trusty_agent_prompts
                     trusty_agent_prompts = data.get("trusty_agent_prompts", {})
                     
+                    # Ensure plausibility uses the default prompt regardless of what was provided
+                    # This ensures consistency since plausibility is excluded from user selection
+                    if "plausibility" in trusty_agents:
+                        default_prompt = TrustyAgentRegistry.get_protoblock_prompt("plausibility")
+                        if default_prompt:
+                            trusty_agent_prompts["plausibility"] = default_prompt
+                    
                     # Get task specification
                     task_spec = data["task"]["specification"] if isinstance(data["task"], dict) else data["task"]
                     if isinstance(task_spec, list):
