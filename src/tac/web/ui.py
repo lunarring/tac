@@ -1,6 +1,7 @@
 import asyncio
 import random
 import string
+import json
 import websockets
 
 async def handle_connection(websocket):
@@ -8,7 +9,9 @@ async def handle_connection(websocket):
         while True:
             try:
                 # Generate a random 10-character string
-                msg = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+                random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+                # Format the message as a JSON object with type and content keys
+                msg = json.dumps({"type": "chat", "content": random_str})
                 await websocket.send(msg)
                 await asyncio.sleep(1)
             except websockets.exceptions.ConnectionClosed:

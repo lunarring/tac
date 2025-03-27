@@ -1,4 +1,5 @@
 import asyncio
+import json
 import random
 import string
 import pytest
@@ -25,8 +26,18 @@ async def test_websocket_server():
         except asyncio.CancelledError:
             pass
 
-    # Assert that 3 messages were received and each is a random 10-character string.
+    # Assert that 3 messages were received and each is a JSON object with 'type' and 'content' keys.
+    # The 'content' field should be a random 10-character string.
     assert len(messages) == 3
-    for msg in messages:
-        assert isinstance(msg, str)
-        assert len(msg) == 10
+    for raw_msg in messages:
+        assert isinstance(raw_msg, str)
+        try:
+            msg = json.loads(raw_msg)
+        except Exception as e:
+            assert False, f"Failed to parse JSON: {e}"
+
+        assert isinstance(msg, dict)
+        assert 'type' in msg
+        assert 'content' in msg
+        assert isinstance(msg['content'], str)
+        assert len(msg['content']) == 10
