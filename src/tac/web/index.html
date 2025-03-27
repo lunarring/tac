@@ -4,60 +4,83 @@
   <meta charset="UTF-8">
   <title>WebSocket Three.js UI</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+    #container {
+      display: flex;
+      flex-direction: row;
+      width: 100vw;
+      height: 100vh;
+    }
+    #chatColumn {
+      width: 40%;
+      padding: 10px;
+      box-sizing: border-box;
+      background-color: #222;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
     #messageContainer {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: #ffffff;
       font-family: sans-serif;
       background: rgba(0,0,0,0.5);
       padding: 10px;
-      z-index: 10;
+      margin-bottom: 10px;
       display: none;
     }
     #statusIndicator {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      color: #ffffff;
       font-family: sans-serif;
       background: red;
       padding: 5px 10px;
       border-radius: 4px;
-      z-index: 10;
+      margin-bottom: 10px;
+      width: fit-content;
     }
     #userInput {
-      position: absolute;
-      top: 70px;
-      left: 10px;
-      width: calc(100% - 20px);
-      max-width: 600px;
-      height: 100px;
+      flex-grow: 1;
       font-size: 16px;
-      padding: 5px 10px;
+      padding: 10px;
       background-color: #333333;
       color: #ffffff;
-      z-index: 10;
+      border: none;
+      resize: none;
+    }
+    #visualizationColumn {
+      width: 60%;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Ensure Three.js canvas fills its container */
+    #visualizationColumn canvas {
+      display: block;
     }
   </style>
 </head>
 <body>
-  <div id="messageContainer"></div>
-  <div id="statusIndicator">offline</div>
-  <textarea id="userInput" placeholder="Enter text here..."></textarea>
+  <div id="container">
+    <div id="chatColumn">
+      <div id="messageContainer"></div>
+      <div id="statusIndicator">offline</div>
+      <textarea id="userInput" placeholder="Enter text here..."></textarea>
+    </div>
+    <div id="visualizationColumn"></div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
     // Initialize Three.js scene
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    // Create a simple rotating cube with wireframe material and repositioned to the right
+    const vizColumn = document.getElementById("visualizationColumn");
+    renderer.setSize(vizColumn.clientWidth, vizColumn.clientHeight);
+    vizColumn.appendChild(renderer.domElement);
+    
+    // Create a simple rotating cube with wireframe material
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
     const cube = new THREE.Mesh(geometry, material);
     cube.position.x = 2;
     scene.add(cube);
@@ -74,6 +97,14 @@
     }
     animate();
 
+    // Handle resizing for Three.js visualization
+    window.addEventListener('resize', function() {
+      const viz = document.getElementById("visualizationColumn");
+      camera.aspect = viz.clientWidth / viz.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(viz.clientWidth, viz.clientHeight);
+    });
+
     // Establish websocket connection and update LED indicator status
     const statusIndicator = document.getElementById("statusIndicator");
     const socket = new WebSocket("ws://localhost:8765");
@@ -83,7 +114,6 @@
       statusIndicator.innerHTML = "online";
     };
     socket.onmessage = function(event) {
-      // Incoming messages are logged but not displayed in the UI per new requirements
       console.log("Received: " + event.data);
     };
     socket.onerror = function(error) {
