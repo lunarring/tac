@@ -43,15 +43,13 @@ class ProtoBlockGenerator:
         """
         codebase = self.project_files.get_codebase_summary()
         
-
-        
         # Get all agent-specific sections for the output format explained
         trusty_agents_prompts = TrustyAgentRegistry.generate_agent_prompts()
 
         trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
 
         return f"""<purpose>
-You are a senior python software engineer. You are specialized in figuring out how to phrase precise instructions for your employees who are junior software engineers and implement the  final code. You have access to the <task_instructions> and <codebase>. The important aspect of your work is that you want to make sure that the resulting code can be easily verified. For this we have a palette of trusty agents from which you choose, and they can run an empirical verification of the code. Each trusty agent is specialized in a different aspect that they can test and your coding instructions and thinking should to be phrased in a way that we can maximize this verification process, given the chosen trusty agents. You follow strictly the <output_format> below, which is a JSON object. You also follow the <planning_rules> below.
+You are a senior python software engineer. You are specialized in figuring out how to phrase precise instructions for your employees who are junior software engineers and implement the final code. You have access to the <task_instructions> and <codebase>. The important aspect of your work is that you want to make sure that the resulting code can be easily verified. For this we have a palette of trusty agents from which you choose, and they can run an empirical verification of the code. Each trusty agent is specialized in a different aspect that they can test and your coding instructions and thinking should to be phrased in a way that we can maximize this verification process, given the chosen trusty agents.
 </purpose>
 
 <task_instructions>
@@ -73,12 +71,33 @@ You are a senior python software engineer. You are specialized in figuring out h
     - write files: files that need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! 
 - If we have an error analysis from the last implementation attempt, you should include it in the task instructions, expand them and make them longer to include as much detail as possible.
 
-
-- The output format is a single JSON object, you need to follow the format as described below.
+- Your response will be in two parts:
+  1. A reasoning section (<reasoning>) where you think step by step about the task
+  2. A protoblock section (<protoblock>) with the formal JSON specification
 </planning_rules>
 
-stick exactly to the following output_format, filling in between ...
-<output_format>
+Your response should follow this format:
+
+<reasoning>
+1. Programming Language Analysis:
+   - Identify the programming language being used
+   - Note any relevant frameworks or libraries
+
+2. Task Understanding:
+   - Rephrase the task in your own words based on the context
+   - Identify key requirements and constraints
+
+3. Verification Strategy:
+   - Analyze which trusty agent would be best for verification
+   - Explain why this agent is most suitable for this task
+   - Describe how the code changes will be verified
+
+4. File Selection Strategy:
+   - Explain your approach to selecting context and write files
+   - Justify why these files are necessary
+</reasoning>
+
+<protoblock>
 {{
     "task": "...",
     "write_files": ["..."],
@@ -91,24 +110,13 @@ stick exactly to the following output_format, filling in between ...
         "agent_name2": "generate here the prompt for the trusty agent 2",
     }}
 }}
-</output_format>
+</protoblock>
 
-And here a bit more detailed explanation of the output format:
+Available trusty agents and their capabilities:
+{trusty_agents_description}
 
-<output_format_explained>
-{{
-    "task": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, however mainly in terms of the goal that we want to achieve. It should ideally be ONE THING that we want to achieve, and it should be described in a way that is easy to understand and implement. Refrain from implementing the solution here, do we are not describe exactly HOW the code needs to be changed but keep it higher level and super descriptive.",
-    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test. Generally, be generous in the files you include here, if it appears related put it in! However always respect the underlying folder structure of the codebase, do not put files in the root folder, if you see a fitting folder, put it in there, otherwise create a folder."],
-    "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
-    "commit_message": "Brief commit message about your changes.",
-    "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
-    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}"],
-    "trusty_agent_prompts": {{"trusty_agent_name": "... fill in here the prompt for the trusty agent that will verify the code"}}
-}}
-
-Now you have to decide which trusty agent you are using. Since we are using trusty agents to generate TRUST in the code that was made by the coding agent, we need to select the most appropriate trusty agent for the task. This really depends on the task at hand and how we can best verify it. We have the following trusty agents available:
-{trusty_agents_prompts}
-</output_format_explained>"""
+Agent prompts formatting:
+{trusty_agents_prompts}"""
 
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
         """
@@ -123,6 +131,16 @@ Now you have to decide which trusty agent you are using. Since we are using trus
         """
         if not json_content or not json_content.strip():
             return False, "Empty JSON content", None
+        
+        # Store the original content to extract reasoning later
+        original_content = json_content
+            
+        # Extract the JSON content from between <protoblock> tags if present
+        if "<protoblock>" in json_content and "</protoblock>" in json_content:
+            start_idx = json_content.find("<protoblock>") + len("<protoblock>")
+            end_idx = json_content.find("</protoblock>")
+            if start_idx < end_idx:
+                json_content = json_content[start_idx:end_idx].strip()
             
         content_to_try = json_content.strip()
         data = None
@@ -179,6 +197,13 @@ Now you have to decide which trusty agent you are using. Since we are using trus
             
             # Extract only the required fields for validation, but keep optional fields
             validated_data = {}
+            
+            # Extract reasoning if present in the original content
+            if "<reasoning>" in original_content and "</reasoning>" in original_content:
+                start_idx = original_content.find("<reasoning>") + len("<reasoning>")
+                end_idx = original_content.find("</reasoning>")
+                if start_idx < end_idx:
+                    validated_data["reasoning"] = original_content[start_idx:end_idx].strip()
             
             # First validate and extract required fields
             for key in required_structure:
@@ -290,7 +315,7 @@ Now you have to decide which trusty agent you are using. Since we are using trus
         
         # Create messages for LLM
         messages = [
-            Message(role="system", content="You are a coding assistant. Stick to the output format as described. No markdown, no code fences. Keep it short and strictly formatted."),
+            Message(role="system", content="You are a coding assistant. Use the specified format with <reasoning> and <protoblock> sections."),
             Message(role="user", content=protoblock_genesis_prompt)
         ]
         
@@ -306,7 +331,7 @@ Now you have to decide which trusty agent you are using. Since we are using trus
                 if not response or not response.strip():
                     raise ValueError("Received empty response from LLM")
                     
-                # Clean code fences from response
+                # Clean code fences from response if needed
                 response = self.llm_client._clean_code_fences(response)
 
                 # Verify and parse the response
@@ -322,6 +347,14 @@ Now you have to decide which trusty agent you are using. Since we are using trus
 
                 # Remove any context files that are also in write_files to avoid duplication
                 context_files = [file for file in context_files if file not in write_files]
+                
+                # Log reasoning section if it exists
+                if "reasoning" in data:
+                    logger.info("\n🤔 Reasoning Analysis:")
+                    reasoning_lines = data["reasoning"].strip().split('\n')
+                    for line in reasoning_lines:
+                        logger.info(f"   {line}")
+                    logger.info("") # Add an empty line for better separation
                 
                 # Create ProtoBlock directly
                 try:
