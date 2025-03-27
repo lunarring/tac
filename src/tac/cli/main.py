@@ -33,7 +33,6 @@ from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
 from tac.trusty_agents.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager
-from tac.cli.gather import cli_gather_files, gather_files_command
 
 # Initialize logger at module level but don't use it as a global in functions
 _module_logger = setup_logging('tac.cli.main')
@@ -444,7 +443,7 @@ def main():
     
     # Command line args have second highest priority
     # Check both global and subcommand log-level arguments
-    cmd_log_level = args.log_level if hasattr(args, 'log-level') and args.log_level else None
+    cmd_log_level = args.log_level if getattr(args, "log_level", None) else None
     
     # Config has lowest priority
     config_log_level = config.logging.get_tac('level', 'INFO')
