@@ -46,8 +46,12 @@ class ProtoBlockGenerator:
         # Get all agent-specific sections for the output format explained
         trusty_agents_prompts = TrustyAgentRegistry.generate_agent_prompts()
 
+        # Get trusty agents description without plausibility
         trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
-
+        
+        # Extract just the agent names for the prompt
+        agent_names = list(trusty_agents_description.keys())
+        
         return f"""<purpose>
 You are a senior python software engineer. You are specialized in figuring out how to phrase precise instructions for your employees who are junior software engineers and implement the final code. You have access to the <task_instructions> and <codebase>. The important aspect of your work is that you want to make sure that the resulting code can be easily verified. For this we have a palette of trusty agents from which you choose, and they can run an empirical verification of the code. Each trusty agent is specialized in a different aspect that they can test and your coding instructions and thinking should to be phrased in a way that we can maximize this verification process, given the chosen trusty agents.
 </purpose>
@@ -63,7 +67,7 @@ You are a senior python software engineer. You are specialized in figuring out h
 <planning_rules>
 - Examine carefully the codebase and the task instructions, and then develop a plan how this task could be implemented, but stay on the GOAL level and do not describe the exact implementation details.
 - Think how this GOAL could be verified by the trusty agents. 
-- Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
+- Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(agent_names)}]
 - Here a description of what each trusty agent is capable of {trusty_agents_description}
 - Select the most appropriate trusty agents that is capable of verifying the task. Select only one agent!
 - Furthermore, we will need to supply two kinds of files to the coding agent:
