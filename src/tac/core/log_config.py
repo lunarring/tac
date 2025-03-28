@@ -11,6 +11,9 @@ import shutil
 # Initialize colorama
 init()
 
+# Module-level flag for file logging activation
+_file_logging_activated = False
+
 # Store configured loggers to prevent duplicate setup
 _configured_loggers = {}
 
@@ -284,7 +287,8 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
         logger = _configured_loggers[name]
         logger.setLevel(numeric_level)
         for handler in logger.handlers:
-            handler.setLevel(numeric_level)
+            if not isinstance(handler, logging.FileHandler):
+                handler.setLevel(numeric_level)
         return logger
 
     # Create custom formatter
@@ -369,14 +373,13 @@ def activate_file_logging(logger: logging.Logger = None):
     Activate file logging by attaching a file handler to the specified logger.
     If no logger is provided, the global 'tac' logger is used.
     """
+    global _file_logging_activated
     if logger is None:
         logger = logging.getLogger('tac')
     
-    # Check if a file handler is already attached
-    for handler in logger.handlers:
-        if isinstance(handler, logging.FileHandler):
-            logger.debug("File logging already activated.")
-            return
+    if _file_logging_activated:
+        logger.debug("File logging already activated.")
+        return
 
     numeric_level = logging.DEBUG
     try:
@@ -432,6 +435,7 @@ def activate_file_logging(logger: logging.Logger = None):
         
         # Log that we've started file logging
         logger.debug(f"Debug logging started to file: {log_filename}")
+        _file_logging_activated = True
     except Exception as e:
         # If file logging setup fails, log to console but don't crash
         logger.warning(f"Failed to set up file logging: {str(e)}")
@@ -441,10 +445,16 @@ def get_current_execution_id():
     return execution_context.execution_id
 
 def reset_execution_context():
-    """Reset the execution context for a new run."""
+    """Reset the execution context for a new run.
+    
+    This function preserves any FileHandler attached by the file logging activation.
+    """
     execution_context.reset()
-    # Also clear configured loggers to force recreation
-    _configured_loggers.clear()
+    # For each configured logger, keep only the FileHandler(s) and remove others.
+    for logger in _configured_loggers.values():
+        logger.handlers = [handler for handler in logger.handlers if isinstance(handler, logging.FileHandler)]
+    # Do not clear _configured_loggers to preserve loggers with file logging
+    # Note: _file_logging_activated flag remains True to maintain file logging across resets.
 
 def update_all_loggers(log_level: str = 'INFO'):
     """Update all existing loggers with a new log level.
@@ -459,15 +469,17 @@ def update_all_loggers(log_level: str = 'INFO'):
     for name, logger in _configured_loggers.items():
         # Set the logger level to the new numeric level
         logger.setLevel(numeric_level)
-        # Update all handlers to the new numeric level
+        # Update all non-FileHandler handlers to the new numeric level
         for handler in logger.handlers:
-            handler.setLevel(numeric_level)
+            if not isinstance(handler, logging.FileHandler):
+                handler.setLevel(numeric_level)
                 
     # Also update the root logger for good measure
     root = logging.getLogger()
     if root.handlers:
         for handler in root.handlers:
-            handler.setLevel(numeric_level)
+            if not isinstance(handler, logging.FileHandler):
+                handler.setLevel(numeric_level)
 
 # Create and expose the default logger
 logger = setup_logging() 
