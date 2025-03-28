@@ -52,6 +52,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
         self.comparison_path = None
         self.analysis_result = None
         self.reference_image_path = None
+        self.reference_image = None
         self.playwright = None
         self.browser = None
         self.context = None
@@ -65,13 +66,23 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
     def set_reference_image(self, reference_image_path: str) -> None:
         """Set the reference image provided via the CLI."""
         if not os.path.exists(reference_image_path):
-            raise ValueError(f"Reference image not found: {reference_image_path}")
+            logger.error(f"Reference image not found: {reference_image_path}")
+            self.reference_image = None
+            self.reference_image_path = None
+            return
         try:
             with Image.open(reference_image_path) as img:
                 img.verify()
+            # Reopen image after verify() as the image gets closed
+            with Image.open(reference_image_path) as img:
+                self.reference_image = img.copy()
+            self.reference_image_path = reference_image_path
+            logger.info("Reference image loaded and verified successfully.")
+            # TODO: Placeholder for any future image processing steps
         except Exception as e:
-            raise ValueError(f"Reference image at {reference_image_path} could not be loaded: {str(e)}")
-        self.reference_image_path = reference_image_path
+            logger.error(f"Failed to load reference image: {str(e)}")
+            self.reference_image = None
+            self.reference_image_path = None
 
     def _ensure_browser(self):
         """Ensure browser resources are available and properly initialized."""
@@ -172,8 +183,8 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             # Store the protoblock for use in _capture_state
             self.protoblock = protoblock
 
-            if not self.reference_image_path:
-                return False, "Reference image not provided", "Missing reference image"
+            if not self.reference_image or not self.reference_image_path:
+                return False, "Reference image not provided or failed to load", "Missing reference image"
             
             # Verify we have the before state
             if not self.before_screenshot_path:

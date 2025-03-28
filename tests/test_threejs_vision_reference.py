@@ -83,6 +83,7 @@ def test_threejs_vision_reference_failure(dummy_agent, dummy_images):
 def test_missing_reference_image(dummy_agent):
     # Test that providing no reference image causes an error
     dummy_agent.reference_image_path = None
+    dummy_agent.reference_image = None
     dummy_proto = DummyProtoBlock()
     success, analysis, error_type = dummy_agent._check_impl(dummy_proto, "", "")
     assert success is False
