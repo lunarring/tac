@@ -198,12 +198,12 @@ def setup_console_logging(name: str = None, log_level: str = 'INFO') -> logging.
     logger.propagate = False
     
     # Set logger level
-    logger.setLevel(getattr(logging, log_level))
-
+    logger.setLevel(getattr(logging, log_level.upper()))
+    
     # Create console handler
     console_handler = logging.StreamHandler(sys.__stdout__)
-    console_handler.setLevel(getattr(logging, log_level))
-
+    console_handler.setLevel(getattr(logging, log_level.upper()))
+    
     # Create formatter and add it to the handler
     log_format = '%(levelname)s - %(message)s [%(name)s]'
     
@@ -282,8 +282,8 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     # If this logger was already configured, update its level and return it
     if name in _configured_loggers:
         logger = _configured_loggers[name]
-        # Always set logger level to DEBUG to allow messages to go to the file handler
-        logger.setLevel(logging.DEBUG)
+        # Set logger level to the requested level
+        logger.setLevel(numeric_level)
         # Update console handler level to the requested level
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
@@ -347,8 +347,8 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     if logger.handlers:
         logger.handlers.clear()
     
-    # Set logger level to DEBUG to allow handlers to filter
-    logger.setLevel(logging.DEBUG)
+    # Set logger level to the requested level
+    logger.setLevel(numeric_level)
 
     # Create console handler with the specified level
     console_handler = logging.StreamHandler(sys.__stdout__)
@@ -445,8 +445,8 @@ def update_all_loggers(log_level: str = 'INFO'):
     
     # Update all configured loggers
     for name, logger in _configured_loggers.items():
-        # Keep the logger level at DEBUG to allow messages to go to the file handler
-        logger.setLevel(logging.DEBUG)
+        # Set the logger level to the new numeric level
+        logger.setLevel(numeric_level)
         # Update console handler level
         for handler in logger.handlers:
             if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
