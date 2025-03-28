@@ -3,9 +3,9 @@ from PIL import Image
 def stitch_images(image_path1: str, image_path2: str, image_path3: str, border: int = 10, border_color: str = "black") -> Image.Image:
     """
     Stitches three images side by side with borders in between. 
-    Each image is rescaled (padded) vertically to a uniform height (the maximum height of the input images)
-    while preserving their original widths and aspect ratios.
-
+    Each image is proportionally rescaled to a uniform target height (the maximum of the input images' heights)
+    while preserving their aspect ratios.
+    
     Args:
         image_path1: Path to the first image file.
         image_path2: Path to the second image file.
@@ -24,25 +24,27 @@ def stitch_images(image_path1: str, image_path2: str, image_path3: str, border: 
     # Determine the target height (maximum of the image heights)
     target_height = max(img1.height, img2.height, img3.height)
     
-    def pad_to_height(img: Image.Image, target_height: int, border_color: str) -> Image.Image:
+    def rescale_to_height(img: Image.Image, target_height: int) -> Image.Image:
         """
-        Pads the image vertically to meet the target height.
-        Center the original image vertically on a new canvas with the given border_color background.
+        Rescales the image proportionally so that its height becomes target_height.
         """
         if img.height == target_height:
             return img
-        new_img = Image.new("RGB", (img.width, target_height), color=border_color)
-        top_offset = (target_height - img.height) // 2
-        new_img.paste(img, (0, top_offset))
-        return new_img
-
-    # Pad images to have uniform height
-    img1_padded = pad_to_height(img1, target_height, border_color)
-    img2_padded = pad_to_height(img2, target_height, border_color)
-    img3_padded = pad_to_height(img3, target_height, border_color)
+        scale_factor = target_height / img.height
+        new_width = int(round(img.width * scale_factor))
+        try:
+            resample_filter = Image.Resampling.LANCZOS
+        except AttributeError:
+            resample_filter = Image.LANCZOS
+        return img.resize((new_width, target_height), resample_filter)
+    
+    # Rescale images to have uniform height
+    img1_resized = rescale_to_height(img1, target_height)
+    img2_resized = rescale_to_height(img2, target_height)
+    img3_resized = rescale_to_height(img3, target_height)
     
     # Compute dimensions for the new image (sum of widths plus borders)
-    total_width = img1_padded.width + img2_padded.width + img3_padded.width + 2 * border
+    total_width = img1_resized.width + img2_resized.width + img3_resized.width + 2 * border
     total_height = target_height
     
     # Create a new image with border_color background
@@ -50,10 +52,10 @@ def stitch_images(image_path1: str, image_path2: str, image_path3: str, border: 
     
     # Paste the images side by side
     x_offset = 0
-    new_img.paste(img1_padded, (x_offset, 0))
-    x_offset += img1_padded.width + border
-    new_img.paste(img2_padded, (x_offset, 0))
-    x_offset += img2_padded.width + border
-    new_img.paste(img3_padded, (x_offset, 0))
+    new_img.paste(img1_resized, (x_offset, 0))
+    x_offset += img1_resized.width + border
+    new_img.paste(img2_resized, (x_offset, 0))
+    x_offset += img2_resized.width + border
+    new_img.paste(img3_resized, (x_offset, 0))
     
     return new_img

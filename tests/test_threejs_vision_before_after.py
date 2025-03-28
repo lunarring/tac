@@ -42,8 +42,9 @@ def test_threejs_vision_before_after_stitching():
         comparison_img = Image.open(agent.comparison_path)
         
         # Expected dimensions:
-        # before (100) + dummy (1) + after (80) + 2*border (2*10) = 100+1+80+20 = 201
-        expected_width = 201
+        # before image is rescaled from 100x50 to 120x60, dummy (1) remains, after is 80x60,
+        # plus 2*border (2*10) = 120 + 1 + 80 + 20 = 221
+        expected_width = 221
         expected_height = max(50, 60)  # 60
         assert comparison_img.width == expected_width, f"Expected width {expected_width}, got {comparison_img.width}"
         assert comparison_img.height == expected_height, f"Expected height {expected_height}, got {comparison_img.height}"
@@ -53,14 +54,14 @@ def test_threejs_vision_before_after_stitching():
         assert left_pixel == (255, 0, 0), f"Expected red in left region, got {left_pixel}"
         
         # The dummy image is inserted between the before and after images.
-        # Its x position: before width (100) + border (10) = 110, width = 1, so pixel at (110, 30) should be black.
-        dummy_pixel = comparison_img.getpixel((110, 30))
+        # Its x position: rescaled before width (120) + border (10) = 130, width = 1, so pixel at (130, 30) should be black.
+        dummy_pixel = comparison_img.getpixel((130, 30))
         assert dummy_pixel == (0, 0, 0), f"Expected black in dummy image region, got {dummy_pixel}"
         
         # Check right portion contains blue (from after image)
-        # right image is pasted at x = before.width (100) + border (10) + dummy width (1) + border (10) = 121.
-        right_pixel = comparison_img.getpixel((121 + 40, 30))  # 40 pixels into the after image area
-        # Blue can be (0, 0, 255)
+        # right image is pasted at x = rescaled before width (120) + border (10) + dummy width (1) + border (10) = 141.
+        right_pixel = comparison_img.getpixel((141 + 40, 30))  # 40 pixels into the after image area
+        # Blue is (0, 0, 255)
         assert right_pixel == (0, 0, 255), f"Expected blue in right region, got {right_pixel}"
         
     finally:
@@ -72,4 +73,3 @@ def test_threejs_vision_before_after_stitching():
 if __name__ == "__main__":
     test_threejs_vision_before_after_stitching()
     print("ThreeJSVisionBeforeAfterAgent stitching test passed.")
-    
