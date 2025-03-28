@@ -50,14 +50,14 @@ def dummy_agent(dummy_images):
     # Override _capture_state to return the after image path
     agent._capture_state = lambda: after_img
     agent.set_reference_image(ref_img)
-    # Override the llm_client with a dummy that returns "YES" for successful verification
-    agent.llm_client = DummyLLMClient("YES - The current state matches the reference image.")
     return agent
 
 def test_threejs_vision_reference_success(dummy_agent):
     dummy_proto = DummyProtoBlock()
     # For success test, ensure protoblock provides a value (if needed)
     dummy_proto.image_url = dummy_agent.reference_image_path
+    # Use a graded successful response
+    dummy_agent.llm_client = DummyLLMClient("GRADE: A\nANALYSIS: The current state closely matches the reference image.")
     success, analysis, error_type = dummy_agent._check_impl(dummy_proto, "", "")
     # Ensure that the composite image was created
     assert dummy_agent.comparison_path is not None
@@ -66,12 +66,12 @@ def test_threejs_vision_reference_success(dummy_agent):
     os.unlink(dummy_agent.comparison_path)
     # Verify that the analysis indicates success
     assert success is True
-    assert "yes" in analysis.lower()
+    assert "GRADE:" in analysis
     assert error_type == ""
     
 def test_threejs_vision_reference_failure(dummy_agent, dummy_images):
-    # Now test failure case by making dummy LLM return "NO"
-    dummy_agent.llm_client = DummyLLMClient("NO - The current state does not match the reference image.")
+    # Now test failure case using a graded response with a low grade
+    dummy_agent.llm_client = DummyLLMClient("GRADE: D\nANALYSIS: Significant discrepancies noted.")
     dummy_proto = DummyProtoBlock()
     dummy_proto.image_url = dummy_agent.reference_image_path
     success, analysis, error_type = dummy_agent._check_impl(dummy_proto, "", "")
@@ -81,7 +81,7 @@ def test_threejs_vision_reference_failure(dummy_agent, dummy_images):
     os.unlink(dummy_agent.comparison_path)
     # Verify that the analysis indicates failure
     assert success is False
-    assert "no" in analysis.lower()
+    assert "GRADE:" in analysis
     assert error_type == "Visual comparison failed"
     
 def test_missing_reference_image(dummy_agent):

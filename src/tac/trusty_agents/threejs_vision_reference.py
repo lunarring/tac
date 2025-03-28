@@ -26,6 +26,7 @@ from tac.utils.web_utils import (
     ensure_playwright_installed
 )
 from tac.utils.image_stitcher import stitch_images
+from tac.core.config import config
 from PIL import Image
 
 logger = setup_logging('tac.trusty_agents.threejs_vision_reference')
@@ -164,6 +165,44 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             raise ValueError("Protoblock not set. Call set_protoblock first.")
         self.before_screenshot_path = self._capture_state()
 
+    def _determine_success(self, analysis_result: str) -> bool:
+        """
+        Determine if the visual comparison analysis indicates success based on a grade.
+        
+        Args:
+            analysis_result: The result from the vision analysis, expected to contain a grade.
+            
+        Returns:
+            bool: True if the grade meets or exceeds the minimum threshold.
+        """
+        try:
+            min_grade = config.general.trusty_agents.minimum_vision_score.upper()
+            if min_grade not in {"A", "B", "C", "D", "F"}:
+                logger.warning(f"Invalid minimum_vision_score in config: {min_grade}, defaulting to 'B'")
+                min_grade = "B"
+            grade_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
+            min_grade_value = grade_values[min_grade]
+
+            if "GRADE:" in analysis_result:
+                grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                if not grade_line:
+                    logger.error("No grade found after 'GRADE:'")
+                    return False
+                grade = grade_line[0].upper()  # Take first character as grade
+                if grade not in grade_values:
+                    logger.error(f"Invalid grade found in analysis: {grade}")
+                    return False
+                return grade_values[grade] >= min_grade_value
+            # Fallback to legacy YES/NO format if no grade found
+            lines = analysis_result.strip().splitlines()
+            if lines and lines[0].strip().upper() in ["YES", "NO"]:
+                logger.warning("Using legacy YES/NO format - treating YES as grade 'B' and NO as grade 'F'")
+                return lines[0].strip().upper() == "YES"
+            return False
+        except Exception as e:
+            logger.error(f"Error determining success from grade: {e}")
+            return False
+
     def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
         """
         Compare the before and after states with the provided reference image.
@@ -221,18 +260,25 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             if not expected_changes:
                 expected_changes = "Compare the current implementation against the provided reference image."
             
-            # Create a detailed prompt for analysis
+            # Create a detailed prompt for analysis using a grading system.
             prompt = f"""Analyze this side-by-side comparison of a Three.js application:
 - Left pane shows the before state.
 - Middle pane shows the after state (current implementation).
 - Right pane shows the provided reference image.
 Expected changes: {expected_changes}
 
-Please provide a simple verification:
-- Answer YES if the current state (after) visually matches the reference.
-- Answer NO if it does not match well.
+Please provide your analysis in the following format:
 
-Also, include a brief explanation of your reasoning."""
+GRADE: [A-F]
+
+ANALYSIS:
+(Detailed explanation)
+
+ISSUES:
+(Optional list of visual issues)
+
+RECOMMENDATIONS:
+(Optional suggestions for improvement)"""
             
             messages = [
                 Message(role="system", content="You are a visual analysis assistant."),
@@ -243,8 +289,8 @@ Also, include a brief explanation of your reasoning."""
             self.analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
             logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
             
-            # Parse the analysis_result to determine success: if "YES" is present (case-insensitive) then success.
-            if "yes" in self.analysis_result.lower():
+            success = self._determine_success(self.analysis_result)
+            if success:
                 return True, self.analysis_result, ""
             else:
                 return False, self.analysis_result, "Visual comparison failed"
