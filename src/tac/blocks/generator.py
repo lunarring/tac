@@ -117,7 +117,7 @@ Available trusty agents and their capabilities:
 
 Agent prompts formatting:
 {trusty_agents_prompts}"""
-
+    
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
         """
         Verifies that a protoblock JSON is valid and contains all required fields.
@@ -373,13 +373,18 @@ Agent prompts formatting:
                     if isinstance(task_spec, list):
                         task_spec = "\n".join(task_spec)
                     
+                    # Process branch_name to remove "tac/" prefix if present
+                    branch_name = data.get("branch_name", "")
+                    if branch_name.startswith("tac/"):
+                        branch_name = branch_name[4:]
+                    
                     protoblock = ProtoBlock(
                         task_description=task_spec,
                         write_files=write_files,
                         context_files=context_files,
                         block_id=str(uuid.uuid4())[:6],
                         commit_message=f"tac: {data.get('commit_message', 'Update')}",
-                        branch_name=data.get("branch_name"),
+                        branch_name=branch_name,
                         trusty_agents=trusty_agents,
                         trusty_agent_prompts=trusty_agent_prompts
                     )
