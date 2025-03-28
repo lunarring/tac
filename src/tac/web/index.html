@@ -4,23 +4,24 @@
   <meta charset="UTF-8">
   <title>WebSocket Three.js UI</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body { margin: 0; overflow: hidden; background-color: #ffffff; }
     #messageContainer {
       position: absolute;
       top: 10px;
       left: 10px;
-      color: #ffffff;
+      color: #000000;
       font-family: sans-serif;
-      background: rgba(0,0,0,0.5);
+      background: rgba(255,255,255,0.9);
       padding: 10px;
       z-index: 10;
       display: none;
+      border: 1px solid #ddd;
     }
     #statusIndicator {
       position: absolute;
       top: 10px;
       right: 10px;
-      color: #ffffff;
+      color: #000000;
       font-family: sans-serif;
       background: red;
       padding: 5px 10px;
@@ -36,9 +37,10 @@
       height: 100px;
       font-size: 16px;
       padding: 5px 10px;
-      background-color: #333333;
-      color: #ffffff;
+      background-color: #ffffff;
+      color: #000000;
       z-index: 10;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
@@ -53,11 +55,12 @@
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0xffffff, 1);
     document.body.appendChild(renderer.domElement);
 
-    // Create a simple rotating cube with wireframe material and repositioned to the right
+    // Create a simple rotating cube with black wireframe material and repositioned to the right
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
+    const material = new THREE.MeshBasicMaterial({color: 0x000000, wireframe: true});
     const cube = new THREE.Mesh(geometry, material);
     cube.position.x = 2;
     scene.add(cube);
