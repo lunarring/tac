@@ -61,6 +61,49 @@ class BlockProcessor:
         
         # Use the appropriate git manager based on config
         self.git_manager = create_git_manager()
+        
+        # Use module level logger and remove any file handlers to disable file logging initially.
+        self.logger = logger
+        for handler in self.logger.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                self.logger.removeHandler(handler)
+        self.file_logging_active = False
+
+    def activate_file_logging(self):
+        """
+        Activates writing log files to disk by adding a FileHandler to the logger.
+        """
+        if self.file_logging_active:
+            self.logger.debug("File logging is already activated.")
+            return
+        try:
+            now = datetime.now()
+            timestamp = now.strftime("%y%m%d_%H%M")
+            logs_dir = '.tac_logs'
+            if not os.path.isabs(logs_dir):
+                logs_dir = os.path.join(os.getcwd(), logs_dir)
+            os.makedirs(logs_dir, exist_ok=True)
+            log_filename = os.path.join(logs_dir, f"{timestamp}_log.txt")
+            file_handler = logging.FileHandler(log_filename, mode='a')
+            file_handler.setLevel(logging.DEBUG)
+            # Create a custom formatter for file logs: LEVEL - MESSAGE - SOURCE - TIMESTAMP
+            class FileFormatter(logging.Formatter):
+                def format(self, record):
+                    timestamp_rec = datetime.fromtimestamp(record.created)
+                    timestamp_str = timestamp_rec.strftime("%y%m%d %H:%M %S.%f")[:-4]
+                    is_heading = hasattr(record, 'heading') and record.heading
+                    msg = f"{record.levelname} - {record.getMessage()} [{record.name} {timestamp_str}]"
+                    if is_heading:
+                        separator = '=' * 80
+                        msg = f"\n{separator}\n{msg}\n{separator}"
+                    return msg
+            file_formatter = FileFormatter()
+            file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(file_handler)
+            self.logger.debug(f"Debug logging started to file: {log_filename}")
+            self.file_logging_active = True
+        except Exception as e:
+            self.logger.warning(f"Failed to set up file logging: {str(e)}")
 
     def create_protoblock(self, idx_attempt, error_analysis):
         if self.input_protoblock:
