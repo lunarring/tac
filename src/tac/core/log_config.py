@@ -282,12 +282,9 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     # If this logger was already configured, update its level and return it
     if name in _configured_loggers:
         logger = _configured_loggers[name]
-        # Set logger level to the requested level
         logger.setLevel(numeric_level)
-        # Update console handler level to the requested level
         for handler in logger.handlers:
-            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
-                handler.setLevel(numeric_level)
+            handler.setLevel(numeric_level)
         return logger
 
     # Create custom formatter
@@ -385,7 +382,7 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
         file_handler = logging.FileHandler(log_filename, mode='a')
         
         # Set file handler level to DEBUG to capture all logs
-        file_handler.setLevel(logging.DEBUG)
+        file_handler.setLevel(numeric_level)
         
         # Create a custom formatter for file logs with the requested format
         # LEVEL - MESSAGE - SOURCE - TIMESTAMP
@@ -439,7 +436,7 @@ def update_all_loggers(log_level: str = 'INFO'):
     """Update all existing loggers with a new log level.
     
     Args:
-        log_level: The new log level to set for console handlers
+        log_level: The new log level to set for all handlers
     """
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
     
@@ -447,17 +444,15 @@ def update_all_loggers(log_level: str = 'INFO'):
     for name, logger in _configured_loggers.items():
         # Set the logger level to the new numeric level
         logger.setLevel(numeric_level)
-        # Update console handler level
+        # Update all handlers to the new numeric level
         for handler in logger.handlers:
-            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
-                handler.setLevel(numeric_level)
+            handler.setLevel(numeric_level)
                 
     # Also update the root logger for good measure
     root = logging.getLogger()
     if root.handlers:
         for handler in root.handlers:
-            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
-                handler.setLevel(numeric_level)
+            handler.setLevel(numeric_level)
 
 # Create and expose the default logger
 logger = setup_logging() 
