@@ -76,25 +76,25 @@ You are a senior python software engineer. You are specialized in figuring out h
   2. A protoblock section (<protoblock>) with the formal JSON specification
 </planning_rules>
 
+<trusty_agents>
+Available trusty agents and their capabilities:
+{trusty_agents_description}
+
+Agent prompts formatting:
+{trusty_agents_prompts}
+</trusty_agents>
+
 Your response should follow this format:
 
 <reasoning>
 1. Programming Language Analysis:
-   - Identify the programming language being used
-   - Note any relevant frameworks or libraries
+Identify the programming language that you will need to use given the codebase and the task instructions.
 
 2. Task Understanding:
-   - Rephrase the task in your own words based on the context
-   - Identify key requirements and constraints
+Rephrase the task in your own words based on the context of the codebase, identify key requirements and constraints
 
 3. Verification Strategy:
-   - Analyze which trusty agent would be best for verification
-   - Explain why this agent is most suitable for this task
-   - Describe how the code changes will be verified
-
-4. File Selection Strategy:
-   - Explain your approach to selecting context and write files
-   - Justify why these files are necessary
+Analyze which trusty agent would be best for verification. Explain why this agent is most suitable for this task. Describe how this trusty agent is able to verify the code changes.
 </reasoning>
 
 <protoblock>
@@ -106,17 +106,26 @@ Your response should follow this format:
     "branch_name": "...",
     "trusty_agents": ["..."],
     "trusty_agent_prompts": {{
-        "agent_name1": "generate here the prompt for the trusty agent 1",
-        "agent_name2": "generate here the prompt for the trusty agent 2",
+        "agent_name": "generate here the prompt for the trusty agent",
     }}
 }}
 </protoblock>
 
-Available trusty agents and their capabilities:
-{trusty_agents_description}
+And here a bit more detailed explanation of the output format:
 
-Agent prompts formatting:
-{trusty_agents_prompts}"""
+<protoblock_explained>
+{{
+    "task": "Given the entire codebase and the task instructions below, we describe the task at hand very precisely and actionable, however mainly in terms of the goal that we want to achieve. It should ideally be ONE THING that we want to achieve, and it should be described in a way that is easy to understand and implement. Refrain from implementing the solution here, do we are not describe exactly HOW the code needs to be changed but keep it higher level and super descriptive.",
+    "write_files": ["List of files that may need to be written for the task. Scan the codebase and review carefully and include every file that need to be changed for the task. Use relative file paths as given in the codebase. Be sure to include everything that could potentially be needed for write access! Test files should only be created in tests/test_*.py for instance tests/test_piano_trainer_main.py. ALWAYS include the test files here, never skip them! If there is a similar test in our codebase, we definitely want to write into the same test file and append the new test. Generally, be generous in the files you include here, if it appears related put it in!"],
+    "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
+    "commit_message": "Brief commit message about your changes.",
+    "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
+    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}"],
+    "trusty_agent_prompts": {{"agent_name1": "... fill in here the prompt for the trusty agent"}}
+}}
+</protoblock_explained>
+
+"""
     
     def verify_protoblock(self, json_content: str) -> Tuple[bool, str, Optional[dict]]:
         """
@@ -372,12 +381,12 @@ Agent prompts formatting:
                     task_spec = data["task"]["specification"] if isinstance(data["task"], dict) else data["task"]
                     if isinstance(task_spec, list):
                         task_spec = "\n".join(task_spec)
-                    
-                    # Process branch_name to remove "tac/" prefix if present
+                
                     branch_name = data.get("branch_name", "")
-                    if branch_name.startswith("tac/"):
-                        branch_name = branch_name[4:]
-                    
+                    # Ensure branch_name always starts with tac/
+                    if branch_name and not branch_name.startswith("tac/"):
+                        branch_name = f"tac/{branch_name}"
+
                     protoblock = ProtoBlock(
                         task_description=task_spec,
                         write_files=write_files,

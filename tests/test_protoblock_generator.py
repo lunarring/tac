@@ -106,8 +106,7 @@ def test_create_protoblock_with_dummy_llm(monkeypatch, generator_instance):
     assert "Dummy task description" in protoblock.task_description
     # Check that commit_message and branch_name are set
     assert protoblock.commit_message.startswith("tac: ")
-    # Updated assertion: branch_name should no longer include the "tac/" prefix
-    assert protoblock.branch_name == "feature/dummy"
+    assert protoblock.branch_name == "tac/feature/dummy"
     
     # Ensure that the write_files paths are relative
     for path in protoblock.write_files:
