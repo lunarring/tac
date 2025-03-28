@@ -359,68 +359,51 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     # Add the handler to the logger
     logger.addHandler(console_handler)
     
-    # Always enable file logging with the new format
-    try:
-        # Create timestamp for log filename in YYMMDD_HHMM format
-        now = datetime.datetime.now()
-        timestamp = now.strftime("%y%m%d_%H%M")
-        
-        # Create log directory
-        logs_dir = '.tac_logs'
-        
-        # Handle relative paths
-        if not os.path.isabs(logs_dir):
-            logs_dir = os.path.join(os.getcwd(), logs_dir)
-            
-        # Create directory if it doesn't exist
-        os.makedirs(logs_dir, exist_ok=True)
-        
-        # Create log filename with timestamp
-        log_filename = os.path.join(logs_dir, f"{timestamp}_log.txt")
-        
-        # Create file handler
-        file_handler = logging.FileHandler(log_filename, mode='a')
-        
-        # Set file handler level to DEBUG to capture all logs
-        file_handler.setLevel(numeric_level)
-        
-        # Create a custom formatter for file logs with the requested format
-        # LEVEL - MESSAGE - SOURCE - TIMESTAMP
-        class FileFormatter(logging.Formatter):
-            def format(self, record):
-                # Format timestamp as YYMMDD HH:MM SS.SS
-                timestamp = datetime.datetime.fromtimestamp(record.created)
-                timestamp_str = timestamp.strftime("%y%m%d %H:%M %S.%f")[:-4]
-                
-                # Check if this is a heading
-                is_heading = hasattr(record, 'heading') and record.heading
-                
-                # Format the log message
-                msg = f"{record.levelname} - {record.getMessage()} [{record.name} {timestamp_str}]"
-                
-                # Add separators for headings in file logs too
-                if is_heading:
-                    separator = '=' * 80  # Fixed width for file logs
-                    msg = f"\n{separator}\n{msg}\n{separator}"
-                
-                return msg
-        
-        file_formatter = FileFormatter()
-        file_handler.setFormatter(file_formatter)
-        
-        # Add the file handler to the logger
-        logger.addHandler(file_handler)
-        
-        # Log that we've started file logging
-        logger.debug(f"Debug logging started to file: {log_filename}")
-    except Exception as e:
-        # If file logging setup fails, log to console but don't crash
-        logger.warning(f"Failed to set up file logging: {str(e)}")
+    # Automatically activate file logging for loggers other than 'tac.blocks.processor'
+    if not (name and name == 'tac.blocks.processor'):
+        activate_file_logging(logger)
 
     # Store the configured logger
     _configured_loggers[name] = logger
 
     return logger
+
+def activate_file_logging(logger: logging.Logger = None):
+    """
+    Activates file logging by adding a FileHandler to the provided logger.
+    If no logger is provided, the root logger is used.
+    This allows delayed activation of file logging.
+    """
+    if logger is None:
+        logger = logging.getLogger()
+    # Check if a FileHandler is already present
+    if any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+        return  # File logging already activated
+
+    try:
+        now = datetime.datetime.now()
+        logs_dir = '.tac_logs'
+        if not os.path.isabs(logs_dir):
+            logs_dir = os.path.join(os.getcwd(), logs_dir)
+        os.makedirs(logs_dir, exist_ok=True)
+        timestamp = now.strftime("%y%m%d_%H%M")
+        log_filename = os.path.join(logs_dir, f"{timestamp}_log.txt")
+        file_handler = logging.FileHandler(log_filename, mode='a')
+        file_handler.setLevel(logging.DEBUG)
+        class FileFormatter(logging.Formatter):
+            def format(self, record):
+                ts = datetime.datetime.fromtimestamp(record.created).strftime("%y%m%d %H:%M %S.%f")[:-4]
+                msg = f"{record.levelname} - {record.getMessage()} [{record.name} {ts}]"
+                if hasattr(record, 'heading') and record.heading:
+                    separator = '=' * 80
+                    msg = f"\n{separator}\n{msg}\n{separator}"
+                return msg
+        file_formatter = FileFormatter()
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+        logger.debug(f"Debug logging started to file: {log_filename}")
+    except Exception as e:
+        logger.warning(f"Failed to set up file logging: {str(e)}")
 
 def get_current_execution_id():
     """Get the current execution ID."""

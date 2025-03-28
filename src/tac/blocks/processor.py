@@ -63,41 +63,6 @@ class BlockProcessor:
         # Use the appropriate git manager based on config
         self.git_manager = create_git_manager()
     
-    def activate_log_file_writing(self):
-        """
-        Activates file logging by adding a FileHandler to the logger.
-        This function is called only when file logging is explicitly enabled.
-        """
-        # Check if a FileHandler is already present
-        if any(isinstance(h, logging.FileHandler) for h in logger.handlers):
-            return  # File logging already activated
-
-        try:
-            import datetime
-            logs_dir = '.tac_logs'
-            if not os.path.isabs(logs_dir):
-                logs_dir = os.path.join(os.getcwd(), logs_dir)
-            os.makedirs(logs_dir, exist_ok=True)
-            now = datetime.datetime.now()
-            timestamp = now.strftime("%y%m%d_%H%M")
-            log_filename = os.path.join(logs_dir, f"{timestamp}_log.txt")
-            file_handler = logging.FileHandler(log_filename, mode='a')
-            file_handler.setLevel(logging.DEBUG)
-            class FileFormatter(logging.Formatter):
-                def format(self, record):
-                    ts = datetime.datetime.fromtimestamp(record.created).strftime("%y%m%d %H:%M %S.%f")[:-4]
-                    msg = f"{record.levelname} - {record.getMessage()} [{record.name} {ts}]"
-                    if hasattr(record, 'heading') and record.heading:
-                        separator = '=' * 80
-                        msg = f"\n{separator}\n{msg}\n{separator}"
-                    return msg
-            file_formatter = FileFormatter()
-            file_handler.setFormatter(file_formatter)
-            logger.addHandler(file_handler)
-            logger.debug(f"Debug logging started to file: {log_filename}")
-        except Exception as e:
-            logger.warning(f"Failed to set up file logging: {str(e)}")
-    
     def create_protoblock(self, idx_attempt, error_analysis):
         if self.input_protoblock:
             # Use the directly provided protoblock
@@ -170,7 +135,8 @@ class BlockProcessor:
 
         # Activate file logging only if explicitly enabled
         if self.enable_file_logging:
-            self.activate_log_file_writing()
+            from tac.core.log_config import activate_file_logging
+            activate_file_logging(logger)
 
         # Preliminary tests before we start.
         max_retries = config.general.max_retries_block_creation
