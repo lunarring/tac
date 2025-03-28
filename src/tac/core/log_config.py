@@ -372,6 +372,7 @@ def activate_file_logging(logger: logging.Logger = None):
     """
     Activate file logging by attaching a file handler to the specified logger.
     If no logger is provided, the global 'tac' logger is used.
+    Once activated, file logging remains active for the entire execution.
     """
     global _file_logging_activated
     if logger is None:
@@ -400,8 +401,14 @@ def activate_file_logging(logger: logging.Logger = None):
         # Create log filename with timestamp
         log_filename = os.path.join(logs_dir, f"{timestamp}_log.txt")
         
-        # Create file handler
-        file_handler = logging.FileHandler(log_filename, mode='a')
+        # Define a custom FileHandler that flushes after every emit
+        class PersistentFileHandler(logging.FileHandler):
+            def emit(self, record):
+                super().emit(record)
+                self.flush()
+        
+        # Create file handler using the custom handler
+        file_handler = PersistentFileHandler(log_filename, mode='a')
         
         # Set file handler level to DEBUG to capture all logs
         file_handler.setLevel(numeric_level)
