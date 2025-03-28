@@ -41,9 +41,11 @@ class ProtoBlock:
         if self.trusty_agent_prompts is None:
             self.trusty_agent_prompts = {}
         
-        # Ensure image_url is set to None if not provided
-        if self.image_url is None:
-            self.image_url = None
+        # Preserve image_url if provided via CLI or elsewhere.
+        # Only set image_url to None if it is not already set.
+        # (This line was removed to avoid overwriting an existing image_url.)
+        # if self.image_url is None:
+        #     self.image_url = None
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
