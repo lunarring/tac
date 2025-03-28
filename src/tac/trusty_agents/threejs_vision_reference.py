@@ -186,6 +186,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             # Retrieve or load the reference image if not already set
             if not self.reference_image or not self.reference_image_path:
                 image_url = getattr(protoblock, "image_url", None)
+                logger.debug(f"Reference image URL: {image_url}")
                 if image_url:
                     self.set_reference_image(image_url)
                 if not self.reference_image or not self.reference_image_path:
