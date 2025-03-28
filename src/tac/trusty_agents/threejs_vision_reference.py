@@ -66,6 +66,11 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
         """Set the reference image provided via the CLI."""
         if not os.path.exists(reference_image_path):
             raise ValueError(f"Reference image not found: {reference_image_path}")
+        try:
+            with Image.open(reference_image_path) as img:
+                img.verify()
+        except Exception as e:
+            raise ValueError(f"Reference image at {reference_image_path} could not be loaded: {str(e)}")
         self.reference_image_path = reference_image_path
 
     def _ensure_browser(self):
