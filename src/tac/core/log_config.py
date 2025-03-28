@@ -197,12 +197,12 @@ def setup_console_logging(name: str = None, log_level: str = 'INFO') -> logging.
     # Prevent propagation to root logger
     logger.propagate = False
     
-    # Set logger level
-    logger.setLevel(getattr(logging, log_level.upper()))
+    # Set logger level (enforcing DEBUG level)
+    logger.setLevel(logging.DEBUG)
     
     # Create console handler
     console_handler = logging.StreamHandler(sys.__stdout__)
-    console_handler.setLevel(getattr(logging, log_level.upper()))
+    console_handler.setLevel(logging.DEBUG)
     
     # Create formatter and add it to the handler
     log_format = '%(levelname)s - %(message)s [%(name)s]'
@@ -265,8 +265,8 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
         log_level: Logging level to use for console output (default: INFO)
         log_color: Color to use for logging (default: green)
     """
-    # Convert log_level string to logging level
-    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    # Force DEBUG level throughout the application runtime
+    numeric_level = logging.DEBUG
     
     # If logging is disabled (level set to CRITICAL), just return a disabled logger
     if logging.getLogger().getEffectiveLevel() >= logging.CRITICAL:
@@ -344,7 +344,7 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     if logger.handlers:
         logger.handlers.clear()
     
-    # Set logger level to the requested level
+    # Set logger level to the enforced DEBUG level
     logger.setLevel(numeric_level)
 
     # Create console handler with the specified level
@@ -438,7 +438,8 @@ def update_all_loggers(log_level: str = 'INFO'):
     Args:
         log_level: The new log level to set for all handlers
     """
-    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    # Force DEBUG level regardless of the provided log_level
+    numeric_level = logging.DEBUG
     
     # Update all configured loggers
     for name, logger in _configured_loggers.items():
