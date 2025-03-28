@@ -16,7 +16,7 @@ from tac.blocks.model import ProtoBlock
 # Remove direct import to break circular dependency
 # from tac.blocks.executor import BlockExecutor
 from tac.coding_agents.aider import AiderAgent
-from tac.core.log_config import setup_logging
+from tac.core.log_config import setup_logging, activate_file_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
@@ -134,6 +134,9 @@ class BlockProcessor:
         return True
 
     def run_loop(self):
+
+        # Activate file logging explicitly at the beginning of the run loop
+        activate_file_logging(logger)
 
         # Preliminary tests before we start.
         max_retries = config.general.max_retries_block_creation

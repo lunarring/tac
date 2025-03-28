@@ -1,7 +1,7 @@
 import os
 import glob
 import logging
-from tac.core.log_config import setup_logging, reset_execution_context
+from tac.core.log_config import setup_logging, reset_execution_context, activate_file_logging
 
 def test_log_file_written(tmp_path, monkeypatch):
     # Change the current working directory to the temporary directory
@@ -14,7 +14,19 @@ def test_log_file_written(tmp_path, monkeypatch):
     logger = setup_logging("test_logger", log_level="DEBUG")
     test_message = "Test error message"
     
-    # Log an error message
+    # Verify that no file handler is attached by default
+    file_handlers = [handler for handler in logger.handlers if isinstance(handler, logging.FileHandler)]
+    assert not file_handlers, "File logging should not be active by default"
+    
+    # Log an error message and ensure no log directory is created
+    logger.error(test_message)
+    default_log_dir = tmp_path / ".tac_logs"
+    assert not default_log_dir.exists(), "Log directory should not exist before file logging activation"
+    
+    # Activate file logging explicitly
+    activate_file_logging(logger)
+    
+    # Log another error message after activating file logging
     logger.error(test_message)
     
     # Flush file handlers to ensure the message is written
@@ -22,7 +34,7 @@ def test_log_file_written(tmp_path, monkeypatch):
         if isinstance(handler, logging.FileHandler):
             handler.flush()
     
-    # The log directory should be created under the current working directory (i.e., tmp_path/.tac_logs)
+    # The log directory should now be created under the current working directory (i.e., tmp_path/.tac_logs)
     log_dir = tmp_path / ".tac_logs"
     assert log_dir.exists() and log_dir.is_dir(), "Log directory not created"
     
@@ -41,4 +53,3 @@ def test_log_file_written(tmp_path, monkeypatch):
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__])
-    

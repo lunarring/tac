@@ -359,7 +359,26 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     # Add the handler to the logger
     logger.addHandler(console_handler)
     
-    # Always enable file logging with the new format
+    # Do NOT enable file logging by default. The file logging can be activated explicitly
+    _configured_loggers[name] = logger
+
+    return logger
+
+def activate_file_logging(logger: logging.Logger = None):
+    """
+    Activate file logging by attaching a file handler to the specified logger.
+    If no logger is provided, the global 'tac' logger is used.
+    """
+    if logger is None:
+        logger = logging.getLogger('tac')
+    
+    # Check if a file handler is already attached
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            logger.debug("File logging already activated.")
+            return
+
+    numeric_level = logging.DEBUG
     try:
         # Create timestamp for log filename in YYMMDD_HHMM format
         now = datetime.datetime.now()
@@ -389,8 +408,8 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
         class FileFormatter(logging.Formatter):
             def format(self, record):
                 # Format timestamp as YYMMDD HH:MM SS.SS
-                timestamp = datetime.datetime.fromtimestamp(record.created)
-                timestamp_str = timestamp.strftime("%y%m%d %H:%M %S.%f")[:-4]
+                timestamp_record = datetime.datetime.fromtimestamp(record.created)
+                timestamp_str = timestamp_record.strftime("%y%m%d %H:%M %S.%f")[:-4]
                 
                 # Check if this is a heading
                 is_heading = hasattr(record, 'heading') and record.heading
@@ -416,11 +435,6 @@ def setup_logging(name: str = None, execution_id: int = None, log_level: str = '
     except Exception as e:
         # If file logging setup fails, log to console but don't crash
         logger.warning(f"Failed to set up file logging: {str(e)}")
-
-    # Store the configured logger
-    _configured_loggers[name] = logger
-
-    return logger
 
 def get_current_execution_id():
     """Get the current execution ID."""
