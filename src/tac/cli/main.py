@@ -443,7 +443,7 @@ def main():
     
     # Command line args have second highest priority
     # Check both global and subcommand log-level arguments
-    cmd_log_level = args.log_level if getattr(args, "log_level", None) else None
+    cmd_log_level = args.log_level if getattr(args, "log-level", None) else None
     
     # Config has lowest priority
     config_log_level = config.logging.get_tac('level', 'INFO')
@@ -587,6 +587,14 @@ def main():
                 setattr(args, "image_url", args.image)
                 if protoblock is not None:
                     protoblock.image_url = args.image
+                else:
+                    from tac.blocks.generator import ProtoBlockGenerator
+                    original_create = ProtoBlockGenerator.create_protoblock
+                    def patched_create(self, protoblock_genesis_prompt, protoblock=None):
+                        pb = original_create(self, protoblock_genesis_prompt, protoblock)
+                        pb.image_url = args.image
+                        return pb
+                    ProtoBlockGenerator.create_protoblock = patched_create
 
             if config.general.use_orchestrator:
                 if voice_ui is not None:
