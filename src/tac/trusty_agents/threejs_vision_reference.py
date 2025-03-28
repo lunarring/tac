@@ -168,39 +168,34 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
     def _determine_success(self, analysis_result: str) -> bool:
         """
         Determine if the visual comparison analysis indicates success based on a grade.
+        Only an A grade is considered acceptable.
         
         Args:
             analysis_result: The result from the vision analysis, expected to contain a grade.
             
         Returns:
-            bool: True if the grade meets or exceeds the minimum threshold.
+            bool: True if the grade is an A; False otherwise.
         """
         try:
-            min_grade = config.general.trusty_agents.minimum_vision_score.upper()
-            if min_grade not in {"A", "B", "C", "D", "F"}:
-                logger.warning(f"Invalid minimum_vision_score in config: {min_grade}, defaulting to 'B'")
-                min_grade = "B"
-            grade_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
-            min_grade_value = grade_values[min_grade]
-
             if "GRADE:" in analysis_result:
                 grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
                 if not grade_line:
                     logger.error("No grade found after 'GRADE:'")
                     return False
                 grade = grade_line[0].upper()  # Take first character as grade
-                if grade not in grade_values:
-                    logger.error(f"Invalid grade found in analysis: {grade}")
+                if grade == "A":
+                    return True
+                else:
+                    logger.info(f"Grade provided is {grade}, which does not meet the required A grade")
                     return False
-                return grade_values[grade] >= min_grade_value
-            # Fallback to legacy YES/NO format if no grade found
+            # Fallback to legacy YES/NO format if no grade found; legacy responses are not acceptable since only A passes.
             lines = analysis_result.strip().splitlines()
             if lines and lines[0].strip().upper() in ["YES", "NO"]:
-                logger.warning("Using legacy YES/NO format - treating YES as grade 'B' and NO as grade 'F'")
-                return lines[0].strip().upper() == "YES"
+                logger.warning("Legacy YES/NO format used, failing because only an A grade is acceptable")
+                return False
             return False
         except Exception as e:
-            logger.error(f"Error determining success from grade: {e}")
+            logger.error(f"Error determining grade: {e}")
             return False
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
