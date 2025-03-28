@@ -12,6 +12,7 @@ class DummyProtoBlock:
         self.write_files = []
         self.context_files = []
         self.trusty_agent_prompts = {"threejs_vision_reference": "The after state should match the reference design."}
+        self.image_url = None
 
 # Create a helper function to generate a dummy image file
 def create_dummy_image(color, size=(100, 100)):
@@ -55,6 +56,8 @@ def dummy_agent(dummy_images):
 
 def test_threejs_vision_reference_success(dummy_agent):
     dummy_proto = DummyProtoBlock()
+    # For success test, ensure protoblock provides a value (if needed)
+    dummy_proto.image_url = dummy_agent.reference_image_path
     success, analysis, error_type = dummy_agent._check_impl(dummy_proto, "", "")
     # Ensure that the composite image was created
     assert dummy_agent.comparison_path is not None
@@ -70,6 +73,7 @@ def test_threejs_vision_reference_failure(dummy_agent, dummy_images):
     # Now test failure case by making dummy LLM return "NO"
     dummy_agent.llm_client = DummyLLMClient("NO - The current state does not match the reference image.")
     dummy_proto = DummyProtoBlock()
+    dummy_proto.image_url = dummy_agent.reference_image_path
     success, analysis, error_type = dummy_agent._check_impl(dummy_proto, "", "")
     # Ensure that the composite image was created
     assert dummy_agent.comparison_path is not None
@@ -85,6 +89,7 @@ def test_missing_reference_image(dummy_agent):
     dummy_agent.reference_image_path = None
     dummy_agent.reference_image = None
     dummy_proto = DummyProtoBlock()
+    # Do not supply an image_url in the protoblock
     success, analysis, error_type = dummy_agent._check_impl(dummy_proto, "", "")
     assert success is False
     assert "Reference image not provided" in analysis

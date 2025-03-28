@@ -39,7 +39,7 @@ logger = setup_logging('tac.trusty_agents.threejs_vision_reference')
 class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
     """
     A trusty agent that captures screenshots before and after code changes,
-    stitches them together with a reference image (provided via CLI) side by side,
+    stitches them together with a reference image (provided via CLI or protoblock) side by side,
     and analyzes the visual differences between the current state and the reference.
     The order of images is: before, after, reference.
     """
@@ -64,7 +64,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
         self.protoblock = protoblock
 
     def set_reference_image(self, reference_image_path: str) -> None:
-        """Set the reference image provided via the CLI."""
+        """Set the reference image provided via the CLI or protoblock."""
         if not os.path.exists(reference_image_path):
             logger.error(f"Reference image not found: {reference_image_path}")
             self.reference_image = None
@@ -183,8 +183,14 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             # Store the protoblock for use in _capture_state
             self.protoblock = protoblock
 
+            # Retrieve or load the reference image if not already set
             if not self.reference_image or not self.reference_image_path:
-                return False, "Reference image not provided or failed to load", "Missing reference image"
+                image_url = getattr(protoblock, "image_url", None)
+                if image_url:
+                    self.set_reference_image(image_url)
+                if not self.reference_image or not self.reference_image_path:
+                    logger.error("Reference image not provided")
+                    return False, "Reference image not provided", "Missing reference image"
             
             # Verify we have the before state
             if not self.before_screenshot_path:
