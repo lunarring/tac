@@ -34,8 +34,84 @@ from tac.trusty_agents.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager
 
-# Initialize logger at module level but don't use it as a global in functions
 _module_logger = setup_logging('tac.cli.main')
+
+# Define InteractiveBlockProcessor subclass to override the commit logic after verification
+class InteractiveBlockProcessor(BlockProcessor):
+    def run_loop(self):
+        max_retries = config.general.max_retries_block_creation
+        _module_logger.info(f"Starting execution loop, using max_retries={max_retries} from config")
+        error_analysis = ""
+        for idx_attempt in range(max_retries):
+            _module_logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
+            if idx_attempt > 0:
+                if config.general.halt_after_fail:
+                    user_input = input("Execution paused after failure. Enter 'r' to revert to last commit (clean state), or 'c' to continue with current state: ").strip().lower()
+                    if user_input in ['r', 'revert']:
+                        if config.git.enabled:
+                            _module_logger.info("Reverting changes as per user selection...")
+                            self.git_manager.revert_changes()
+                        else:
+                            _module_logger.info("Git is disabled; cannot revert changes.")
+                    elif user_input in ['c', 'continue']:
+                        _module_logger.info("Continuing with current state as per user selection...")
+                    else:
+                        _module_logger.info("Invalid selection, defaulting to continue without reverting.")
+                else:
+                    if config.git.enabled:
+                        _module_logger.info("Reverting changes while staying on feature branch...")
+                        self.git_manager.revert_changes()
+
+            try:
+                self.create_protoblock(idx_attempt, error_analysis)
+            except ValueError as exc:
+                error_analysis = str(exc)
+                _module_logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
+                self.store_previous_protoblock()
+                continue
+
+            if idx_attempt == 0:
+                if not self.handle_git_branch_setup():
+                    return False
+
+            execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
+
+            if not execution_success:
+                _module_logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
+                if config.general.trusty_agents.run_error_analysis and error_analysis:
+                    _module_logger.error(error_analysis)
+                self.store_previous_protoblock()
+                if not config.general.trusty_agents.run_error_analysis:
+                    error_analysis = ""
+            else:
+                if config.git.enabled:
+                    if getattr(config.general, "halt_after_verify", False):
+                        _module_logger.info("Halt after successful verification is enabled.")
+                        choice = input("Verification successful! Enter 'c' to commit changes, or any other key to exit without committing: ").strip().lower()
+                        if choice in ['c', 'commit']:
+                            commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                            if commit_success:
+                                _module_logger.info("Changes committed successfully.")
+                            else:
+                                _module_logger.error("Failed to commit changes")
+                                return False
+                        else:
+                            _module_logger.info("Exiting without committing changes.")
+                    else:
+                        commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                        if not commit_success:
+                            _module_logger.error("Failed to commit changes")
+                            return False
+                return True
+
+        if config.git.enabled and self.protoblock:
+            current_branch = self.git_manager.get_current_branch()
+            base_branch = self.git_manager.base_branch if self.git_manager.base_branch else "main"
+            _module_logger.error("❌ All execution attempts failed", heading=True)
+            _module_logger.error("📋 Git Cleanup Commands:")
+            _module_logger.error(f"  To switch back to your main branch and clean up:")
+            _module_logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
+        return False
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -468,12 +544,10 @@ def main():
     # Update all existing loggers with the new log level
     update_all_loggers(log_level)
     
-    # Add a debug message to verify logging is working
     logger.debug(f"Starting TAC with log level: {log_level}")
     
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
-        # Import and run the viewer without creating log files
         from tac.cli.viewer import TACViewer
         try:
             TACViewer().logs_menu()
@@ -482,7 +556,6 @@ def main():
             sys.exit(0)
         return
     
-    # Configure logging for all other commands
     logger.debug(f"Overriding config with args: {vars(args)}")
     logger.debug(f"Config after override: {config}")
     
@@ -500,21 +573,15 @@ def main():
         return
     
     if args.command == 'optimize':
-        # Set log level explicitly for the optimize command
         if hasattr(args, 'log_level') and args.log_level:
             log_level = args.log_level
-            # Update the logger with the new log level
             logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
-            # Also update the config
             config.override_with_dict({'logging': {'tac': {'level': log_level}}})
-            # Update all existing loggers
             update_all_loggers(log_level)
             
         logger.debug(f"Optimizing function: {args.function_name}")
         optimizer = PerformanceTestingAgent(args.function_name, config)
-        # First do a pre-run, setting up the test and getting baseline performance
         optimizer.optimize(nmb_runs=5) 
-
         sys.exit(0)
 
     voice_ui = None
@@ -528,7 +595,6 @@ def main():
             logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
             voice_instructions = voice_ui.task_instructions
             
-            # Set up all necessary args that make command uses
             make_args = argparse.Namespace()
             make_args.dir = '.'
             make_args.no_git = getattr(args, 'no_git', False)
@@ -582,8 +648,6 @@ def main():
             else:
                 task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
 
-            # HERE WE INJECT THE UI PROMPT
-
             protoblock = None
             if args.json:
                 from tac.blocks.model import ProtoBlock
@@ -618,7 +682,8 @@ def main():
                     logger.error("Multi-block orchestrator execution failed.")
                     sys.exit(1)
             else:
-                block_processor = BlockProcessor(task_instructions, codebase, protoblock=protoblock)
+                # Use the InteractiveBlockProcessor with overridden commit logic
+                block_processor = InteractiveBlockProcessor(task_instructions, codebase, protoblock=protoblock)
                 success = block_processor.run_loop()
             
             if success:
