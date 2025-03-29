@@ -125,7 +125,8 @@ class ProjectFiles:
                     "hash": current_hash,
                     "size": file_size,
                     "last_modified": last_modified,
-                    "summary": analysis["content"]
+                    "summary_high_level": analysis["summary_high_level"],
+                    "summary_detailed": analysis["summary_detailed"]
                 }
                 
                 if rel_path in existing_files:
@@ -195,7 +196,18 @@ class ProjectFiles:
         if summary:
             if "error" in summary:
                 return f"Error analyzing file: {summary['error']}"
-            return summary.get("summary", "No summary available")
+            
+            high_level = summary.get("summary_high_level", "")
+            detailed = summary.get("summary_detailed", "")
+            
+            if high_level and detailed:
+                return f"High-level summary: {high_level}\n\n{detailed}"
+            elif high_level:
+                return high_level
+            elif "summary" in summary:  # Backward compatibility
+                return summary.get("summary", "No summary available")
+            
+            return "No summary available"
         
         return f"No summary available for {file_path}" 
 
@@ -214,9 +226,20 @@ class ProjectFiles:
         formatted_strings = []
         
         for rel_path, file_info in data["files"].items():
-            summary = file_info.get("summary", "No summary available")
             if "error" in file_info:
                 summary = f"Error analyzing file: {file_info['error']}"
+            else:
+                high_level = file_info.get("summary_high_level", "")
+                detailed = file_info.get("summary_detailed", "")
+                
+                if high_level and detailed:
+                    summary = f"High-level summary: {high_level}\n\n{detailed}"
+                elif high_level:
+                    summary = high_level
+                elif "summary" in file_info:  # Backward compatibility
+                    summary = file_info.get("summary", "No summary available")
+                else:
+                    summary = "No summary available"
                 
             formatted_strings.append(
                 f"###FILE: {rel_path}\n{summary}\n###END_FILE"
