@@ -265,15 +265,20 @@ Expected changes: {expected_changes}
 Please provide your analysis in the following format:
 
 GRADE: [A-F]
+"A" is the best possible score, if it really looks the same
+"B" is good, going the right direction but not quite the same
+"C" means some things are in place but some are missing or wrong
+"D" is not really right, not close to the reference image
+"F" is failed, because the implementation is far away from the reference image 
 
 ANALYSIS:
 (Detailed explanation)
 
 ISSUES:
-(Optional list of visual issues)
+(list of visual issues. what is different? what is missing? what is wrong?)
 
 RECOMMENDATIONS:
-(Optional suggestions for improvement)"""
+(suggestions for improvement. can potentially be radical and drastic. the goal is to make the implementation match the reference image as closely as possible, and the programmers are blind and you are their eyes)"""
             
             messages = [
                 Message(role="system", content="You are a visual analysis assistant."),

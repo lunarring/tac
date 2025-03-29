@@ -122,7 +122,7 @@ Additionally, below, you add a small note to the user about the changes you made
 # insert the note here
 ###END_NOTE
 
-REMEMBER: don't break existing code that does not need to be changed and ONLY implement functionality that is listed in the task description.
+REMEMBER: don't break existing code that does not need to be changed and ONLY implement functionality that is listed in the task description. However if this really would require a big rewrite, so be it, do it!
 
 Here are language specific instructions:
 Python: 
