@@ -202,7 +202,11 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         type=str,
         help='Image URL to be associated with the task'
     )
-    
+    run_parser.add_argument(
+        '--halt-after-verify',
+        action='store_true',
+        help='Prevent auto commit after successful verification and pause for manual review'
+    )
     # Dynamically add arguments from general config
     general_config = config.general
     for key, value in vars(general_config).items():

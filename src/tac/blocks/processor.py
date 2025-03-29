@@ -198,10 +198,14 @@ class BlockProcessor:
             else:
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
-                    commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
-                    if not commit_success:
-                        logger.error("Failed to commit changes")
-                        return False
+                    if getattr(config.general, "halt_after_verify", False):
+                        logger.info("Halt after successful verification is enabled. Halting before auto-commit. Please review the changes and commit manually.")
+                        input("Press Enter to exit without auto-committing: ")
+                    else:
+                        commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                        if not commit_success:
+                            logger.error("Failed to commit changes")
+                            return False
                 return True
             
         # If we've reached here, all attempts failed
