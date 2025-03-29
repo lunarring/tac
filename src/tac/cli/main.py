@@ -87,16 +87,23 @@ class InteractiveBlockProcessor(BlockProcessor):
                 if config.git.enabled:
                     if getattr(config.general, "halt_after_verify", False):
                         _module_logger.info("Halt after successful verification is enabled.")
-                        choice = input("Verification successful! Enter 'c' to commit changes, or any other key to exit without committing: ").strip().lower()
-                        if choice in ['c', 'commit']:
-                            commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
-                            if commit_success:
-                                _module_logger.info("Changes committed successfully.")
+                        while True:
+                            choice = input("Verification successful! Enter 'c' to commit changes, or 'a' to abort: ").strip().lower()
+                            if choice == 'c':
+                                commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                                if commit_success:
+                                    _module_logger.info("Changes committed successfully.")
+                                    break
+                                else:
+                                    _module_logger.error("Failed to commit changes")
+                                    return False
+                            elif choice == 'a':
+                                _module_logger.info("User chose to abort. Reverting changes...")
+                                self.git_manager.revert_changes()
+                                _module_logger.info("Exiting without committing changes.")
+                                break
                             else:
-                                _module_logger.error("Failed to commit changes")
-                                return False
-                        else:
-                            _module_logger.info("Exiting without committing changes.")
+                                _module_logger.info("Invalid selection. Please enter 'c' to commit or 'a' to abort.")
                     else:
                         commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
                         if not commit_success:
