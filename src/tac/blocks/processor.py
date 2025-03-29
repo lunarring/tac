@@ -199,8 +199,24 @@ class BlockProcessor:
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
                     if getattr(config.general, "halt_after_verify", False):
-                        logger.info("Halt after successful verification is enabled. Halting before auto-commit. Please review the changes and commit manually.")
-                        input("Press Enter to exit without auto-committing: ")
+                        logger.info("Halt after successful verification is enabled.")
+                        while True:
+                            choice = input("Verification successful! Enter 'c' to commit changes, or 'a' to abort: ").strip().lower()
+                            if choice == 'c':
+                                commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                                if commit_success:
+                                    logger.info("Changes committed successfully.")
+                                    break
+                                else:
+                                    logger.error("Failed to commit changes")
+                                    return False
+                            elif choice == 'a':
+                                logger.info("User chose to abort. Reverting changes...")
+                                self.git_manager.revert_changes()
+                                logger.info("Exiting without committing changes.")
+                                break
+                            else:
+                                logger.info("Invalid selection. Please enter 'c' to commit or 'a' to abort.")
                     else:
                         commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
                         if not commit_success:
