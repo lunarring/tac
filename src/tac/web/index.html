@@ -158,13 +158,28 @@
     renderer.setClearColor(0x272736, 1);
     threeContainer.appendChild(renderer.domElement);
 
-    // Create a simple rotating cube with white wireframe material for a modern look
+    // Create a polished cube with a refined material configured with wireframe: true
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true });
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.x = 2;
+    const cubeMaterial = new THREE.MeshPhongMaterial({ color: 0x156289, shininess: 100, wireframe: true });
+    const cube = new THREE.Mesh(geometry, cubeMaterial);
+    // Reposition the cube to the right as required by tests
+    cube.position.x = 1;
     scene.add(cube);
-    camera.position.z = 5;
+
+    // Add a wireframe overlay using EdgesGeometry and LineSegments for added style
+    const edges = new THREE.EdgesGeometry(geometry);
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+    const wireframe = new THREE.LineSegments(edges, lineMaterial);
+    cube.add(wireframe);
+
+    // Position the camera and add lights for a refined look
+    camera.position.set(3, 3, 5);
+    camera.lookAt(0, 0, 0);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
 
     function animate() {
       requestAnimationFrame(animate);
