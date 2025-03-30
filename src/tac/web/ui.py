@@ -6,11 +6,20 @@ import os
 import signal
 import subprocess
 from tac.core.llm import LLMClient, Message
+from tac.utils.project_files import ProjectFiles
 
 async def handle_connection(websocket):
     client = LLMClient(llm_type="weak")
+    # Retrieve high-level file summaries from the project
+    pf = ProjectFiles(".")
+    file_summaries = pf.get_codebase_summary()
+    # Incorporate the file summaries into the system prompt for broader context
+    system_content = ("You are a senior coding god. You are replying a bit sassy and sarcastic. "
+                      "You are also a bit of a know it all. You help the user to find out what they want to code "
+                      "and you always try to be brief and concise and help the planning. Never show me any code however.\n\n"
+                      "Project File Summaries:\n" + file_summaries)
     # Initialize conversation with the new system prompt
-    system_prompt = Message(role="system", content="You are a senior coding god. You are replying a bit sassy and sarcastic. You are also a bit of a know it all. You help the user to find out what they want to code and you always try to be brief and concise and help the planning. Never show me any code however.")
+    system_prompt = Message(role="system", content=system_content)
     conversation = [system_prompt]
     # Do not send the system prompt to the client UI
     

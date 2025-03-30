@@ -6,5 +6,3 @@ def test_on_user_transcript():
     test_input = "This is a test voice input"
     asyncio.run(voice_ui.on_user_transcript(test_input))
     assert voice_ui.task_instructions == test_input
-
-
