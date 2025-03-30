@@ -9,7 +9,11 @@ from tac.core.llm import LLMClient, Message
 
 async def handle_connection(websocket):
     client = LLMClient(llm_type="weak")
-    conversation = [Message(role="system", content="You are a helpful assistant")]
+    # Initialize conversation with the new system prompt
+    system_prompt = Message(role="system", content="You are a senior coding god")
+    conversation = [system_prompt]
+    # Immediately send the system prompt message upon connection
+    await websocket.send(system_prompt.content)
     while True:
         try:
             user_input = await websocket.recv()
