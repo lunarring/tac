@@ -31,6 +31,7 @@ class ProtoBlock:
     branch_name: str = None
     commit_message: str = None
     image_url: Optional[str] = None
+    visual_description: Optional[str] = None
 
     def __post_init__(self):
         # Set default value for trusty_agents from config if None
@@ -86,6 +87,7 @@ class ProtoBlock:
         trusty_agents = version_data.get('trusty_agents', config.general.trusty_agents.default_trusty_agents)
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
         image_url = version_data.get('image_url', None)
+        visual_description = version_data.get('visual_description', None)
         
         # Create and return the ProtoBlock
         return cls(
@@ -97,7 +99,8 @@ class ProtoBlock:
             branch_name=branch_name,
             trusty_agents=trusty_agents,
             trusty_agent_prompts=trusty_agent_prompts,
-            image_url=image_url
+            image_url=image_url,
+            visual_description=visual_description
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -125,7 +128,8 @@ class ProtoBlock:
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
             "timestamp": datetime.now().isoformat(),
-            "image_url": self.image_url
+            "image_url": self.image_url,
+            "visual_description": self.visual_description
         }
         
         # Use provided filename or generate default one
@@ -174,5 +178,6 @@ class ProtoBlock:
             "block_id": self.block_id,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
-            "image_url": self.image_url
+            "image_url": self.image_url,
+            "visual_description": self.visual_description
         }

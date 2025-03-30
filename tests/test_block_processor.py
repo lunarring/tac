@@ -125,7 +125,8 @@ def test_proto_block_to_dict():
         "block_id": "dictTest",
         "trusty_agents": ["agent_dict"],
         "trusty_agent_prompts": {"agent_dict": "dict prompt"},
-        "image_url": None
+        "image_url": None,
+        "visual_description": None
     }
     assert d == expected
 

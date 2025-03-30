@@ -663,14 +663,23 @@ def main():
             
             if args.image is not None:
                 setattr(args, "image_url", args.image)
+                # Run vision LLM to get visual description
+                vision_client = LLMClient(llm_type="vision")
+                vision_messages = [
+                    Message(role="system", content="You are a helpful assistant that can analyze images."),
+                    Message(role="user", content="Please provide a visual description of the image.")
+                ]
+                visual_description = vision_client.vision_chat_completion(vision_messages, args.image)
                 if protoblock is not None:
                     protoblock.image_url = args.image
+                    protoblock.visual_description = visual_description
                 else:
                     from tac.blocks.generator import ProtoBlockGenerator
                     original_create = ProtoBlockGenerator.create_protoblock
                     def patched_create(self, protoblock_genesis_prompt, protoblock=None):
                         pb = original_create(self, protoblock_genesis_prompt, protoblock)
                         pb.image_url = args.image
+                        pb.visual_description = visual_description
                         return pb
                     ProtoBlockGenerator.create_protoblock = patched_create
 
