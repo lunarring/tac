@@ -11,7 +11,7 @@
       width: 100vw;
       height: 100vh;
       font-family: 'Roboto', sans-serif;
-      background: linear-gradient(135deg, #f0f2f5, #ffffff);
+      background: linear-gradient(135deg, #e0eafc, #cfdef3);
     }
     /* Container split into two equal halves */
     #splitContainer {
@@ -20,24 +20,23 @@
       height: 100%;
       overflow: hidden;
     }
-    /* Left panel for chat interface with a subtle vertical gradient and refined shadow */
+    /* Left panel for chat interface with a clean, modern aesthetic */
     #leftPane {
       flex: 1;
       position: relative;
-      border-right: 1px solid #e0e0e0;
-      background: linear-gradient(180deg, #ffffff, #f7f7f9);
+      border-right: 1px solid #d0d0d0;
+      background: #ffffff;
       display: flex;
       flex-direction: column;
-      box-shadow: 4px 0 16px rgba(0, 0, 0, 0.1);
+      box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
     }
-    /* Header for chat with recipient name and status */
+    /* Header for chat with refined padding and subtle shadow effect */
     #chatHeader {
       display: flex;
       align-items: center;
-      padding: 12px 20px;
-      border-bottom: 1px solid #e0e0e0;
-      background-color: #f7f7f9;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      padding: 16px 24px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
       z-index: 10;
     }
     #chatHeader #recipientName {
@@ -65,10 +64,10 @@
       flex: 1;
       overflow-y: auto;
       padding: 20px;
-      color: #333;
-      background-color: transparent;
+      color: #555;
+      background-color: #fafafa;
     }
-    /* Chat input area at the bottom of the chat pane with refined borders and shadows */
+    /* Chat input area at the bottom of the chat pane with modern styling */
     #userInput {
       width: calc(100% - 20px);
       min-width: 300px;
@@ -79,7 +78,7 @@
       margin: 10px;
       background-color: #ffffff;
       color: #333;
-      border: 1px solid #dcdfe6;
+      border: 1px solid #c3c3c3;
       border-radius: 12px;
       resize: none;
       outline: none;
@@ -87,14 +86,13 @@
     }
     #userInput:focus {
       border-color: #007bff;
-      box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+      box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
     }
-    /* Right panel for Three.js canvas with a darker modern gradient */
+    /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
       flex: 1;
       position: relative;
       background: linear-gradient(135deg, #2d2d44, #272736);
-      /* Added subtle inner shadow for a modern feel */
       box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
     }
     /* Ensure Three.js canvas fills its container */
@@ -103,16 +101,16 @@
       height: 100% !important;
       display: block;
     }
-    /* Chat bubble styles revamped for a contemporary look */
+    /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
       margin: 10px 0;
       padding: 12px 16px;
       border-radius: 20px;
       max-width: 80%;
       clear: both;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
       font-size: 14px;
-      line-height: 1.4;
+      line-height: 1.5;
       transition: background 0.3s, box-shadow 0.3s;
     }
     .chat-user {
@@ -154,7 +152,6 @@
     const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(threeContainer.clientWidth, threeContainer.clientHeight);
-    // Set clear color to match the dark gradient background of rightPane
     renderer.setClearColor(0x272736, 1);
     threeContainer.appendChild(renderer.domElement);
 
