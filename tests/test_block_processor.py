@@ -125,7 +125,8 @@ def test_proto_block_to_dict():
         "block_id": "dictTest",
         "trusty_agents": ["agent_dict"],
         "trusty_agent_prompts": {"agent_dict": "dict prompt"},
-        "image_url": None
+        "image_url": None,
+        "visual_description": ""
     }
     assert d == expected
 
@@ -159,6 +160,7 @@ def test_save_load_new_format(tmp_path):
     assert loaded_pb.branch_name == "save_branch"
     assert loaded_pb.trusty_agents == ["agent_save"]
     assert loaded_pb.trusty_agent_prompts == {"agent_save": "save prompt"}
+    assert loaded_pb.visual_description == ""
 
 def test_save_load_legacy_format(tmp_path):
     # Create a legacy format file (without versions) manually
@@ -169,7 +171,8 @@ def test_save_load_legacy_format(tmp_path):
         "commit_message": "legacy commit",
         "branch_name": "legacy_branch",
         "trusty_agents": ["agent_legacy"],
-        "trusty_agent_prompts": {"agent_legacy": "legacy prompt"}
+        "trusty_agent_prompts": {"agent_legacy": "legacy prompt"},
+        "visual_description": ""
     }
     file_path = tmp_path / ".tac_protoblock_legacyTest.json"
     with open(file_path, "w", encoding="utf-8") as f:
@@ -186,6 +189,7 @@ def test_save_load_legacy_format(tmp_path):
     assert loaded_pb.branch_name == "legacy_branch"
     assert loaded_pb.trusty_agents == ["agent_legacy"]
     assert loaded_pb.trusty_agent_prompts == {"agent_legacy": "legacy prompt"}
+    assert loaded_pb.visual_description == ""
 
 def test_load_invalid_json(tmp_path):
     # Write an invalid JSON file and ensure load raises a ValueError

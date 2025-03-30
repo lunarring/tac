@@ -31,6 +31,7 @@ class ProtoBlock:
     branch_name: str = None
     commit_message: str = None
     image_url: Optional[str] = None
+    visual_description: Optional[str] = None
 
     def __post_init__(self):
         # Set default value for trusty_agents from config if None
@@ -41,11 +42,9 @@ class ProtoBlock:
         if self.trusty_agent_prompts is None:
             self.trusty_agent_prompts = {}
         
-        # Preserve image_url if provided via CLI or elsewhere.
-        # Only set image_url to None if it is not already set.
-        # (This line was removed to avoid overwriting an existing image_url.)
-        # if self.image_url is None:
-        #     self.image_url = None
+        # Set default for visual_description if not provided
+        if self.visual_description is None:
+            self.visual_description = ""
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -86,6 +85,7 @@ class ProtoBlock:
         trusty_agents = version_data.get('trusty_agents', config.general.trusty_agents.default_trusty_agents)
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
         image_url = version_data.get('image_url', None)
+        visual_description = version_data.get('visual_description', "")
         
         # Create and return the ProtoBlock
         return cls(
@@ -97,7 +97,8 @@ class ProtoBlock:
             branch_name=branch_name,
             trusty_agents=trusty_agents,
             trusty_agent_prompts=trusty_agent_prompts,
-            image_url=image_url
+            image_url=image_url,
+            visual_description=visual_description
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -125,7 +126,8 @@ class ProtoBlock:
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
             "timestamp": datetime.now().isoformat(),
-            "image_url": self.image_url
+            "image_url": self.image_url,
+            "visual_description": self.visual_description
         }
         
         # Use provided filename or generate default one
@@ -174,5 +176,6 @@ class ProtoBlock:
             "block_id": self.block_id,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
-            "image_url": self.image_url
+            "image_url": self.image_url,
+            "visual_description": self.visual_description
         }
