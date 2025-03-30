@@ -28,8 +28,8 @@ async def handle_connection(websocket):
                     extracted_content = ai_response
                 # Append the assistant's response to the conversation and send only its raw content
                 conversation.append(Message(role="assistant", content=extracted_content))
-                msg = json.dumps({"type": "chat", "content": extracted_content})
-                await websocket.send(msg)
+                print(f"Sending message to client: {extracted_content}")
+                await websocket.send(extracted_content)
         except websockets.exceptions.ConnectionClosed:
             break
         except Exception as e:
