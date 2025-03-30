@@ -7,15 +7,23 @@ import socket
 import os
 import signal
 import subprocess
+from tac.core.llm import LLMClient, Message
 
 async def handle_connection(websocket):
     async def send_messages():
+        # Initialize the weak LLM client and conversation history with a system prompt.
+        client = LLMClient(llm_type="weak")
+        conversation = [Message(role="system", content="You are a helpful assistant")]
         while True:
             try:
-                # Generate a random 10-character string
-                random_str = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-                # Format the message as a JSON object with type and content keys
-                msg = json.dumps({"type": "chat", "content": random_str})
+                # Simulate a user message with a random 10-character string.
+                user_input = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+                conversation.append(Message(role="user", content=user_input))
+                # Get AI response from the LLM client.
+                ai_response = client.chat_completion(conversation)
+                conversation.append(Message(role="assistant", content=ai_response))
+                # Format the message as a JSON object with type and content keys.
+                msg = json.dumps({"type": "chat", "content": ai_response})
                 await websocket.send(msg)
                 await asyncio.sleep(1)
             except websockets.exceptions.ConnectionClosed:

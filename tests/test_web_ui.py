@@ -1,7 +1,5 @@
 import asyncio
 import json
-import random
-import string
 import pytest
 import websockets
 from tac.web.ui import run_server
@@ -27,7 +25,7 @@ async def test_websocket_server():
             pass
 
     # Assert that 3 messages were received and each is a JSON object with 'type' and 'content' keys.
-    # The 'content' field should be a random 10-character string.
+    # The 'content' field should be a non-empty string.
     assert len(messages) == 3
     for raw_msg in messages:
         assert isinstance(raw_msg, str)
@@ -40,4 +38,4 @@ async def test_websocket_server():
         assert 'type' in msg
         assert 'content' in msg
         assert isinstance(msg['content'], str)
-        assert len(msg['content']) == 10
+        assert len(msg['content']) > 0
