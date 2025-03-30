@@ -92,6 +92,11 @@ class LLMClient:
         Returns:
             str: The content of the model's response message
         """
+        # Lightweight chat functionality for weak LLM: simply append all incoming message contents.
+        if self.config.model.lower() == "weak":
+            combined_response = " ".join(message.content for message in messages)
+            return combined_response
+        
         # Inject reasoning effort into system prompts for reasoning models.
         messages = self._inject_reasoning_into_system(messages)
         
@@ -400,12 +405,12 @@ if __name__ == "__main__":
     ]
     
     # Example with weak model (default)
-    # print("Using weak model:")
-    # client_weak = LLMClient(llm_type="weak")
-    # response_weak = client_weak.chat_completion(messages)
-    # print(response_weak)
+    print("Using weak model:")
+    client_weak = LLMClient(llm_type="weak")
+    response_weak = client_weak.chat_completion(messages)
+    print(response_weak)
     
-    # # Example with strong model
+    # Example with strong model
     # print("\nUsing strong model:")
     # client_strong = LLMClient(llm_type="strong")
     # response_strong = client_strong.chat_completion(messages)
