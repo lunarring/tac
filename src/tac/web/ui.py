@@ -33,13 +33,14 @@ async def handle_connection(websocket):
     system_prompt = Message(role="system", content=system_content)
     conversation = [system_prompt]
     # Do not send the system prompt to the client UI
-    
+
     while True:
         try:
             user_input = await websocket.recv()
             print("Received message from client:", user_input)
             if user_input.strip():
-                conversation.append(Message(role="user", content=user_input))
+                # Insert the new user message at the beginning of the conversation (after system prompt)
+                conversation.insert(1, Message(role="user", content=user_input))
                 ai_response = client.chat_completion(conversation)
                 # Extract only the 'content' field from the AI response if it's in JSON format
                 try:
@@ -50,8 +51,8 @@ async def handle_connection(websocket):
                         extracted_content = ai_response
                 except Exception:
                     extracted_content = ai_response
-                # Append the assistant's response to the conversation and send only its raw content
-                conversation.append(Message(role="assistant", content=extracted_content))
+                # Insert the assistant's response at the beginning of the conversation (after system prompt)
+                conversation.insert(1, Message(role="assistant", content=extracted_content))
                 print(f"Sending message to client: {extracted_content}")
                 await websocket.send(extracted_content)
         except websockets.exceptions.ConnectionClosed:
