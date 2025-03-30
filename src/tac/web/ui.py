@@ -17,6 +17,7 @@ async def handle_connection(websocket):
             if user_input.strip():
                 conversation.append(Message(role="user", content=user_input))
                 ai_response = client.chat_completion(conversation)
+                # Append the assistant's response to the conversation and send only its raw content
                 conversation.append(Message(role="assistant", content=ai_response))
                 msg = json.dumps({"type": "chat", "content": ai_response})
                 await websocket.send(msg)
