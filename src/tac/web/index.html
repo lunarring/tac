@@ -30,13 +30,35 @@
       flex-direction: column;
       box-shadow: 4px 0 16px rgba(0, 0, 0, 0.1);
     }
-    /* Right panel for Three.js canvas with a darker modern gradient */
-    #rightPane {
-      flex: 1;
-      position: relative;
-      background: linear-gradient(135deg, #2d2d44, #272736);
-      /* Added subtle inner shadow for a modern feel */
-      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
+    /* Header for chat with recipient name and status */
+    #chatHeader {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid #e0e0e0;
+      background-color: #f7f7f9;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+    #chatHeader #recipientName {
+      font-weight: 500;
+      font-size: 18px;
+      color: #333;
+    }
+    #chatHeader #recipientStatus {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      font-size: 14px;
+      color: #4caf50;
+    }
+    .statusDot {
+      width: 8px;
+      height: 8px;
+      background-color: #4caf50;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
     }
     /* Chat message container within left pane */
     #messageContainer {
@@ -45,20 +67,6 @@
       padding: 20px;
       color: #333;
       background-color: transparent;
-    }
-    /* Status indicator in the chat pane */
-    #statusIndicator {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      color: #fff;
-      background: #e74c3c;
-      padding: 6px 12px;
-      border-radius: 20px;
-      z-index: 10;
-      font-size: 12px;
-      font-weight: 500;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     }
     /* Chat input area at the bottom of the chat pane with refined borders and shadows */
     #userInput {
@@ -80,6 +88,14 @@
     #userInput:focus {
       border-color: #007bff;
       box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+    }
+    /* Right panel for Three.js canvas with a darker modern gradient */
+    #rightPane {
+      flex: 1;
+      position: relative;
+      background: linear-gradient(135deg, #2d2d44, #272736);
+      /* Added subtle inner shadow for a modern feel */
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
     }
     /* Ensure Three.js canvas fills its container */
     #rightPane canvas {
@@ -119,8 +135,11 @@
 <body>
   <div id="splitContainer">
     <div id="leftPane">
+      <div id="chatHeader">
+        <span id="recipientName">AI coder</span>
+        <span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
+      </div>
       <div id="messageContainer"></div>
-      <div id="statusIndicator">offline</div>
       <textarea id="userInput" placeholder="Enter text here..."></textarea>
     </div>
     <div id="rightPane">
@@ -166,7 +185,8 @@
 
     // Chat functionality in the left pane
     const messageContainer = document.getElementById("messageContainer");
-    const statusIndicator = document.getElementById("statusIndicator");
+    const statusText = document.getElementById("statusText");
+    const statusDot = document.querySelector("#recipientStatus .statusDot");
     const userInput = document.getElementById("userInput");
 
     function addChatMessage(sender, text) {
@@ -185,12 +205,12 @@
       messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
-    // Establish websocket connection and update status indicator
+    // Establish websocket connection and update status indicator in header
     const socket = new WebSocket("ws://localhost:8765");
     socket.onopen = function() {
       console.log("WebSocket connection opened");
-      statusIndicator.style.background = "green";
-      statusIndicator.textContent = "online";
+      statusDot.style.backgroundColor = "#4caf50";
+      statusText.textContent = "online";
     };
     socket.onmessage = function(event) {
       // Display incoming AI messages in the chat container
@@ -198,13 +218,13 @@
     };
     socket.onerror = function(error) {
       console.error("WebSocket error:", error);
-      statusIndicator.style.background = "red";
-      statusIndicator.textContent = "offline";
+      statusDot.style.backgroundColor = "red";
+      statusText.textContent = "offline";
     };
     socket.onclose = function() {
       console.log("WebSocket connection closed");
-      statusIndicator.style.background = "red";
-      statusIndicator.textContent = "offline";
+      statusDot.style.backgroundColor = "red";
+      statusText.textContent = "offline";
     };
 
     // Send user message when Enter key is pressed (without Shift)
