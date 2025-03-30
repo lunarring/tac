@@ -16,9 +16,27 @@ from tac.trusty_agents.registry import TrustyAgentRegistry
 logger = logging.getLogger(__name__)
 
 def compute_visual_description(image_url: str) -> str:
-    # Dummy implementation of vision processing component.
-    # In a real scenario, this would process the image and return a descriptive text.
-    return f"Visual description for image at {image_url}"
+    # Verify that the image file exists
+    if not os.path.exists(image_url):
+        error_msg = f"Image file not found: {image_url}"
+        logger.error(error_msg)
+        return f"Visual description unavailable: {error_msg}"
+    
+    # Instantiate an LLMClient configured for vision tasks
+    vision_client = LLMClient(llm_type="vision")
+    
+    # Construct conversation with appropriate system and user messages
+    messages = [
+        Message(role="system", content="You are a helpful assistant that can analyze images."),
+        Message(role="user", content="Please provide a detailed visual description of the image.")
+    ]
+    
+    # Call vision_chat_completion with the image path
+    response = vision_client.vision_chat_completion(messages, image_url)
+    
+    # Clean the returned output using the client's cleaning method
+    cleaned_output = vision_client._clean_code_fences(response)
+    return cleaned_output
 
 class ProtoBlockGenerator:
     """
