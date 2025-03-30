@@ -17,9 +17,18 @@ async def handle_connection(websocket):
             if user_input.strip():
                 conversation.append(Message(role="user", content=user_input))
                 ai_response = client.chat_completion(conversation)
+                # Extract only the 'content' field from the AI response if it's in JSON format
+                try:
+                    parsed = json.loads(ai_response)
+                    if isinstance(parsed, dict) and "content" in parsed:
+                        extracted_content = parsed["content"]
+                    else:
+                        extracted_content = ai_response
+                except Exception:
+                    extracted_content = ai_response
                 # Append the assistant's response to the conversation and send only its raw content
-                conversation.append(Message(role="assistant", content=ai_response))
-                msg = json.dumps({"type": "chat", "content": ai_response})
+                conversation.append(Message(role="assistant", content=extracted_content))
+                msg = json.dumps({"type": "chat", "content": extracted_content})
                 await websocket.send(msg)
         except websockets.exceptions.ConnectionClosed:
             break
