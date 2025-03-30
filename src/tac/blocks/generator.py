@@ -15,6 +15,11 @@ from tac.trusty_agents.registry import TrustyAgentRegistry
 
 logger = logging.getLogger(__name__)
 
+def compute_visual_description(image_url: str) -> str:
+    # Dummy implementation of vision processing component.
+    # In a real scenario, this would process the image and return a descriptive text.
+    return f"Visual description for image at {image_url}"
+
 class ProtoBlockGenerator:
     """
     Creates structured task specifications (ProtoBlocks) from high-level instructions.
@@ -311,6 +316,9 @@ And here a bit more detailed explanation of the output format:
         # If protoblock is provided, return it directly
         if protoblock is not None:
             logger.info("Using provided protoblock, skipping creation process")
+            # Compute visual description if a reference image is provided.
+            if protoblock.image_url:
+                protoblock.visual_description = compute_visual_description(protoblock.image_url)
             return protoblock
             
         # Use centralized config
@@ -395,8 +403,13 @@ And here a bit more detailed explanation of the output format:
                         commit_message=f"tac: {data.get('commit_message', 'Update')}",
                         branch_name=branch_name,
                         trusty_agents=trusty_agents,
-                        trusty_agent_prompts=trusty_agent_prompts
+                        trusty_agent_prompts=trusty_agent_prompts,
+                        image_url=data.get("image_url", None),
+                        visual_description=data.get("visual_description", None)
                     )
+                    # Compute visual description if a reference image is provided.
+                    if protoblock.image_url:
+                        protoblock.visual_description = compute_visual_description(protoblock.image_url)
                     logger.info("\nProtoblock details:")
                     logger.info(f"🎯 Task: {protoblock.task_description}")
                     logger.info(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
