@@ -6,15 +6,15 @@ from tac.web.ui import run_server
 
 @pytest.mark.asyncio
 async def test_websocket_server():
-    # Start the websocket server in the background
     server_task = asyncio.create_task(run_server())
     await asyncio.sleep(0.5)  # Give the server time to start
 
     messages = []
     try:
         async with websockets.connect("ws://localhost:8765") as websocket:
-            # Receive 3 messages from the server
-            for _ in range(3):
+            for i in range(3):
+                user_message = f"Test message {i}"
+                await websocket.send(user_message)
                 msg = await websocket.recv()
                 messages.append(msg)
     finally:
@@ -24,8 +24,6 @@ async def test_websocket_server():
         except asyncio.CancelledError:
             pass
 
-    # Assert that 3 messages were received and each is a JSON object with 'type' and 'content' keys.
-    # The 'content' field should be a non-empty string.
     assert len(messages) == 3
     for raw_msg in messages:
         assert isinstance(raw_msg, str)
