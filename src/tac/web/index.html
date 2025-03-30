@@ -157,7 +157,15 @@
 
     // Create a polished cube with a refined material configured with wireframe: true
     const geometry = new THREE.BoxGeometry();
-    const cubeMaterial = new THREE.MeshPhongMaterial({ color: 0x156289, shininess: 100, wireframe: true });
+    const cubeMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x156289, 
+      shininess: 100, 
+      wireframe: true, 
+      transparent: true, 
+      opacity: 0.7,
+      emissive: 0x156289,
+      emissiveIntensity: 0.5
+    });
     const cube = new THREE.Mesh(geometry, cubeMaterial);
     // Reposition the cube to the right as required by tests
     cube.position.x = 1;
