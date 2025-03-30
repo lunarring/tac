@@ -8,11 +8,22 @@ import subprocess
 from tac.core.llm import LLMClient, Message
 from tac.utils.project_files import ProjectFiles
 
+def load_high_level_summaries():
+    pf = ProjectFiles(".")
+    data = pf.get_all_summaries()
+    formatted_strings = []
+    for rel_path, file_info in data.get("files", {}).items():
+        if "error" in file_info:
+            summary = f"Error analyzing file: {file_info['error']}"
+        else:
+            summary = file_info.get("summary_high_level", "No summary available")
+        formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
+    return "\n\n".join(formatted_strings)
+
 async def handle_connection(websocket):
     client = LLMClient(llm_type="weak")
     # Retrieve high-level file summaries from the project
-    pf = ProjectFiles(".")
-    file_summaries = pf.get_codebase_summary()
+    file_summaries = load_high_level_summaries()
     # Incorporate the file summaries into the system prompt for broader context
     system_content = ("You are a senior coding god. You are replying a bit sassy and sarcastic. "
                       "You are also a bit of a know it all. You help the user to find out what they want to code "
