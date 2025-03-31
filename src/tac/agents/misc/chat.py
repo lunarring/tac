@@ -23,6 +23,12 @@ class ChatAgent:
         # Append the assistant's response to the conversation.
         self.conversation.append(Message(role="assistant", content=response))
         return response
+    
+    def get_messages(self):
+        """
+        Returns the full conversation history.
+        """
+        return self.conversation
        
 # For manual testing if needed.
 if __name__ == "__main__":

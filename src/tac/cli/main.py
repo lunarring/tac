@@ -508,6 +508,100 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     return parser, args
 
+def execute_command(task_instructions=None, protoblock=None, config_overrides=None):
+    """
+    Execute the main command logic that can be triggered from CLI or GUI.
+    
+    Args:
+        task_instructions: Instructions for the task to execute
+        protoblock: Optional protoblock object
+        config_overrides: Dictionary of config overrides
+        
+    Returns:
+        bool: True if execution was successful, False otherwise
+    """
+    git_manager = None
+    success = False
+    logger = _module_logger
+    
+    try:
+        # Apply config overrides if provided
+        if config_overrides:
+            config.override_with_dict(config_overrides)
+
+        # Handle git settings
+        if config.safe_get('general', 'no_git'):
+            config.override_with_dict({'git': {'enabled': False}})
+            logger.info("Git operations disabled via config")
+
+        git_manager = create_git_manager()
+        if not git_manager.check_status()[0]:
+            return False
+
+        logger.info("Test Execution Details:", heading=True)
+        logger.info(f"Working directory: {os.getcwd()}")
+        logger.info(f"Python path: {sys.path}")
+        test_runner = TestRunner()
+        success = test_runner.run_tests()
+        if not success:
+            logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
+            return False
+
+        project_files = ProjectFiles()
+        project_files.update_summaries()
+        codebase = project_files.get_codebase_summary()
+
+        # Process image if specified in config
+        image_url = config.safe_get('general', 'image')
+        if image_url:
+            # Run vision LLM to get visual description
+            vision_client = LLMClient(llm_type="vision")
+            vision_messages = [
+                Message(role="system", content="You are a helpful assistant that can analyze images."),
+                Message(role="user", content="Please provide a visual description of the image.")
+            ]
+            visual_description = vision_client.vision_chat_completion(vision_messages, image_url)
+            if protoblock is not None:
+                protoblock.image_url = image_url
+                protoblock.visual_description = visual_description
+            else:
+                from tac.blocks.generator import ProtoBlockGenerator
+                original_create = ProtoBlockGenerator.create_protoblock
+                def patched_create(self, protoblock_genesis_prompt, protoblock=None):
+                    pb = original_create(self, protoblock_genesis_prompt, protoblock)
+                    pb.image_url = image_url
+                    pb.visual_description = visual_description
+                    return pb
+                ProtoBlockGenerator.create_protoblock = patched_create
+
+        if config.general.use_orchestrator:
+            multi_block_orchestrator = MultiBlockOrchestrator()
+            success = multi_block_orchestrator.execute(task_instructions, codebase, config, None, git_manager)
+            
+            if success:
+                print("\n✅ Multi-block orchestrator completed successfully!")
+                logger.info("Multi-block orchestrator completed successfully.")
+            else:
+                print("\n❌ Multi-block orchestrator execution failed.")
+                logger.error("Multi-block orchestrator execution failed.")
+        else:
+            # Use the InteractiveBlockProcessor with overridden commit logic
+            block_processor = InteractiveBlockProcessor(task_instructions, codebase, protoblock=protoblock)
+            success = block_processor.run_loop()
+        
+        if success:
+            print("\n✅ Task completed successfully!")
+            logger.info("Task completed successfully.")
+        else:
+            print("\n❌ Task execution failed.")
+            logger.error("Task execution failed.")
+        
+        return success
+            
+    except Exception as e:
+        logger.error(f"Error during execution: {e}")
+        return False
+
 def main():
     parser, args = parse_args()
 
@@ -525,7 +619,7 @@ def main():
     
     # Command line args have second highest priority
     # Check both global and subcommand log-level arguments
-    cmd_log_level = args.log_level if getattr(args, "log-level", None) else None
+    cmd_log_level = args.log_level if hasattr(args, "log_level") else None
     
     # Config has lowest priority
     config_log_level = config.logging.get_tac('level', 'INFO')
@@ -583,7 +677,6 @@ def main():
         optimizer.optimize(nmb_runs=5) 
         sys.exit(0)
 
-    voice_ui = None
     if args.command == 'voice':
         from tac.cli.voice import VoiceUI
         try:
@@ -592,120 +685,57 @@ def main():
                 voice_ui.temperature = args.temperature
             voice_ui.start()
             logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
-            voice_instructions = voice_ui.task_instructions
             
-            make_args = argparse.Namespace()
-            make_args.dir = '.'
-            make_args.no_git = getattr(args, 'no_git', False)
-            make_args.json = None
-            make_args.instructions = None
-            
+            # Convert args to config overrides
+            config_overrides = {}
             for key in vars(config.general):
-                setattr(make_args, key.replace('-', '_'), config.safe_get('general', key))
+                if hasattr(args, key.replace('-', '_')):
+                    config_overrides[key] = getattr(args, key.replace('-', '_'))
             
-            for attr in vars(make_args):
-                setattr(args, attr, getattr(make_args, attr))
+            success = execute_command(
+                task_instructions=voice_ui.task_instructions,
+                config_overrides=config_overrides
+            )
+            if not success:
+                sys.exit(1)
             
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)
 
-    if args.command == 'make' or voice_ui is not None:
-        git_manager = None
+    if args.command == 'make':
+        # Extract task instructions from args
+        task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
         
-        try:
-            config_override = {}
-            for key in vars(config.general):
-                arg_key = key.replace('-', '_')
-                if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
-                    config_override[key] = getattr(args, arg_key)
-                
-            if args.no_git:
-                config_override['git'] = {'enabled': False}
-                config.override_with_dict(config_override)
-                logger.info("Git operations disabled via --no-git flag")
-
-            git_manager = create_git_manager()
-            if not git_manager.check_status()[0]:
-                sys.exit(1)
-
-            logger.info("Test Execution Details:", heading=True)
-            logger.info(f"Working directory: {os.getcwd()}")
-            logger.info(f"Python path: {sys.path}")
-            test_runner = TestRunner()
-            success = test_runner.run_tests()
-            if not success:
-                logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
-                sys.exit(1)
-
-            project_files = ProjectFiles()
-            project_files.update_summaries()
-            codebase = project_files.get_codebase_summary()
-
-            if voice_ui is not None:
-                task_instructions = voice_ui.wait_until_prompt()
-            else:
-                task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
-
-            protoblock = None
-            if args.json:
-                from tac.blocks.model import ProtoBlock
-                protoblock = ProtoBlock.load(args.json)
-                print(f"\n📄 Loaded protoblock from: {args.json}")
-            
-            if args.image is not None:
-                setattr(args, "image_url", args.image)
-                # Run vision LLM to get visual description
-                vision_client = LLMClient(llm_type="vision")
-                vision_messages = [
-                    Message(role="system", content="You are a helpful assistant that can analyze images."),
-                    Message(role="user", content="Please provide a visual description of the image.")
-                ]
-                visual_description = vision_client.vision_chat_completion(vision_messages, args.image)
-                if protoblock is not None:
-                    protoblock.image_url = args.image
-                    protoblock.visual_description = visual_description
-                else:
-                    from tac.blocks.generator import ProtoBlockGenerator
-                    original_create = ProtoBlockGenerator.create_protoblock
-                    def patched_create(self, protoblock_genesis_prompt, protoblock=None):
-                        pb = original_create(self, protoblock_genesis_prompt, protoblock)
-                        pb.image_url = args.image
-                        pb.visual_description = visual_description
-                        return pb
-                    ProtoBlockGenerator.create_protoblock = patched_create
-
-            if config.general.use_orchestrator:
-                if voice_ui is not None:
-                    raise NotImplementedError("Voice UI is not supported with orchestrator")
-                
-                multi_block_orchestrator = MultiBlockOrchestrator()
-                success = multi_block_orchestrator.execute(task_instructions, codebase, args, voice_ui, git_manager)
-                
-                if success:
-                    print("\n✅ Multi-block orchestrator completed successfully!")
-                    logger.info("Multi-block orchestrator completed successfully.")
-                else:
-                    print("\n❌ Multi-block orchestrator execution failed.")
-                    logger.error("Multi-block orchestrator execution failed.")
-                    sys.exit(1)
-            else:
-                # Use the InteractiveBlockProcessor with overridden commit logic
-                block_processor = InteractiveBlockProcessor(task_instructions, codebase, protoblock=protoblock)
-                success = block_processor.run_loop()
-            
-            if success:
-                print("\n✅ Task completed successfully!")
-                logger.info("Task completed successfully.")
-            else:
-                print("\n❌ Task execution failed.")
-                logger.error("Task execution failed.")
-                sys.exit(1)
-                
-        except Exception as e:
-            logger.error(f"Error during execution: {e}")
+        # Prepare protoblock from JSON if specified
+        protoblock = None
+        if args.json:
+            from tac.blocks.model import ProtoBlock
+            protoblock = ProtoBlock.load(args.json)
+            print(f"\n📄 Loaded protoblock from: {args.json}")
+        
+        # Create config overrides from args
+        config_overrides = {}
+        for key in vars(config.general):
+            arg_key = key.replace('-', '_')
+            if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
+                config_overrides[key] = getattr(args, arg_key)
+        
+        # Handle the no-git flag
+        if args.no_git:
+            config_overrides['git'] = {'enabled': False}
+        
+        # Set image in config if provided
+        if args.image:
+            config_overrides['image'] = args.image
+        
+        success = execute_command(
+            task_instructions=task_instructions,
+            protoblock=protoblock,
+            config_overrides=config_overrides
+        )
+        if not success:
             sys.exit(1)
-
     else:
         parser.print_help()
         sys.exit(1)

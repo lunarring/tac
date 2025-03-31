@@ -330,22 +330,26 @@
       typingAnimation.style.display = "none";
     }
 
-    // Establish websocket connection and update status indicator in header
+    // Create WebSocket connection
     const socket = new WebSocket("ws://localhost:8765");
-    socket.onopen = function() {
-      console.log("WebSocket connection opened");
+
+    // Connection opened
+    socket.addEventListener('open', (event) => {
+      console.log('Connected to WebSocket server');
       statusDot.style.backgroundColor = "#4caf50";
       statusText.textContent = "online";
-    };
-    socket.onmessage = function(event) {
-      hideTypingIndicator();
-      
+    });
+
+    // Listen for messages from the server
+    socket.addEventListener('message', (event) => {
       try {
-        // Try to parse the message as JSON
+        // Try to parse as JSON first
         const data = JSON.parse(event.data);
         
-        // Check if this is a transcribed message from speech-to-text
-        if (data.type === "transcribed_message") {
+        if (data.type === "status_message") {
+          // Handle status messages (from block button processing)
+          addChatMessage("System", data.message);
+        } else if (data.type === "transcribed_message") {
           // Display as a user message
           addChatMessage("User", data.message);
           
@@ -361,20 +365,10 @@
           addChatMessage("AI", event.data);
         }
       } catch (e) {
-        // Not JSON, treat as regular AI message
+        // If not JSON or parsing fails, treat as a regular message
         addChatMessage("AI", event.data);
       }
-    };
-    socket.onerror = function(error) {
-      console.error("WebSocket error:", error);
-      statusDot.style.backgroundColor = "red";
-      statusText.textContent = "offline";
-    };
-    socket.onclose = function() {
-      console.log("WebSocket connection closed");
-      statusDot.style.backgroundColor = "red";
-      statusText.textContent = "offline";
-    };
+    });
 
     // Send user message when Enter key is pressed (without Shift)
     userInput.addEventListener("keydown", function(event) {

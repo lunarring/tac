@@ -5,9 +5,12 @@ import socket
 import os
 import signal
 import subprocess
+import argparse
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
 from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
+from tac.cli.main import execute_command
+from tac.core.llm import LLMClient, Message
 
 # Global variables to manage recording state and speech-to-text instance
 is_recording = False
@@ -74,6 +77,10 @@ async def handle_connection(websocket):
                     if message_type == "mic_click":
                         await dummy_mic_click(websocket)
                         continue
+                    elif message_type == "block_click":
+                        # Handle block click event - compress chat and generate protoblock
+                        await handle_block_click(websocket, agent)
+                        continue
                     elif message_type in ["user_message", "transcribed_message"]:
                         user_message = data.get("message", "").strip()
                 else:
@@ -96,6 +103,80 @@ async def handle_connection(websocket):
         except Exception as e:
             print(f"Error in processing message: {e}")
             break
+
+async def handle_block_click(websocket, agent):
+    """
+    Handle the block button click by:
+    1. Compressing the chat history into a genesis prompt
+    2. Creating config overrides
+    3. Running the execute_command function
+    """
+    try:
+        # Send status message to client
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": "Creating block from conversation..."
+        }))
+        
+        # Get conversation history from agent
+        conversation = agent.get_messages()
+        
+        # Use LLM to compress chat into a genesis prompt
+        llm_client = LLMClient()
+        system_prompt = "You are a helpful assistant that can summarize conversations into clear, concise instructions."
+        
+        # Prepare messages for the LLM
+        compress_messages = [
+            Message(role="system", content=system_prompt),
+            Message(role="user", content="Please compress the following conversation into a clear, concise instruction set that captures the core requirements. The summary should be specific, actionable, and focused on what needs to be implemented:\n\n" + 
+                "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation]))
+        ]
+        
+        # Get compressed instructions from LLM
+        genesis_prompt = llm_client.chat_completion(compress_messages)
+        
+        # Prepare config overrides for execute_command
+        config_overrides = {
+            'no_git': False,
+            'json': None,
+            'image': None
+        }
+        
+        # For any LLM-specific config
+        for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
+            config_overrides[attr] = None
+        
+        # Inform client that execution is starting
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": "Executing block with instructions: " + genesis_prompt[:100] + "..."
+        }))
+        
+        # Run execution in a separate thread to not block the websocket
+        loop = asyncio.get_event_loop()
+        success = await loop.run_in_executor(None, lambda: execute_command(
+            task_instructions=genesis_prompt,
+            config_overrides=config_overrides
+        ))
+        
+        # Report result back to client
+        if success:
+            await websocket.send(json.dumps({
+                "type": "status_message",
+                "message": "✅ Block executed successfully!"
+            }))
+        else:
+            await websocket.send(json.dumps({
+                "type": "status_message",
+                "message": "❌ Block execution failed."
+            }))
+    
+    except Exception as e:
+        print(f"Error during block execution: {e}")
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": f"❌ Error: {str(e)}"
+        }))
 
 async def run_server():
     try:
