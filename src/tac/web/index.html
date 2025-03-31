@@ -146,6 +146,19 @@
       color: #ffffff;
       transform: scale(1.1);
     }
+    /* Amplitude display area at the bottom of the UI */
+    #amplitudeContainer {
+      height: 30px;
+      background: #ddd;
+      margin: 10px;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    #amplitudeBar {
+      height: 100%;
+      width: 0%;
+      background: green;
+    }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
       flex: 1;
@@ -204,6 +217,10 @@
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
         <button id="micButton">🎤</button>
+      </div>
+      <!-- Amplitude waveform display area -->
+      <div id="amplitudeContainer">
+        <div id="amplitudeBar"></div>
       </div>
     </div>
     <div id="rightPane">
@@ -275,6 +292,7 @@
     const statusDot = document.querySelector("#recipientStatus .statusDot");
     const userInput = document.getElementById("userInput");
     const typingAnimation = document.getElementById("typingAnimation");
+    const amplitudeBar = document.getElementById("amplitudeBar");
 
     function addChatMessage(sender, text) {
       const bubble = document.createElement("div");
@@ -313,6 +331,13 @@
       try {
         // Try to parse the message as JSON
         const data = JSON.parse(event.data);
+        
+        if (data.type === "amplitude") {
+          // Update amplitude bar width based on the amplitude value (assuming normalized between 0 and 1)
+          const percentage = Math.min(100, Math.max(0, data.amplitude * 100));
+          amplitudeBar.style.width = percentage + "%";
+          return; // Do not process further if it's an amplitude message
+        }
         
         // Check if this is a transcribed message from speech-to-text
         if (data.type === "transcribed_message") {

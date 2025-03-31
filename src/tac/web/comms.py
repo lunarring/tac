@@ -27,3 +27,15 @@ def process_chat_message(message):
     ]
     response = client.chat_completion(messages)
     return response
+
+def create_amplitude_message(amplitude):
+    """
+    Create a JSON formatted amplitude message to be sent to the frontend.
+    Args:
+        amplitude (float): The amplitude value.
+    Returns:
+        str: A JSON string with the amplitude data.
+    """
+    import json
+    return json.dumps({"type": "amplitude", "amplitude": amplitude})
+    

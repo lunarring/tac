@@ -30,6 +30,7 @@ class AudioRecorder:
         stream (sd.InputStream): Audio stream.
         output_filename (str): Output file name.
         logger: A logging instance. If None, a default logger will be used.
+        amplitude_callback (callable): Optional callback to be called with the amplitude value.
     """
 
     def __init__(
@@ -47,6 +48,26 @@ class AudioRecorder:
         self.stream = None
         self.output_filename = None
         self.logger = logger if logger else setup_logging('tac.utils.audio.AudioRecorder')
+        self.amplitude_callback = None
+
+    def set_amplitude_callback(self, callback):
+        """
+        Set a callback function that will be called with the real-time amplitude value.
+        Args:
+            callback (callable): A function that accepts one argument (amplitude value).
+        """
+        self.amplitude_callback = callback
+
+    @staticmethod
+    def compute_amplitude(data_chunk):
+        """
+        Compute the root mean square amplitude of the provided audio data.
+        Args:
+            data_chunk (np.array): Audio data.
+        Returns:
+            float: The RMS amplitude.
+        """
+        return float(np.sqrt(np.mean(np.square(data_chunk))))
 
     def _record(self, max_time=None):
         self.stream = sd.InputStream(
@@ -64,7 +85,10 @@ class AudioRecorder:
                     break
                 data, overflowed = self.stream.read(self.chunk)
                 self.frames.append(data.flatten())
-
+                if self.amplitude_callback:
+                    # Compute amplitude from the current chunk and call the callback
+                    amplitude = AudioRecorder.compute_amplitude(data)
+                    self.amplitude_callback(amplitude)
         self.logger.info("Finished recording.")
         
         # Convert to WAV and then to MP3
@@ -73,6 +97,7 @@ class AudioRecorder:
         wf.setnchannels(self.channels)
         wf.setsampwidth(2)  # 2 bytes for 16-bit audio
         wf.setframerate(self.rate)
+        # Ensure frames are in correct numeric range
         self.frames = np.clip(self.frames, -1, +1)
         wf.writeframes(np.array(self.frames*32767).astype(np.int16).tobytes())
         wf.close()
@@ -113,7 +138,7 @@ class Speech2Text:
             offline_model_type: An instance of an offline model for speech recognition. If None, it will use the API for transcription.
 
         Raises:
-            ValueError: If no OpenAI API key is found in the environment variables.
+            ValueError: If no OPENAI_API_KEY is found in the environment variables.
         """
         self.transcript = None
         if client is None:
@@ -407,8 +432,6 @@ class Text2SpeechElevenlabs:
         if voice_id is None:
             voice_id = self.default_voice_id
         
-            
-    
         audio = self.client.generate(
             text=text,
             voice=Voice(
@@ -420,7 +443,6 @@ class Text2SpeechElevenlabs:
         self.output_filename = output_filename if output_filename else "output_speech.mp3"
         save(audio, self.output_filename)
         self.logger.info(f"Generated speech saved to {self.output_filename}")
-
 
 
 
@@ -483,6 +505,11 @@ if __name__ == "__main__":
 
     #%%
 
+    # Example: setting an amplitude callback to print amplitude values in real-time.
+    def print_amplitude(val):
+        print(f"Amplitude: {val:.3f}")
+    audio_recorder.set_amplitude_callback(print_amplitude)
+
     speech_detector.start_recording()
     time.sleep(3)
     translation = speech_detector.stop_recording()
@@ -520,4 +547,3 @@ if __name__ == "__main__":
     
     # play(audio)
     
-
