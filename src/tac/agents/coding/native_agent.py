@@ -83,7 +83,8 @@ class NativeAgent(Agent):
         Returns:
             Complete formatted prompt string
         """
-        prompt = f"""You are a coding implementation expert. Your task is to implement requested functionality in a thought through manner. You are provided a task description, which you will have to follow consequentially and rigorously. Furthermore you are given a list of context files, which you should not edit. Only edit the files listed in the write files section. Critically, you need to think through before implementing: what could be your overall strategy to implement the task given the code? 
+        prompt = f"""You are a coding implementation expert. Your task is to implement requested functionality in a thought through manner. You are provided a task description, which you will have to follow consequentially and rigorously. Furthermore you are given a list of context files, which you should not edit. Only edit the files listed in the write files section. Critically, you need to think through before implementing: what could be your overall strategy to implement the task given the code? Also make sure your implementation passes the tests (if any provided or requested to be written) If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. Always supply back the FULL code, never do dummy implementations or partial implementations, always full runnable code. 
+
 Task Description: {task_description}
 
 Context Files, please do not edit these files:
@@ -92,8 +93,7 @@ Context Files, please do not edit these files:
 Write files, these are the ones you need to modify:
 {write_files_section}
 
-Make sure your implementation passes the tests, if listed in the context files! If there are tests listed in the write files, then you may have to MODIFY existing test so they are adapted to the new functionality you are adding. 
-You edit the code carefully, meaning you only edit the parts of the code that are necessary and don't do any refactoring or other unprompted code changes. Thus leave the code as intact and functional as possible given your task. For each write file, you return the FULL code, nothing else, no further explanation. You can only edit the write files that we have supplied you. 
+
 
 THE RESPONSE FORMAT IS CRITICAL: You MUST always include BOTH the start marker ###FILE: [filepath] AND end marker ###END_FILE for EACH file you modify. Always ensure that each file section is properly closed with ###END_FILE before starting a new file section with ###FILE:
 
