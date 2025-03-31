@@ -316,10 +316,10 @@
       }
     });
 
-    // Bind click event to the microphone button to log when recording starts
+    // Bind click event to the microphone button to send the 'mic_click' event to the backend
     const micButton = document.getElementById('micButton');
     micButton.addEventListener('click', function() {
-      console.log('Recording is starting');
+      socket.send("mic_click");
     });
 
     // Expose socket and cube for testing purposes
