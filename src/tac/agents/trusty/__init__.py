@@ -17,7 +17,7 @@ def load_all_agents():
     logger.info("Loading all trusty agents...")
     
     # Get the path to the trusty_agents package
-    import tac.trusty_agents as agents_pkg
+    import tac.agents.trusty as agents_pkg
     
     # Define modules that need to be loaded first due to dependencies
     priority_modules = ['base', 'registry']
@@ -25,7 +25,7 @@ def load_all_agents():
     # First load the priority modules that others might depend on
     for name in priority_modules:
         try:
-            importlib.import_module(f"tac.trusty_agents.{name}")
+            importlib.import_module(f"tac.agents.trusty.{name}")
             logger.info(f"Loaded priority trusty agent module: {name}")
         except ImportError as e:
             logger.debug(f"Skipping priority trusty agent module '{name}': {e}")
@@ -39,7 +39,7 @@ def load_all_agents():
         if name in priority_modules or name == '__init__':
             continue
         try:
-            importlib.import_module(f"tac.trusty_agents.{name}")
+            importlib.import_module(f"tac.agents.trusty.{name}")
             logger.info(f"Loaded trusty agent module: {name}")
         except ImportError as e:
             logger.debug(f"Skipping optional trusty agent module '{name}': {e}")

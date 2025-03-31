@@ -1,6 +1,6 @@
 import os
 import unittest
-from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.agents.trusty.performance import PerformanceTestingAgent
 
 class DummyGeneral:
     test_path = "dummy_tests"

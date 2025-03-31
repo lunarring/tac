@@ -23,14 +23,14 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 from tac.blocks import ProtoBlock, ProtoBlockGenerator, BlockExecutor, BlockProcessor, MultiBlockOrchestrator
-from tac.coding_agents.aider import AiderAgent
+from tac.agents.coding.aider import AiderAgent
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
-from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
-from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.agents.trusty.pytest import PytestTestingAgent as TestRunner
+from tac.agents.trusty.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager
 

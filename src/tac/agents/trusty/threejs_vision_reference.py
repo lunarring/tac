@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright
 from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.core.log_config import setup_logging
-from tac.trusty_agents.base import TrustyAgent, ComparativeTrustyAgent, trusty_agent
+from tac.agents.trusty.base import TrustyAgent, ComparativeTrustyAgent, trusty_agent
 from tac.utils.web_utils import (
     verify_page_load, 
     take_page_screenshot,

@@ -11,7 +11,7 @@ from tac.utils.project_files import ProjectFiles
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
 from .model import ProtoBlock
-from tac.trusty_agents.registry import TrustyAgentRegistry
+from tac.agents.trusty.registry import TrustyAgentRegistry
 
 logger = logging.getLogger(__name__)
 

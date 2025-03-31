@@ -12,7 +12,7 @@ from pexpect import spawn, TIMEOUT, EOF
 import traceback
 
 from tac.blocks import ProtoBlock
-from tac.trusty_agents.base import TrustyAgent, trusty_agent
+from tac.agents.trusty.base import TrustyAgent, trusty_agent
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 

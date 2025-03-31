@@ -1,12 +1,12 @@
-from tac.coding_agents.base import Agent
-from tac.coding_agents.aider import AiderAgent
-from tac.coding_agents.native_agent import NativeAgent
+from tac.agents.coding.base import Agent
+from tac.agents.coding.aider import AiderAgent
+from tac.agents.coding.native_agent import NativeAgent
 from tac.core.config import config
 from typing import Optional, Dict
 import logging
 
 # Get logger for this module
-logger = logging.getLogger('tac.coding_agents.constructor')
+logger = logging.getLogger('tac.agents.coding.constructor')
 
 class CodingAgentConstructor:
     """

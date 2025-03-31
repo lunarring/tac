@@ -1,6 +1,6 @@
 from tac.blocks.model import ProtoBlock
 from tac.blocks.generator import ProtoBlockGenerator
-from tac.coding_agents import CodingAgentConstructor
+from tac.agents.coding import CodingAgentConstructor
 from tac.utils.filesystem import cleanup_nested_tests
 from tac.utils.git_manager import create_git_manager
 import sys
@@ -11,8 +11,8 @@ from typing import Dict, Optional, Tuple, List
 from tac.core.log_config import setup_logging, get_current_execution_id
 from tac.core.config import config
 import shutil
-from tac.trusty_agents.registry import TrustyAgentRegistry
-from tac.trusty_agents.base import TrustyAgent, ComparativeTrustyAgent
+from tac.agents.trusty.registry import TrustyAgentRegistry
+from tac.agents.trusty.base import TrustyAgent, ComparativeTrustyAgent
 logger = setup_logging('tac.blocks.executor')
 
 class BlockExecutor:

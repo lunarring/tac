@@ -15,7 +15,7 @@ from tac.blocks.model import ProtoBlock
 # from tac.blocks.generator import ProtoBlockGenerator
 # Remove direct import to break circular dependency
 # from tac.blocks.executor import BlockExecutor
-from tac.coding_agents.aider import AiderAgent
+from tac.agents.coding.aider import AiderAgent
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
@@ -23,7 +23,7 @@ from tac.core.llm import LLMClient, Message
 from tac.utils.git_manager import create_git_manager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
-from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
+from tac.agents.trusty.pytest import PytestTestingAgent as TestRunner
 
 # Use TYPE_CHECKING for type hints to avoid circular imports
 if TYPE_CHECKING:

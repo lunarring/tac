@@ -16,7 +16,7 @@ from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
-from tac.trusty_agents.base import TrustyAgent, trusty_agent
+from tac.agents.trusty.base import TrustyAgent, trusty_agent
 
 logger = setup_logging('tac.trusty_agents.vision')
 

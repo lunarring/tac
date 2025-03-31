@@ -2,7 +2,7 @@ import os
 import tempfile
 import shutil
 from PIL import Image
-from tac.trusty_agents.threejs_vision_before_after import ThreeJSVisionBeforeAfterAgent
+from tac.agents.trusty.threejs_vision_before_after import ThreeJSVisionBeforeAfterAgent
 
 class DummyProtoBlock:
     def __init__(self):

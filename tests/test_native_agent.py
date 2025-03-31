@@ -2,7 +2,7 @@ import os
 import shutil
 import pytest
 from pathlib import Path
-from tac.coding_agents.native_agent import NativeAgent
+from tac.agents.coding.native_agent import NativeAgent
 from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
 # A minimal dummy ProtoBlock to simulate the real one

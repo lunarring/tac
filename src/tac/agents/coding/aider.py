@@ -1,6 +1,6 @@
 import os
 import subprocess
-from tac.coding_agents.base import Agent
+from tac.agents.coding.base import Agent
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.blocks import ProtoBlock
@@ -12,7 +12,7 @@ from typing import List, Optional
 from tac.core.config import config
 from tac.utils.filesystem import cleanup_nested_tests
 
-logger = setup_logging('tac.coding_agents.aider')
+logger = setup_logging('tac.agents.coding.aider')
 
 class AiderAgent(Agent):
     def __init__(self, config: dict):

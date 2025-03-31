@@ -1,16 +1,16 @@
 import os
 import subprocess
-from tac.coding_agents.base import Agent
+from tac.agents.coding.base import Agent
 from tac.core.log_config import setup_logging
 from tac.blocks import ProtoBlock
 from tac.core.llm import LLMClient, Message
 import select
 import time
 import sys
-from tac.trusty_agents.registry import TrustyAgentRegistry
+from tac.agents.trusty.registry import TrustyAgentRegistry
 from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
-logger = setup_logging('tac.coding_agents.native')
+logger = setup_logging('tac.agents.coding.native')
 
 class NativeAgent(Agent):
     def __init__(self, config: dict):

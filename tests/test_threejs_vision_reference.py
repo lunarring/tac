@@ -42,7 +42,7 @@ class DummyLLMClient:
 @pytest.fixture
 def dummy_agent(dummy_images):
     # Import the agent class here to ensure proper context
-    from tac.trusty_agents.threejs_vision_reference import ThreeJSVisionReferenceAgent
+    from tac.agents.trusty.threejs_vision_reference import ThreeJSVisionReferenceAgent
     agent = ThreeJSVisionReferenceAgent()
     # Instead of capturing the state via browser, we monkeypatch _capture_state to return our dummy after image
     before_img, after_img, ref_img = dummy_images

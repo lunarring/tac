@@ -4,6 +4,7 @@ from functools import wraps
 
 from tac.blocks import ProtoBlock
 from tac.core.log_config import setup_logging
+from tac.agents.trusty.registry import TrustyAgentRegistry
 
 logger = setup_logging('tac.trusty_agents.base')
 
@@ -62,8 +63,6 @@ class TrustyAgent(ABC):
     def register(cls):
         """Register this agent with the registry."""
         try:
-            from tac.trusty_agents.registry import TrustyAgentRegistry
-            
             if not cls.agent_name:
                 # Use class name if agent_name is not set
                 name = cls.__name__.lower()

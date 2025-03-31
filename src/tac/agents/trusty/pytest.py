@@ -12,7 +12,7 @@ from tac.blocks import ProtoBlock
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.core.log_config import setup_logging
-from tac.trusty_agents.base import TrustyAgent, trusty_agent
+from tac.agents.trusty.base import TrustyAgent, trusty_agent
 
 logger = setup_logging('tac.trusty_agents.pytest')
 

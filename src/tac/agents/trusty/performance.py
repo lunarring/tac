@@ -13,10 +13,10 @@ from tac.blocks.model import ProtoBlock
 # from tac.blocks.generator import ProtoBlockGenerator
 from tac.utils.project_files import ProjectFiles
 from tac.core.log_config import setup_logging
-from tac.coding_agents.aider import AiderAgent
-from tac.coding_agents.native_agent import NativeAgent
+from tac.agents.coding.aider import AiderAgent
+from tac.agents.coding.native_agent import NativeAgent
 from tac.utils.git_manager import FakeGitManager
-from tac.trusty_agents.base import TrustyAgent
+from tac.agents.trusty.base import TrustyAgent
 import subprocess
 import re
 import datetime
@@ -26,7 +26,7 @@ import io
 logger = setup_logging('tac.trusty_agents.performance')
 
 # Use the decorator for registration
-from tac.trusty_agents.base import trusty_agent
+from tac.agents.trusty.base import trusty_agent
 
 @trusty_agent(
     name="performance",
