@@ -97,7 +97,7 @@
       color: #555;
       background-color: #fafafa;
     }
-    /* Container for input and microphone button */
+    /* Container for input and buttons */
     #inputContainer {
       position: relative;
       margin: 10px;
@@ -145,6 +145,30 @@
       background-color: red;
       color: #ffffff;
       transform: scale(1.1);
+    }
+    /* Style for block button with a cube-like appearance */
+    #blockButton {
+      position: absolute;
+      bottom: 10px;
+      right: 70px;
+      border: none;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 20px;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s, transform 0.3s;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      /* Cube-like visual effect */
+      transform: perspective(300px) rotateX(10deg);
+    }
+    #blockButton.active {
+      background-color: #007bff;
+      color: #ffffff;
+      transform: perspective(300px) rotateX(10deg) scale(1.1);
     }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
@@ -200,9 +224,10 @@
         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
       </div>
       <div id="messageContainer"></div>
-      <!-- Input container wrapping the textarea and microphone button -->
+      <!-- Input container wrapping the textarea and buttons -->
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
+        <button id="blockButton">■</button>
         <button id="micButton">🎤</button>
       </div>
     </div>
@@ -367,6 +392,23 @@
           userInput.value = "";
         }
       }
+    });
+
+    // Bind click event to the block button for cube-like interaction
+    const blockButton = document.getElementById('blockButton');
+    let blockActive = false;
+    blockButton.addEventListener('click', function() {
+      blockActive = !blockActive;
+      if (blockActive) {
+        blockButton.classList.add('active');
+      } else {
+        blockButton.classList.remove('active');
+      }
+      const payload = {
+        type: "block_click",
+        active: blockActive
+      };
+      socket.send(JSON.stringify(payload));
     });
 
     // Bind click event to the microphone button to send the 'mic_click' event to the backend
