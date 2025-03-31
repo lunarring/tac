@@ -198,7 +198,7 @@ class BlockProcessor:
             else:
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
-                    if getattr(config.general, "halt_after_verify", False):
+                    if config.safe_get('general', 'halt_after_verify'):
                         logger.info("Halt after successful verification is enabled.")
                         while True:
                             choice = input("Verification successful! Enter 'c' to commit changes, or 'a' to abort: ").strip().lower()

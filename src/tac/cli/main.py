@@ -85,7 +85,7 @@ class InteractiveBlockProcessor(BlockProcessor):
                     error_analysis = ""
             else:
                 if config.git.enabled:
-                    if getattr(config.general, "halt_after_verify", False):
+                    if config.safe_get('general', 'halt_after_verify'):
                         _module_logger.info("Halt after successful verification is enabled.")
                         while True:
                             choice = input("Verification successful! Enter 'c' to commit changes, or 'a' to abort: ").strip().lower()
@@ -284,11 +284,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         '--image',
         type=str,
         help='Image URL to be associated with the task'
-    )
-    run_parser.add_argument(
-        '--halt-after-verify',
-        action='store_true',
-        help='Prevent auto commit after successful verification and pause for manual review'
     )
     # Dynamically add arguments from general config
     general_config = config.general
@@ -606,7 +601,7 @@ def main():
             make_args.instructions = None
             
             for key in vars(config.general):
-                setattr(make_args, key.replace('-', '_'), getattr(config.general, key))
+                setattr(make_args, key.replace('-', '_'), config.safe_get('general', key))
             
             for attr in vars(make_args):
                 setattr(args, attr, getattr(make_args, attr))

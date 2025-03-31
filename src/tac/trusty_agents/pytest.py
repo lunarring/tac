@@ -148,7 +148,7 @@ class PytestTestingAgent(TrustyAgent):
             if os.path.isfile(test_target):
                 args.append(test_target)
             else:
-                exclude_performance_tests = getattr(config.general.trusty_agents, 'exclude_performance_tests', True)
+                exclude_performance_tests = config.safe_get('general', 'trusty_agents', 'exclude_performance_tests')
                 if exclude_performance_tests:
                     args.extend(['-m', 'not performance and not transient', test_target])
                 else:

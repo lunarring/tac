@@ -213,6 +213,28 @@ class ConfigManager:
         """Get a value from config by key with a default."""
         return getattr(self._config, key, default)
 
+    def safe_get(self, *keys: str) -> Any:
+        """Safely get a nested config value using dot notation.
+        Uses the default values defined in the config classes themselves.
+        
+        Args:
+            *keys: Variable number of keys to traverse the config hierarchy
+            
+        Example:
+            config.safe_get('general', 'max_retries_block_creation')
+            config.safe_get('git', 'enabled')
+        """
+        current = self._config
+        for key in keys:
+            if not hasattr(current, key):
+                # Get the default value from the config class
+                config_class = type(current)
+                if hasattr(config_class, key):
+                    return getattr(config_class, key)
+                return None
+            current = getattr(current, key)
+        return current
+
     def override_with_args(self, args: dict) -> None:
         """Override configuration values with command-line arguments.
         
