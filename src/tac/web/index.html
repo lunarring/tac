@@ -123,47 +123,41 @@
       border-color: #007bff;
       box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
     }
-    /* Style for microphone button in normal and recording state */
-    #micButton {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      border: none;
-      background: #ffffff;
-      cursor: pointer;
-      font-size: 20px;
+    /* Common styling for both action buttons */
+    .action-button {
       width: 48px;
       height: 48px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 50%;
+      border: none;
+      background-color: #ffffff;
+      cursor: pointer;
       transition: background-color 0.3s, transform 0.3s;
+      border-radius: 50%;
     }
-    /* Recording state style */
+    /* Specific positioning for the microphone button */
+    #micButton {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      font-size: 20px;
+    }
+    /* Recording state style for microphone button */
     #micButton.recording {
       background-color: red;
       color: #ffffff;
       transform: scale(1.1);
     }
-    /* Enhanced style for block button with an intricate filigrane design */
+    /* Specific positioning for the block button */
     #blockButton {
       position: absolute;
       bottom: 10px;
       right: 70px;
-      border: 1px solid rgba(0, 0, 0, 0.15);
-      border-radius: 12px;
-      background: linear-gradient(145deg, #ffffff, #f0f0f0);
-      cursor: pointer;
-      padding: 4px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background-color 0.3s, transform 0.3s;
-      box-shadow: inset 1px 1px 3px rgba(255,255,255,0.7), 2px 2px 6px rgba(0, 0, 0, 0.2);
+      font-size: 16px;
     }
+    /* Active state for block button */
     #blockButton.active {
-      background: linear-gradient(145deg, #e0eafc, #cfdef3);
       transform: scale(1.1);
     }
     /* Style for the canvas inside the block button */
@@ -228,13 +222,13 @@
       <!-- Input container wrapping the textarea and buttons -->
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
-        <button id="blockButton">
+        <button id="blockButton" class="action-button">
           <!-- A canvas element for the rotating cube -->
           <canvas id="cubeCanvas"></canvas>
           <!-- Hidden text for accessibility/testing -->
           <span style="display: none;">Cube</span>
         </button>
-        <button id="micButton">🎤</button>
+        <button id="micButton" class="action-button">🎤</button>
       </div>
     </div>
     <div id="rightPane">
