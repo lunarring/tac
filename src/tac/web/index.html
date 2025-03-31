@@ -59,6 +59,36 @@
       display: inline-block;
       margin-right: 6px;
     }
+    /* Typing animation indicator styles */
+    #typingAnimation {
+      display: none;
+      padding: 5px 24px;
+      font-style: italic;
+      color: #888;
+    }
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin: 0 2px;
+      background-color: #888;
+      border-radius: 50%;
+      animation: blink 1.4s infinite both;
+    }
+    .dot:nth-child(1) {
+      animation-delay: 0s;
+    }
+    .dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    @keyframes blink {
+      0% { opacity: 0.2; }
+      20% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
     /* Chat message container within left pane */
     #messageContainer {
       flex: 1;
@@ -137,6 +167,10 @@
         <span id="recipientName">vibe.tac</span>
         <span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
       </div>
+      <!-- Typing animation indicator -->
+      <div id="typingAnimation">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
       <div id="messageContainer"></div>
       <textarea id="userInput" placeholder="Enter text here..."></textarea>
     </div>
@@ -208,6 +242,7 @@
     const statusText = document.getElementById("statusText");
     const statusDot = document.querySelector("#recipientStatus .statusDot");
     const userInput = document.getElementById("userInput");
+    const typingAnimation = document.getElementById("typingAnimation");
 
     function addChatMessage(sender, text) {
       const bubble = document.createElement("div");
@@ -225,6 +260,14 @@
       messageContainer.scrollTop = messageContainer.scrollHeight;
     }
 
+    function showTypingIndicator() {
+      typingAnimation.style.display = "block";
+    }
+
+    function hideTypingIndicator() {
+      typingAnimation.style.display = "none";
+    }
+
     // Establish websocket connection and update status indicator in header
     const socket = new WebSocket("ws://localhost:8765");
     socket.onopen = function() {
@@ -233,6 +276,7 @@
       statusText.textContent = "online";
     };
     socket.onmessage = function(event) {
+      hideTypingIndicator();
       // Display incoming AI messages in the chat container
       addChatMessage("AI", event.data);
     };
@@ -255,8 +299,9 @@
         if (text !== "") {
           // Display user's message in the chat history
           addChatMessage("User", text);
-          // Send the message to the server via WebSocket
+          // Send the message to the server via WebSocket and show typing animation
           socket.send(text);
+          showTypingIndicator();
           userInput.value = "";
         }
       }
