@@ -83,7 +83,7 @@ class NativeAgent(Agent):
         Returns:
             Complete formatted prompt string
         """
-        prompt = f"""Implement the following functionality:
+        prompt = f"""You are a coding implementation expert. Your task is to implement requested functionality in a thought through manner. You are provided a task description, which you will have to follow consequentially and rigorously. Furthermore you are given a list of context files, which you should not edit. Only edit the files listed in the write files section. Critically, you need to think through before implementing: what could be your overall strategy to implement the task given the code? 
 Task Description: {task_description}
 
 Context Files, please do not edit these files:
