@@ -409,6 +409,27 @@
       socket.send(JSON.stringify(payload));
     });
 
+    // Prompt the user for custom dimension/styling preferences for the block button.
+    // If valid dimensions are provided in "width,height" format (in pixels), apply them;
+    // otherwise, or if left blank, apply a default increased size.
+    (function() {
+      let custom = prompt("Enter block button dimensions in pixels as 'width,height' (e.g., 64,64), or leave blank to use default enlarged size.");
+      if (custom) {
+        let parts = custom.split(",");
+        if(parts.length === 2 && !isNaN(parseInt(parts[0].trim())) && !isNaN(parseInt(parts[1].trim()))) {
+          blockButton.style.width = parseInt(parts[0].trim()) + "px";
+          blockButton.style.height = parseInt(parts[1].trim()) + "px";
+        } else {
+          alert("Invalid input. Using default size.");
+          blockButton.style.width = "64px";
+          blockButton.style.height = "64px";
+        }
+      } else {
+        blockButton.style.width = "64px";
+        blockButton.style.height = "64px";
+      }
+    })();
+
     // Bind click event to the microphone button to send the 'mic_click' event to the backend
     const micButton = document.getElementById('micButton');
     let isRecording = false; // flag to track recording state
