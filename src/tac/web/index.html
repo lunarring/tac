@@ -155,16 +155,16 @@
     renderer.setClearColor(0x272736, 1);
     threeContainer.appendChild(renderer.domElement);
 
-    // Create a polished cube with a refined material configured with wireframe: true
+    // Create a polished cube with a refined glass-like material.
+    // Updated material properties to achieve a glassy appearance with transparency and soft internal glow.
     const geometry = new THREE.BoxGeometry();
     const cubeMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x156289, 
       shininess: 100, 
-      wireframe: true, 
       transparent: true, 
-      opacity: 0.7,
-      emissive: 0x156289,
-      emissiveIntensity: 0.5
+      opacity: 0.5,
+      emissive: 0x88ccff,
+      emissiveIntensity: 0.8
     });
     const cube = new THREE.Mesh(geometry, cubeMaterial);
     // Reposition the cube to the right as required by tests
