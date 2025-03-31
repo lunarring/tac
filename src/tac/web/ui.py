@@ -37,28 +37,52 @@ async def dummy_mic_click(websocket):
         print("Recording stopped. Transcript:", transcript)
         is_recording = False
         if transcript:
-            # Send the transcript over the WebSocket as if the user typed it
-            await websocket.send(transcript)
+            # Wrap the transcript as a user message in JSON format.
+            payload = {"type": "user_message", "message": transcript}
+            await websocket.send(json.dumps(payload))
 
 async def handle_connection(websocket):
     # Retrieve high-level file summaries from the project
     file_summaries = load_high_level_summaries()
     # Incorporate the file summaries into the system prompt for broader context
-    system_content = ("You are a senior coding god. You are replying a bit sassy and sarcastic. You are also a bit of a know it all.  A high level summary of the codebase that the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. You help the user to find out what they want to be implemented and you always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and trusty agents. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above.")
+    system_content = ("You are a senior coding god. You are replying a bit sassy and sarcastic. "
+                      "You are also a bit of a know it all.  A high level summary of the codebase that the user wants to modify is here: {file_summaries}. "
+                      "Always reply concise and without formatting. You help the user to find out what they want to be implemented "
+                      "and you always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, "
+                      "it is actually you and your team of AI agents and trusty agents. So don't tell the user how to do it themselves, "
+                      "but rather try to gather information about what the user wants to build in the context of the codebase above.")
     formatted_system_content = system_content.format(file_summaries=file_summaries)
     # Initialize ChatAgent with the new system prompt that includes file summaries.
     agent = ChatAgent(system_prompt=formatted_system_content)
 
     while True:
         try:
-            user_input = await websocket.recv()
-            print("Received message from client:", user_input)
-            if user_input.strip():
-                if user_input.strip() == "mic_click":
+            user_input_raw = await websocket.recv()
+            print("Received message from client:", user_input_raw)
+            user_message = None
+            # Try to parse the incoming message as JSON. If parsing fails, treat it as plain text.
+            try:
+                data = json.loads(user_input_raw)
+                if isinstance(data, dict) and "type" in data:
+                    if data["type"] == "mic_click":
+                        await dummy_mic_click(websocket)
+                        continue
+                    elif data["type"] == "user_message":
+                        user_message = data.get("message", "").strip()
+                    else:
+                        user_message = user_input_raw.strip()
+                else:
+                    user_message = user_input_raw.strip()
+            except json.JSONDecodeError:
+                # If not JSON, check for plain mic_click command.
+                if user_input_raw.strip() == "mic_click":
                     await dummy_mic_click(websocket)
                     continue
-                # Process the incoming message using the ChatAgent to maintain conversation state and generate response.
-                assistant_reply = agent.process_message(user_input)
+                user_message = user_input_raw.strip()
+
+            if user_message:
+                # Process the incoming user message ensuring it is registered as a user message.
+                assistant_reply = agent.process_message(user_message)
                 print(f"Sending message to client: {assistant_reply}")
                 await websocket.send(assistant_reply)
         except websockets.exceptions.ConnectionClosed:
