@@ -286,8 +286,31 @@
     };
     socket.onmessage = function(event) {
       hideTypingIndicator();
-      // Display incoming AI messages in the chat container
-      addChatMessage("AI", event.data);
+      
+      try {
+        // Try to parse the message as JSON
+        const data = JSON.parse(event.data);
+        
+        // Check if this is a transcribed message from speech-to-text
+        if (data.type === "transcribed_message") {
+          // Display as a user message
+          addChatMessage("User", data.message);
+          
+          // Send it back to server for processing
+          const payload = {
+            type: "user_message",
+            message: data.message
+          };
+          socket.send(JSON.stringify(payload));
+          showTypingIndicator();
+        } else {
+          // Regular AI response
+          addChatMessage("AI", event.data);
+        }
+      } catch (e) {
+        // Not JSON, treat as regular AI message
+        addChatMessage("AI", event.data);
+      }
     };
     socket.onerror = function(error) {
       console.error("WebSocket error:", error);
@@ -308,8 +331,15 @@
         if (text !== "") {
           // Display user's message in the chat history
           addChatMessage("User", text);
+          
+          // Format the message as JSON
+          const payload = {
+            type: "user_message",
+            message: text
+          };
+          
           // Send the message to the server via WebSocket and show typing animation
-          socket.send(text);
+          socket.send(JSON.stringify(payload));
           showTypingIndicator();
           userInput.value = "";
         }
@@ -319,7 +349,10 @@
     // Bind click event to the microphone button to send the 'mic_click' event to the backend
     const micButton = document.getElementById('micButton');
     micButton.addEventListener('click', function() {
-      socket.send("mic_click");
+      const payload = {
+        type: "mic_click"
+      };
+      socket.send(JSON.stringify(payload));
     });
 
     // Expose socket and cube for testing purposes

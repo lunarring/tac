@@ -37,8 +37,12 @@ async def dummy_mic_click(websocket):
         print("Recording stopped. Transcript:", transcript)
         is_recording = False
         if transcript:
-            # Wrap the transcript as a user message in JSON format.
-            payload = {"type": "user_message", "message": transcript}
+            # Send transcript to client as a user message
+            # The client should display this as a user message in the UI
+            payload = {
+                "type": "transcribed_message", 
+                "message": transcript
+            }
             await websocket.send(json.dumps(payload))
 
 async def handle_connection(websocket):
@@ -60,28 +64,30 @@ async def handle_connection(websocket):
             user_input_raw = await websocket.recv()
             print("Received message from client:", user_input_raw)
             user_message = None
-            # Try to parse the incoming message as JSON. If parsing fails, treat it as plain text.
+            
+            # Try to parse the incoming message as JSON
             try:
                 data = json.loads(user_input_raw)
                 if isinstance(data, dict) and "type" in data:
-                    if data["type"] == "mic_click":
+                    message_type = data["type"]
+                    
+                    if message_type == "mic_click":
                         await dummy_mic_click(websocket)
                         continue
-                    elif data["type"] == "user_message":
+                    elif message_type in ["user_message", "transcribed_message"]:
                         user_message = data.get("message", "").strip()
-                    else:
-                        user_message = user_input_raw.strip()
                 else:
+                    # JSON but not our expected format
                     user_message = user_input_raw.strip()
             except json.JSONDecodeError:
-                # If not JSON, check for plain mic_click command.
+                # Not JSON, handle as plain text for backward compatibility
                 if user_input_raw.strip() == "mic_click":
                     await dummy_mic_click(websocket)
                     continue
                 user_message = user_input_raw.strip()
 
             if user_message:
-                # Process the incoming user message ensuring it is registered as a user message.
+                # Process the incoming user message
                 assistant_reply = agent.process_message(user_message)
                 print(f"Sending message to client: {assistant_reply}")
                 await websocket.send(assistant_reply)
