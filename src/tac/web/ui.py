@@ -35,9 +35,16 @@ async def handle_connection(websocket):
             print("Received message from client:", user_input)
             if user_input.strip():
                 # Process the incoming message using the ChatAgent to maintain conversation state and generate response.
-                ai_response = agent.process_message(user_input)
-                print(f"Sending message to client: {ai_response}")
-                await websocket.send(ai_response)
+                full_response = agent.process_message(user_input)
+                # Remove the system prompt from the beginning of the assistant's response 
+                # to avoid unnecessary repetition in the UI.
+                system_prompt = agent.conversation[0].content
+                if full_response.startswith(system_prompt):
+                    trimmed_response = full_response[len(system_prompt):].lstrip()
+                else:
+                    trimmed_response = full_response
+                print(f"Sending message to client: {trimmed_response}")
+                await websocket.send(trimmed_response)
         except websockets.exceptions.ConnectionClosed:
             break
         except Exception as e:
