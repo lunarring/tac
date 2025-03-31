@@ -51,6 +51,9 @@ class GeneralConfig:
     save_protoblock: bool = False  # Whether to save protoblocks to disk
     use_orchestrator: bool = False
     confirm_multiblock_execution: bool = False  # Whether to ask for confirmation before executing multiblock chunks
+    # File peeker settings
+    file_peeker_summary_level: str = "detailed"  # Options: "high_level", "detailed", "auto"
+    file_peeker_max_files: int = 10  # Maximum number of files to include in context
 
 
 @dataclass
@@ -121,7 +124,7 @@ class Config:
     ))
     llm_weak: LLMConfig = field(default_factory=lambda: LLMConfig(
         provider="openai",
-        model="o3-mini",
+        model="gpt-4o-2024-08-06",
         settings=LLMSettings(
             temperature=0.7,
             max_tokens=None,
