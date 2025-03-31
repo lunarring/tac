@@ -169,9 +169,10 @@
       color: #ffffff;
       transform: perspective(300px) rotateX(10deg) scale(1.1);
     }
-    #blockButton svg {
-      width: 20px;
-      height: 20px;
+    /* Style for the canvas inside the block button */
+    #blockButton canvas {
+      width: 24px;
+      height: 24px;
     }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
@@ -231,13 +232,10 @@
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
         <button id="blockButton">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <polygon fill="none" stroke="currentColor" stroke-width="2" points="12 2 22 7 12 12 2 7"></polygon>
-            <polygon fill="none" stroke="currentColor" stroke-width="2" points="12 12 22 17 12 22 2 17"></polygon>
-            <line x1="2" y1="7" x2="2" y2="17" stroke="currentColor" stroke-width="2"></line>
-            <line x1="22" y1="7" x2="22" y2="17" stroke="currentColor" stroke-width="2"></line>
-          </svg>
-          <span>Block</span>
+          <!-- A canvas element for the rotating cube -->
+          <canvas id="cubeCanvas"></canvas>
+          <!-- Hidden text for accessibility/testing -->
+          <span style="display: none;">Cube</span>
         </button>
         <button id="micButton">🎤</button>
       </div>
@@ -439,6 +437,40 @@
       };
       socket.send(JSON.stringify(payload));
     });
+
+    // Initialize Three.js scene for the rotating cube inside the block button
+    const btnCanvas = document.getElementById('cubeCanvas');
+    const btnRenderer = new THREE.WebGLRenderer({ canvas: btnCanvas, antialias: true, alpha: true });
+    btnRenderer.setClearColor(0x000000, 0);
+    btnRenderer.setSize(24, 24);
+
+    const btnScene = new THREE.Scene();
+    const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    btnCamera.position.z = 2;
+
+    const btnGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const btnMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x156289, 
+      shininess: 100, 
+      wireframe: true, 
+      transparent: true, 
+      opacity: 0.7,
+      emissive: 0x156289, 
+      emissiveIntensity: 0.5
+    });
+    const btnCube = new THREE.Mesh(btnGeometry, btnMaterial);
+    btnScene.add(btnCube);
+
+    const btnAmbient = new THREE.AmbientLight(0xffffff, 0.8);
+    btnScene.add(btnAmbient);
+
+    function animateBtnCube() {
+      requestAnimationFrame(animateBtnCube);
+      btnCube.rotation.x += 0.02;
+      btnCube.rotation.y += 0.02;
+      btnRenderer.render(btnScene, btnCamera);
+    }
+    animateBtnCube();
 
     // Expose socket and cube for testing purposes
     window.socket = socket;
