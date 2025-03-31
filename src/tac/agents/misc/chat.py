@@ -29,7 +29,38 @@ class ChatAgent:
         Returns the full conversation history.
         """
         return self.conversation
-       
+    
+    def generate_task_instructions(self) -> str:
+        """
+        Summarizes the conversation history into a clear, concise set of task instructions.
+        
+        Returns:
+            str: Compressed conversation as task instructions
+        """
+        # Skip if there's not enough conversation to summarize
+        if len(self.conversation) <= 2:  # Only system prompt and maybe one exchange
+            return "No substantial conversation to summarize."
+        
+        # Use a stronger LLM for summarization
+        summarizer = LLMClient(llm_type="strong")
+        
+        # Format the conversation for the summary prompt
+        conversation_text = "\n".join([f"{msg.role}: {msg.content}" for msg in self.conversation])
+        
+        # Prepare the prompt for summarization
+        system_prompt = "You are a helpful assistant that can summarize conversations into clear, concise instructions."
+        user_prompt = "Please compress the following conversation into a clear, concise instruction set that captures the core requirements. The summary should be specific, actionable, and focused on what needs to be implemented:\n\n" + conversation_text
+        
+        # Create messages for the LLM
+        summary_messages = [
+            Message(role="system", content=system_prompt),
+            Message(role="user", content=user_prompt)
+        ]
+        
+        # Get the summary from the LLM
+        summary = summarizer.chat_completion(summary_messages)
+        return summary
+        
 # For manual testing if needed.
 if __name__ == "__main__":
     agent = ChatAgent(system_prompt="You are a helpful assistant.")

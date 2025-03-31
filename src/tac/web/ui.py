@@ -107,7 +107,7 @@ async def handle_connection(websocket):
 async def handle_block_click(websocket, agent):
     """
     Handle the block button click by:
-    1. Compressing the chat history into a genesis prompt
+    1. Generating task instructions from the conversation
     2. Creating config overrides
     3. Running the execute_command function
     """
@@ -118,22 +118,8 @@ async def handle_block_click(websocket, agent):
             "message": "Creating block from conversation..."
         }))
         
-        # Get conversation history from agent
-        conversation = agent.get_messages()
-        
-        # Use LLM to compress chat into a genesis prompt
-        llm_client = LLMClient()
-        system_prompt = "You are a helpful assistant that can summarize conversations into clear, concise instructions."
-        
-        # Prepare messages for the LLM
-        compress_messages = [
-            Message(role="system", content=system_prompt),
-            Message(role="user", content="Please compress the following conversation into a clear, concise instruction set that captures the core requirements. The summary should be specific, actionable, and focused on what needs to be implemented:\n\n" + 
-                "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation]))
-        ]
-        
-        # Get compressed instructions from LLM
-        genesis_prompt = llm_client.chat_completion(compress_messages)
+        # Generate task instructions from the chat history
+        genesis_prompt = agent.generate_task_instructions()
         
         # Prepare config overrides for execute_command
         config_overrides = {
@@ -173,6 +159,8 @@ async def handle_block_click(websocket, agent):
     
     except Exception as e:
         print(f"Error during block execution: {e}")
+        import traceback
+        traceback.print_exc()
         await websocket.send(json.dumps({
             "type": "status_message",
             "message": f"❌ Error: {str(e)}"
