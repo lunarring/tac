@@ -146,7 +146,7 @@
       color: #ffffff;
       transform: scale(1.1);
     }
-    /* Style for block button with a cube-like appearance */
+    /* Style for block button with a cube-like appearance and refined filigrane design */
     #blockButton {
       position: absolute;
       bottom: 10px;
@@ -154,21 +154,24 @@
       border: none;
       background: #ffffff;
       cursor: pointer;
-      font-size: 20px;
-      width: 48px;
-      height: 48px;
+      font-size: 16px;
+      padding: 6px 12px;
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: 6px;
       transition: background-color 0.3s, transform 0.3s;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      /* Cube-like visual effect */
       transform: perspective(300px) rotateX(10deg);
     }
     #blockButton.active {
       background-color: #007bff;
       color: #ffffff;
       transform: perspective(300px) rotateX(10deg) scale(1.1);
+    }
+    #blockButton svg {
+      width: 20px;
+      height: 20px;
     }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
@@ -227,7 +230,15 @@
       <!-- Input container wrapping the textarea and buttons -->
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
-        <button id="blockButton">■</button>
+        <button id="blockButton">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon fill="none" stroke="currentColor" stroke-width="2" points="12 2 22 7 12 12 2 7"></polygon>
+            <polygon fill="none" stroke="currentColor" stroke-width="2" points="12 12 22 17 12 22 2 17"></polygon>
+            <line x1="2" y1="7" x2="2" y2="17" stroke="currentColor" stroke-width="2"></line>
+            <line x1="22" y1="7" x2="22" y2="17" stroke="currentColor" stroke-width="2"></line>
+          </svg>
+          <span>Block</span>
+        </button>
         <button id="micButton">🎤</button>
       </div>
     </div>
