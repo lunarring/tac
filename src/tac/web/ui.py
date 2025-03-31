@@ -20,6 +20,9 @@ def load_high_level_summaries():
         formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
     return "\n\n".join(formatted_strings)
 
+def dummy_mic_click():
+    print("recording is starting")
+
 async def handle_connection(websocket):
     # Retrieve high-level file summaries from the project
     file_summaries = load_high_level_summaries()
@@ -34,6 +37,9 @@ async def handle_connection(websocket):
             user_input = await websocket.recv()
             print("Received message from client:", user_input)
             if user_input.strip():
+                if user_input.strip() == "mic_click":
+                    dummy_mic_click()
+                    continue
                 # Process the incoming message using the ChatAgent to maintain conversation state and generate response.
                 assistant_reply = agent.process_message(user_input)
                 print(f"Sending message to client: {assistant_reply}")
