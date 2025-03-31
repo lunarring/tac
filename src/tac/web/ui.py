@@ -7,6 +7,11 @@ import signal
 import subprocess
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
+from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
+
+# Global variables to manage recording state and speech-to-text instance
+is_recording = False
+speech_to_text = Speech2Text()
 
 def load_high_level_summaries():
     pf = ProjectFiles(".")
@@ -21,7 +26,16 @@ def load_high_level_summaries():
     return "\n\n".join(formatted_strings)
 
 def dummy_mic_click():
-    print("recording is starting")
+    global is_recording, speech_to_text
+    # On first button press, start recording. On the next press, stop recording.
+    if not is_recording:
+        speech_to_text.start_recording()
+        print("Recording started.")
+        is_recording = True
+    else:
+        transcript = speech_to_text.stop_recording()
+        print("Recording stopped. Transcript:", transcript)
+        is_recording = False
 
 async def handle_connection(websocket):
     # Retrieve high-level file summaries from the project
