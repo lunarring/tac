@@ -5,7 +5,7 @@ import socket
 import os
 import signal
 import subprocess
-from tac.core.llm import LLMClient, Message
+from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
 
 def load_high_level_summaries():
@@ -21,37 +21,23 @@ def load_high_level_summaries():
     return "\n\n".join(formatted_strings)
 
 async def handle_connection(websocket):
-    client = LLMClient(llm_type="weak")
     # Retrieve high-level file summaries from the project
     file_summaries = load_high_level_summaries()
     # Incorporate the file summaries into the system prompt for broader context
     system_content = ("You are a senior coding god. You are replying a bit sassy and sarcastic. You are also a bit of a know it all.  A high level summary of the codebase that the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. You help the user to find out what they want to be implemented and you always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and trusty agents. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above.")
-    # Initialize conversation with the new system prompt
-    system_prompt = Message(role="system", content=system_content)
-    conversation = [system_prompt]
-    # Do not send the system prompt to the client UI
+    formatted_system_content = system_content.format(file_summaries=file_summaries)
+    # Initialize ChatAgent with the new system prompt that includes file summaries.
+    agent = ChatAgent(system_prompt=formatted_system_content)
 
     while True:
         try:
             user_input = await websocket.recv()
             print("Received message from client:", user_input)
             if user_input.strip():
-                # Insert the new user message at the beginning of the conversation (after system prompt)
-                conversation.insert(1, Message(role="user", content=user_input))
-                ai_response = client.chat_completion(conversation)
-                # Extract only the 'content' field from the AI response if it's in JSON format
-                try:
-                    parsed = json.loads(ai_response)
-                    if isinstance(parsed, dict) and "content" in parsed:
-                        extracted_content = parsed["content"]
-                    else:
-                        extracted_content = ai_response
-                except Exception:
-                    extracted_content = ai_response
-                # Insert the assistant's response at the beginning of the conversation (after system prompt)
-                conversation.insert(1, Message(role="assistant", content=extracted_content))
-                print(f"Sending message to client: {extracted_content}")
-                await websocket.send(extracted_content)
+                # Process the incoming message using the ChatAgent to maintain conversation state and generate response.
+                ai_response = agent.process_message(user_input)
+                print(f"Sending message to client: {ai_response}")
+                await websocket.send(ai_response)
         except websockets.exceptions.ConnectionClosed:
             break
         except Exception as e:
