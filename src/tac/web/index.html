@@ -396,17 +396,16 @@
 
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
-    let blockActive = false;
     blockButton.addEventListener('click', function() {
-      blockActive = !blockActive;
-      if (blockActive) {
-        blockButton.classList.add('active');
-      } else {
+      // Add active class to trigger animation
+      blockButton.classList.add('active');
+      // Remove active class after a short delay to revert to original state
+      setTimeout(() => {
         blockButton.classList.remove('active');
-      }
+      }, 300);
+      // Send the block click event to the server (transient action)
       const payload = {
-        type: "block_click",
-        active: blockActive
+        type: "block_click"
       };
       socket.send(JSON.stringify(payload));
     });
