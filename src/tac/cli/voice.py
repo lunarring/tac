@@ -93,7 +93,9 @@ class VoiceUI:
         """
         logger.info(f"👤 User: {transcript}")
         print(transcript)
+        # Instead of treating this as an AI message, we simulate the user entering text.
         self.task_instructions = transcript
+        self.inject_message(transcript)
         self.stop_ai_audio = True
 
     async def on_ai_transcript(self, transcript: str):
