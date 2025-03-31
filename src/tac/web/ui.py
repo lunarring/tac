@@ -25,7 +25,7 @@ def load_high_level_summaries():
         formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
     return "\n\n".join(formatted_strings)
 
-def dummy_mic_click():
+async def dummy_mic_click(websocket):
     global is_recording, speech_to_text
     # On first button press, start recording. On the next press, stop recording.
     if not is_recording:
@@ -36,6 +36,9 @@ def dummy_mic_click():
         transcript = speech_to_text.stop_recording()
         print("Recording stopped. Transcript:", transcript)
         is_recording = False
+        if transcript:
+            # Send the transcript over the WebSocket as if the user typed it
+            await websocket.send(transcript)
 
 async def handle_connection(websocket):
     # Retrieve high-level file summaries from the project
@@ -52,7 +55,7 @@ async def handle_connection(websocket):
             print("Received message from client:", user_input)
             if user_input.strip():
                 if user_input.strip() == "mic_click":
-                    dummy_mic_click()
+                    await dummy_mic_click(websocket)
                     continue
                 # Process the incoming message using the ChatAgent to maintain conversation state and generate response.
                 assistant_reply = agent.process_message(user_input)
@@ -103,3 +106,4 @@ def launch_ui():
         asyncio.run(run_server())
     except KeyboardInterrupt:
         print("WebSocket server stopped by user.")
+        
