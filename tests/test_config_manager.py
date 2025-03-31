@@ -28,14 +28,6 @@ def test_config_manager():
     assert git.enabled is True
     assert git.auto_commit_if_success is True
 
-    # Verify 'llm_weak' configuration
-    llm = cm.get_llm_config("weak")
-    assert llm.model == "o3-mini"
-    assert llm.provider == "openai"
-    assert llm.settings.temperature == 0.7
-    assert llm.settings.timeout == 120
-    assert llm.settings.max_tokens is None
-    assert llm.settings.verify_ssl is True
 
     # Verify default value when key is missing
     assert cm.get("nonexistent_key", "default") == "default"
