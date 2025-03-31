@@ -146,28 +146,25 @@
       color: #ffffff;
       transform: scale(1.1);
     }
-    /* Style for block button with a cube-like appearance and refined filigrane design */
+    /* Enhanced style for block button with an intricate filigrane design */
     #blockButton {
       position: absolute;
       bottom: 10px;
       right: 70px;
-      border: none;
-      background: #ffffff;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-radius: 12px;
+      background: linear-gradient(145deg, #ffffff, #f0f0f0);
       cursor: pointer;
-      font-size: 16px;
-      padding: 6px 12px;
+      padding: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
       transition: background-color 0.3s, transform 0.3s;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-      transform: perspective(300px) rotateX(10deg);
+      box-shadow: inset 1px 1px 3px rgba(255,255,255,0.7), 2px 2px 6px rgba(0, 0, 0, 0.2);
     }
     #blockButton.active {
-      background-color: #007bff;
-      color: #ffffff;
-      transform: perspective(300px) rotateX(10deg) scale(1.1);
+      background: linear-gradient(145deg, #e0eafc, #cfdef3);
+      transform: scale(1.1);
     }
     /* Style for the canvas inside the block button */
     #blockButton canvas {
