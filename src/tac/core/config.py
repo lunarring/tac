@@ -45,6 +45,7 @@ class GeneralConfig:
     max_retries_protoblock_creation: int = 4
     total_timeout: int = 600
     halt_after_fail: bool = False
+    halt_after_verify: bool = False  # Whether to pause for manual review after successful verification
     ignore_paths: List[str] = field(default_factory=lambda: [".git", "__pycache__", "build"])
     test_path: str = "tests/"  # Add default test path
     save_protoblock: bool = False  # Whether to save protoblocks to disk

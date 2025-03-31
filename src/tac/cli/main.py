@@ -523,9 +523,6 @@ def main():
     
     # Initialize config before any logging
     config.override_with_args(vars(args))
-    # Propagate the new halt-after-verify flag to the general config
-    if hasattr(args, 'halt_after_verify'):
-        setattr(config.general, 'halt_after_verify', args.halt_after_verify)
     
     # Set up logging with config values
     # Check environment variable first (highest priority)
