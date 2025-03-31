@@ -86,7 +86,7 @@ You are a senior python software engineer. You are specialized in figuring out h
 <planning_rules>
 - Examine carefully the codebase and the task instructions, and then develop a plan how this task could be implemented, but stay on the GOAL level and do not describe the exact implementation details.
 - Think how this GOAL could be verified by the trusty agents. 
-- Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: [{', '.join(trusty_agents_description.keys())}]
+- Here are the available trusty agents, to you need to decide how we evaluate the code changes. Choose from this list of trusty agents: {', '.join(TrustyAgentRegistry.get_all_agents())}
 - Here a description of what each trusty agent is capable of {trusty_agents_description}
 - Select the most appropriate trusty agents that is capable of verifying the task. Select only one agent!
 - Furthermore, we will need to supply two kinds of files to the coding agent:
@@ -143,7 +143,7 @@ And here a bit more detailed explanation of the output format:
     "context_files": ["List of files that need to be read for context in order to implement the task and as background information for the test. Scan the codebase and review carefully and include every file that need to be read for the task. Use relative file paths as given in the codebase. Be sure to provide enough context!"],
     "commit_message": "Brief commit message about your changes.",
     "branch_name": "Name of the branch to create for this task. Use the task description as a basis for the branch name, the branch name always starts with tac/ e.g.  tac/feature/new-user-authentication or tac/bugfix/fix_login_issue.",
-    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(trusty_agents_description.keys())}"],
+    "trusty_agents": ["List of trusty agents to use for this task. Choose from the following list: {', '.join(TrustyAgentRegistry.get_all_agents())}"],
     "trusty_agent_prompts": {{"agent_name1": "... fill in here the prompt for the trusty agent"}}
 }}
 </protoblock_explained>
