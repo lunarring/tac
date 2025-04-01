@@ -97,6 +97,10 @@
       color: #555;
       background-color: #fafafa;
     }
+    /* When offline, change chat bubble text to red */
+    #messageContainer.offline .chat-bubble {
+      color: red;
+    }
     /* Container for input and buttons */
     #inputContainer {
       position: relative;
@@ -376,6 +380,7 @@
       console.log('Connected to WebSocket server');
       statusDot.style.backgroundColor = "#4caf50";
       statusText.textContent = "online";
+      messageContainer.classList.remove("offline");
     });
     
     // Handle WebSocket closure to indicate offline status (red indicator)
@@ -383,6 +388,7 @@
       console.log('WebSocket connection closed');
       statusDot.style.backgroundColor = "#f44336";
       statusText.textContent = "offline";
+      messageContainer.classList.add("offline");
     });
     
     // Handle WebSocket errors to indicate offline status (red indicator)
@@ -390,6 +396,7 @@
       console.log('WebSocket error');
       statusDot.style.backgroundColor = "#f44336";
       statusText.textContent = "offline";
+      messageContainer.classList.add("offline");
     });
 
     // Listen for messages from the server
