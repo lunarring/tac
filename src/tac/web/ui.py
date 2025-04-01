@@ -73,7 +73,7 @@ async def handle_connection(websocket):
                         await dummy_mic_click(websocket)
                         continue
                     elif message_type == "block_click":
-                        # Handle block click event - compress chat and generate protoblock
+                        # Handle block click event - bypass chat agent and return a constant response
                         await handle_block_click(websocket, agent)
                         continue
                     elif message_type in ["user_message", "transcribed_message"]:
@@ -101,65 +101,10 @@ async def handle_connection(websocket):
 
 async def handle_block_click(websocket, agent):
     """
-    Handle the block button click by:
-    1. Generating task instructions from the conversation
-    2. Creating config overrides
-    3. Running the execute_command function
+    Handle the block button click by immediately bypassing the chat agent logic
+    and returning a constant response.
     """
-    try:
-        # Send status message to client
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": "Creating block from conversation..."
-        }))
-        
-        # Generate task instructions from the chat history
-        genesis_prompt = agent.generate_task_instructions()
-        
-        # Prepare config overrides for execute_command
-        config_overrides = {
-            'no_git': False,
-            'json': None,
-            'image': None
-        }
-        
-        # For any LLM-specific config
-        for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
-            config_overrides[attr] = None
-        
-        # Inform client that execution is starting
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": "Executing block with instructions: " + genesis_prompt[:100] + "..."
-        }))
-        
-        # Run execution in a separate thread to not block the websocket
-        loop = asyncio.get_event_loop()
-        success = await loop.run_in_executor(None, lambda: execute_command(
-            task_instructions=genesis_prompt,
-            config_overrides=config_overrides
-        ))
-        
-        # Report result back to client
-        if success:
-            await websocket.send(json.dumps({
-                "type": "status_message",
-                "message": "✅ Block executed successfully!"
-            }))
-        else:
-            await websocket.send(json.dumps({
-                "type": "status_message",
-                "message": "❌ Block execution failed."
-            }))
-    
-    except Exception as e:
-        print(f"Error during block execution: {e}")
-        import traceback
-        traceback.print_exc()
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": f"❌ Error: {str(e)}"
-        }))
+    await websocket.send("making block...")
 
 async def run_server():
     try:
