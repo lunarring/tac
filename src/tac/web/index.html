@@ -13,7 +13,7 @@
       font-family: 'Roboto', sans-serif;
       background: linear-gradient(135deg, #e0eafc, #cfdef3);
     }
-    /* Container split into two equal halves */
+    /* Container split into three columns: chat, three.js canvas and protoblock details */
     #splitContainer {
       display: flex;
       width: 100%;
@@ -22,7 +22,7 @@
     }
     /* Left panel for chat interface with a clean, modern aesthetic */
     #leftPane {
-      flex: 1;
+      flex: 2;
       position: relative;
       border-right: 1px solid #d0d0d0;
       background: #ffffff;
@@ -30,7 +30,35 @@
       flex-direction: column;
       box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
     }
-    /* Header for chat with refined padding and subtle shadow effect */
+    /* Center panel for Three.js canvas */
+    #centerPane {
+      flex: 2;
+      position: relative;
+      background: linear-gradient(135deg, #2d2d44, #272736);
+      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
+    }
+    /* Ensure Three.js canvas fills its container */
+    #centerPane canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+    /* Right panel for protoblock details */
+    #rightPanel {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      padding: 20px;
+      overflow-y: auto;
+      border-left: 1px solid #d0d0d0;
+    }
+    /* Styling protoblock details text */
+    #protoblockDetails {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #333;
+    }
+    /* Reuse header and chat styles for leftPane (unchanged) */
     #chatHeader {
       display: flex;
       align-items: center;
@@ -44,7 +72,6 @@
       font-size: 18px;
       color: #333;
     }
-    /* Typing animation indicator styles moved inside header and enlarged */
     #typingAnimation {
       display: none;
       margin-left: 10px;
@@ -52,7 +79,6 @@
       color: #888;
       align-items: center;
     }
-    /* Base style for animated dots; animation speed increased to 0.5s */
     #typingAnimation .dot {
       display: inline-block;
       width: 10px;
@@ -62,7 +88,6 @@
       animation: typing 0.5s ease-in-out infinite;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
-    /* Unique dot colors and adjusted delays */
     #typingAnimation .dot:nth-child(1) {
       animation-delay: 0s;
       background: radial-gradient(circle, red, darkred);
@@ -75,7 +100,6 @@
       animation-delay: 0.2s;
       background: radial-gradient(circle, blue, darkblue);
     }
-    /* Keyframes for smooth, sinusoidal vertical movement */
     @keyframes typing {
       0%   { transform: translateY(0); }
       50%  { transform: translateY(-5px); }
@@ -88,7 +112,6 @@
       font-size: 14px;
       color: #4caf50;
     }
-    /* New CSS rule to update the offline status text color to red */
     #chatHeader.offline #recipientStatus {
       color: #f44336;
     }
@@ -100,7 +123,6 @@
       display: inline-block;
       margin-right: 6px;
     }
-    /* Chat message container within left pane */
     #messageContainer {
       flex: 1;
       overflow-y: auto;
@@ -108,18 +130,15 @@
       color: #555;
       background-color: #fafafa;
     }
-    /* When offline, change chat bubble text to red */
     #messageContainer.offline .chat-bubble {
       color: red;
     }
-    /* Input container now uses flex layout to allocate dedicated space to the text field and buttons */
     #inputContainer {
       margin: 10px;
       display: flex;
       gap: 10px;
       align-items: center;
     }
-    /* Chat input area with modern styling; allow dynamic resizing within available space */
     #userInput {
       flex: 1;
       min-width: 300px;
@@ -140,12 +159,10 @@
       border-color: #007bff;
       box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
     }
-    /* Container for the action buttons on the right side of the input field */
     #buttonContainer {
       display: flex;
       gap: 10px;
     }
-    /* Common styling for both action buttons with a rounded rectangle border */
     .action-button {
       width: 48px;
       height: 48px;
@@ -158,16 +175,13 @@
       transition: background-color 0.3s, transform 0.3s;
       border-radius: 12px;
     }
-    /* Subtle hover effect for action buttons with a gentle brightness increase */
     .action-button:hover {
       filter: brightness(1.1);
     }
-    /* Additional smoother animation for block button when active */
     #blockButton.active {
       transform: scale(1.1);
       transition: transform 0.3s ease-in-out;
     }
-    /* Keyframes for pulsating effect */
     @keyframes pulsate {
       0% {
         transform: scale(1);
@@ -182,20 +196,7 @@
         filter: brightness(1);
       }
     }
-    /* Right panel for Three.js canvas with a modern dark gradient */
-    #rightPane {
-      flex: 1;
-      position: relative;
-      background: linear-gradient(135deg, #2d2d44, #272736);
-      box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
-    }
-    /* Ensure Three.js canvas fills its container */
-    #rightPane canvas {
-      width: 100% !important;
-      height: 100% !important;
-      display: block;
-    }
-    /* Chat bubble styles revamped for a sleek contemporary look */
+    /* Chat bubble styles */
     .chat-bubble {
       margin: 10px 0;
       padding: 12px 16px;
@@ -222,7 +223,6 @@
     .chat-clear {
       clear: both;
     }
-    /* Ensure block and microphone buttons have identical dimensions for consistent UI */
     #blockButton, #micButton {
       width: 48px;
       height: 48px;
@@ -241,28 +241,53 @@
         <span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
       </div>
       <div id="messageContainer"></div>
-      <!-- Input container wrapping the textarea and a new button container -->
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
         <div id="buttonContainer">
           <button id="blockButton" class="action-button">
-            <!-- A canvas element for the rotating cube -->
             <canvas id="cubeCanvas"></canvas>
-            <!-- Hidden text for accessibility/testing -->
             <span style="display: none;">Cube</span>
           </button>
           <button id="micButton" class="action-button">🎤</button>
         </div>
       </div>
     </div>
-    <div id="rightPane">
+    <div id="centerPane">
       <!-- Three.js canvas will be injected here -->
+    </div>
+    <div id="rightPanel">
+      <h3>Protoblock Details</h3>
+      <div id="protoblockDetails">
+        <!-- Protoblock details will be populated by JavaScript -->
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
-    // Initialize Three.js scene in the right pane
-    const threeContainer = document.getElementById('rightPane');
+    // Initialize protoblock data (in a real scenario this would be dynamic)
+    const protoblock = {
+      prompt: "Implement a new UI panel to show protoblock details.",
+      write_files: ["src/tac/web/index.html", "src/tac/web/ui.py"],
+      context_files: ["src/tac/blocks/model.py"],
+      selected_trusty_agent: "ChatAgent",
+      agent_prompt: "You are a smart assistant that ensures code quality and protocols."
+    };
+
+    // Populate the protoblock details panel
+    function populateProtoblockDetails() {
+      const detailsDiv = document.getElementById('protoblockDetails');
+      detailsDiv.innerHTML = `
+        <p><strong>Prompt:</strong> ${protoblock.prompt}</p>
+        <p><strong>Write Files:</strong> ${protoblock.write_files.join(', ')}</p>
+        <p><strong>Context Files:</strong> ${protoblock.context_files.join(', ')}</p>
+        <p><strong>Selected Trusty Agent:</strong> ${protoblock.selected_trusty_agent}</p>
+        <p><strong>Agent Prompt:</strong> ${protoblock.agent_prompt}</p>
+      `;
+    }
+    populateProtoblockDetails();
+
+    // Initialize Three.js scene in the center pane
+    const threeContainer = document.getElementById('centerPane');
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -283,17 +308,16 @@
       emissiveIntensity: 0.5
     });
     const cube = new THREE.Mesh(geometry, cubeMaterial);
-    // Reposition the cube to the right as required by tests
     cube.position.x = 1;
     scene.add(cube);
 
-    // Add a wireframe overlay using EdgesGeometry and LineSegments for added style
+    // Add a wireframe overlay using EdgesGeometry and LineSegments
     const edges = new THREE.EdgesGeometry(geometry);
     const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
     const wireframe = new THREE.LineSegments(edges, lineMaterial);
     cube.add(wireframe);
 
-    // Position the camera and add lights for a refined look
+    // Position camera and add lights
     camera.position.set(3, 3, 5);
     camera.lookAt(0, 0, 0);
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -310,7 +334,6 @@
     }
     animate();
 
-    // Update renderer and camera on resize for rightPane
     window.addEventListener('resize', () => {
       const width = threeContainer.clientWidth;
       const height = threeContainer.clientHeight;
@@ -319,7 +342,7 @@
       camera.updateProjectionMatrix();
     });
 
-    // Chat functionality in the left pane
+    // Chat functionality in the left pane remains unchanged
     const messageContainer = document.getElementById("messageContainer");
     const statusText = document.getElementById("statusText");
     const statusDot = document.querySelector("#recipientStatus .statusDot");
@@ -335,8 +358,6 @@
         bubble.classList.add("chat-user");
       } else if (sender === "AI") {
         bubble.classList.add("chat-ai");
-      } else {
-        // For System messages or others, no additional styling is applied.
       }
       bubble.textContent = text;
       messageContainer.appendChild(bubble);
@@ -357,7 +378,6 @@
     // Create WebSocket connection
     const socket = new WebSocket("ws://localhost:8765");
 
-    // Connection opened
     socket.addEventListener('open', (event) => {
       console.log('Connected to WebSocket server');
       statusDot.style.backgroundColor = "#4caf50";
@@ -366,7 +386,6 @@
       chatHeader.classList.remove("offline");
     });
     
-    // Handle WebSocket closure to indicate offline status (red indicator)
     socket.addEventListener('close', (event) => {
       console.log('WebSocket connection closed');
       statusDot.style.backgroundColor = "#f44336";
@@ -375,7 +394,6 @@
       chatHeader.classList.add("offline");
     });
     
-    // Handle WebSocket errors to indicate offline status (red indicator)
     socket.addEventListener('error', (event) => {
       console.log('WebSocket error');
       statusDot.style.backgroundColor = "#f44336";
@@ -384,59 +402,42 @@
       chatHeader.classList.add("offline");
     });
 
-    // Listen for messages from the server
     socket.addEventListener('message', (event) => {
       try {
-        // Try to parse as JSON first
         const data = JSON.parse(event.data);
         
         if (data.type === "status_message") {
-          // Handle status messages (from block button processing)
           addChatMessage("System", data.message);
         } else if (data.type === "transcribed_message") {
-          // Display as a user message
           addChatMessage("User", data.message);
-          
-          // Send it back to server for processing
           const payload = {
             type: "user_message",
             message: data.message
           };
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
-
-          // Remove waiting and recording indication from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
         } else {
-          // Regular AI response
           addChatMessage("AI", event.data);
-          // Immediately hide typing indicator after full display of AI message
           hideTypingIndicator();
         }
       } catch (e) {
-        // If not JSON or parsing fails, treat as a regular message
         addChatMessage("AI", event.data);
         hideTypingIndicator();
       }
     });
 
-    // Send user message when Enter key is pressed (without Shift)
     userInput.addEventListener("keydown", function(event) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         const text = userInput.value.trim();
         if (text !== "") {
-          // Display user's message in the chat history
           addChatMessage("User", text);
-          
-          // Format the message as JSON
           const payload = {
             type: "user_message",
             message: text
           };
-          
-          // Send the message to the server via WebSocket and show typing animation
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
           userInput.value = "";
@@ -444,17 +445,12 @@
       }
     });
 
-    // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Add active class to trigger animation
       blockButton.classList.add('active');
-      // Remove active class after a short delay to revert to original state
       setTimeout(() => {
         blockButton.classList.remove('active');
       }, 300);
-      
-      // If there is a message typed in, send it first to the chat system
       const text = userInput.value.trim();
       if (text !== "") {
         addChatMessage("User", text);
@@ -466,26 +462,19 @@
         showTypingIndicator();
         userInput.value = "";
       }
-      
-      // Initiate block processing by sending the block_click payload
       const payload = {
         type: "block_click"
       };
       socket.send(JSON.stringify(payload));
     });
 
-    // Bind click event to the microphone button to send the 'mic_click' event to the backend
-    let isRecording = false; // flag to track recording state
-
+    let isRecording = false;
     micButton.addEventListener('click', function() {
-      // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add recording class and ensure waiting is removed
         micButton.classList.add('recording');
         micButton.classList.remove('waiting');
       } else {
-        // Stop recording: keep red state by retaining 'recording' and add waiting animation
         micButton.classList.add('waiting');
       }
       const payload = {
@@ -506,7 +495,6 @@
     const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     btnCamera.position.z = 2;
 
-    // Updated cube geometry dimensions for a visibly larger cube
     const btnGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
     const btnMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x156289, 
@@ -531,7 +519,6 @@
     }
     animateBtnCube();
 
-    // Expose socket and cube for testing purposes
     window.socket = socket;
     window.cube = cube;
   </script>
