@@ -27,3 +27,16 @@ def process_chat_message(message):
     ]
     response = client.chat_completion(messages)
     return response
+
+def process_block_click():
+    """
+    Process a block click event. This bypasses any chat bot or LLM responses and
+    immediately creates a new block.
+
+    Returns:
+        str: A confirmation message that a new block was created.
+    """
+    # Immediately create a new block (instant action)
+    # In a complete system, additional block creation logic would be added here.
+    return "Block created"
+    
