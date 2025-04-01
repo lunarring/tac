@@ -49,7 +49,7 @@ class ChatAgent:
         
         # Prepare the prompt for summarization
         system_prompt = "You are a helpful assistant that can summarize conversations into clear, concise instructions."
-        user_prompt = "Please compress the following conversation into a clear, concise instruction set that captures the core requirements. The summary should be specific, actionable, and focused on what needs to be implemented:\n\n" + conversation_text
+        user_prompt = "Please compress the following conversation into a clear, concise instruction set that captures the core requirements. Especially take into account what the user has been saying and what the assistant said is less important. Also the last messages are especially important. The summary should be specific, actionable, and focused on what needs to be implemented:\n\n" + conversation_text
         
         # Create messages for the LLM
         summary_messages = [
