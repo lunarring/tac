@@ -135,6 +135,7 @@
       cursor: pointer;
       transition: background-color 0.3s, transform 0.3s;
       border-radius: 12px;
+      position: relative;
     }
     /* Specific positioning for the microphone button */
     #micButton {
@@ -148,6 +149,24 @@
       background-color: red;
       color: #ffffff;
       transform: scale(1.1);
+    }
+    /* Waiting animation indicator for microphone button */
+    #micButton.waiting:after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid #fff;
+      border-top: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
     }
     /* Specific positioning for the block button */
     #blockButton {
@@ -305,6 +324,7 @@
     const statusDot = document.querySelector("#recipientStatus .statusDot");
     const userInput = document.getElementById("userInput");
     const typingAnimation = document.getElementById("typingAnimation");
+    const micButton = document.getElementById('micButton');
 
     function addChatMessage(sender, text) {
       const bubble = document.createElement("div");
@@ -360,6 +380,10 @@
           };
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
+
+          // Remove waiting and recording indication from micButton once transcription is received
+          micButton.classList.remove('waiting');
+          micButton.classList.remove('recording');
         } else {
           // Regular AI response
           addChatMessage("AI", event.data);
@@ -410,16 +434,18 @@
     });
 
     // Bind click event to the microphone button to send the 'mic_click' event to the backend
-    const micButton = document.getElementById('micButton');
     let isRecording = false; // flag to track recording state
 
     micButton.addEventListener('click', function() {
       // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
+        // Start recording: add recording class and ensure waiting is removed
         micButton.classList.add('recording');
+        micButton.classList.remove('waiting');
       } else {
-        micButton.classList.remove('recording');
+        // Stop recording: keep red state by retaining 'recording' and add waiting animation
+        micButton.classList.add('waiting');
       }
       const payload = {
         type: "mic_click",
