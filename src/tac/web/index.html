@@ -303,13 +303,13 @@
       return result;
     }
 
-    // Set up the auto-refresh mechanism for the placeholder overlay
+    // Set up the placeholder overlay with a fixed status message.
     document.addEventListener("DOMContentLoaded", function(){
       function updatePlaceholder() {
-        document.getElementById("placeholderOverlay").innerText = generateRandomString();
+        // Instead of displaying a random string, always display a fixed message.
+        document.getElementById("placeholderOverlay").innerText = "Awaiting instructions";
       }
       updatePlaceholder();
-      setInterval(updatePlaceholder, 1000);
     });
   </script>
   <script>
@@ -387,8 +387,6 @@
         bubble.classList.add("chat-user");
       } else if (sender === "AI") {
         bubble.classList.add("chat-ai");
-      } else {
-        // For System messages or others, no additional styling is applied.
       }
       bubble.textContent = text;
       messageContainer.appendChild(bubble);
@@ -439,59 +437,42 @@
     // Listen for messages from the server
     socket.addEventListener('message', (event) => {
       try {
-        // Try to parse as JSON first
         const data = JSON.parse(event.data);
         
         if (data.type === "status_message") {
-          // Handle status messages (from block button processing)
           addChatMessage("System", data.message);
         } else if (data.type === "status_update") {
-          // Update the dedicated UI element in the right panel with the status update message
           document.getElementById("status_update").innerText = data.message;
         } else if (data.type === "transcribed_message") {
-          // Display as a user message
           addChatMessage("User", data.message);
-          
-          // Send it back to server for processing
           const payload = {
             type: "user_message",
             message: data.message
           };
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
-
-          // Remove waiting and recording indication from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
         } else {
-          // Regular AI response
           addChatMessage("AI", event.data);
-          // Immediately hide typing indicator after full display of AI message
           hideTypingIndicator();
         }
       } catch (e) {
-        // If not JSON or parsing fails, treat as a regular message
         addChatMessage("AI", event.data);
         hideTypingIndicator();
       }
     });
 
-    // Send user message when Enter key is pressed (without Shift)
     userInput.addEventListener("keydown", function(event) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
         const text = userInput.value.trim();
         if (text !== "") {
-          // Display user's message in the chat history
           addChatMessage("User", text);
-          
-          // Format the message as JSON
           const payload = {
             type: "user_message",
             message: text
           };
-          
-          // Send the message to the server via WebSocket and show typing animation
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
           userInput.value = "";
@@ -499,17 +480,13 @@
       }
     });
 
-    // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Add active class to trigger animation
       blockButton.classList.add('active');
-      // Remove active class after a short delay to revert to original state
       setTimeout(() => {
         blockButton.classList.remove('active');
       }, 300);
       
-      // If there is a message typed in, send it first to the chat system
       const text = userInput.value.trim();
       if (text !== "") {
         addChatMessage("User", text);
@@ -522,25 +499,19 @@
         userInput.value = "";
       }
       
-      // Initiate block processing by sending the block_click payload
       const payload = {
         type: "block_click"
       };
       socket.send(JSON.stringify(payload));
     });
 
-    // Bind click event to the microphone button to send the 'mic_click' event to the backend
-    let isRecording = false; // flag to track recording state
-
+    let isRecording = false;
     micButton.addEventListener('click', function() {
-      // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add recording class and ensure waiting is removed
         micButton.classList.add('recording');
         micButton.classList.remove('waiting');
       } else {
-        // Stop recording: keep red state by retaining 'recording' and add waiting animation
         micButton.classList.add('waiting');
       }
       const payload = {
@@ -550,7 +521,6 @@
       socket.send(JSON.stringify(payload));
     });
 
-    // Initialize Three.js scene for the rotating cube inside the block button
     const btnCanvas = document.getElementById('cubeCanvas');
     const btnRenderer = new THREE.WebGLRenderer({ canvas: btnCanvas, antialias: true, alpha: true });
     btnRenderer.setPixelRatio(window.devicePixelRatio);
@@ -561,7 +531,6 @@
     const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     btnCamera.position.z = 2;
 
-    // Updated cube geometry dimensions for a visibly larger cube
     const btnGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
     const btnMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x156289, 
@@ -586,10 +555,8 @@
     }
     animateBtnCube();
 
-    // Expose socket and cube for testing purposes
     window.socket = socket;
     window.cube = cube;
   </script>
 </body>
 </html>
-<!-- End of index.html -->
