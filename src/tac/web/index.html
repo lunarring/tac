@@ -377,6 +377,20 @@
       statusDot.style.backgroundColor = "#4caf50";
       statusText.textContent = "online";
     });
+    
+    // Handle WebSocket closure to indicate offline status (red indicator)
+    socket.addEventListener('close', (event) => {
+      console.log('WebSocket connection closed');
+      statusDot.style.backgroundColor = "#f44336";
+      statusText.textContent = "offline";
+    });
+    
+    // Handle WebSocket errors to indicate offline status (red indicator)
+    socket.addEventListener('error', (event) => {
+      console.log('WebSocket error');
+      statusDot.style.backgroundColor = "#f44336";
+      statusText.textContent = "offline";
+    });
 
     // Listen for messages from the server
     socket.addEventListener('message', (event) => {
