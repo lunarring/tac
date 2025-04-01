@@ -438,7 +438,21 @@
       setTimeout(() => {
         blockButton.classList.remove('active');
       }, 300);
-      // Send the block click event to the server (transient action)
+      
+      // If there is a message typed in, send it first to the chat system
+      const text = userInput.value.trim();
+      if (text !== "") {
+        addChatMessage("User", text);
+        const messagePayload = {
+          type: "user_message",
+          message: text
+        };
+        socket.send(JSON.stringify(messagePayload));
+        showTypingIndicator();
+        userInput.value = "";
+      }
+      
+      // Initiate block processing by sending the block_click payload
       const payload = {
         type: "block_click"
       };
