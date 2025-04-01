@@ -499,6 +499,10 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     args = parser.parse_args()
     
+    # Set default subcommand for 'test' if none is provided
+    if args.command == 'test' and args.test_command is None:
+        args.test_command = 'run'
+    
     if args.command == 'run':
         # Only validate that we have either instructions or a JSON file
         if not args.instructions and not args.json:
@@ -619,7 +623,7 @@ def main():
     
     # Command line args have second highest priority
     # Check both global and subcommand log-level arguments
-    cmd_log_level = args.log_level if hasattr(args, "log_level") else None
+    cmd_log_level = args.log_level if hasattr(args, "log-level") else None
     
     # Config has lowest priority
     config_log_level = config.logging.get_tac('level', 'INFO')
