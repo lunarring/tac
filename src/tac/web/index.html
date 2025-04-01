@@ -288,10 +288,13 @@
       return result;
     }
 
-    // Set the placeholder overlay text to a random string on DOM load
+    // Set up the auto-refresh mechanism for the placeholder overlay
     document.addEventListener("DOMContentLoaded", function(){
-      const placeholderText = generateRandomString();
-      document.getElementById("placeholderOverlay").innerText = placeholderText;
+      function updatePlaceholder() {
+        document.getElementById("placeholderOverlay").innerText = generateRandomString();
+      }
+      updatePlaceholder();
+      setInterval(updatePlaceholder, 1000);
     });
   </script>
   <script>
