@@ -208,6 +208,18 @@
       height: 100% !important;
       display: block;
     }
+    /* Styling for the new runtime status text field in the right panel */
+    #runtimeStatus {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 18px;
+      background-color: rgba(0, 0, 0, 0.5);
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
     /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
       margin: 10px 0;
@@ -270,6 +282,7 @@
     </div>
     <div id="rightPanel">
       <!-- Three.js canvas will be injected here -->
+      <div id="runtimeStatus">status</div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
