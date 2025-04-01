@@ -1,0 +1,11 @@
+/* Override button positioning rules from inline styles to work with the new flex layout */
+#blockButton,
+#micButton {
+  position: static !important;
+}
+
+/* Additional styles for the new button container in the input area */
+#buttonContainer {
+  display: flex;
+  gap: 10px;
+}

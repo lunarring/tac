@@ -105,14 +105,16 @@
     #messageContainer.offline .chat-bubble {
       color: red;
     }
-    /* Container for input and buttons */
+    /* Input container now uses flex layout to allocate dedicated space to the text field and buttons */
     #inputContainer {
-      position: relative;
       margin: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
     }
-    /* Chat input area with modern styling */
+    /* Chat input area with modern styling; allow dynamic resizing within available space */
     #userInput {
-      width: 100%;
+      flex: 1;
       min-width: 300px;
       min-height: 40px;
       height: 60px;
@@ -131,6 +133,11 @@
       border-color: #007bff;
       box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
     }
+    /* Container for the action buttons on the right side of the input field */
+    #buttonContainer {
+      display: flex;
+      gap: 10px;
+    }
     /* Common styling for both action buttons with a rounded rectangle border */
     .action-button {
       width: 48px;
@@ -143,7 +150,6 @@
       cursor: pointer;
       transition: background-color 0.3s, transform 0.3s;
       border-radius: 12px;
-      position: relative;
     }
     /* Subtle hover effect for action buttons with a gentle brightness increase */
     .action-button:hover {
@@ -164,52 +170,8 @@
         filter: brightness(1);
       }
     }
-    /* Specific positioning for the microphone button */
-    #micButton {
-      position: absolute;
-      bottom: 10px;
-      right: 10px;
-      font-size: 20px;
-    }
-    /* Recording state style for microphone button */
-    #micButton.recording {
-      background-color: red;
-      color: #ffffff;
-      transform: scale(1.1);
-    }
-    /* Waiting animation indicator for microphone button */
-    #micButton.waiting:after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      border: 2px solid #fff;
-      border-top: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-    /* Specific positioning for the block button */
-    #blockButton {
-      position: absolute;
-      bottom: 10px;
-      right: 70px;
-      font-size: 16px;
-    }
-    /* Active state for block button */
-    #blockButton.active {
-      transform: scale(1.1);
-    }
-    /* Style for the canvas inside the block button */
-    #blockButton canvas {
-      width: 32px;
-      height: 32px;
-    }
+    /* Removed absolute positioning from the buttons; new layout is managed by flexbox in the input container */
+    /* Specific styling for microphone and block buttons from within the button container remains via their dimensions */
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
       flex: 1;
@@ -256,6 +218,7 @@
       height: 48px;
     }
   </style>
+  <link rel="stylesheet" type="text/css" href="index.css">
 </head>
 <body>
   <div id="splitContainer">
@@ -269,16 +232,18 @@
         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
       </div>
       <div id="messageContainer"></div>
-      <!-- Input container wrapping the textarea and buttons -->
+      <!-- Input container wrapping the textarea and a new button container -->
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Enter text here..."></textarea>
-        <button id="blockButton" class="action-button">
-          <!-- A canvas element for the rotating cube -->
-          <canvas id="cubeCanvas"></canvas>
-          <!-- Hidden text for accessibility/testing -->
-          <span style="display: none;">Cube</span>
-        </button>
-        <button id="micButton" class="action-button">🎤</button>
+        <div id="buttonContainer">
+          <button id="blockButton" class="action-button">
+            <!-- A canvas element for the rotating cube -->
+            <canvas id="cubeCanvas"></canvas>
+            <!-- Hidden text for accessibility/testing -->
+            <span style="display: none;">Cube</span>
+          </button>
+          <button id="micButton" class="action-button">🎤</button>
+        </div>
       </div>
     </div>
     <div id="rightPane">
