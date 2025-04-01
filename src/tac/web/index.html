@@ -58,6 +58,27 @@
       line-height: 1.6;
       color: #333;
     }
+    /* New overlay style for protoblock details with animation */
+    #protoblockOverlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      border-top: 1px solid #d0d0d0;
+      transform: translateY(100%);
+      opacity: 0;
+      transition: transform 0.5s ease-out, opacity 0.5s ease-out;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #333;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+    }
+    #protoblockOverlay.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
     /* Reuse header and chat styles for leftPane (unchanged) */
     #chatHeader {
       display: flex;
@@ -260,6 +281,8 @@
       <div id="protoblockDetails">
         <!-- Protoblock details will be populated by JavaScript -->
       </div>
+      <!-- Animated overlay element for protoblock details -->
+      <div id="protoblockOverlay"></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -285,6 +308,15 @@
       `;
     }
     populateProtoblockDetails();
+
+    // Animate the overlay by copying the protoblock details and triggering a slide in animation
+    function animateOverlay() {
+      const overlay = document.getElementById('protoblockOverlay');
+      overlay.innerHTML = document.getElementById('protoblockDetails').innerHTML;
+      // Allow a slight delay before starting the animation for a smoother effect
+      setTimeout(() => { overlay.classList.add('show'); }, 100);
+    }
+    animateOverlay();
 
     // Initialize Three.js scene in the center pane
     const threeContainer = document.getElementById('centerPane');
