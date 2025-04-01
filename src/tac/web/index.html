@@ -137,9 +137,25 @@
       border-radius: 12px;
       position: relative;
     }
-    /* Hover effect for action buttons */
+    /* Hover effect for action buttons with vibrant color and pulsating animation */
     .action-button:hover {
-      background-color: #f7f7f7;
+      background-color: #ff4081; /* Vibrant contrasting color */
+      animation: pulsate 1.5s ease-in-out infinite;
+    }
+    /* Keyframes for pulsating effect */
+    @keyframes pulsate {
+      0% {
+        transform: scale(1);
+        filter: brightness(1);
+      }
+      50% {
+        transform: scale(1.1);
+        filter: brightness(1.5);
+      }
+      100% {
+        transform: scale(1);
+        filter: brightness(1);
+      }
     }
     /* Specific positioning for the microphone button */
     #micButton {
