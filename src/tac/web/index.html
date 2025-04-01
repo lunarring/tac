@@ -180,8 +180,8 @@
     }
     /* Style for the canvas inside the block button */
     #blockButton canvas {
-      width: 24px;
-      height: 24px;
+      width: 32px;
+      height: 32px;
     }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
@@ -457,13 +457,14 @@
     const btnCanvas = document.getElementById('cubeCanvas');
     const btnRenderer = new THREE.WebGLRenderer({ canvas: btnCanvas, antialias: true, alpha: true });
     btnRenderer.setClearColor(0x000000, 0);
-    btnRenderer.setSize(24, 24);
+    btnRenderer.setSize(32, 32);
 
     const btnScene = new THREE.Scene();
     const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     btnCamera.position.z = 2;
 
-    const btnGeometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    // Updated cube geometry dimensions for a visibly larger cube
+    const btnGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
     const btnMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x156289, 
       shininess: 100, 
