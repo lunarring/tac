@@ -52,24 +52,28 @@
       color: #888;
       align-items: center;
     }
+    /* Base style for animated dots; animation speed increased to 0.5s */
     #typingAnimation .dot {
       display: inline-block;
       width: 10px;
       height: 10px;
       margin: 0 3px;
-      background: radial-gradient(circle, #888, #ccc);
       border-radius: 50%;
-      animation: typing 0.75s ease-in-out infinite;
+      animation: typing 0.5s ease-in-out infinite;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
+    /* Unique dot colors and adjusted delays */
     #typingAnimation .dot:nth-child(1) {
       animation-delay: 0s;
+      background: radial-gradient(circle, red, darkred);
     }
     #typingAnimation .dot:nth-child(2) {
-      animation-delay: 0.15s;
+      animation-delay: 0.1s;
+      background: radial-gradient(circle, green, darkgreen);
     }
     #typingAnimation .dot:nth-child(3) {
-      animation-delay: 0.3s;
+      animation-delay: 0.2s;
+      background: radial-gradient(circle, blue, darkblue);
     }
     /* Keyframes for smooth, sinusoidal vertical movement */
     @keyframes typing {
@@ -533,3 +537,4 @@
   </script>
 </body>
 </html>
+<!-- END OF FILE -->

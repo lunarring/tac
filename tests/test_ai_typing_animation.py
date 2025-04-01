@@ -11,8 +11,8 @@ def load_index_html():
 
 def test_animation_duration():
     """
-    Verify that the typing animation for AI dots runs at double the speed
-    by ensuring the animation duration is set to 0.75s and the delays are halved.
+    Verify that the typing animation for AI dots runs at the increased speed
+    by ensuring the animation duration is set to 0.5s.
     """
     html_content = load_index_html()
     
@@ -21,7 +21,7 @@ def test_animation_duration():
     match = re.search(duration_pattern, html_content, re.MULTILINE)
     assert match, "No animation duration found for .dot elements."
     duration = float(match.group(1))
-    assert duration == 0.75, f"Expected animation duration 0.75s, found {duration}s."
+    assert duration == 0.5, f"Expected animation duration 0.5s, found {duration}s."
 
 def test_animation_delays():
     """
@@ -34,14 +34,14 @@ def test_animation_delays():
     match = re.search(second_dot_pattern, html_content, re.MULTILINE)
     assert match, "No animation delay found for .dot:nth-child(2)."
     delay2 = float(match.group(1))
-    assert delay2 == 0.15, f"Expected second dot delay 0.15s, found {delay2}s."
+    assert delay2 == 0.1, f"Expected second dot delay 0.1s, found {delay2}s."
     
     # Check for third dot delay.
     third_dot_pattern = r"\.dot:nth-child\(3\)\s*\{\s*[^}]*animation-delay:\s*([0-9.]+)s"
     match = re.search(third_dot_pattern, html_content, re.MULTILINE)
     assert match, "No animation delay found for .dot:nth-child(3)."
     delay3 = float(match.group(1))
-    assert delay3 == 0.3, f"Expected third dot delay 0.3s, found {delay3}s."
+    assert delay3 == 0.2, f"Expected third dot delay 0.2s, found {delay3}s."
     
 if __name__ == "__main__":
     pytest.main()
