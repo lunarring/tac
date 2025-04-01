@@ -5,6 +5,10 @@
   <title>WebSocket Three.js UI</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --mic-animation-speed: 1s;
+      --mic-recording-color: red;
+    }
     html, body {
       margin: 0;
       padding: 0;
@@ -133,7 +137,7 @@
       border: 2px solid #c3c3c3;
       background-color: #ffffff;
       cursor: pointer;
-      transition: background-color 0.3s, transform 0.3s;
+      transition: background-color var(--mic-animation-speed) ease, transform var(--mic-animation-speed) ease;
       border-radius: 12px;
       position: relative;
     }
@@ -144,11 +148,23 @@
       right: 10px;
       font-size: 20px;
     }
-    /* Recording state style for microphone button */
+    /* Refined recording state style for microphone button */
     #micButton.recording {
-      background-color: red;
+      background-color: var(--mic-recording-color);
       color: #ffffff;
+    }
+    /* Scale effect when not pulsating */
+    #micButton.recording:not(.pulsate) {
       transform: scale(1.1);
+    }
+    /* Pulsating effect style for microphone button */
+    #micButton.recording.pulsate {
+      animation: pulse var(--mic-animation-speed) infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
     }
     /* Waiting animation indicator for microphone button */
     #micButton.waiting:after {
@@ -384,6 +400,7 @@
           // Remove waiting and recording indication from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
+          micButton.classList.remove('pulsate');
         } else {
           // Regular AI response
           addChatMessage("AI", event.data);
@@ -440,11 +457,15 @@
       // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add recording class and ensure waiting is removed
+        // Start recording: add recording class and, if enabled, the pulsate effect.
         micButton.classList.add('recording');
         micButton.classList.remove('waiting');
+        if (window.micPulsate) {
+          micButton.classList.add('pulsate');
+        }
       } else {
-        // Stop recording: keep red state by retaining 'recording' and add waiting animation
+        // Stop recording: remove pulsate effect and add waiting indicator while retaining recording for visual cue.
+        micButton.classList.remove('pulsate');
         micButton.classList.add('waiting');
       }
       const payload = {
@@ -487,6 +508,18 @@
       btnRenderer.render(btnScene, btnCamera);
     }
     animateBtnCube();
+
+    // Prompt user for microphone button design preferences
+    document.addEventListener("DOMContentLoaded", function(){
+      let pulsate = confirm("Do you want a pulsating effect for the microphone button?");
+      let userColor = prompt("Enter your preferred recording color (e.g., red or #ff0000):", "red");
+      let speed = prompt("Enter desired animation speed in seconds (e.g., 1):", "1");
+      let speedSec = parseFloat(speed);
+      if (isNaN(speedSec) || speedSec <= 0) { speedSec = 1; }
+      document.documentElement.style.setProperty('--mic-animation-speed', speedSec + "s");
+      document.documentElement.style.setProperty('--mic-recording-color', userColor || "red");
+      window.micPulsate = pulsate;
+    });
 
     // Expose socket and cube for testing purposes
     window.socket = socket;
