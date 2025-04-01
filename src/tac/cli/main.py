@@ -611,8 +611,9 @@ def main():
     parser, args = parse_args()
 
     if args.ui:
-        from tac.web.ui import launch_ui
-        launch_ui()
+        from tac.web.ui import UIManager
+        ui_manager = UIManager()
+        ui_manager.launch_ui()
         sys.exit(0)
     
     # Initialize config before any logging
