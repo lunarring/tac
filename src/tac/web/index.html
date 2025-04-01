@@ -269,11 +269,31 @@
     </div>
     <div id="rightPanel">
       <!-- Overlay element displaying the placeholder text above the scene -->
-      <div id="placeholderOverlay">currently generating XYZ</div>
+      <div id="placeholderOverlay"></div>
       <!-- Three.js canvas will be injected here -->
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script>
+    // Function to mimic the Python generate_random_string function
+    function generateRandomString(length = 10, includeSymbols = false) {
+      let allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      if (includeSymbols) {
+        allowedChars += "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+      }
+      let result = "";
+      for (let i = 0; i < length; i++) {
+        result += allowedChars.charAt(Math.floor(Math.random() * allowedChars.length));
+      }
+      return result;
+    }
+
+    // Set the placeholder overlay text to a random string on DOM load
+    document.addEventListener("DOMContentLoaded", function(){
+      const placeholderText = generateRandomString();
+      document.getElementById("placeholderOverlay").innerText = placeholderText;
+    });
+  </script>
   <script>
     // Initialize Three.js scene in the right panel
     const threeContainer = document.getElementById('rightPanel');
@@ -551,3 +571,4 @@
   </script>
 </body>
 </html>
+<!-- End of index.html -->
