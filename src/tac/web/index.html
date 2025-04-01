@@ -186,6 +186,15 @@
         filter: brightness(1);
       }
     }
+    /* Animation keyframes for rotating effect */
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    /* CSS rule for rotating mic button to indicate ongoing transcription */
+    #micButton.rotating {
+      animation: rotate 1s linear infinite;
+    }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPanel {
       flex: 1;
@@ -409,9 +418,10 @@
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
 
-          // Remove waiting and recording indication from micButton once transcription is received
+          // Remove any indication (waiting, recording, rotating) from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
+          micButton.classList.remove('rotating');
         } else {
           // Regular AI response
           addChatMessage("AI", event.data);
@@ -485,11 +495,13 @@
       // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add 'recording' class to display red indicator
+        // Start recording: add 'recording' class to display red indicator and remove rotating if set
         micButton.classList.add('recording');
+        micButton.classList.remove('rotating');
       } else {
-        // Stop recording: remove 'recording' class to revert to default appearance
+        // Stop recording: remove 'recording' class and add 'rotating' class to indicate ongoing transcription
         micButton.classList.remove('recording');
+        micButton.classList.add('rotating');
       }
       const payload = {
         type: "mic_click",
