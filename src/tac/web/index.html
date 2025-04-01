@@ -157,6 +157,11 @@
     .action-button:hover {
       filter: brightness(1.1);
     }
+    /* Additional smoother animation for block button when active */
+    #blockButton.active {
+      transform: scale(1.1);
+      transition: transform 0.3s ease-in-out;
+    }
     /* Keyframes for pulsating effect */
     @keyframes pulsate {
       0% {
@@ -256,6 +261,7 @@
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(threeContainer.clientWidth, threeContainer.clientHeight);
     renderer.setClearColor(0x272736, 1);
     threeContainer.appendChild(renderer.domElement);
@@ -487,6 +493,7 @@
     // Initialize Three.js scene for the rotating cube inside the block button
     const btnCanvas = document.getElementById('cubeCanvas');
     const btnRenderer = new THREE.WebGLRenderer({ canvas: btnCanvas, antialias: true, alpha: true });
+    btnRenderer.setPixelRatio(window.devicePixelRatio);
     btnRenderer.setClearColor(0x000000, 0);
     btnRenderer.setSize(32, 32);
 
