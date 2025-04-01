@@ -44,6 +44,37 @@
       font-size: 18px;
       color: #333;
     }
+    /* Typing animation indicator styles moved inside header and enlarged */
+    #typingAnimation {
+      display: none;
+      margin-left: 10px;
+      font-style: italic;
+      color: #888;
+      align-items: center;
+    }
+    #typingAnimation .dot {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      margin: 0 4px;
+      background-color: #888;
+      border-radius: 50%;
+      animation: blink 1.4s infinite both;
+    }
+    #typingAnimation .dot:nth-child(1) {
+      animation-delay: 0s;
+    }
+    #typingAnimation .dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    #typingAnimation .dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    @keyframes blink {
+      0% { opacity: 0.2; }
+      20% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
     #chatHeader #recipientStatus {
       margin-left: auto;
       display: flex;
@@ -62,36 +93,6 @@
       border-radius: 50%;
       display: inline-block;
       margin-right: 6px;
-    }
-    /* Typing animation indicator styles */
-    #typingAnimation {
-      display: none;
-      padding: 5px 24px;
-      font-style: italic;
-      color: #888;
-    }
-    .dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      margin: 0 2px;
-      background-color: #888;
-      border-radius: 50%;
-      animation: blink 1.4s infinite both;
-    }
-    .dot:nth-child(1) {
-      animation-delay: 0s;
-    }
-    .dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    .dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    @keyframes blink {
-      0% { opacity: 0.2; }
-      20% { opacity: 1; }
-      100% { opacity: 0.2; }
     }
     /* Chat message container within left pane */
     #messageContainer {
@@ -170,8 +171,6 @@
         filter: brightness(1);
       }
     }
-    /* Removed absolute positioning from the buttons; new layout is managed by flexbox in the input container */
-    /* Specific styling for microphone and block buttons from within the button container remains via their dimensions */
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPane {
       flex: 1;
@@ -225,11 +224,10 @@
     <div id="leftPane">
       <div id="chatHeader">
         <span id="recipientName">vibe.tac</span>
+        <div id="typingAnimation">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
         <span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
-      </div>
-      <!-- Typing animation indicator -->
-      <div id="typingAnimation">
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
       </div>
       <div id="messageContainer"></div>
       <!-- Input container wrapping the textarea and a new button container -->
@@ -335,7 +333,7 @@
     }
 
     function showTypingIndicator() {
-      typingAnimation.style.display = "block";
+      typingAnimation.style.display = "inline-flex";
     }
 
     function hideTypingIndicator() {
