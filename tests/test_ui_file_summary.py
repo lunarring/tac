@@ -1,5 +1,6 @@
 import pytest
-from tac.web import ui
+import asyncio
+from tac.web.ui import UIManager
 from tac.utils.project_files import ProjectFiles
 
 class DummyProjectFiles:
@@ -24,8 +25,10 @@ def dummy_get_all_summaries(self):
 def patch_project_files(monkeypatch):
     monkeypatch.setattr(ProjectFiles, "get_all_summaries", dummy_get_all_summaries)
 
-def test_load_high_level_summaries():
-    result = ui.load_high_level_summaries()
+@pytest.mark.asyncio
+async def test_load_high_level_summaries():
+    ui_manager = UIManager()
+    result = await ui_manager.load_high_level_summaries()
     # Check that dummy.py shows only high level info and does not include detailed info
     assert "High level info" in result
     assert "Detailed info" not in result

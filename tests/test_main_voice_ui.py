@@ -1,11 +1,11 @@
 import pytest
-from tac.cli.voice import VoiceUI
+from tac.web.ui import UIManager
 
-def test_voice_ui_instantiation():
-    """Test that VoiceUI can be instantiated without prompt_codebase and has default values."""
+def test_ui_manager_instantiation():
+    """Test that UIManager can be instantiated without arguments and has default values."""
     try:
-        voice_ui = VoiceUI()
+        ui_manager = UIManager()
     except TypeError:
-        pytest.fail("VoiceUI instantiation raised a TypeError with no arguments")
+        pytest.fail("UIManager instantiation raised a TypeError with no arguments")
     # Check that task_instructions is initialized as expected (None by default)
-    assert voice_ui.task_instructions is None
+    assert ui_manager.task_instructions is None
