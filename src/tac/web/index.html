@@ -43,7 +43,7 @@
       height: 100% !important;
       display: block;
     }
-    /* Right panel for protoblock details */
+    /* Right panel for protoblock details and cube animation arranged vertically */
     #rightPanel {
       flex: 1;
       position: relative;
@@ -51,6 +51,23 @@
       padding: 20px;
       overflow-y: auto;
       border-left: 1px solid #d0d0d0;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Container for cube animation in right panel */
+    #cubeAnimationContainer {
+      height: 200px;
+      margin-bottom: 20px;
+    }
+    #cubeAnimationCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* Container for protoblock details and overlay */
+    #protoblockSection {
+      flex: 1;
+      position: relative;
     }
     /* Styling protoblock details text */
     #protoblockDetails {
@@ -278,12 +295,17 @@
       <!-- Three.js canvas will be injected here -->
     </div>
     <div id="rightPanel">
-      <h3>Protoblock Details</h3>
-      <div id="protoblockDetails">
-        <!-- Protoblock details will be populated by JavaScript -->
+      <div id="cubeAnimationContainer">
+        <canvas id="cubeAnimationCanvas"></canvas>
       </div>
-      <!-- Animated overlay element for protoblock details integrated within rightPanel -->
-      <div id="protoblockOverlay"></div>
+      <div id="protoblockSection">
+        <h3>Protoblock Details</h3>
+        <div id="protoblockDetails">
+          <!-- Protoblock details will be populated by JavaScript -->
+        </div>
+        <!-- Animated overlay element for protoblock details integrated within protoblockSection -->
+        <div id="protoblockOverlay"></div>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -551,6 +573,48 @@
       btnRenderer.render(btnScene, btnCamera);
     }
     animateBtnCube();
+
+    // Initialize Three.js scene for the cube animation in the right panel
+    const rightCanvas = document.getElementById('cubeAnimationCanvas');
+    const rightRenderer = new THREE.WebGLRenderer({ canvas: rightCanvas, antialias: true, alpha: true });
+    rightRenderer.setPixelRatio(window.devicePixelRatio);
+    // Set initial size based on parent container
+    const cubeAnimContainer = document.getElementById('cubeAnimationContainer');
+    rightRenderer.setSize(cubeAnimContainer.clientWidth, cubeAnimContainer.clientHeight);
+    
+    const rightScene = new THREE.Scene();
+    const rightCamera = new THREE.PerspectiveCamera(75, cubeAnimContainer.clientWidth / cubeAnimContainer.clientHeight, 0.1, 1000);
+    rightCamera.position.z = 2;
+
+    const rightCubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const rightCubeMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0xff0000, 
+      wireframe: true, 
+      transparent: true, 
+      opacity: 0.7 
+    });
+    const rightCube = new THREE.Mesh(rightCubeGeometry, rightCubeMaterial);
+    rightScene.add(rightCube);
+
+    const rightAmbientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    rightScene.add(rightAmbientLight);
+
+    function animateRightCube() {
+      requestAnimationFrame(animateRightCube);
+      rightCube.rotation.x += 0.02;
+      rightCube.rotation.y += 0.02;
+      rightRenderer.render(rightScene, rightCamera);
+    }
+    animateRightCube();
+
+    window.addEventListener('resize', () => {
+      const container = document.getElementById('cubeAnimationContainer');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      rightRenderer.setSize(width, height);
+      rightCamera.aspect = width / height;
+      rightCamera.updateProjectionMatrix();
+    });
 
     window.socket = socket;
     window.cube = cube;
