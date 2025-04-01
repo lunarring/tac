@@ -51,6 +51,10 @@
       font-size: 14px;
       color: #4caf50;
     }
+    /* New CSS rule to update the offline status text color to red */
+    #chatHeader.offline #recipientStatus {
+      color: #f44336;
+    }
     .statusDot {
       width: 8px;
       height: 8px;
@@ -347,6 +351,7 @@
     const userInput = document.getElementById("userInput");
     const typingAnimation = document.getElementById("typingAnimation");
     const micButton = document.getElementById('micButton');
+    const chatHeader = document.getElementById('chatHeader');
 
     function addChatMessage(sender, text) {
       const bubble = document.createElement("div");
@@ -381,6 +386,7 @@
       statusDot.style.backgroundColor = "#4caf50";
       statusText.textContent = "online";
       messageContainer.classList.remove("offline");
+      chatHeader.classList.remove("offline");
     });
     
     // Handle WebSocket closure to indicate offline status (red indicator)
@@ -389,6 +395,7 @@
       statusDot.style.backgroundColor = "#f44336";
       statusText.textContent = "offline";
       messageContainer.classList.add("offline");
+      chatHeader.classList.add("offline");
     });
     
     // Handle WebSocket errors to indicate offline status (red indicator)
@@ -397,6 +404,7 @@
       statusDot.style.backgroundColor = "#f44336";
       statusText.textContent = "offline";
       messageContainer.classList.add("offline");
+      chatHeader.classList.add("offline");
     });
 
     // Listen for messages from the server
