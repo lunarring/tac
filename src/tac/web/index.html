@@ -321,8 +321,10 @@
       bubble.classList.add("chat-bubble");
       if (sender === "User") {
         bubble.classList.add("chat-user");
-      } else {
+      } else if (sender === "AI") {
         bubble.classList.add("chat-ai");
+      } else {
+        // For System messages or others, no additional styling is applied.
       }
       bubble.textContent = text;
       messageContainer.appendChild(bubble);
@@ -397,10 +399,13 @@
         } else {
           // Regular AI response
           addChatMessage("AI", event.data);
+          // Immediately hide typing indicator after full display of AI message
+          hideTypingIndicator();
         }
       } catch (e) {
         // If not JSON or parsing fails, treat as a regular message
         addChatMessage("AI", event.data);
+        hideTypingIndicator();
       }
     });
 
