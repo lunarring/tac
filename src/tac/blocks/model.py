@@ -78,6 +78,10 @@ class ProtoBlock:
 
     @image_url.setter
     def image_url(self, value: Optional[str]):
+        if value is not None and not isinstance(value, str):
+            logger.error("Invalid type for image_url: expected str, got %s", type(value))
+            raise TypeError("image_url must be a string.")
+        logger.debug("Setting image_url to: %s", value)
         self.visual_metadata.image_url = value
 
     @property
@@ -86,7 +90,33 @@ class ProtoBlock:
 
     @visual_description.setter
     def visual_description(self, value: Optional[str]):
+        if value is not None and not isinstance(value, str):
+            logger.error("Invalid type for visual_description: expected str, got %s", type(value))
+            raise TypeError("visual_description must be a string.")
+        logger.debug("Setting visual_description to: %s", value)
         self.visual_metadata.visual_description = value
+
+    def update_visual_description(self, image_path: Optional[str] = None):
+        """
+        Update the visual_description field by dynamically generating a description
+        via the vision LLM. If image_path is not provided, it uses the image_url attribute.
+        """
+        if image_path is None:
+            if self.image_url is None:
+                logger.error("No image URL available to update visual description.")
+                raise ValueError("No image URL provided.")
+            image_path = self.image_url
+
+        logger.debug("Updating visual description using image: %s", image_path)
+        from tac.core.llm import LLMClient, Message
+        messages = [
+            Message(role="system", content="You are a helpful assistant that can analyze images."),
+            Message(role="user", content="Please provide a detailed visual description of the image.")
+        ]
+        client = LLMClient(llm_type="vision")
+        description = client.vision_chat_completion(messages, image_path)
+        logger.debug("Received visual description: %s", description)
+        self.visual_description = description
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
