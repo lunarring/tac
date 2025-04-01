@@ -288,7 +288,6 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     # Dynamically add arguments from general config
     general_config = config.general
     for key, value in vars(general_config).items():
-            
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
         if arg_type == bool:
@@ -502,6 +501,8 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     # Set default subcommand for 'test' if none is provided
     if args.command == 'test' and args.test_command is None:
         args.test_command = 'run'
+        if not hasattr(args, 'directory') or args.directory is None:
+            args.directory = '.'
     
     if args.command == 'run':
         # Only validate that we have either instructions or a JSON file
