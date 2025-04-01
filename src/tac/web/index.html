@@ -21,7 +21,7 @@
       overflow: hidden;
     }
     /* Left panel for chat interface with a clean, modern aesthetic */
-    #leftPane {
+    #leftPanel {
       flex: 1;
       position: relative;
       border-right: 1px solid #d0d0d0;
@@ -100,7 +100,7 @@
       display: inline-block;
       margin-right: 6px;
     }
-    /* Chat message container within left pane */
+    /* Chat message container within left panel */
     #messageContainer {
       flex: 1;
       overflow-y: auto;
@@ -183,14 +183,14 @@
       }
     }
     /* Right panel for Three.js canvas with a modern dark gradient */
-    #rightPane {
+    #rightPanel {
       flex: 1;
       position: relative;
       background: linear-gradient(135deg, #2d2d44, #272736);
       box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
     }
     /* Ensure Three.js canvas fills its container */
-    #rightPane canvas {
+    #rightPanel canvas {
       width: 100% !important;
       height: 100% !important;
       display: block;
@@ -232,7 +232,7 @@
 </head>
 <body>
   <div id="splitContainer">
-    <div id="leftPane">
+    <div id="leftPanel">
       <div id="chatHeader">
         <span id="recipientName">vibe.tac</span>
         <div id="typingAnimation">
@@ -255,14 +255,14 @@
         </div>
       </div>
     </div>
-    <div id="rightPane">
+    <div id="rightPanel">
       <!-- Three.js canvas will be injected here -->
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
-    // Initialize Three.js scene in the right pane
-    const threeContainer = document.getElementById('rightPane');
+    // Initialize Three.js scene in the right panel
+    const threeContainer = document.getElementById('rightPanel');
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -310,7 +310,7 @@
     }
     animate();
 
-    // Update renderer and camera on resize for rightPane
+    // Update renderer and camera on resize for rightPanel
     window.addEventListener('resize', () => {
       const width = threeContainer.clientWidth;
       const height = threeContainer.clientHeight;
@@ -319,7 +319,7 @@
       camera.updateProjectionMatrix();
     });
 
-    // Chat functionality in the left pane
+    // Chat functionality in the left panel
     const messageContainer = document.getElementById("messageContainer");
     const statusText = document.getElementById("statusText");
     const statusDot = document.querySelector("#recipientStatus .statusDot");
@@ -537,4 +537,3 @@
   </script>
 </body>
 </html>
-<!-- END OF FILE -->
