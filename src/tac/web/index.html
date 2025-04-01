@@ -158,6 +158,10 @@
       transition: background-color 0.3s, transform 0.3s;
       border-radius: 12px;
     }
+    /* CSS rule to display a red indicator when recording */
+    .action-button.recording {
+      background-color: red;
+    }
     /* Subtle hover effect for action buttons with a gentle brightness increase */
     .action-button:hover {
       filter: brightness(1.1);
@@ -481,12 +485,11 @@
       // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add recording class and ensure waiting is removed
+        // Start recording: add 'recording' class to display red indicator
         micButton.classList.add('recording');
-        micButton.classList.remove('waiting');
       } else {
-        // Stop recording: keep red state by retaining 'recording' and add waiting animation
-        micButton.classList.add('waiting');
+        // Stop recording: remove 'recording' class to revert to default appearance
+        micButton.classList.remove('recording');
       }
       const payload = {
         type: "mic_click",
