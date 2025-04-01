@@ -63,6 +63,11 @@ class BlockProcessor:
         self.git_manager = create_git_manager()
 
     def create_protoblock(self, idx_attempt, error_analysis):
+        # Inform the UI that protoblock generation has started.
+        from tac.web.comms import Web2PythonTransfer
+        status_transfer = Web2PythonTransfer()
+        status_transfer.set_payload("generating protoblock")
+        
         if self.input_protoblock:
             # Use the directly provided protoblock
             protoblock = self.input_protoblock
