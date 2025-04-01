@@ -194,6 +194,18 @@
       width: 100% !important;
       height: 100% !important;
       display: block;
+      z-index: 1;
+    }
+    /* Overlay element displaying the placeholder text above the cube */
+    #placeholderOverlay {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 18px;
+      z-index: 10;
+      pointer-events: none;
     }
     /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
@@ -256,6 +268,8 @@
       </div>
     </div>
     <div id="rightPanel">
+      <!-- Overlay element displaying the placeholder text above the scene -->
+      <div id="placeholderOverlay">currently generating XYZ</div>
       <!-- Three.js canvas will be injected here -->
     </div>
   </div>
