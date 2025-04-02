@@ -83,7 +83,11 @@ class UIManager:
                     data = json.loads(user_input_raw)
                     if isinstance(data, dict) and "type" in data:
                         message_type = data["type"]
-                        if message_type == "mic_click":
+                        if message_type == "runtime_status_update":
+                            # Route runtime_status_update messages to update the status bar
+                            await self.update_status_bar(websocket, data.get("message", ""))
+                            continue
+                        elif message_type == "mic_click":
                             await self.dummy_mic_click(websocket)
                             continue
                         elif message_type == "block_click":
@@ -91,6 +95,9 @@ class UIManager:
                             continue
                         elif message_type in ["user_message", "transcribed_message"]:
                             user_message = data.get("message", "").strip()
+                        else:
+                            # Unhandled type: treat as a plain message input
+                            user_message = user_input_raw.strip()
                     else:
                         user_message = user_input_raw.strip()
                 except json.JSONDecodeError:
