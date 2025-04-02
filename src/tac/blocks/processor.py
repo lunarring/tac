@@ -96,6 +96,9 @@ class BlockProcessor:
             else:
                 logger.info("Protoblock saving is disabled. Use --save-protoblock to enable.")
 
+        # Set the attempt number based on idx_attempt
+        protoblock.attempt_number = idx_attempt + 1
+        
         self.protoblock = protoblock
 
     def override_new_protoblock_with_previous_protoblock(self, protoblock):
@@ -134,7 +137,6 @@ class BlockProcessor:
         return True
 
     def run_loop(self):
-
         # Preliminary tests before we start.
         max_retries = config.general.max_retries_block_creation
 
@@ -145,9 +147,15 @@ class BlockProcessor:
 
         for idx_attempt in range(max_retries):
             logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
-
-            # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
+            
+            # Since we already created the protoblock in UI.handle_block_click for first attempt,
+            # we only need to handle subsequent attempts here
             if idx_attempt > 0:
+                # Send status update at beginning of each attempt
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"Starting attempt {idx_attempt + 1} of {max_retries}...")
+
+                # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
                 if config.general.halt_after_fail:
                     user_input = input("Execution paused after failure. Enter 'r' to revert to last commit (clean state), or 'c' to continue with current state: ").strip().lower()
                     if user_input in ['r', 'revert']:
@@ -165,21 +173,23 @@ class BlockProcessor:
                         logger.info("Reverting changes while staying on feature branch...")
                         self.git_manager.revert_changes()
 
-            # Generate a protoblock
-            try:
-                # SEND STATUS MESSAGE
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar("Generating protoblock from conversation...")
-                self.create_protoblock(idx_attempt, error_analysis)
-            except ValueError as exc:
-                error_analysis = str(exc)
-                logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar(f"❌ Protoblock generation failed: {error_analysis[:100]}...")
-                self.store_previous_protoblock()
-                continue
+                # Generate a protoblock for subsequent attempts
+                try:
+                    # SEND STATUS MESSAGE
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"Creating new protoblock for attempt {idx_attempt + 1}...")
+                    self.create_protoblock(idx_attempt, error_analysis)
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"Protoblock created for attempt {idx_attempt + 1}!")
+                except ValueError as exc:
+                    error_analysis = str(exc)
+                    logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"❌ Protoblock generation failed: {error_analysis[:100]}...")
+                    self.store_previous_protoblock()
+                    continue
 
-            # Handle git branch setup first if git is enabled
+            # Handle git branch setup only for first attempt
             if idx_attempt == 0:
                 if self.ui_manager:
                     self.ui_manager.send_status_bar("Setting up git branch...")
@@ -190,7 +200,8 @@ class BlockProcessor:
 
             # Execute the protoblock using the builder
             if self.ui_manager:
-                self.ui_manager.send_status_bar(f"Running implementation for task #{idx_attempt + 1}...")
+                self.ui_manager.send_status_bar(f"Starting coding agent execution for attempt {idx_attempt + 1}...")
+            
             execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
@@ -210,7 +221,7 @@ class BlockProcessor:
                     error_analysis = ""
             else:
                 if self.ui_manager:
-                    self.ui_manager.send_status_bar("✅ Execution successful!")
+                    self.ui_manager.send_status_bar(f"✅ Execution successful for attempt {idx_attempt + 1}!")
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
                     if config.safe_get('general', 'halt_after_verify'):

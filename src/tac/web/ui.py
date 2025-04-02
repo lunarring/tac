@@ -24,19 +24,38 @@ class UIManager:
         self.websocket = None
         self._loop = None
         self._status_queue = asyncio.Queue()
-        self.block_attempt_count = 0  # Track how many attempts we've made
         self.max_attempts = 4  # Maximum attempts
+        # Add lock for thread safety
+        self._status_lock = asyncio.Lock()
 
     def send_status_bar(self, message):
         """
         Safe method to update the status bar from any context (sync or async).
         Can be called from both the main thread and background threads.
         """
+        print(f"Status update requested: {message}")
         if self._loop and self._loop.is_running():
-            asyncio.run_coroutine_threadsafe(self._status_queue.put(message), self._loop)
+            try:
+                # If we're in an async context with a running loop
+                future = asyncio.run_coroutine_threadsafe(self._status_queue.put(message), self._loop)
+                # Don't wait for the result to avoid blocking
+                print(f"Status message queued: {message}")
+            except Exception as e:
+                print(f"Error queueing status message: {e}")
+                # Fallback - try to send directly if queueing fails
+                if self.websocket:
+                    try:
+                        asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._loop)
+                    except Exception as e2:
+                        print(f"Fallback status send failed: {e2}")
         elif self.websocket:
-            # If we don't have a loop yet, fallback to the old method
-            asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._get_loop())
+            # If we don't have a loop yet, try to get one and send directly
+            try:
+                loop = self._get_loop()
+                asyncio.run_coroutine_threadsafe(self.send_status_message(message), loop)
+                print(f"Status message sent via new loop: {message}")
+            except Exception as e:
+                print(f"Failed to send status via new loop: {e}")
 
     def send_status(self, message):
         """Legacy wrapper for sending status messages, use send_status_bar instead"""
@@ -45,9 +64,16 @@ class UIManager:
     async def _process_status_queue(self):
         """Process status messages from the queue"""
         while True:
-            message = await self._status_queue.get()
-            await self.send_status_message(message)
-            self._status_queue.task_done()
+            try:
+                message = await self._status_queue.get()
+                # Use lock to prevent multiple concurrent status updates
+                async with self._status_lock:
+                    await self.send_status_message(message)
+                self._status_queue.task_done()
+            except Exception as e:
+                print(f"Error processing status queue: {e}")
+                # Don't break the loop on error
+                await asyncio.sleep(0.1)
 
     def _get_loop(self):
         if self._loop is None:
@@ -59,12 +85,17 @@ class UIManager:
         return self._loop
 
     async def send_status_message(self, message):
+        """Direct async method to send status messages with awaiting"""
         if self.websocket:
-            await self.websocket.send(json.dumps({
-                "type": "status_message",
-                "message": message
-            }))
-            
+            try:
+                await self.websocket.send(json.dumps({
+                    "type": "status_message",
+                    "message": message
+                }))
+                print(f"Status update sent: {message}")  # Log sent messages
+            except Exception as e:
+                print(f"Error sending status message: {e}")
+
     async def send_protoblock_data(self, protoblock):
         """
         Send protoblock data to the client to display in the UI.
@@ -73,8 +104,9 @@ class UIManager:
             protoblock: The ProtoBlock object containing all the details
         """
         if self.websocket and protoblock:
-            # Format attempt number
-            attempt_number = f"{self.block_attempt_count}/{self.max_attempts}"
+            # Get attempt number from processor's idx_attempt in run_loop
+            # Format attempt number using max_attempts from config
+            attempt_number = f"{protoblock.attempt_number}/{self.max_attempts}"
             
             # Convert protoblock to a suitable JSON format for display
             protoblock_data = {
@@ -121,12 +153,15 @@ class UIManager:
 
     async def handle_connection(self, websocket):
         self.websocket = websocket
+        self._loop = asyncio.get_running_loop()
+        
         file_summaries = await self.load_high_level_summaries()
-        # Send frequent status updates for key workflow stages:
-        self.send_status("waiting for block click...")
-
-        # Start the status queue processor
-        status_processor = asyncio.create_task(self._process_status_queue())
+        
+        # Start the status queue processor right away and save it as instance variable
+        self._status_processor = asyncio.create_task(self._process_status_queue())
+        
+        # Send initial status
+        await self.send_status_message("Connected. Waiting for instructions...")
 
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
@@ -171,22 +206,23 @@ class UIManager:
                     break
         finally:
             # Cancel the status processor when connection is closed
-            status_processor.cancel()
-            try:
-                await status_processor
-            except asyncio.CancelledError:
-                pass
+            if hasattr(self, '_status_processor'):
+                self._status_processor.cancel()
+                try:
+                    await self._status_processor
+                except asyncio.CancelledError:
+                    pass
+            # Clear websocket reference
+            self.websocket = None
 
     async def handle_block_click(self, websocket, chat_agent):
         try:
-            # Increment attempt counter
-            self.block_attempt_count += 1
-            
-            self.send_status(f"Creating block from conversation (Attempt {self.block_attempt_count}/{self.max_attempts})...")
+            # Send status immediately
+            await self.send_status_message("Creating block from conversation...")
             genesis_prompt = chat_agent.generate_task_instructions()
 
             # Load codebase information
-            self.send_status("Analyzing codebase...")
+            await self.send_status_message("Analyzing codebase...")
             project_files = ProjectFiles()
             codebase = project_files.get_codebase_summary()
 
@@ -197,6 +233,9 @@ class UIManager:
             }
             for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
                 config_overrides[attr] = None
+
+            # Send status update before creating processor
+            await self.send_status_message("Initializing task processor...")
 
             # Use BlockProcessor directly
             from tac.blocks.processor import BlockProcessor
@@ -209,33 +248,43 @@ class UIManager:
                 ui_manager=self
             )
             
+            # Send status update right before generating protoblock
+            await self.send_status_message("Analyzing task requirements...")
+            
             # Get the protoblock before execution for immediate display
             try:
+                # Create the protoblock
                 processor.create_protoblock(idx_attempt=0, error_analysis="")
+                
                 if processor.protoblock:
                     # Display protoblock as soon as it's created, before execution
-                    self.send_status("Generated protoblock! Starting execution...")
+                    await self.send_status_message("Generated protoblock. Preparing execution...")
                     await self.send_protoblock_data(processor.protoblock)
+                    # Small delay to ensure UI updates
+                    await asyncio.sleep(0.5)
             except Exception as e:
                 print(f"Error creating protoblock: {e}")
                 traceback.print_exc()
+                await self.send_status_message(f"Error creating protoblock: {str(e)[:100]}...")
+                return
             
             # Execute the processor directly
+            await self.send_status_message("Starting block execution and agent processing...")
             loop = asyncio.get_event_loop()
             success = await loop.run_in_executor(None, processor.run_loop)
 
             # Check if execution was successful and we have a protoblock
             if success and processor.protoblock:
-                self.send_status("✅ Block executed successfully! Displaying protoblock details...")
+                await self.send_status_message("✅ Block executed successfully! Displaying final results...")
                 # Send updated protoblock data after execution
                 await self.send_protoblock_data(processor.protoblock)
             else:
-                self.send_status("❌ Block execution failed!")
+                await self.send_status_message("❌ Block execution failed!")
 
         except Exception as e:
             print(f"Error during block execution: {e}")
             traceback.print_exc()
-            self.send_status(f"❌ Error: {str(e)}")
+            await self.send_status_message(f"❌ Error: {str(e)}")
 
     async def run_server(self):
         try:

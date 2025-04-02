@@ -32,6 +32,7 @@ class ProtoBlock:
     commit_message: str = None
     image_url: Optional[str] = None
     visual_description: Optional[str] = None
+    attempt_number: int = 1
 
     def __post_init__(self):
         # Set default value for trusty_agents from config if None
@@ -82,6 +83,7 @@ class ProtoBlock:
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
         image_url = version_data.get('image_url', None)
         visual_description = version_data.get('visual_description', None)
+        attempt_number = version_data.get('attempt_number', 1)
         
         # Create and return the ProtoBlock
         return cls(
@@ -94,7 +96,8 @@ class ProtoBlock:
             trusty_agents=trusty_agents,
             trusty_agent_prompts=trusty_agent_prompts,
             image_url=image_url,
-            visual_description=visual_description
+            visual_description=visual_description,
+            attempt_number=attempt_number
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -123,7 +126,8 @@ class ProtoBlock:
             "trusty_agent_prompts": self.trusty_agent_prompts,
             "timestamp": datetime.now().isoformat(),
             "image_url": self.image_url,
-            "visual_description": self.visual_description
+            "visual_description": self.visual_description,
+            "attempt_number": self.attempt_number
         }
         
         # Use provided filename or generate default one
@@ -173,5 +177,6 @@ class ProtoBlock:
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
             "image_url": self.image_url,
-            "visual_description": self.visual_description
+            "visual_description": self.visual_description,
+            "attempt_number": self.attempt_number
         }
