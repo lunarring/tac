@@ -74,18 +74,12 @@ class UIManager:
         self.websocket = websocket
         file_summaries = await self.load_high_level_summaries()
         # Send frequent status updates for key workflow stages:
-        self.send_status("Running initial tests...")
-        await asyncio.sleep(0.3)
-        self.send_status("Initial tests passed.")
-        await asyncio.sleep(0.3)
-        self.send_status("Updating file summaries...")
-        await asyncio.sleep(0.3)
-        self.send_status("File updates completed.")
+        self.send_status("Initializing...")
 
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
         formatted_system_content = system_content.format(file_summaries=file_summaries)
-        agent = ChatAgent(system_prompt=formatted_system_content)
+        chat_agent = ChatAgent(system_prompt=formatted_system_content)
 
         while True:
             try:
@@ -101,7 +95,7 @@ class UIManager:
                             await self.dummy_mic_click(websocket)
                             continue
                         elif message_type == "block_click":
-                            await self.handle_block_click(websocket, agent)
+                            await self.handle_block_click(websocket, chat_agent)
                             continue
                         elif message_type in ["user_message", "transcribed_message"]:
                             user_message = data.get("message", "").strip()
@@ -114,7 +108,7 @@ class UIManager:
                     user_message = user_input_raw.strip()
 
                 if user_message:
-                    assistant_reply = agent.process_message(user_message)
+                    assistant_reply = chat_agent.process_message(user_message)
                     print(f"Sending message to client: {assistant_reply}")
                     await websocket.send(assistant_reply)
             except websockets.exceptions.ConnectionClosed:
@@ -125,12 +119,8 @@ class UIManager:
 
     async def handle_block_click(self, websocket, agent):
         try:
-            self.send_status("Creating block from conversation...")
 
             genesis_prompt = agent.generate_task_instructions()
-
-            # Send a clear status update indicating protoblock execution begins
-            self.send_status("Executing protoblock")
 
             config_overrides = {
                 'no_git': False,
