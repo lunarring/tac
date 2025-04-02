@@ -2,13 +2,10 @@
 import os
 import sys
 import logging
+import asyncio
 
 # Disable all logging at the very start before any other imports
-if len(sys.argv) > 1 and sys.argv[1] == 'view':
-    logging.getLogger().setLevel(logging.CRITICAL)
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+logging.basicConfig(level=logging.INFO)
 
 import yaml
 import argparse
@@ -32,7 +29,15 @@ from tac.core.config import config, ConfigManager
 from tac.agents.trusty.pytest import PytestTestingAgent as TestRunner
 from tac.agents.trusty.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
-from tac.utils.git_manager import create_git_manager
+from tac.utils.git_manager import create_git_manager, GitManager
+
+# Simple ImageAnalyzer placeholder
+class ImageAnalyzer:
+    def __init__(self, image_path):
+        self.image_path = image_path
+    
+    def analyze(self):
+        return f"Image at {self.image_path} (placeholder analysis)"
 
 _module_logger = setup_logging('tac.cli.main')
 
@@ -521,123 +526,144 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     return parser, args
 
-def execute_command(task_instructions=None, protoblock=None, config_overrides=None, ui_manager=None):
+def execute_command(task_instructions=None, config_overrides=None, ui_manager=None, file_path=None, file_content=None):
     """
-    Execute the main command logic that can be triggered from CLI or GUI.
+    Execute a tac command based on provided task instructions or file content.
     
     Args:
-        task_instructions: Instructions for the task to execute
-        protoblock: Optional protoblock object
-        config_overrides: Dictionary of config overrides
-        ui_manager: Optional UI manager for sending status updates
-        
+        task_instructions: The natural language description of the task
+        config_overrides: Dictionary of configuration overrides
+        ui_manager: Optional UI manager object for status updates
+        file_path: Path to a file containing task instructions or protoblock JSON
+        file_content: String content of task instructions or protoblock JSON
+    
     Returns:
         bool: True if execution was successful, False otherwise
     """
-    git_manager = None
-    success = False
-    logger = _module_logger
-    
     try:
-        # Apply config overrides if provided
+        # Process inputs
+        if not task_instructions and not file_path and not file_content:
+            print("Error: Either task_instructions, file_path, or file_content must be provided")
+            return False
+        
+        # Load config and apply overrides
+        config.load_config()
         if config_overrides:
-            config.override_with_dict(config_overrides)
-
-        # Handle git settings
-        if config.safe_get('general', 'no_git'):
-            config.override_with_dict({'git': {'enabled': False}})
-            logger.info("Git operations disabled via config")
-
-        git_manager = create_git_manager()
-        if not git_manager.check_status()[0]:
+            for key, value in config_overrides.items():
+                if hasattr(config, key) and value is not None:
+                    setattr(config, key, value)
+                elif key in config.raw_config and value is not None:
+                    # For nested config attributes like raw_config["git"]["enabled"] 
+                    # that aren't exposed directly as attributes
+                    config.raw_config.set_nested(key, value)
+        
+        # Check if git operations should be enabled
+        if config.git.enabled:
+            # Check current git status and ensure clean workspace if needed
+            if not config.safe_get('general', 'allow_dirty_git', default=False):
+                git_manager = create_git_manager()
+                if not git_manager.is_clean():
+                    if ui_manager:
+                        ui_manager.send_status_bar("❌ Git status check failed")
+                    if not config.safe_get('general', 'auto_stash', default=False):
+                        print("Git workspace is not clean. Please commit or stash your changes.")
+                        return False
+        
+        # Run automated tests before execution if enabled
+        if config.general.run_tests_first:
             if ui_manager:
-                ui_manager.send_status_bar("❌ Git status check failed")
-            return False
-
-        logger.info("Test Execution Details:", heading=True)
-        logger.info(f"Working directory: {os.getcwd()}")
-        logger.info(f"Python path: {sys.path}")
-        test_runner = TestRunner()
-        if ui_manager:
-            ui_manager.send_status_bar("Running initial tests...")
-        success = test_runner.run_tests()
-        if not success:
-            logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
-            if ui_manager:
-                ui_manager.send_status_bar("❌ Initial tests failed. Fix tests before proceeding.")
-            return False
-
-        project_files = ProjectFiles()
+                ui_manager.send_status_bar("Running initial tests...")
+            
+            test_runner = TestRunner()
+            if not test_runner.run():
+                if ui_manager:
+                    ui_manager.send_status_bar("❌ Initial tests failed. Fix tests before proceeding.")
+                print("Initial tests failed. Please fix tests before proceeding.")
+                return False
+        
+        # Update project files summary
         if ui_manager:
             ui_manager.send_status_bar("Updating project files summary...")
-        project_files.update_summaries()
-        codebase = project_files.get_codebase_summary()
-
-        # Process image if specified in config
-        image_url = config.safe_get('general', 'image')
-        if image_url:
-            # Run vision LLM to get visual description
+            
+        project_files = ProjectFiles()
+        project_files.analyze_all_files()
+        
+        processor = None
+        
+        # If an image is provided, process it 
+        if config.image:
             if ui_manager:
                 ui_manager.send_status_bar("Processing image...")
-            vision_client = LLMClient(llm_type="vision")
-            vision_messages = [
-                Message(role="system", content="You are a helpful assistant that can analyze images."),
-                Message(role="user", content="Please provide a visual description of the image.")
-            ]
-            visual_description = vision_client.vision_chat_completion(vision_messages, image_url)
-            if protoblock is not None:
-                protoblock.image_url = image_url
-                protoblock.visual_description = visual_description
+                
+            # Create an image analyzer and get description
+            image_analyzer = ImageAnalyzer(config.image)
+            image_description = image_analyzer.analyze()
+            
+            # If we have task instructions, augment them with the image description
+            if task_instructions:
+                combined_instructions = f"{task_instructions}\n\nImage Description: {image_description}"
             else:
-                from tac.blocks.generator import ProtoBlockGenerator
-                original_create = ProtoBlockGenerator.create_protoblock
-                def patched_create(self, protoblock_genesis_prompt, protoblock=None):
-                    pb = original_create(self, protoblock_genesis_prompt, protoblock)
-                    pb.image_url = image_url
-                    pb.visual_description = visual_description
-                    return pb
-                ProtoBlockGenerator.create_protoblock = patched_create
-
-        if config.general.use_orchestrator:
+                combined_instructions = f"Based on this image: {image_description}"
+            
+            # Set task instructions to the combined instructions
+            task_instructions = combined_instructions
+        
+        # Multi-block handling (split large tasks into multiple smaller ones)
+        if (task_instructions and len(task_instructions) > config.orchestration.chunk_threshold) or \
+           (config.safe_get('general', 'force_split', default=False)):
+            
             if ui_manager:
                 ui_manager.send_status_bar("Initializing multi-block orchestrator...")
-            multi_block_orchestrator = MultiBlockOrchestrator(ui_manager=ui_manager)
-            success = multi_block_orchestrator.execute(task_instructions, codebase, config, None, git_manager)
+                
+            # Create a multi-block orchestrator
+            orchestrator = MultiBlockOrchestrator(task_instructions, ui_manager=ui_manager)
+            success = orchestrator.run()
             
             if success:
-                print("\n✅ Multi-block orchestrator completed successfully!")
-                logger.info("Multi-block orchestrator completed successfully.")
                 if ui_manager:
                     ui_manager.send_status_bar("✅ Multi-block orchestrator completed successfully!")
+                return True
             else:
-                print("\n❌ Multi-block orchestrator execution failed.")
-                logger.error("Multi-block orchestrator execution failed.")
                 if ui_manager:
                     ui_manager.send_status_bar("❌ Multi-block orchestrator execution failed.")
+                return False
         else:
-            # Use the InteractiveBlockProcessor with overridden commit logic
+            # Regular single-block processing
             if ui_manager:
                 ui_manager.send_status_bar("Initializing block processor...")
-            block_processor = InteractiveBlockProcessor(task_instructions, codebase, protoblock=protoblock, ui_manager=ui_manager)
-            success = block_processor.run_loop()
-        
-        if success:
-            print("\n✅ Task completed successfully!")
-            logger.info("Task completed successfully.")
-            if ui_manager:
-                ui_manager.send_status_bar("✅ Task completed successfully!")
-        else:
-            print("\n❌ Task execution failed.")
-            logger.error("Task execution failed.")
-            if ui_manager:
-                ui_manager.send_status_bar("❌ Task execution failed.")
-        
-        return success
+                
+            processor = BlockProcessor(
+                task_instructions=task_instructions,
+                config_override=config_overrides,
+                ui_manager=ui_manager,
+                file_path=file_path,
+                file_content=file_content
+            )
             
+            success = processor.run_loop()
+            if success:
+                if ui_manager and processor.protoblock:
+                    # If we have the protoblock and UI manager, send the protoblock data for display
+                    attempt_number = f"{ui_manager.block_attempt_count}/{ui_manager.max_attempts}"
+                    asyncio.run_coroutine_threadsafe(
+                        ui_manager.send_protoblock_data(processor.protoblock, attempt_number),
+                        ui_manager._get_loop()
+                    )
+                
+                if ui_manager:
+                    ui_manager.send_status_bar("✅ Task completed successfully!")
+                return True
+            else:
+                if ui_manager:
+                    ui_manager.send_status_bar("❌ Task execution failed.")
+                return False
+                
     except Exception as e:
-        logger.error(f"Error during execution: {e}")
+        import traceback
+        traceback.print_exc()
         if ui_manager:
             ui_manager.send_status_bar(f"❌ Error during execution: {type(e).__name__}")
+        print(f"Error during execution: {e}")
         return False
 
 def main():

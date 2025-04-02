@@ -6,9 +6,11 @@ import os
 import signal
 import subprocess
 import argparse
+import traceback
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
 from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
+from tac.blocks.processor import BlockProcessor
 from tac.cli.main import execute_command
 from tac.core.llm import LLMClient, Message
 
@@ -22,6 +24,8 @@ class UIManager:
         self.websocket = None
         self._loop = None
         self._status_queue = asyncio.Queue()
+        self.block_attempt_count = 0  # Track how many attempts we've made
+        self.max_attempts = 4  # Maximum attempts
 
     def send_status_bar(self, message):
         """
@@ -60,6 +64,33 @@ class UIManager:
                 "type": "status_message",
                 "message": message
             }))
+            
+    async def send_protoblock_data(self, protoblock):
+        """
+        Send protoblock data to the client to display in the UI.
+        
+        Args:
+            protoblock: The ProtoBlock object containing all the details
+        """
+        if self.websocket and protoblock:
+            # Format attempt number
+            attempt_number = f"{self.block_attempt_count}/{self.max_attempts}"
+            
+            # Convert protoblock to a suitable JSON format for display
+            protoblock_data = {
+                "type": "protoblock_data",
+                "attempt": attempt_number,
+                "block_id": protoblock.block_id,
+                "task_description": protoblock.task_description,
+                "write_files": protoblock.write_files,
+                "context_files": protoblock.context_files,
+                "trusty_agents": protoblock.trusty_agents,
+                "trusty_agent_prompts": protoblock.trusty_agent_prompts or {}
+            }
+            
+            print(f"Sending protoblock data to client: {json.dumps(protoblock_data, indent=2)}")
+            await self.websocket.send(json.dumps(protoblock_data))
+            print("Protoblock data sent successfully")
 
     async def load_high_level_summaries(self):
         data = self.project_files.get_all_summaries()
@@ -148,8 +179,16 @@ class UIManager:
 
     async def handle_block_click(self, websocket, chat_agent):
         try:
-            self.send_status("Creating block from conversation...")
+            # Increment attempt counter
+            self.block_attempt_count += 1
+            
+            self.send_status(f"Creating block from conversation (Attempt {self.block_attempt_count}/{self.max_attempts})...")
             genesis_prompt = chat_agent.generate_task_instructions()
+
+            # Load codebase information
+            self.send_status("Analyzing codebase...")
+            project_files = ProjectFiles()
+            codebase = project_files.get_codebase_summary()
 
             config_overrides = {
                 'no_git': False,
@@ -159,21 +198,42 @@ class UIManager:
             for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
                 config_overrides[attr] = None
 
-            loop = asyncio.get_event_loop()
-            success = await loop.run_in_executor(None, lambda: execute_command(
+            # Use BlockProcessor directly
+            from tac.blocks.processor import BlockProcessor
+            
+            # Create a processor instance with all required parameters
+            processor = BlockProcessor(
                 task_instructions=genesis_prompt,
-                config_overrides=config_overrides,
+                codebase=codebase,
+                config_override=config_overrides,
                 ui_manager=self
-            ))
+            )
+            
+            # Get the protoblock before execution for immediate display
+            try:
+                processor.create_protoblock(idx_attempt=0, error_analysis="")
+                if processor.protoblock:
+                    # Display protoblock as soon as it's created, before execution
+                    self.send_status("Generated protoblock! Starting execution...")
+                    await self.send_protoblock_data(processor.protoblock)
+            except Exception as e:
+                print(f"Error creating protoblock: {e}")
+                traceback.print_exc()
+            
+            # Execute the processor directly
+            loop = asyncio.get_event_loop()
+            success = await loop.run_in_executor(None, processor.run_loop)
 
-            if success:
-                self.send_status("✅ Block executed successfully!")
+            # Check if execution was successful and we have a protoblock
+            if success and processor.protoblock:
+                self.send_status("✅ Block executed successfully! Displaying protoblock details...")
+                # Send updated protoblock data after execution
+                await self.send_protoblock_data(processor.protoblock)
             else:
                 self.send_status("❌ Block execution failed!")
 
         except Exception as e:
             print(f"Error during block execution: {e}")
-            import traceback
             traceback.print_exc()
             self.send_status(f"❌ Error: {str(e)}")
 

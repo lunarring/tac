@@ -201,6 +201,7 @@
       position: relative;
       background: linear-gradient(135deg, #e0eafc, #cfdef3);
       box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);
+      overflow-y: auto;
     }
     /* Ensure Three.js canvas fills its container */
     #rightPanel canvas {
@@ -222,6 +223,70 @@
       padding: 8px 12px;
       border-radius: 4px;
       text-align: center;
+      z-index: 10;
+    }
+    /* Protoblock display container styling */
+    #protoblockContainer {
+      display: none;
+      width: 90%;
+      margin: 70px auto 20px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      color: #333;
+      font-size: 14px;
+    }
+    #protoblockHeader {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #eee;
+    }
+    #protoblockHeader h2 {
+      margin: 0 0 5px;
+      color: #333;
+      font-size: 22px;
+    }
+    #protoblockHeader p {
+      margin: 0;
+      color: #666;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-weight: 500;
+      color: #007bff;
+      font-size: 16px;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .file-list {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+    .file-list li {
+      background-color: #f5f5f5;
+      padding: 8px 12px;
+      margin-bottom: 5px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .code-block {
+      background-color: #f8f8f8;
+      font-family: monospace;
+      padding: 15px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #eee;
     }
     /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
@@ -255,6 +320,25 @@
       width: 48px;
       height: 48px;
     }
+    /* Styling for trusty agent prompts */
+    .prompt-section {
+      margin-bottom: 15px;
+    }
+    .agent-name {
+      font-weight: 500;
+      margin-bottom: 5px;
+      color: #333;
+      background-color: #f0f0f0;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    #trustyAgentPrompts .code-block {
+      max-height: 200px;
+      margin-bottom: 15px;
+      font-size: 12px;
+      background-color: #f8f8f8;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -286,6 +370,34 @@
     <div id="rightPanel">
       <!-- Three.js canvas will be injected here -->
       <div id="runtimeStatus">waiting</div>
+      
+      <!-- Protoblock display container -->
+      <div id="protoblockContainer">
+        <div id="protoblockHeader">
+          <h2>Protoblock</h2>
+          <p id="protoblockAttempt">Attempt 1/4</p>
+        </div>
+        <div class="section">
+          <div class="section-title">Task Description</div>
+          <div id="taskDescription" class="code-block"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Files to Modify</div>
+          <ul id="writeFilesList" class="file-list"></ul>
+        </div>
+        <div class="section">
+          <div class="section-title">Context Files</div>
+          <ul id="contextFilesList" class="file-list"></ul>
+        </div>
+        <div class="section">
+          <div class="section-title">Trusty Agents</div>
+          <ul id="trustyAgentsList" class="file-list"></ul>
+        </div>
+        <div class="section">
+          <div class="section-title">Trusty Agent Prompts</div>
+          <div id="trustyAgentPrompts"></div>
+        </div>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -338,6 +450,93 @@
       renderer.render(scene, camera);
     }
     animate();
+
+    // Function to toggle between 3D cube and protoblock display
+    function toggleProtoblockDisplay(show) {
+      const protoblockContainer = document.getElementById('protoblockContainer');
+      const canvas = renderer.domElement;
+      
+      if (show) {
+        canvas.style.display = 'none';
+        protoblockContainer.style.display = 'block';
+      } else {
+        canvas.style.display = 'block';
+        protoblockContainer.style.display = 'none';
+      }
+    }
+
+    // Function to display protoblock data
+    function displayProtoblockData(data) {
+      console.log("Displaying protoblock data:", data);
+      
+      // Update header
+      document.getElementById('protoblockAttempt').textContent = `Attempt ${data.attempt}`;
+      
+      // Update task description
+      document.getElementById('taskDescription').textContent = data.task_description;
+      
+      // Update files to modify
+      const writeFilesList = document.getElementById('writeFilesList');
+      writeFilesList.innerHTML = '';
+      data.write_files.forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = file;
+        writeFilesList.appendChild(li);
+      });
+      
+      // Update context files
+      const contextFilesList = document.getElementById('contextFilesList');
+      contextFilesList.innerHTML = '';
+      data.context_files.forEach(file => {
+        const li = document.createElement('li');
+        li.textContent = file;
+        contextFilesList.appendChild(li);
+      });
+      
+      // Update trusty agents
+      const trustyAgentsList = document.getElementById('trustyAgentsList');
+      trustyAgentsList.innerHTML = '';
+      if (data.trusty_agents && data.trusty_agents.length > 0) {
+        data.trusty_agents.forEach(agent => {
+          const li = document.createElement('li');
+          li.textContent = agent;
+          trustyAgentsList.appendChild(li);
+        });
+      } else {
+        const li = document.createElement('li');
+        li.textContent = 'No trusty agents specified';
+        trustyAgentsList.appendChild(li);
+      }
+      
+      // Update trusty agent prompts
+      const trustyAgentPromptsContainer = document.getElementById('trustyAgentPrompts');
+      trustyAgentPromptsContainer.innerHTML = '';
+      
+      if (data.trusty_agent_prompts && Object.keys(data.trusty_agent_prompts).length > 0) {
+        // Create a div for each trusty agent prompt
+        for (const [agent, prompt] of Object.entries(data.trusty_agent_prompts)) {
+          const promptSection = document.createElement('div');
+          promptSection.className = 'prompt-section';
+          
+          const agentName = document.createElement('div');
+          agentName.className = 'agent-name';
+          agentName.textContent = agent;
+          
+          const promptText = document.createElement('div');
+          promptText.className = 'code-block';
+          promptText.textContent = prompt;
+          
+          promptSection.appendChild(agentName);
+          promptSection.appendChild(promptText);
+          trustyAgentPromptsContainer.appendChild(promptSection);
+        }
+      } else {
+        trustyAgentPromptsContainer.textContent = 'No trusty agent prompts specified';
+      }
+      
+      // Show the protoblock display
+      toggleProtoblockDisplay(true);
+    }
 
     // Update renderer and camera on resize for rightPanel
     window.addEventListener('resize', () => {
@@ -423,7 +622,20 @@
           // Update the right-side status text bar.
           document.getElementById("runtimeStatus").textContent = data.message;
           return;
-        } else if (data.type === "transcribed_message") {
+        } 
+        else if (data.type === "protoblock_data") {
+          // Display protoblock data in the right panel
+          console.log("Received protoblock data:", data);
+          
+          // Ensure the protoblock container is visible
+          document.getElementById('protoblockContainer').style.display = 'block';
+          document.querySelector('#rightPanel canvas').style.display = 'none';
+          
+          // Display the data
+          displayProtoblockData(data);
+          return;
+        }
+        else if (data.type === "transcribed_message") {
           // Display as a user message
           addChatMessage("User", data.message);
           
@@ -480,6 +692,9 @@
     blockButton.addEventListener('click', function() {
       // Immediately update the runtime status to reflect the protoblock execution process.
       document.getElementById("runtimeStatus").textContent = "Executing protoblock";
+      
+      // Hide the protoblock display when starting a new block generation
+      toggleProtoblockDisplay(false);
       
       // Add active class to trigger animation
       blockButton.classList.add('active');
@@ -565,6 +780,9 @@
       btnRenderer.render(btnScene, btnCamera);
     }
     animateBtnCube();
+
+    // Initially hide the protoblock display
+    toggleProtoblockDisplay(false);
 
     // Expose socket and cube for testing purposes
     window.socket = socket;

@@ -189,8 +189,8 @@ class BlockProcessor:
                     return False
 
             # Execute the protoblock using the builder
-            if self.ui_manager:
-                self.ui_manager.send_status_bar("Executing protoblock...")
+            # if self.ui_manager:
+            #     self.ui_manager.send_status_bar("Executing protoblock...")
             execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
