@@ -19,6 +19,29 @@ class UIManager:
         self.speech_to_text = Speech2Text()
         self.is_recording = False
         self.task_instructions = None
+        self.websocket = None
+        self._loop = None
+
+    def _get_loop(self):
+        if self._loop is None:
+            try:
+                self._loop = asyncio.get_event_loop()
+            except RuntimeError:
+                self._loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(self._loop)
+        return self._loop
+
+    def send_status(self, message):
+        """Synchronous wrapper for sending status messages"""
+        if self.websocket:
+            asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._get_loop())
+
+    async def send_status_message(self, message):
+        if self.websocket:
+            await self.websocket.send(json.dumps({
+                "type": "status_message",
+                "message": message
+            }))
 
     async def load_high_level_summaries(self):
         data = self.project_files.get_all_summaries()
@@ -45,30 +68,19 @@ class UIManager:
                     "type": "transcribed_message",
                     "message": transcript
                 }
-                await websocket.send(json.dumps(payload))
+                await self.websocket.send(json.dumps(payload))
 
     async def handle_connection(self, websocket):
+        self.websocket = websocket
         file_summaries = await self.load_high_level_summaries()
         # Send frequent status updates for key workflow stages:
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": "Running initial tests..."
-        }))
+        self.send_status("Running initial tests...")
         await asyncio.sleep(0.3)
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": "Initial tests passed."
-        }))
+        self.send_status("Initial tests passed.")
         await asyncio.sleep(0.3)
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": "Updating file summaries..."
-        }))
+        self.send_status("Updating file summaries...")
         await asyncio.sleep(0.3)
-        await websocket.send(json.dumps({
-            "type": "status_message",
-            "message": "File updates completed."
-        }))
+        self.send_status("File updates completed.")
 
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
@@ -113,18 +125,12 @@ class UIManager:
 
     async def handle_block_click(self, websocket, agent):
         try:
-            await websocket.send(json.dumps({
-                "type": "status_message",
-                "message": "Creating block from conversation..."
-            }))
+            self.send_status("Creating block from conversation...")
 
             genesis_prompt = agent.generate_task_instructions()
 
             # Send a clear status update indicating protoblock execution begins
-            await websocket.send(json.dumps({
-                "type": "status_message",
-                "message": "Executing protoblock"
-            }))
+            self.send_status("Executing protoblock")
 
             config_overrides = {
                 'no_git': False,
@@ -141,24 +147,15 @@ class UIManager:
             ))
 
             if success:
-                await websocket.send(json.dumps({
-                    "type": "status_message",
-                    "message": "✅ Block executed successfully!"
-                }))
+                self.send_status("✅ Block executed successfully!")
             else:
-                await websocket.send(json.dumps({
-                    "type": "status_message",
-                    "message": "❌ Block execution failed."
-                }))
+                self.send_status("❌ Block execution failed!")
 
         except Exception as e:
             print(f"Error during block execution: {e}")
             import traceback
             traceback.print_exc()
-            await websocket.send(json.dumps({
-                "type": "status_message",
-                "message": f"❌ Error: {str(e)}"
-            }))
+            self.send_status(f"❌ Error: {str(e)}")
 
     async def run_server(self):
         try:
