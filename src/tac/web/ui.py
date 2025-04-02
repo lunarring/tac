@@ -49,6 +49,27 @@ class UIManager:
 
     async def handle_connection(self, websocket):
         file_summaries = await self.load_high_level_summaries()
+        # Send frequent status updates for key workflow stages:
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": "Running initial tests..."
+        }))
+        await asyncio.sleep(0.3)
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": "Initial tests passed."
+        }))
+        await asyncio.sleep(0.3)
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": "Updating file summaries..."
+        }))
+        await asyncio.sleep(0.3)
+        await websocket.send(json.dumps({
+            "type": "status_message",
+            "message": "File updates completed."
+        }))
+
         system_content = (
             "You are a senior coding god. You are replying a bit sassy and sarcastic. You are also a bit of a know it all.  "
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. "
