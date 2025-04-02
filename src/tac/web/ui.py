@@ -31,11 +31,24 @@ class UIManager:
             formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
         return "\n\n".join(formatted_strings)
 
+    async def update_status_bar(self, websocket, new_status):
+        """
+        Generic function to update the web UI's status bar.
+        Sends a message with type 'runtime_status_update' and the new status text.
+        """
+        payload = {
+            "type": "runtime_status_update",
+            "message": new_status
+        }
+        await websocket.send(json.dumps(payload))
+
     async def dummy_mic_click(self, websocket):
         if not self.is_recording:
             self.speech_to_text.start_recording()
             print("Recording started.")
             self.is_recording = True
+            # Update UI status bar to show 'recording audio'
+            await self.update_status_bar(websocket, "recording audio")
         else:
             transcript = self.speech_to_text.stop_recording()
             print("Recording stopped. Transcript:", transcript)
