@@ -11,6 +11,7 @@ from tac.utils.project_files import ProjectFiles
 from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
 from tac.cli.main import execute_command
 from tac.core.llm import LLMClient, Message
+from bs4 import BeautifulSoup  # Added for HTML parsing
 
 class UIManager:
     def __init__(self, base_dir="."):
@@ -19,6 +20,24 @@ class UIManager:
         self.speech_to_text = Speech2Text()
         self.is_recording = False
         self.task_instructions = None
+        # Update index.html runtimeStatus element to 'waiting' on initialization
+        self._update_runtime_status('waiting')
+
+    def _get_index_html_path(self):
+        return os.path.join(self.base_dir, "src", "tac", "web", "index.html")
+
+    def _update_runtime_status(self, new_status):
+        index_path = self._get_index_html_path()
+        try:
+            with open(index_path, "r", encoding="utf-8") as f:
+                soup = BeautifulSoup(f, "html.parser")
+            runtime_status = soup.find(id="runtimeStatus")
+            if runtime_status is not None:
+                runtime_status.string = new_status
+            with open(index_path, "w", encoding="utf-8") as f:
+                f.write(str(soup))
+        except Exception as e:
+            print("Error updating runtimeStatus:", e)
 
     async def load_high_level_summaries(self):
         data = self.project_files.get_all_summaries()
@@ -97,6 +116,8 @@ class UIManager:
                 break
 
     async def handle_block_click(self, websocket, agent):
+        # Upon block button click, update the runtime status to 'creating protoblock'
+        self._update_runtime_status('creating protoblock')
         try:
             await websocket.send(json.dumps({
                 "type": "status_message",

@@ -1,10 +1,11 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Vibe.tac</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-  <style>
+<meta charset="utf-8"/>
+<title>Vibe.tac</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<style>
     html, body {
       margin: 0;
       padding: 0;
@@ -256,40 +257,40 @@
       height: 48px;
     }
   </style>
-  <link rel="stylesheet" type="text/css" href="index.css">
+<link href="index.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
-  <div id="splitContainer">
-    <div id="leftPanel">
-      <div id="chatHeader">
-        <span id="recipientName">vibe.tac</span>
-        <div id="typingAnimation">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-        </div>
-        <span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
-      </div>
-      <div id="messageContainer"></div>
-      <!-- Input container wrapping the textarea and a new button container -->
-      <div id="inputContainer">
-        <textarea id="userInput" placeholder="Enter text here..."></textarea>
-        <div id="buttonContainer">
-          <button id="blockButton" class="action-button">
-            <!-- A canvas element for the rotating cube -->
-            <canvas id="cubeCanvas"></canvas>
-            <!-- Hidden text for accessibility/testing -->
-            <span style="display: none;">Cube</span>
-          </button>
-          <button id="micButton" class="action-button">🎤</button>
-        </div>
-      </div>
-    </div>
-    <div id="rightPanel">
-      <!-- Three.js canvas will be injected here -->
-      <div id="runtimeStatus">status</div>
-    </div>
-  </div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-  <script>
+<div id="splitContainer">
+<div id="leftPanel">
+<div id="chatHeader">
+<span id="recipientName">vibe.tac</span>
+<div id="typingAnimation">
+<span class="dot"></span><span class="dot"></span><span class="dot"></span>
+</div>
+<span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
+</div>
+<div id="messageContainer"></div>
+<!-- Input container wrapping the textarea and a new button container -->
+<div id="inputContainer">
+<textarea id="userInput" placeholder="Enter text here..."></textarea>
+<div id="buttonContainer">
+<button class="action-button" id="blockButton">
+<!-- A canvas element for the rotating cube -->
+<canvas id="cubeCanvas"></canvas>
+<!-- Hidden text for accessibility/testing -->
+<span style="display: none;">Cube</span>
+</button>
+<button class="action-button" id="micButton">🎤</button>
+</div>
+</div>
+</div>
+<div id="rightPanel">
+<!-- Three.js canvas will be injected here -->
+<div id="runtimeStatus">waiting</div>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+<script>
     // Initialize Three.js scene in the right panel
     const threeContainer = document.getElementById('rightPanel');
     const scene = new THREE.Scene();
