@@ -21,6 +21,19 @@ class UIManager:
         self.task_instructions = None
         self.websocket = None
         self._loop = None
+        self._status_queue = asyncio.Queue()
+
+    def send_status_sync(self, message):
+        """Synchronous method to queue status messages"""
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(self._status_queue.put(message), self._loop)
+
+    async def _process_status_queue(self):
+        """Process status messages from the queue"""
+        while True:
+            message = await self._status_queue.get()
+            await self.send_status_message(message)
+            self._status_queue.task_done()
 
     def _get_loop(self):
         if self._loop is None:
@@ -76,51 +89,62 @@ class UIManager:
         # Send frequent status updates for key workflow stages:
         self.send_status("Initializing...")
 
+        # Start the status queue processor
+        status_processor = asyncio.create_task(self._process_status_queue())
+
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
         formatted_system_content = system_content.format(file_summaries=file_summaries)
         chat_agent = ChatAgent(system_prompt=formatted_system_content)
 
-        while True:
-            try:
-                user_input_raw = await websocket.recv()
-                print("Received message from client:", user_input_raw)
-                user_message = None
-
+        try:
+            while True:
                 try:
-                    data = json.loads(user_input_raw)
-                    if isinstance(data, dict) and "type" in data:
-                        message_type = data["type"]
-                        if message_type == "mic_click":
+                    user_input_raw = await websocket.recv()
+                    print("Received message from client:", user_input_raw)
+                    user_message = None
+
+                    try:
+                        data = json.loads(user_input_raw)
+                        if isinstance(data, dict) and "type" in data:
+                            message_type = data["type"]
+                            if message_type == "mic_click":
+                                await self.dummy_mic_click(websocket)
+                                continue
+                            elif message_type == "block_click":
+                                await self.handle_block_click(websocket, chat_agent)
+                                continue
+                            elif message_type in ["user_message", "transcribed_message"]:
+                                user_message = data.get("message", "").strip()
+                        else:
+                            user_message = user_input_raw.strip()
+                    except json.JSONDecodeError:
+                        if user_input_raw.strip() == "mic_click":
                             await self.dummy_mic_click(websocket)
                             continue
-                        elif message_type == "block_click":
-                            await self.handle_block_click(websocket, chat_agent)
-                            continue
-                        elif message_type in ["user_message", "transcribed_message"]:
-                            user_message = data.get("message", "").strip()
-                    else:
                         user_message = user_input_raw.strip()
-                except json.JSONDecodeError:
-                    if user_input_raw.strip() == "mic_click":
-                        await self.dummy_mic_click(websocket)
-                        continue
-                    user_message = user_input_raw.strip()
 
-                if user_message:
-                    assistant_reply = chat_agent.process_message(user_message)
-                    print(f"Sending message to client: {assistant_reply}")
-                    await websocket.send(assistant_reply)
-            except websockets.exceptions.ConnectionClosed:
-                break
-            except Exception as e:
-                print(f"Error in processing message: {e}")
-                break
+                    if user_message:
+                        assistant_reply = chat_agent.process_message(user_message)
+                        print(f"Sending message to client: {assistant_reply}")
+                        await websocket.send(assistant_reply)
+                except websockets.exceptions.ConnectionClosed:
+                    break
+                except Exception as e:
+                    print(f"Error in processing message: {e}")
+                    break
+        finally:
+            # Cancel the status processor when connection is closed
+            status_processor.cancel()
+            try:
+                await status_processor
+            except asyncio.CancelledError:
+                pass
 
-    async def handle_block_click(self, websocket, agent):
+    async def handle_block_click(self, websocket, chat_agent):
         try:
-
-            genesis_prompt = agent.generate_task_instructions()
+            self.send_status("Creating block from conversation...")
+            genesis_prompt = chat_agent.generate_task_instructions()
 
             config_overrides = {
                 'no_git': False,
@@ -133,7 +157,8 @@ class UIManager:
             loop = asyncio.get_event_loop()
             success = await loop.run_in_executor(None, lambda: execute_command(
                 task_instructions=genesis_prompt,
-                config_overrides=config_overrides
+                config_overrides=config_overrides,
+                ui_manager=self
             ))
 
             if success:
