@@ -195,20 +195,26 @@
     #micButton.rotating {
       animation: rotate 1s linear infinite;
     }
-    /* Right panel for Three.js canvas with a modern dark gradient */
+    /* Right panel now split into two vertical sections: canvas and debug panel */
     #rightPanel {
       flex: 1;
-      position: relative;
+      display: flex;
+      flex-direction: column;
       background: linear-gradient(135deg, #2d2d44, #272736);
       box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.3);
     }
+    /* Container for Three.js canvas and runtime status */
+    #canvasContainer {
+      position: relative;
+      flex: 2;
+    }
     /* Ensure Three.js canvas fills its container */
-    #rightPanel canvas {
+    #canvasContainer canvas {
       width: 100% !important;
       height: 100% !important;
       display: block;
     }
-    /* Styling for the new runtime status text field in the right panel */
+    /* Styling for the runtime status text field */
     #runtimeStatus {
       position: absolute;
       top: 16px;
@@ -222,6 +228,26 @@
       padding: 8px 12px;
       border-radius: 4px;
       text-align: center;
+      z-index: 5;
+    }
+    /* Debug panel styling for real-time log streaming */
+    #debugPanel {
+      flex: 1;
+      overflow-y: auto;
+      background: #1e1e2f;
+      color: #dcdcdc;
+      padding: 8px;
+      font-size: 12px;
+      border-top: 1px solid #444;
+    }
+    /* Debug log entry styling */
+    .debug-entry {
+      padding: 4px;
+      border-bottom: 1px solid #333;
+      cursor: pointer;
+    }
+    .debug-entry:hover {
+      background: #2a2a3a;
     }
     /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
@@ -284,14 +310,16 @@
       </div>
     </div>
     <div id="rightPanel">
-      <!-- Three.js canvas will be injected here -->
-      <div id="runtimeStatus">waiting</div>
+      <div id="canvasContainer">
+        <div id="runtimeStatus">waiting</div>
+      </div>
+      <div id="debugPanel"></div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
-    // Initialize Three.js scene in the right panel
-    const threeContainer = document.getElementById('rightPanel');
+    // Initialize Three.js scene in the canvasContainer
+    const threeContainer = document.getElementById('canvasContainer');
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -339,7 +367,7 @@
     }
     animate();
 
-    // Update renderer and camera on resize for rightPanel
+    // Update renderer and camera on resize for canvasContainer
     window.addEventListener('resize', () => {
       const width = threeContainer.clientWidth;
       const height = threeContainer.clientHeight;
@@ -356,6 +384,7 @@
     const typingAnimation = document.getElementById("typingAnimation");
     const micButton = document.getElementById('micButton');
     const chatHeader = document.getElementById('chatHeader');
+    const debugPanel = document.getElementById("debugPanel");
 
     function addChatMessage(sender, text) {
       const bubble = document.createElement("div");
@@ -364,8 +393,6 @@
         bubble.classList.add("chat-user");
       } else if (sender === "AI") {
         bubble.classList.add("chat-ai");
-      } else {
-        // For System messages or others, no additional styling is applied.
       }
       bubble.textContent = text;
       messageContainer.appendChild(bubble);
@@ -381,6 +408,18 @@
 
     function hideTypingIndicator() {
       typingAnimation.style.display = "none";
+    }
+
+    // Append debug log entries to the debug panel and add click event for detailed inspection
+    function appendDebugLog(phase, message) {
+      const entry = document.createElement("div");
+      entry.classList.add("debug-entry");
+      entry.textContent = `[${phase}] ${message}`;
+      entry.addEventListener("click", () => {
+        alert(`[${phase}] Full Log:\n${message}`);
+      });
+      debugPanel.appendChild(entry);
+      debugPanel.scrollTop = debugPanel.scrollHeight;
     }
 
     // Create WebSocket connection
@@ -416,37 +455,33 @@
     // Listen for messages from the server
     socket.addEventListener('message', (event) => {
       try {
-        // Try to parse as JSON first
         const data = JSON.parse(event.data);
         
         if (data.type === "status_message") {
-          // Update the right-side status text bar.
+          // Update the runtime status text bar.
           document.getElementById("runtimeStatus").textContent = data.message;
           return;
         } else if (data.type === "transcribed_message") {
-          // Display as a user message
           addChatMessage("User", data.message);
-          
-          // Send it back to server for processing
           const payload = {
             type: "user_message",
             message: data.message
           };
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
-
-          // Remove any indication (waiting, recording, rotating) from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
           micButton.classList.remove('rotating');
+        } else if (data.type === "debug_log") {
+          // Append debug logs to the debug panel.
+          appendDebugLog(data.phase, data.message);
+          return;
         } else {
           // Regular AI response
           addChatMessage("AI", event.data);
-          // Immediately hide typing indicator after full display of AI message
           hideTypingIndicator();
         }
       } catch (e) {
-        // If not JSON or parsing fails, treat as a regular message
         addChatMessage("AI", event.data);
         hideTypingIndicator();
       }
@@ -458,16 +493,11 @@
         event.preventDefault();
         const text = userInput.value.trim();
         if (text !== "") {
-          // Display user's message in the chat history
           addChatMessage("User", text);
-          
-          // Format the message as JSON
           const payload = {
             type: "user_message",
             message: text
           };
-          
-          // Send the message to the server via WebSocket and show typing animation
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
           userInput.value = "";
@@ -478,17 +508,11 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Immediately update the runtime status to reflect the protoblock execution process.
       document.getElementById("runtimeStatus").textContent = "Executing protoblock";
-      
-      // Add active class to trigger animation
       blockButton.classList.add('active');
-      // Remove active class after a short delay to revert to original state
       setTimeout(() => {
         blockButton.classList.remove('active');
       }, 300);
-      
-      // If there is a message typed in, send it first to the chat system
       const text = userInput.value.trim();
       if (text !== "") {
         addChatMessage("User", text);
@@ -500,8 +524,6 @@
         showTypingIndicator();
         userInput.value = "";
       }
-      
-      // Initiate block processing by sending the block_click payload
       const payload = {
         type: "block_click"
       };
@@ -512,14 +534,11 @@
     let isRecording = false; // flag to track recording state
 
     micButton.addEventListener('click', function() {
-      // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add 'recording' class to display red indicator and remove rotating if set
         micButton.classList.add('recording');
         micButton.classList.remove('rotating');
       } else {
-        // Stop recording: remove 'recording' class and add 'rotating' class to indicate ongoing transcription
         micButton.classList.remove('recording');
         micButton.classList.add('rotating');
       }
@@ -541,7 +560,6 @@
     const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     btnCamera.position.z = 2;
 
-    // Updated cube geometry dimensions for a visibly larger cube
     const btnGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
     const btnMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x156289, 
