@@ -420,8 +420,9 @@
         const data = JSON.parse(event.data);
         
         if (data.type === "status_message") {
-          // Handle status messages (from block button processing)
-          addChatMessage("System", data.message);
+          // Update the right-side status text bar.
+          document.getElementById("runtimeStatus").textContent = data.message;
+          return;
         } else if (data.type === "transcribed_message") {
           // Display as a user message
           addChatMessage("User", data.message);
