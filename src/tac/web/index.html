@@ -391,11 +391,10 @@
         </div>
         <div class="section">
           <div class="section-title">Trusty Agents</div>
-          <ul id="trustyAgentsList" class="file-list"></ul>
-        </div>
-        <div class="section">
-          <div class="section-title">Trusty Agent Prompts</div>
-          <div id="trustyAgentPrompts"></div>
+          <div id="trustyAgentsSection">
+            <ul id="trustyAgentsList" class="file-list"></ul>
+            <div id="trustyAgentPrompts"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -465,6 +464,62 @@
       }
     }
 
+    // Function to handle block execution failure
+    function handleBlockFailure() {
+      // Hide the protoblock display completely
+      toggleProtoblockDisplay(false);
+      
+      // Reset any protoblock data displayed
+      document.getElementById('protoblockContainer').innerHTML = '';
+      
+      // Rebuild the container structure
+      rebuildProtoblockContainer();
+      
+      // Update the runtime status to show error
+      document.getElementById("runtimeStatus").textContent = "Block execution failed";
+    }
+    
+    // Function to rebuild the empty protoblock container structure
+    function rebuildProtoblockContainer() {
+      const container = document.getElementById('protoblockContainer');
+      
+      // Header
+      const header = document.createElement('div');
+      header.id = 'protoblockHeader';
+      header.innerHTML = '<h2>Protoblock</h2><p id="protoblockAttempt">Attempt 1/4</p>';
+      container.appendChild(header);
+      
+      // Task Description
+      const taskSection = document.createElement('div');
+      taskSection.className = 'section';
+      taskSection.innerHTML = '<div class="section-title">Task Description</div>' +
+                              '<div id="taskDescription" class="code-block"></div>';
+      container.appendChild(taskSection);
+      
+      // Files to Modify
+      const writeFilesSection = document.createElement('div');
+      writeFilesSection.className = 'section';
+      writeFilesSection.innerHTML = '<div class="section-title">Files to Modify</div>' +
+                                   '<ul id="writeFilesList" class="file-list"></ul>';
+      container.appendChild(writeFilesSection);
+      
+      // Context Files
+      const contextFilesSection = document.createElement('div');
+      contextFilesSection.className = 'section';
+      contextFilesSection.innerHTML = '<div class="section-title">Context Files</div>' +
+                                     '<ul id="contextFilesList" class="file-list"></ul>';
+      container.appendChild(contextFilesSection);
+      
+      // Trusty Agents
+      const trustyAgentsSection = document.createElement('div');
+      trustyAgentsSection.className = 'section';
+      trustyAgentsSection.innerHTML = '<div class="section-title">Trusty Agents</div>' +
+                                     '<div id="trustyAgentsSection">' +
+                                     '<ul id="trustyAgentsList" class="file-list"></ul>' +
+                                     '<div id="trustyAgentPrompts"></div></div>';
+      container.appendChild(trustyAgentsSection);
+    }
+
     // Function to display protoblock data
     function displayProtoblockData(data) {
       console.log("Displaying protoblock data:", data);
@@ -496,42 +551,51 @@
       // Update trusty agents
       const trustyAgentsList = document.getElementById('trustyAgentsList');
       trustyAgentsList.innerHTML = '';
-      if (data.trusty_agents && data.trusty_agents.length > 0) {
-        data.trusty_agents.forEach(agent => {
-          const li = document.createElement('li');
-          li.textContent = agent;
-          trustyAgentsList.appendChild(li);
-        });
-      } else {
-        const li = document.createElement('li');
-        li.textContent = 'No trusty agents specified';
-        trustyAgentsList.appendChild(li);
-      }
       
       // Update trusty agent prompts
       const trustyAgentPromptsContainer = document.getElementById('trustyAgentPrompts');
       trustyAgentPromptsContainer.innerHTML = '';
       
-      if (data.trusty_agent_prompts && Object.keys(data.trusty_agent_prompts).length > 0) {
-        // Create a div for each trusty agent prompt
-        for (const [agent, prompt] of Object.entries(data.trusty_agent_prompts)) {
-          const promptSection = document.createElement('div');
-          promptSection.className = 'prompt-section';
-          
-          const agentName = document.createElement('div');
-          agentName.className = 'agent-name';
-          agentName.textContent = agent;
-          
-          const promptText = document.createElement('div');
-          promptText.className = 'code-block';
-          promptText.textContent = prompt;
-          
-          promptSection.appendChild(agentName);
-          promptSection.appendChild(promptText);
-          trustyAgentPromptsContainer.appendChild(promptSection);
+      // Combined display logic for trusty agents and their prompts
+      if (data.trusty_agents && data.trusty_agents.length > 0) {
+        // Always show all agents in the list
+        trustyAgentsList.style.display = 'block';
+        data.trusty_agents.forEach(agent => {
+          const li = document.createElement('li');
+          li.textContent = agent;
+          trustyAgentsList.appendChild(li);
+        });
+        
+        // Show prompts only for agents that have them
+        if (data.trusty_agent_prompts && Object.keys(data.trusty_agent_prompts).length > 0) {
+          trustyAgentPromptsContainer.style.display = 'block';
+          // Create a div for each trusty agent prompt
+          for (const [agent, prompt] of Object.entries(data.trusty_agent_prompts)) {
+            const promptSection = document.createElement('div');
+            promptSection.className = 'prompt-section';
+            
+            const agentName = document.createElement('div');
+            agentName.className = 'agent-name';
+            agentName.textContent = agent;
+            
+            const promptText = document.createElement('div');
+            promptText.className = 'code-block';
+            promptText.textContent = prompt;
+            
+            promptSection.appendChild(agentName);
+            promptSection.appendChild(promptText);
+            trustyAgentPromptsContainer.appendChild(promptSection);
+          }
+        } else {
+          // No prompts available
+          trustyAgentPromptsContainer.style.display = 'none';
         }
       } else {
-        trustyAgentPromptsContainer.textContent = 'No trusty agent prompts specified';
+        // No agents at all
+        const li = document.createElement('li');
+        li.textContent = 'No trusty agents specified';
+        trustyAgentsList.appendChild(li);
+        trustyAgentPromptsContainer.style.display = 'none';
       }
       
       // Show the protoblock display
@@ -621,8 +685,49 @@
         if (data.type === "status_message") {
           // Update the right-side status text bar.
           document.getElementById("runtimeStatus").textContent = data.message;
+          
+          // Check for attempt number updates in status messages
+          const attemptMatch = data.message.match(/Starting attempt (\d+) of (\d+)/);
+          if (attemptMatch) {
+            const current = attemptMatch[1];
+            const max = attemptMatch[2];
+            // Update the attempt number display in protoblock header
+            document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
+            console.log(`Updated attempt number to ${current}/${max}`);
+            
+            // Don't hide the protoblock here - it will be replaced when the new one is created
+          }
+          
+          // Check for block execution failure message
+          if (data.message === "❌ Block execution failed!" || 
+              data.message.startsWith("❌ Error:") ||
+              data.message.includes("Error creating protoblock:") ||
+              data.message.includes("Execution attempt") && data.message.includes("failed")) {
+            console.log("Removing protoblock display due to failure message");
+            // Force the canvas to be shown and protoblock to be hidden
+            document.getElementById('protoblockContainer').style.display = 'none';
+            document.querySelector('#rightPanel canvas').style.display = 'block';
+            // Don't clear the data - just hide it
+          }
+          
           return;
         } 
+        else if (data.type === "remove_protoblock") {
+          // This is an explicit message to remove the protoblock display
+          console.log("Received explicit remove_protoblock message");
+          
+          // Force the canvas to be shown and protoblock to be hidden
+          document.getElementById('protoblockContainer').style.display = 'none';
+          document.querySelector('#rightPanel canvas').style.display = 'block';
+          
+          // Clear any existing protoblock data and rebuild the container
+          document.getElementById('protoblockContainer').innerHTML = '';
+          rebuildProtoblockContainer();
+          
+          // Update runtime status 
+          document.getElementById("runtimeStatus").textContent = data.message || "Block processing complete";
+          return;
+        }
         else if (data.type === "protoblock_data") {
           // Display protoblock data in the right panel
           console.log("Received protoblock data:", data);
@@ -631,8 +736,14 @@
           document.getElementById('protoblockContainer').style.display = 'block';
           document.querySelector('#rightPanel canvas').style.display = 'none';
           
+          // Clear any previous data if needed
+          // document.getElementById('protoblockContainer').innerHTML = '';
+          // rebuildProtoblockContainer();
+          
           // Display the data
           displayProtoblockData(data);
+          
+          console.log("Protoblock is now visible");
           return;
         }
         else if (data.type === "transcribed_message") {
@@ -695,6 +806,10 @@
       
       // Hide the protoblock display when starting a new block generation
       toggleProtoblockDisplay(false);
+      
+      // Clear any existing protoblock data
+      document.getElementById('protoblockContainer').innerHTML = '';
+      rebuildProtoblockContainer();
       
       // Add active class to trigger animation
       blockButton.classList.add('active');
@@ -783,6 +898,9 @@
 
     // Initially hide the protoblock display
     toggleProtoblockDisplay(false);
+
+    // Initialize the protoblock container structure
+    rebuildProtoblockContainer();
 
     // Expose socket and cube for testing purposes
     window.socket = socket;

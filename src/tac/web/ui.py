@@ -265,7 +265,12 @@ class UIManager:
             except Exception as e:
                 print(f"Error creating protoblock: {e}")
                 traceback.print_exc()
-                await self.send_status_message(f"Error creating protoblock: {str(e)[:100]}...")
+                await self.send_status_message(f"❌ Error creating protoblock: {str(e)[:100]}...")
+                # Ensure we remove any previous protoblock display
+                await self.websocket.send(json.dumps({
+                    "type": "remove_protoblock",
+                    "message": "Failed to create protoblock"
+                }))
                 return
             
             # Execute the processor directly
@@ -276,15 +281,26 @@ class UIManager:
             # Check if execution was successful and we have a protoblock
             if success and processor.protoblock:
                 await self.send_status_message("✅ Block executed successfully! Displaying final results...")
-                # Send updated protoblock data after execution
+                # Send updated protoblock data after execution with the final attempt number
                 await self.send_protoblock_data(processor.protoblock)
             else:
+                # If block execution failed, send explicit failure message
                 await self.send_status_message("❌ Block execution failed!")
+                # Force removal of protoblock display
+                await self.websocket.send(json.dumps({
+                    "type": "remove_protoblock",
+                    "message": "Block execution failed"
+                }))
 
         except Exception as e:
             print(f"Error during block execution: {e}")
             traceback.print_exc()
             await self.send_status_message(f"❌ Error: {str(e)}")
+            # Force removal of protoblock display on any exception
+            await self.websocket.send(json.dumps({
+                "type": "remove_protoblock",
+                "message": f"Error: {str(e)[:100]}"
+            }))
 
     async def run_server(self):
         try:
