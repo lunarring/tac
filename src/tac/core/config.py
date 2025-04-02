@@ -253,28 +253,31 @@ class ConfigManager:
         
         for key, value in args.items():
             if value is not None:
-                if key.startswith("general_"):
-                    subkey = key[len("general_"):]
+                # Normalize the key by converting underscores to hyphens
+                normalized_key = key.replace("_", "-")
+                
+                if normalized_key.startswith("general-"):
+                    subkey = normalized_key[len("general-"):].replace("-", "_")
                     if hasattr(self._config.general, subkey):
                         setattr(self._config.general, subkey, value)
                         if self._logger:
                             self._logger.debug(f"Set general config {subkey}={value} from prefixed arg")
-                elif key.startswith("git_"):
-                    subkey = key[len("git_"):]
+                elif normalized_key.startswith("git-"):
+                    subkey = normalized_key[len("git-"):].replace("-", "_")
                     if hasattr(self._config.git, subkey):
                         setattr(self._config.git, subkey, value)
                         if self._logger:
                             self._logger.debug(f"Set git config {subkey}={value} from prefixed arg")
                 # Handle unprefixed arguments that match general config keys
-                elif key.replace("-", "_") in vars(self._config.general):
-                    normalized_key = key.replace("-", "_")
-                    setattr(self._config.general, normalized_key, value)
+                elif normalized_key.replace("-", "_") in vars(self._config.general):
+                    subkey = normalized_key.replace("-", "_")
+                    setattr(self._config.general, subkey, value)
                     if self._logger:
-                        self._logger.debug(f"Set general config {normalized_key}={value} from unprefixed arg")
-                elif hasattr(self._config, key):
-                    setattr(self._config, key, value)
+                        self._logger.debug(f"Set general config {subkey}={value} from unprefixed arg")
+                elif hasattr(self._config, normalized_key.replace("-", "_")):
+                    setattr(self._config, normalized_key.replace("-", "_"), value)
                     if self._logger:
-                        self._logger.debug(f"Set root config {key}={value}")
+                        self._logger.debug(f"Set root config {normalized_key.replace('-', '_')}={value}")
         
         if self._logger:
             self._logger.debug(f"Final general config after override: {vars(self._config.general)}")

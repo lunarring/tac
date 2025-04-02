@@ -245,6 +245,9 @@ def list_tests_command(args):
     print(f"\nTotal tests found: {test_count}")
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
+    # Initialize logger for argument parsing
+    logger = setup_logging('tac.cli.main', log_level='DEBUG')
+    
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -257,72 +260,77 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         help='Set the logging level (default: from config)'
     )
-    
-    subparsers = parser.add_subparsers(dest='command', help='Available commands')
-    
-    # Block command
-    run_parser = subparsers.add_parser('make',
-        help='Execute a task with automated tests based on instructions'
-    )
-    # Also add log-level to the make subcommand to handle both positions
-    run_parser.add_argument(
-        '--log-level',
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        help='Set the logging level (default: from config)'
-    )
-    run_parser.add_argument(
-        'instructions',
-        nargs='+',
-        help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
-    )
-    run_parser.add_argument(
-        '--dir',
-        default='.',
-        help='Directory to analyze and create block from (default: current directory)'
-    )
-    run_parser.add_argument(
-        '--image',
-        type=str,
-        help='Image URL to be associated with the task'
-    )
-    # Dynamically add arguments from general config
+
+    # Dynamically add arguments from general config to main parser
     general_config = config.general
+    logger.debug("Adding arguments from general config:")
     for key, value in vars(general_config).items():
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
+        logger.debug(f"Adding argument: {arg_name} (type: {arg_type})")
         if arg_type == bool:
             # For boolean flags, create both positive and negative versions
             positive_name = arg_name
             negative_name = f'--no-{key.replace("_", "-")}'
+            logger.debug(f"Adding boolean arguments: {positive_name} and {negative_name}")
             # Create a mutually exclusive group
-            group = run_parser.add_mutually_exclusive_group()
+            group = parser.add_mutually_exclusive_group()
             group.add_argument(
                 positive_name,
                 action='store_true',
                 default=None,
+                dest=key,  # Use the original key as the destination
                 help=f'Enable {key.replace("_", " ").title()} (default: {value})'
             )
             group.add_argument(
                 negative_name,
                 action='store_false',
-                dest=key.replace("-", "_"),
+                dest=key,  # Use the original key as the destination
                 default=None,
                 help=f'Disable {key.replace("_", " ").title()} (default: {value})'
             )
         else:
-            run_parser.add_argument(
+            parser.add_argument(
                 arg_name,
                 type=arg_type,
                 default=value,
+                dest=key,  # Use the original key as the destination
                 help=f'{key.replace("_", " ").title()} (default: {value})'
             )
-
-    run_parser.add_argument(
+    
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Block command
+    make_parser = subparsers.add_parser('make',
+        help='Execute a task with automated tests based on instructions'
+    )
+    # Also add log-level to the make subcommand to handle both positions
+    make_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
+    make_parser.add_argument(
+        'instructions',
+        nargs='+',
+        help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
+    )
+    make_parser.add_argument(
+        '--dir',
+        default='.',
+        help='Directory to analyze and create block from (default: current directory)'
+    )
+    make_parser.add_argument(
+        '--image',
+        type=str,
+        help='Image URL to be associated with the task'
+    )
+    make_parser.add_argument(
         '--json',
         type=str,
         help='Path to a JSON file containing a protoblock definition to execute'
     )
-    run_parser.add_argument(
+    make_parser.add_argument(
         '--no-git',
         action='store_true',
         help='Disable all git operations (branch checks, commits, etc.)'
@@ -504,7 +512,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         if not hasattr(args, 'directory') or args.directory is None:
             args.directory = '.'
     
-    if args.command == 'run':
+    if args.command == 'make':
         # Only validate that we have either instructions or a JSON file
         if not args.instructions and not args.json:
             parser.error("Must provide either instructions or --json")
@@ -644,6 +652,8 @@ def main():
     update_all_loggers(log_level)
     
     logger.debug(f"Starting TAC with log level: {log_level}")
+    logger.debug(f"Command: {args.command}")
+    logger.debug(f"Arguments: {vars(args)}")
     
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
@@ -692,11 +702,12 @@ def main():
             voice_ui.start()
             logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
             
-            # Convert args to config overrides
+            # Create config overrides from args
             config_overrides = {}
             for key in vars(config.general):
-                if hasattr(args, key.replace('-', '_')):
-                    config_overrides[key] = getattr(args, key.replace('-', '_'))
+                arg_key = key.replace('_', '-')  # Convert underscore to hyphen for CLI args
+                if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
+                    config_overrides[key] = getattr(args, arg_key)
             
             success = execute_command(
                 task_instructions=voice_ui.task_instructions,
@@ -723,7 +734,7 @@ def main():
         # Create config overrides from args
         config_overrides = {}
         for key in vars(config.general):
-            arg_key = key.replace('-', '_')
+            arg_key = key.replace('_', '-')  # Convert underscore to hyphen for CLI args
             if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
                 config_overrides[key] = getattr(args, arg_key)
         

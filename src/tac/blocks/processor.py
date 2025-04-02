@@ -79,7 +79,6 @@ class BlockProcessor:
 
             # Generate complete genesis prompt
             protoblock_genesis_prompt = self.generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
-            logger.debug(f"Protoblock genesis prompt: {protoblock_genesis_prompt}")
             
             # Create protoblock from genesis prompt
             protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
