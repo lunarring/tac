@@ -105,6 +105,12 @@ class UIManager:
 
             genesis_prompt = agent.generate_task_instructions()
 
+            # Send a clear status update indicating protoblock execution begins
+            await websocket.send(json.dumps({
+                "type": "status_message",
+                "message": "Executing protoblock"
+            }))
+
             config_overrides = {
                 'no_git': False,
                 'json': None,
@@ -112,11 +118,6 @@ class UIManager:
             }
             for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
                 config_overrides[attr] = None
-
-            await websocket.send(json.dumps({
-                "type": "status_message",
-                "message": "Executing block with instructions: " + genesis_prompt[:100] + "..."
-            }))
 
             loop = asyncio.get_event_loop()
             success = await loop.run_in_executor(None, lambda: execute_command(

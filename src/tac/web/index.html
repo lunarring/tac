@@ -477,8 +477,8 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Immediately update the runtime status to reflect the protoblock creation process.
-      document.getElementById("runtimeStatus").textContent = "creating protoblock";
+      // Immediately update the runtime status to reflect the protoblock execution process.
+      document.getElementById("runtimeStatus").textContent = "Executing protoblock";
       
       // Add active class to trigger animation
       blockButton.classList.add('active');
