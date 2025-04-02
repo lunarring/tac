@@ -87,22 +87,7 @@ class UIManager:
                     user_message = user_input_raw.strip()
 
                 if user_message:
-                    # Send pre-LLM debug log
-                    await websocket.send(json.dumps({
-                        "type": "debug_log",
-                        "phase": "pre-LLM",
-                        "message": user_message
-                    }))
-
                     assistant_reply = agent.process_message(user_message)
-                    
-                    # Send post-LLM debug log
-                    await websocket.send(json.dumps({
-                        "type": "debug_log",
-                        "phase": "post-LLM",
-                        "message": assistant_reply
-                    }))
-
                     print(f"Sending message to client: {assistant_reply}")
                     await websocket.send(assistant_reply)
             except websockets.exceptions.ConnectionClosed:
