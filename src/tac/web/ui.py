@@ -13,6 +13,8 @@ from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text fun
 from tac.blocks.processor import BlockProcessor
 from tac.cli.main import execute_command
 from tac.core.llm import LLMClient, Message
+from tac.core.config import config, ConfigManager
+from tac.utils.git_manager import create_git_manager
 
 class UIManager:
     def __init__(self, base_dir="."):
@@ -27,6 +29,7 @@ class UIManager:
         self.max_attempts = 4  # Maximum attempts
         # Add lock for thread safety
         self._status_lock = asyncio.Lock()
+        # Config is already initialized when imported
 
     def send_status_bar(self, message):
         """
@@ -56,8 +59,6 @@ class UIManager:
                 print(f"Status message sent via new loop: {message}")
             except Exception as e:
                 print(f"Failed to send status via new loop: {e}")
-
-
 
     async def _process_status_queue(self):
         """Process status messages from the queue"""
@@ -144,6 +145,33 @@ class UIManager:
             formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
         return "\n\n".join(formatted_strings)
 
+    async def check_git_status(self):
+        """Check git status early to prevent issues later. Returns True if git is clean or not enabled."""
+        if not config.git.enabled:
+            await self.send_status_message("Git operations are disabled in config.")
+            return True
+            
+        await self.send_status_message("Checking git status...")
+        git_manager = create_git_manager()
+        
+        if not git_manager.is_clean():
+            await self.send_status_message("❌ Git workspace is not clean. Please commit or stash your changes before proceeding.")
+            
+            if config.safe_get('general', 'auto_stash', default=False):
+                await self.send_status_message("Auto-stash is enabled. Stashing changes...")
+                if git_manager.revert_changes():
+                    await self.send_status_message("✅ Changes successfully stashed.")
+                    return True
+                else:
+                    await self.send_status_message("❌ Failed to stash changes. Please clean your git workspace manually.")
+                    return False
+            else:
+                await self.send_status_message("Please commit or stash your changes before proceeding.")
+                return False
+        
+        await self.send_status_message("✅ Git workspace is clean.")
+        return True
+
     async def dummy_mic_click(self, websocket):
         if not self.is_recording:
             self.speech_to_text.start_recording()
@@ -164,13 +192,23 @@ class UIManager:
         self.websocket = websocket
         self._loop = asyncio.get_running_loop()
         
-        file_summaries = await self.load_high_level_summaries()
-        
         # Start the status queue processor right away and save it as instance variable
         self._status_processor = asyncio.create_task(self._process_status_queue())
         
         # Send initial status
-        await self.send_status_message("Connected. Waiting for instructions...")
+        await self.send_status_message("Connected. Initializing...")
+        
+        # Check git status early
+        git_clean = await self.check_git_status()
+        if not git_clean:
+            # Still allow chat, but user will be notified of git issues
+            await self.send_status_message("Warning: Git status check failed. You can chat but execution may be limited.")
+        
+        # Load file summaries
+        await self.send_status_message("Loading project file summaries...")
+        file_summaries = await self.load_high_level_summaries()
+        
+        await self.send_status_message("Ready. Waiting for instructions...")
 
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
@@ -229,6 +267,16 @@ class UIManager:
             # Send status immediately
             await self.send_status_message("Creating block from conversation...")
             genesis_prompt = chat_agent.generate_task_instructions()
+
+            # Check git status again before proceeding
+            git_clean = await self.check_git_status()
+            if not git_clean:
+                await self.send_status_message("❌ Cannot proceed with block execution due to git status issues.")
+                await self.websocket.send(json.dumps({
+                    "type": "error_message",
+                    "message": "Git workspace is not clean. Please commit or stash your changes before proceeding."
+                }))
+                return
 
             # Load codebase information
             await self.send_status_message("Analyzing codebase...")

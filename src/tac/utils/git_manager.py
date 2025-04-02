@@ -407,6 +407,26 @@ class GitManager:
             logger.error(f"Failed to checkout branch {branch_name}: {e}")
             return False
 
+    def is_clean(self, ignore_untracked: bool = False) -> bool:
+        """Check if the git repository is clean (no uncommitted changes).
+        
+        Args:
+            ignore_untracked: If True, untracked files will not cause the status check to fail
+            
+        Returns:
+            bool: True if the repository is clean, False otherwise
+        """
+        if not config.git.enabled:
+            logger.debug("Git operations are disabled.")
+            return True
+            
+        if not self.repo:
+            logger.debug("No repository to check if clean.")
+            return False
+            
+        is_clean, _ = self.check_status(ignore_untracked)
+        return is_clean
+
     def commit(self, commit_message: str) -> bool:
         """Commit all changes with the given message.
         
@@ -863,6 +883,11 @@ class FakeGitManager:
         """Fake implementation of check_status"""
         logger.info("FakeGitManager: check_status called")
         return True, "main"
+    
+    def is_clean(self, ignore_untracked: bool = False) -> bool:
+        """Fake implementation of is_clean that always returns True"""
+        logger.info("FakeGitManager: is_clean called")
+        return True
     
     def create_or_switch_to_tac_branch(self, tac_id: str) -> bool:
         """Fake implementation of create_or_switch_to_tac_branch"""
