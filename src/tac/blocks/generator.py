@@ -370,7 +370,7 @@ And here a bit more detailed explanation of the output format:
             try:
                 logger.info(f"Attempting protoblock creation (attempt {attempt + 1}/{max_retries})")
                 if self.ui_manager:
-                    self.ui_manager.send_status_bar(f"Generating protoblock (attempt {attempt + 1}/{max_retries})...")
+                    self.ui_manager.send_status_bar(f"Generating protoblock...")
                 
                 # Get response from LLM
                 response = self.llm_client.chat_completion(messages)

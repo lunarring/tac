@@ -195,6 +195,20 @@
     #micButton.rotating {
       animation: rotate 1s linear infinite;
     }
+    
+    /* New animation for mic button during transcription */
+    @keyframes wave {
+      0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+    }
+    
+    #micButton.transcribing {
+      background-color: #e8f4ff;
+      animation: wave 1.5s ease-out infinite;
+      border-color: #007bff;
+      color: #007bff;
+    }
     /* Right panel for Three.js canvas with a modern dark gradient */
     #rightPanel {
       flex: 1;
@@ -758,10 +772,11 @@
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
 
-          // Remove any indication (waiting, recording, rotating) from micButton once transcription is received
+          // Remove any indication (waiting, recording, transcribing) from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
           micButton.classList.remove('rotating');
+          micButton.classList.remove('transcribing');
         } else {
           // Regular AI response
           addChatMessage("AI", event.data);
@@ -848,10 +863,12 @@
         // Start recording: add 'recording' class to display red indicator and remove rotating if set
         micButton.classList.add('recording');
         micButton.classList.remove('rotating');
+        micButton.classList.remove('transcribing');
       } else {
-        // Stop recording: remove 'recording' class and add 'rotating' class to indicate ongoing transcription
+        // Stop recording: remove 'recording' class and add 'transcribing' class to indicate ongoing transcription
         micButton.classList.remove('recording');
-        micButton.classList.add('rotating');
+        micButton.classList.remove('rotating');
+        micButton.classList.add('transcribing');
       }
       const payload = {
         type: "mic_click",
