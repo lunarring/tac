@@ -312,8 +312,8 @@
       emissiveIntensity: 0.5
     });
     const cube = new THREE.Mesh(geometry, cubeMaterial);
-    // Reposition the cube to the right as required by tests
-    cube.position.x = 1;
+    // Center the cube horizontally within the scene
+    cube.position.x = 0;
     scene.add(cube);
 
     // Add a wireframe overlay using EdgesGeometry and LineSegments for added style
