@@ -290,6 +290,9 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
+    // On page startup, update the status bar text to 'system started'
+    document.getElementById('runtimeStatus').textContent = "system started";
+
     // Initialize Three.js scene in the right panel
     const threeContainer = document.getElementById('rightPanel');
     const scene = new THREE.Scene();
@@ -477,6 +480,9 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
+      // Update status bar with plain-text update for block action
+      document.getElementById('runtimeStatus').textContent = "creating protoblock";
+      
       // Add active class to trigger animation
       blockButton.classList.add('active');
       // Remove active class after a short delay to revert to original state
