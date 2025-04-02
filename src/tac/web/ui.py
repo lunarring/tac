@@ -23,10 +23,20 @@ class UIManager:
         self._loop = None
         self._status_queue = asyncio.Queue()
 
-    def send_status_sync(self, message):
-        """Synchronous method to queue status messages"""
+    def send_status_bar(self, message):
+        """
+        Safe method to update the status bar from any context (sync or async).
+        Can be called from both the main thread and background threads.
+        """
         if self._loop and self._loop.is_running():
             asyncio.run_coroutine_threadsafe(self._status_queue.put(message), self._loop)
+        elif self.websocket:
+            # If we don't have a loop yet, fallback to the old method
+            asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._get_loop())
+
+    def send_status(self, message):
+        """Legacy wrapper for sending status messages, use send_status_bar instead"""
+        self.send_status_bar(message)
 
     async def _process_status_queue(self):
         """Process status messages from the queue"""
@@ -43,11 +53,6 @@ class UIManager:
                 self._loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(self._loop)
         return self._loop
-
-    def send_status(self, message):
-        """Synchronous wrapper for sending status messages"""
-        if self.websocket:
-            asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._get_loop())
 
     async def send_status_message(self, message):
         if self.websocket:
@@ -87,7 +92,7 @@ class UIManager:
         self.websocket = websocket
         file_summaries = await self.load_high_level_summaries()
         # Send frequent status updates for key workflow stages:
-        self.send_status("Initializing...")
+        self.send_status("waiting for block click...")
 
         # Start the status queue processor
         status_processor = asyncio.create_task(self._process_status_queue())

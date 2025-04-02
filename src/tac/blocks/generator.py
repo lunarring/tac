@@ -51,9 +51,10 @@ class ProtoBlockGenerator:
     Uses LLM to transform abstract requirements into concrete implementation plans.
     """
     
-    def __init__(self):
+    def __init__(self, ui_manager=None):
         self.llm_client = LLMClient(llm_type="strong")
         self.project_files = ProjectFiles()
+        self.ui_manager = ui_manager
     
     def get_protoblock_genesis_prompt(self, codebase: str, task_instructions: str) -> str:
         """
@@ -334,8 +335,12 @@ And here a bit more detailed explanation of the output format:
         # If protoblock is provided, return it directly
         if protoblock is not None:
             logger.info("Using provided protoblock, skipping creation process")
+            if self.ui_manager:
+                self.ui_manager.send_status_bar("Using existing protoblock...")
             # Compute visual description if a reference image is provided.
             if protoblock.image_url:
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Processing image for protoblock...")
                 protoblock.visual_description = compute_visual_description(protoblock.image_url)
             return protoblock
             
@@ -345,6 +350,8 @@ And here a bit more detailed explanation of the output format:
         
         if use_summaries:
             logger.info("Using file summaries for protoblock creation")
+            if self.ui_manager:
+                self.ui_manager.send_status_bar("Building file summaries for context...")
             # Update all summaries first to ensure they're current
             self.project_files.update_summaries()
         
@@ -358,22 +365,30 @@ And here a bit more detailed explanation of the output format:
         for attempt in range(max_retries):
             try:
                 logger.info(f"Attempting protoblock creation (attempt {attempt + 1}/{max_retries})")
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"Generating protoblock (attempt {attempt + 1}/{max_retries})...")
                 
                 # Get response from LLM
                 response = self.llm_client.chat_completion(messages)
                 
                 # Check for empty or whitespace-only response
                 if not response or not response.strip():
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar("❌ Received empty response from LLM")
                     raise ValueError("Received empty response from LLM")
                     
                 # Clean code fences from response if needed
                 response = self.llm_client._clean_code_fences(response)
 
                 # Verify and parse the response
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Verifying protoblock structure...")
                 is_valid, error_msg, data = self.verify_protoblock(response)
                 if not is_valid:
                     # Include part of the response in the error message for context
                     preview = response[:200] + "..." if len(response) > 200 else response
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"❌ Invalid protoblock: {error_msg[:100]}...")
                     raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
                 
                 # Ensure all paths are relative
@@ -400,53 +415,51 @@ And here a bit more detailed explanation of the output format:
                     if "plausibility" not in trusty_agents:
                         trusty_agents.append("plausibility")
                     
-                    # Get trusty_agent_prompts
-                    trusty_agent_prompts = data.get("trusty_agent_prompts", {})
+                    # Create block ID
+                    block_id = str(uuid.uuid4())
                     
-                    # Get task specification
-                    task_spec = data["task"]["specification"] if isinstance(data["task"], dict) else data["task"]
-                    if isinstance(task_spec, list):
-                        task_spec = "\n".join(task_spec)
-                
+                    # Get branch name from data or create a default one
                     branch_name = data.get("branch_name", "")
-                    # Ensure branch_name always starts with tac/
-                    if branch_name and not branch_name.startswith("tac/"):
-                        branch_name = f"tac/{branch_name}"
-
-                    protoblock = ProtoBlock(
-                        task_description=task_spec,
+                    if not branch_name:
+                        # Create a simple branch name based on the date
+                        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                        branch_name = f"tac/feature/task-{timestamp}"
+                    elif not branch_name.startswith("tac/"):
+                        # Ensure branch name starts with tac/
+                        branch_name = f"tac/{branch_name.replace('tac/', '')}"
+                        
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar("Creating protoblock with task specification...")
+                    
+                    # Create the protoblock
+                    return ProtoBlock(
+                        block_id=block_id,
+                        task_description=data["task"]["specification"] if isinstance(data["task"], dict) else data["task"],
                         write_files=write_files,
                         context_files=context_files,
-                        block_id=str(uuid.uuid4())[:6],
-                        commit_message=f"tac: {data.get('commit_message', 'Update')}",
+                        commit_message=data.get("commit_message", "Implement task"),
                         branch_name=branch_name,
                         trusty_agents=trusty_agents,
-                        trusty_agent_prompts=trusty_agent_prompts,
-                        image_url=data.get("image_url", None),
-                        visual_description=data.get("visual_description", None)
+                        trusty_agent_prompts=data.get("trusty_agent_prompts", {}),
+                        image_url=data.get("image_url", "")
                     )
-                    # Compute visual description if a reference image is provided.
-                    if protoblock.image_url:
-                        protoblock.visual_description = compute_visual_description(protoblock.image_url)
-                    logger.info("\nProtoblock details:")
-                    logger.info(f"🎯 Task: {protoblock.task_description}")
-                    logger.info(f"📝 Files to Write: {', '.join(protoblock.write_files)}")
-                    logger.info(f"📚 Context Files: {', '.join(protoblock.context_files)}")
-                    logger.info(f"💬 Commit Message: {protoblock.commit_message}")
-                    logger.info(f"🤖 Trusty Agents: {', '.join(protoblock.trusty_agents)}")
-                    logger.info(f"🔍 Trusty Agent Prompts: {json.dumps(protoblock.trusty_agent_prompts, indent=2)}")
-                    logger.info("🚀 Starting protoblock execution...\n")
-                    return protoblock
-                except KeyError as e:
-                    raise ValueError(f"Missing required field in protoblock: {str(e)}\nData: {json.dumps(data, indent=2)}")
+                except Exception as e:
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"❌ Error creating protoblock: {type(e).__name__}")
+                    raise ValueError(f"Error creating ProtoBlock object: {str(e)}")
                     
             except Exception as e:
-                last_error = e
-                logger.warning(f"Protoblock creation failed (attempt {attempt + 1}/{max_retries}): {str(e)}")
-                if attempt < max_retries - 1:
-                    # Add a small delay before retrying to avoid rate limits
-                    time.sleep(1)
-                    continue
-                
-        # If we get here, all retries failed
-        raise ValueError(f"Failed to create protoblock after {max_retries} attempts. Last error: {str(last_error)}") 
+                last_error = str(e)
+                logger.warning(f"Protoblock creation attempt {attempt + 1} failed: {last_error}")
+                if attempt + 1 < max_retries:
+                    # On failure, try to provide more guidance in the next attempt
+                    error_guidance = f"Previous attempt failed with error: {last_error}. Please correct the format and try again."
+                    messages.append(Message(role="assistant", content=response if 'response' in locals() else ""))
+                    messages.append(Message(role="user", content=error_guidance))
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"Retrying protoblock creation ({attempt + 2}/{max_retries})...")
+        
+        if self.ui_manager:
+            self.ui_manager.send_status_bar("❌ Failed to create protoblock after multiple attempts")
+        # Raise error after all retries
+        raise ValueError(f"Failed to create valid protoblock after {max_retries} attempts. Last error: {last_error}") 

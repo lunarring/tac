@@ -40,7 +40,7 @@ class BlockProcessor:
     
     Acts as the central coordinator between the generator and executor components.
     """
-    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None):
+    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None, ui_manager=None):
         # Input validation
         if protoblock is None and (task_instructions is None or codebase is None):
             raise ValueError("Either protoblock must be specified, or both task_instructions and codebase must be provided")
@@ -50,14 +50,15 @@ class BlockProcessor:
         self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
+        self.ui_manager = ui_manager
         
         # Import BlockExecutor at runtime to avoid circular imports
         from tac.blocks.executor import BlockExecutor
-        self.executor = BlockExecutor(config_override=config_override, codebase=codebase)
+        self.executor = BlockExecutor(config_override=config_override, codebase=codebase, ui_manager=ui_manager)
         
         # Import ProtoBlockGenerator at runtime to avoid circular imports
         from tac.blocks.generator import ProtoBlockGenerator
-        self.generator = ProtoBlockGenerator()
+        self.generator = ProtoBlockGenerator(ui_manager=ui_manager)
         
         # Use the appropriate git manager based on config
         self.git_manager = create_git_manager()
@@ -166,23 +167,36 @@ class BlockProcessor:
 
             # Generate a protoblock
             try:
+                # SEND STATUS MESSAGE
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Generating protoblock from conversation...")
                 self.create_protoblock(idx_attempt, error_analysis)
             except ValueError as exc:
                 error_analysis = str(exc)
                 logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"❌ Protoblock generation failed: {error_analysis[:100]}...")
                 self.store_previous_protoblock()
                 continue
 
             # Handle git branch setup first if git is enabled
             if idx_attempt == 0:
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Setting up git branch...")
                 if not self.handle_git_branch_setup():
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar("❌ Git branch setup failed")
                     return False
 
             # Execute the protoblock using the builder
-            execution_success, error_analysis, failure_type  = self.executor.execute_block(self.protoblock, idx_attempt)
+            if self.ui_manager:
+                self.ui_manager.send_status_bar("Executing protoblock...")
+            execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"❌ Execution attempt {idx_attempt + 1} failed: {failure_type}")
                 
                 # Only log error analysis if run_error_analysis is enabled in config
                 if config.general.trusty_agents.run_error_analysis and error_analysis:
@@ -195,6 +209,8 @@ class BlockProcessor:
                 if not config.general.trusty_agents.run_error_analysis:
                     error_analysis = ""
             else:
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("✅ Execution successful!")
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
                     if config.safe_get('general', 'halt_after_verify'):

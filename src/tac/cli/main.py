@@ -521,7 +521,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     return parser, args
 
-def execute_command(task_instructions=None, protoblock=None, config_overrides=None):
+def execute_command(task_instructions=None, protoblock=None, config_overrides=None, ui_manager=None):
     """
     Execute the main command logic that can be triggered from CLI or GUI.
     
@@ -529,6 +529,7 @@ def execute_command(task_instructions=None, protoblock=None, config_overrides=No
         task_instructions: Instructions for the task to execute
         protoblock: Optional protoblock object
         config_overrides: Dictionary of config overrides
+        ui_manager: Optional UI manager for sending status updates
         
     Returns:
         bool: True if execution was successful, False otherwise
@@ -549,18 +550,26 @@ def execute_command(task_instructions=None, protoblock=None, config_overrides=No
 
         git_manager = create_git_manager()
         if not git_manager.check_status()[0]:
+            if ui_manager:
+                ui_manager.send_status_bar("❌ Git status check failed")
             return False
 
         logger.info("Test Execution Details:", heading=True)
         logger.info(f"Working directory: {os.getcwd()}")
         logger.info(f"Python path: {sys.path}")
         test_runner = TestRunner()
+        if ui_manager:
+            ui_manager.send_status_bar("Running initial tests...")
         success = test_runner.run_tests()
         if not success:
             logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
+            if ui_manager:
+                ui_manager.send_status_bar("❌ Initial tests failed. Fix tests before proceeding.")
             return False
 
         project_files = ProjectFiles()
+        if ui_manager:
+            ui_manager.send_status_bar("Updating project files summary...")
         project_files.update_summaries()
         codebase = project_files.get_codebase_summary()
 
@@ -568,6 +577,8 @@ def execute_command(task_instructions=None, protoblock=None, config_overrides=No
         image_url = config.safe_get('general', 'image')
         if image_url:
             # Run vision LLM to get visual description
+            if ui_manager:
+                ui_manager.send_status_bar("Processing image...")
             vision_client = LLMClient(llm_type="vision")
             vision_messages = [
                 Message(role="system", content="You are a helpful assistant that can analyze images."),
@@ -588,31 +599,45 @@ def execute_command(task_instructions=None, protoblock=None, config_overrides=No
                 ProtoBlockGenerator.create_protoblock = patched_create
 
         if config.general.use_orchestrator:
-            multi_block_orchestrator = MultiBlockOrchestrator()
+            if ui_manager:
+                ui_manager.send_status_bar("Initializing multi-block orchestrator...")
+            multi_block_orchestrator = MultiBlockOrchestrator(ui_manager=ui_manager)
             success = multi_block_orchestrator.execute(task_instructions, codebase, config, None, git_manager)
             
             if success:
                 print("\n✅ Multi-block orchestrator completed successfully!")
                 logger.info("Multi-block orchestrator completed successfully.")
+                if ui_manager:
+                    ui_manager.send_status_bar("✅ Multi-block orchestrator completed successfully!")
             else:
                 print("\n❌ Multi-block orchestrator execution failed.")
                 logger.error("Multi-block orchestrator execution failed.")
+                if ui_manager:
+                    ui_manager.send_status_bar("❌ Multi-block orchestrator execution failed.")
         else:
             # Use the InteractiveBlockProcessor with overridden commit logic
-            block_processor = InteractiveBlockProcessor(task_instructions, codebase, protoblock=protoblock)
+            if ui_manager:
+                ui_manager.send_status_bar("Initializing block processor...")
+            block_processor = InteractiveBlockProcessor(task_instructions, codebase, protoblock=protoblock, ui_manager=ui_manager)
             success = block_processor.run_loop()
         
         if success:
             print("\n✅ Task completed successfully!")
             logger.info("Task completed successfully.")
+            if ui_manager:
+                ui_manager.send_status_bar("✅ Task completed successfully!")
         else:
             print("\n❌ Task execution failed.")
             logger.error("Task execution failed.")
+            if ui_manager:
+                ui_manager.send_status_bar("❌ Task execution failed.")
         
         return success
             
     except Exception as e:
         logger.error(f"Error during execution: {e}")
+        if ui_manager:
+            ui_manager.send_status_bar(f"❌ Error during execution: {type(e).__name__}")
         return False
 
 def main():
@@ -711,7 +736,8 @@ def main():
             
             success = execute_command(
                 task_instructions=voice_ui.task_instructions,
-                config_overrides=config_overrides
+                config_overrides=config_overrides,
+                ui_manager=None  # VoiceUI doesn't support send_status_bar
             )
             if not success:
                 sys.exit(1)
@@ -749,7 +775,8 @@ def main():
         success = execute_command(
             task_instructions=task_instructions,
             protoblock=protoblock,
-            config_overrides=config_overrides
+            config_overrides=config_overrides,
+            ui_manager=None
         )
         if not success:
             sys.exit(1)

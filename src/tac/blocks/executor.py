@@ -27,9 +27,10 @@ class BlockExecutor:
     
     Provides error analysis and feedback for failed implementations.
     """
-    def __init__(self, config_override: Optional[Dict] = None, codebase: Optional[Dict[str, str]] = None):
+    def __init__(self, config_override: Optional[Dict] = None, codebase: Optional[Dict[str, str]] = None, ui_manager=None):
         self.protoblock = None
         self.codebase = codebase  # Store codebase internally
+        self.ui_manager = ui_manager
         
         # Log configuration information
         logger.info(f"Initializing BlockExecutor with config_override: {config_override}")
@@ -128,22 +129,31 @@ class BlockExecutor:
             - str: Failure type
         """
         for agent in agents:
-            logger.info(f"Running trusty agent: {agent.__class__.__name__}", heading=True)
+            agent_name = agent.__class__.__name__
+            logger.info(f"Running trusty agent: {agent_name}", heading=True)
+            if self.ui_manager:
+                self.ui_manager.send_status_bar(f"Running trusty agent: {agent_name}...")
             try:
                 success, error_analysis, failure_type = agent.check(
                     self.protoblock, self.codebase, code_diff
                 )
                 
                 if not success:
-                    logger.error(f"{agent.__class__.__name__} check failed: {failure_type}")
+                    logger.error(f"{agent_name} check failed: {failure_type}")
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"❌ {agent_name} check failed: {failure_type}")
                     return False, error_analysis, failure_type
                 else:
-                    logger.info(f"{agent.__class__.__name__} check passed")
+                    logger.info(f"{agent_name} check passed")
+                    if self.ui_manager:
+                        self.ui_manager.send_status_bar(f"✅ {agent_name} check passed")
                     
             except Exception as e:
-                error_msg = f"Error during {agent.__class__.__name__} check: {type(e).__name__}: {str(e)}"
+                error_msg = f"Error during {agent_name} check: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg, exc_info=True)
-                return False, error_msg, f"Exception in {agent.__class__.__name__} check"
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"❌ Error in {agent_name}: {type(e).__name__}")
+                return False, error_msg, f"Exception in {agent_name} check"
         
         return True, "", ""
 
@@ -169,17 +179,25 @@ class BlockExecutor:
             
             # Capture initial states for comparative agents
             if comparative_agents:
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Capturing initial state for comparative checks...")
                 self._capture_initial_states(comparative_agents)
             
             # Run the coding agent
             logger.info(f"Starting coding agent implementation (attempt {idx_attempt + 1})", heading=True)
             try:
                 # Pass empty string as previous_analysis for first attempt
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"Running coding agent ({config.general.coding_agent})...")
                 self.coding_agent.run(self.protoblock, previous_analysis="")
                 logger.info(f"Coding agent implementation completed (attempt {idx_attempt + 1})")
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Coding agent implementation completed")
             except Exception as e:
                 error_msg = f"Error during coding agent execution: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg)
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar(f"❌ Coding agent error: {type(e).__name__}")
                 return False, error_msg, "Exception during agent execution"
 
             # Cycle through trusty agents, gather materials first
@@ -187,11 +205,15 @@ class BlockExecutor:
             
             # Run comparative agents 
             if comparative_agents:
+                if self.ui_manager:
+                    self.ui_manager.send_status_bar("Running comparative trusty agents...")
                 success, error_analysis, failure_type = self._run_trusty_agents(comparative_agents, code_diff)
                 if not success:
                     return False, error_analysis, failure_type
                 
             # Run standard trusty agents 
+            if self.ui_manager:
+                self.ui_manager.send_status_bar("Running standard trusty agents...")
             success, error_analysis, failure_type = self._run_trusty_agents(standard_agents, code_diff)
             if not success:
                 return False, error_analysis, failure_type
@@ -199,13 +221,19 @@ class BlockExecutor:
             
             # If we got here, all agents passed
             logger.info(f"All trusty agents are happy ({', '.join(self.protoblock.trusty_agents)}). Trust is assured!", heading=True)
+            if self.ui_manager:
+                self.ui_manager.send_status_bar("✅ All trusty agents approved the changes!")
             return True, None, ""
             
         except KeyboardInterrupt:
             logger.info("\nExecution interrupted by user")
+            if self.ui_manager:
+                self.ui_manager.send_status_bar("⛔ Execution interrupted by user")
             return False, "Execution interrupted", ""
         except Exception as e:
             logger.error(f"Unexpected error during block execution: {e}", exc_info=True)
+            if self.ui_manager:
+                self.ui_manager.send_status_bar(f"❌ Unexpected error: {type(e).__name__}")
             return False, str(e), "Unexpected error"
 
     def run_tests(self, test_path: str = None) -> bool:
