@@ -291,6 +291,10 @@ And here a bit more detailed explanation of the output format:
                             logger.warning(f"Converted absolute path '{item}' to relative path '{rel_path}' in {key}")
                         except ValueError:
                             return False, f"Cannot convert absolute path '{item}' to relative path in {key}", None
+            
+            # Ensure there is at least one write file
+            if not validated_data["write_files"]:
+                return False, "At least one write file is required", None
 
             # Validate trusty_agents
             if not all(isinstance(item, str) for item in validated_data["trusty_agents"]):
