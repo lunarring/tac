@@ -285,7 +285,7 @@
     </div>
     <div id="rightPanel">
       <!-- Three.js canvas will be injected here -->
-      <div id="runtimeStatus">status</div>
+      <div id="runtimeStatus">waiting</div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
@@ -477,6 +477,9 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
+      // Immediately update the runtime status to reflect the protoblock creation process.
+      document.getElementById("runtimeStatus").textContent = "creating protoblock";
+      
       // Add active class to trigger animation
       blockButton.classList.add('active');
       // Remove active class after a short delay to revert to original state
