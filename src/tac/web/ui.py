@@ -57,9 +57,7 @@ class UIManager:
             except Exception as e:
                 print(f"Failed to send status via new loop: {e}")
 
-    def send_status(self, message):
-        """Legacy wrapper for sending status messages, use send_status_bar instead"""
-        self.send_status_bar(message)
+
 
     async def _process_status_queue(self):
         """Process status messages from the queue"""
@@ -88,6 +86,17 @@ class UIManager:
         """Direct async method to send status messages with awaiting"""
         if self.websocket:
             try:
+                # Check if this is an attempt update message from the processor
+                processor_attempt_match = None
+                if "Starting block creation and execution attempt" in message:
+                    # Extract the attempt info from the processor log message
+                    processor_attempt_match = message.split("Starting block creation and execution attempt ")[1].split(" of ")
+                    if len(processor_attempt_match) == 2:
+                        current = processor_attempt_match[0]
+                        max_attempts = processor_attempt_match[1]
+                        # Update message to match the format in the processor
+                        message = f"Starting attempt {current} of {max_attempts}..."
+                
                 await self.websocket.send(json.dumps({
                     "type": "status_message",
                     "message": message
@@ -275,6 +284,10 @@ class UIManager:
             
             # Execute the processor directly
             await self.send_status_message("Starting block execution and agent processing...")
+            
+            # For the first attempt, make sure we use the same format as in processor.py
+            await self.send_status_message("Starting block creation and execution attempt 1 of 4")
+            
             loop = asyncio.get_event_loop()
             success = await loop.run_in_executor(None, processor.run_loop)
 

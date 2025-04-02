@@ -686,8 +686,8 @@
           // Update the right-side status text bar.
           document.getElementById("runtimeStatus").textContent = data.message;
           
-          // Check for attempt number updates in status messages
-          const attemptMatch = data.message.match(/Starting attempt (\d+) of (\d+)/);
+          // Check for attempt number updates in status messages - support both formats
+          const attemptMatch = data.message.match(/Starting (?:block creation and execution )?attempt (\d+) of (\d+)/);
           if (attemptMatch) {
             const current = attemptMatch[1];
             const max = attemptMatch[2];

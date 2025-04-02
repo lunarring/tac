@@ -153,7 +153,8 @@ class BlockProcessor:
             if idx_attempt > 0:
                 # Send status update at beginning of each attempt
                 if self.ui_manager:
-                    self.ui_manager.send_status_bar(f"Starting attempt {idx_attempt + 1} of {max_retries}...")
+                    # Make sure the attempt number is correctly reflected
+                    self.ui_manager.send_status_bar(f"Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}")
                     
                 # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
                 if config.general.halt_after_fail:
