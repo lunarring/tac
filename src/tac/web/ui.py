@@ -7,6 +7,7 @@ import signal
 import subprocess
 import argparse
 import traceback
+import difflib
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
 from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
@@ -29,6 +30,8 @@ class UIManager:
         self.max_attempts = 4  # Maximum attempts
         # Add lock for thread safety
         self._status_lock = asyncio.Lock()
+        # Git manager for diffs
+        self.git_manager = create_git_manager()
         # Config is already initialized when imported
 
     def send_status_bar(self, message):
@@ -157,7 +160,22 @@ class UIManager:
         if not git_manager.is_clean():
             await self.send_status_message("❌ Git workspace is not clean. Please commit or stash your changes before proceeding.")
             
-            if config.safe_get('general', 'auto_stash', default=False):
+            # Check if auto-stash is enabled - get the value manually since safe_get doesn't accept a default parameter
+            auto_stash = False
+            try:
+                # Check if the general section has auto_stash attribute
+                if hasattr(config.general, 'auto_stash'):
+                    auto_stash = config.general.auto_stash
+                # If not found, try to get it from config.safe_get without a default
+                else:
+                    auto_stash_value = config.safe_get('general', 'auto_stash')
+                    if auto_stash_value is not None:
+                        auto_stash = auto_stash_value
+            except:
+                # If any error occurs, default to False
+                auto_stash = False
+                
+            if auto_stash:
                 await self.send_status_message("Auto-stash is enabled. Stashing changes...")
                 if git_manager.revert_changes():
                     await self.send_status_message("✅ Changes successfully stashed.")
@@ -188,6 +206,235 @@ class UIManager:
                 }
                 await self.websocket.send(json.dumps(payload))
 
+    async def handle_file_diff_request(self, filename):
+        """
+        Handles a request for a diff of a specific file.
+        Gets the diff for the file from git and sends it back to the client.
+        
+        Args:
+            filename: The name of the file to get the diff for
+        """
+        try:
+            # Standardize the filename to reduce path issues
+            filename = filename.strip()
+            
+            await self.send_status_message(f"Getting diff for {filename}...")
+            
+            # Check if the file exists
+            filepath = os.path.join(self.base_dir, filename)
+            if not os.path.exists(filepath):
+                await self.send_error_response(filename, f"File {filename} does not exist")
+                return
+            
+            # Always read the current file content for comparison
+            try:
+                with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                    current_content = f.read()
+            except Exception as read_err:
+                await self.send_error_response(filename, f"Could not read file: {str(read_err)}")
+                return
+                
+            # In UI mode, we disabled auto_commit, so changes should be in working directory
+            if not self.git_manager or not hasattr(self.git_manager, 'repo') or not self.git_manager.repo:
+                # No git, just return the file content
+                await self.websocket.send(json.dumps({
+                    "type": "file_diff_response",
+                    "filename": filename,
+                    "diff": f"Full file content (no git):\n{current_content}"
+                }))
+                return
+                
+            # Get diff info from git
+            try:
+                # Is this a tracked file?
+                is_tracked = False
+                try:
+                    tracked_files = self.git_manager.repo.git.ls_files().split('\n')
+                    is_tracked = filename in tracked_files
+                except Exception:
+                    pass
+                    
+                # Is this an untracked file?
+                is_untracked = filename in self.git_manager.repo.untracked_files
+                
+                # First check for unstaged changes (most common in UI mode)
+                unstaged_diff = ""
+                try:
+                    unstaged_diff = self.git_manager.repo.git.diff('--', filename)
+                except Exception:
+                    pass
+                    
+                # Then check for staged changes
+                staged_diff = ""
+                try:
+                    staged_diff = self.git_manager.repo.git.diff('--staged', '--', filename)
+                except Exception:
+                    pass
+                
+                # Format appropriate diff output
+                if unstaged_diff:
+                    # Found unstaged changes - show those
+                    diff = unstaged_diff
+                elif staged_diff:
+                    # Found staged changes - show those
+                    diff = staged_diff
+                elif is_untracked:
+                    # Untracked new file - show all content as added
+                    diff = f"diff --git a/{filename} b/{filename}\n--- /dev/null\n+++ b/{filename}\n"
+                    diff += "".join([f"+{line}\n" for line in current_content.splitlines()])
+                elif is_tracked:
+                    # File is tracked but no git changes detected - might be unchanged
+                    # In UI mode, this is uncommon because we disabled auto-commit
+                    # Try to get original content to compare manually
+                    try:
+                        original_content = self.git_manager.repo.git.show(f"HEAD:{filename}")
+                        if original_content != current_content:
+                            # Manual diff - file changed but git didn't detect it
+                            diff_lines = difflib.unified_diff(
+                                original_content.splitlines(),
+                                current_content.splitlines(),
+                                fromfile=f'a/{filename}',
+                                tofile=f'b/{filename}',
+                                lineterm=''
+                            )
+                            diff = '\n'.join(diff_lines)
+                        else:
+                            diff = f"File is tracked but hasn't changed."
+                    except Exception as e:
+                        # Cannot get original version, just show current
+                        diff = f"Current file content (couldn't get original):\n{current_content}"
+                else:
+                    # Not tracked, not untracked - should not happen
+                    diff = f"File status unknown. Current content:\n{current_content}"
+                    
+            except Exception as git_err:
+                print(f"Git error getting diff: {git_err}")
+                traceback.print_exc()
+                # Fall back to showing current content
+                diff = f"Current file content (git error: {str(git_err)}):\n{current_content}"
+            
+            # Send the result
+            await self.websocket.send(json.dumps({
+                "type": "file_diff_response",
+                "filename": filename,
+                "diff": diff
+            }))
+            
+        except Exception as e:
+            await self.send_error_response(filename, f"Unexpected error: {str(e)}")
+            traceback.print_exc()
+
+    async def send_error_response(self, filename, error_message):
+        """Helper method to send error responses for file diff requests"""
+        if self.websocket:
+            try:
+                await self.websocket.send(json.dumps({
+                    "type": "file_diff_response",
+                    "filename": filename,
+                    "error": error_message
+                }))
+            except Exception as e:
+                print(f"Error sending error response: {e}")
+
+    async def handle_file_status_request(self, filename):
+        """
+        Handles a request to check if a file has been modified.
+        Checks the git status of the file and returns whether it has been modified.
+        
+        Args:
+            filename: The name of the file to check
+        """
+        try:
+            # Standardize the filename to reduce path issues
+            filename = filename.strip()
+            
+            # Check if the file exists
+            filepath = os.path.join(self.base_dir, filename)
+            if not os.path.exists(filepath):
+                await self.websocket.send(json.dumps({
+                    "type": "file_status_response",
+                    "filename": filename,
+                    "is_modified": False,
+                    "error": "File does not exist"
+                }))
+                return
+            
+            is_modified = False
+            
+            # Check if file is modified using git
+            if self.git_manager and hasattr(self.git_manager, 'repo') and self.git_manager.repo:
+                try:
+                    # Is this a tracked file?
+                    is_tracked = False
+                    try:
+                        tracked_files = self.git_manager.repo.git.ls_files().split('\n')
+                        is_tracked = filename in tracked_files
+                    except Exception:
+                        pass
+                        
+                    # Is this an untracked file?
+                    is_untracked = filename in self.git_manager.repo.untracked_files
+                    
+                    # Check for unstaged changes
+                    unstaged_diff = ""
+                    try:
+                        unstaged_diff = self.git_manager.repo.git.diff('--', filename)
+                    except Exception:
+                        pass
+                        
+                    # Check for staged changes
+                    staged_diff = ""
+                    try:
+                        staged_diff = self.git_manager.repo.git.diff('--staged', '--', filename)
+                    except Exception:
+                        pass
+                    
+                    # Determine if the file is modified
+                    if unstaged_diff or staged_diff:
+                        # Has diff changes
+                        is_modified = True
+                    elif is_untracked:
+                        # New file
+                        is_modified = True
+                    elif is_tracked:
+                        # Tracked but no git diff - check content manually
+                        try:
+                            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                                current_content = f.read()
+                            original_content = self.git_manager.repo.git.show(f"HEAD:{filename}")
+                            is_modified = original_content != current_content
+                        except Exception:
+                            # Can't determine, assume unmodified
+                            is_modified = False
+                    else:
+                        # Unknown status
+                        is_modified = False
+                        
+                except Exception as git_err:
+                    # Error checking git status, assume unmodified
+                    print(f"Error checking git status: {git_err}")
+                    is_modified = False
+            else:
+                # No git, all files are considered modified in UI mode
+                is_modified = True
+            
+            # Send the response
+            await self.websocket.send(json.dumps({
+                "type": "file_status_response",
+                "filename": filename,
+                "is_modified": is_modified
+            }))
+            
+        except Exception as e:
+            print(f"Error handling file status request: {e}")
+            traceback.print_exc()
+            await self.websocket.send(json.dumps({
+                "type": "file_status_response",
+                "filename": filename,
+                "is_modified": False,
+                "error": str(e)
+            }))
+            
     async def handle_connection(self, websocket):
         self.websocket = websocket
         self._loop = asyncio.get_running_loop()
@@ -231,6 +478,12 @@ class UIManager:
                                 continue
                             elif message_type == "block_click":
                                 await self.handle_block_click(websocket, chat_agent)
+                                continue
+                            elif message_type == "file_diff_request":
+                                await self.handle_file_diff_request(data.get("filename", ""))
+                                continue
+                            elif message_type == "file_status_request":
+                                await self.handle_file_status_request(data.get("filename", ""))
                                 continue
                             elif message_type in ["user_message", "transcribed_message"]:
                                 user_message = data.get("message", "").strip()
@@ -283,10 +536,14 @@ class UIManager:
             project_files = ProjectFiles()
             codebase = project_files.get_codebase_summary()
 
+            # Disable auto commit in UI mode to allow viewing diffs
             config_overrides = {
                 'no_git': False,
                 'json': None,
-                'image': None
+                'image': None,
+                'git': {
+                    'auto_commit_if_success': False  # Disable auto commit to allow diff viewing
+                }
             }
             for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
                 config_overrides[attr] = None
@@ -344,6 +601,12 @@ class UIManager:
                 await self.send_status_message("✅ Block executed successfully! Displaying final results...")
                 # Send updated protoblock data after execution with the final attempt number
                 await self.send_protoblock_data(processor.protoblock)
+                
+                # Inform user that changes are uncommitted and can be viewed
+                await self.websocket.send(json.dumps({
+                    "type": "info_message",
+                    "message": "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
+                }))
             else:
                 # If block execution failed, send explicit failure message
                 await self.send_status_message("❌ Block execution failed!")

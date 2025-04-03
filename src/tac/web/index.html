@@ -239,6 +239,30 @@
       text-align: center;
       z-index: 10;
     }
+    /* Info message styling */
+    #infoMessage {
+      position: absolute;
+      bottom: 16px;
+      left: 0;
+      right: 0;
+      width: 75%;
+      margin: 0 auto;
+      color: #0366d6;
+      font-size: 16px;
+      background-color: rgba(230, 247, 255, 0.9);
+      padding: 12px;
+      border-radius: 4px;
+      text-align: center;
+      z-index: 10;
+      border-left: 4px solid #0366d6;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: none; /* Hidden by default */
+      animation: fadeIn 0.5s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     /* Protoblock display container styling */
     #protoblockContainer {
       display: none;
@@ -294,6 +318,33 @@
       border: 1px solid #ddd;
       box-shadow: 0 2px 4px rgba(0,0,0,0.05);
       display: inline-block;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.2s;
+    }
+    .file-list li:hover {
+      background-color: #e6f7ff;
+      border-color: #91d5ff;
+      transform: translateY(-2px);
+    }
+    .clickable-file {
+      position: relative;
+    }
+    .clickable-file::after {
+      content: "🔍";
+      margin-left: 5px;
+      font-size: 10px;
+      opacity: 0.7;
+    }
+    .modified-file {
+      background-color: #e6ffed !important;
+      border-color: #85e89d !important;
+      font-weight: 500;
+    }
+    .modified-file::after {
+      content: "📝";
+      margin-left: 5px;
+      font-size: 12px;
+      color: #28a745;
     }
     .code-block {
       background-color: #f8f8f8;
@@ -358,6 +409,233 @@
       font-size: 12px;
       background-color: #f8f8f8;
     }
+    /* New overlay styles for file diff display */
+    #fileDiffOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    #fileDiffContent {
+      width: 90%;
+      max-width: 1200px;
+      height: 80%;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #fileDiffHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background-color: #f6f8fa;
+      border-bottom: 1px solid #e1e4e8;
+    }
+    #fileDiffHeader h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #24292e;
+    }
+    #fileDiffCloseBtn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      color: #586069;
+    }
+    #fileDiffCloseBtn:hover {
+      color: #24292e;
+    }
+    #fileDiffBody {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      background-color: #f8f8f8;
+    }
+    #fileDiffSplitView {
+      display: flex;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      position: relative;
+    }
+    #fileDiffLeft, #fileDiffRight {
+      flex: 1;
+      padding: 10px 20px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-y: hidden;
+    }
+    #fileDiffLeft {
+      background-color: #fffbf6;
+      border-right: 1px solid #e1e4e8;
+    }
+    #fileDiffRight {
+      background-color: #f6fffe;
+    }
+    #fileDiffScrollContainer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 15px;
+      height: 100%;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    #fileDiffScrollContent {
+      height: 1000px; /* Will be adjusted dynamically */
+    }
+    .diff-line {
+      display: flex;
+      padding: 0 5px;
+      border-radius: 3px;
+      margin: 2px 0;
+    }
+    .diff-line-number {
+      color: #999;
+      text-align: right;
+      user-select: none;
+      padding-right: 10px;
+      min-width: 40px;
+      border-right: 1px solid #eee;
+      margin-right: 10px;
+    }
+    .diff-line-content {
+      flex: 1;
+    }
+    .diff-added-line {
+      background-color: #e6ffed;
+    }
+    .diff-removed-line {
+      background-color: #ffeef0;
+    }
+    .diff-section-header {
+      background-color: #f1f8ff;
+      padding: 5px;
+      margin: 10px 0;
+      color: #0366d6;
+      font-weight: 500;
+      border-bottom: 1px solid #c8e1ff;
+    }
+    .diff-file-header {
+      background-color: #f1f8ff;
+      padding: 8px 5px;
+      margin: 15px 0 10px 0;
+      color: #0366d6;
+      font-weight: 500;
+      border-bottom: 1px solid #c8e1ff;
+      border-top: 1px solid #c8e1ff;
+    }
+    .diff-added {
+      background-color: #e6ffed;
+      color: #22863a;
+      display: block;
+      white-space: pre-wrap;
+    }
+    .diff-removed {
+      background-color: #ffeef0;
+      color: #cb2431;
+      display: block;
+      white-space: pre-wrap;
+    }
+    .diff-header {
+      background-color: #f1f8ff;
+      color: #0366d6;
+      padding: 5px 0;
+      margin: 10px 0;
+      border-bottom: 1px solid #c8e1ff;
+      display: block;
+      white-space: pre-wrap;
+    }
+    .diff-unchanged {
+      color: #24292e;
+      display: block;
+      white-space: pre-wrap;
+    }
+    .diff-section {
+      margin-top: 20px;
+      border-top: 1px solid #e1e4e8;
+      padding-top: 10px;
+      display: block;
+    }
+    .diff-error, .diff-empty {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      display: block;
+    }
+    .diff-error {
+      background-color: #ffeef0;
+      border: 1px solid #fdb8c0;
+      color: #cb2431;
+    }
+    .diff-empty {
+      background-color: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      color: #586069;
+    }
+    #fileDiffViewToggle {
+      background-color: #f0f0f0;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      padding: 5px 10px;
+      margin-right: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      transition: background-color 0.2s;
+    }
+    #fileDiffViewToggle:hover {
+      background-color: #e0e0e0;
+    }
+    #fileDiffViewToggle:active {
+      background-color: #d0d0d0;
+    }
+    
+    /* Style for filler lines in split view */
+    .diff-filler {
+      height: 22px; /* Match height of other lines */
+      background-color: transparent;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    /* Ensure all diff lines have a consistent height */
+    .diff-line {
+      height: 22px;
+      padding: 0 5px;
+      margin: 0;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+      box-sizing: border-box;
+      align-items: center;
+    }
+    
+    /* Improve line number styling */
+    .diff-line-number {
+      color: #999;
+      text-align: right;
+      user-select: none;
+      padding-right: 10px;
+      min-width: 40px;
+      border-right: 1px solid #eee;
+      margin-right: 10px;
+      font-size: 12px;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -389,6 +667,7 @@
     <div id="rightPanel">
       <!-- Three.js canvas will be injected here -->
       <div id="runtimeStatus">waiting</div>
+      <div id="infoMessage"></div>
       
       <!-- Protoblock display container -->
       <div id="protoblockContainer">
@@ -731,6 +1010,19 @@
           
           return;
         } 
+        else if (data.type === "info_message") {
+          // Display info message at the bottom of the right panel
+          const infoMessage = document.getElementById("infoMessage");
+          infoMessage.textContent = data.message;
+          infoMessage.style.display = "block";
+          
+          // Automatically hide after 15 seconds
+          setTimeout(() => {
+            infoMessage.style.display = "none";
+          }, 15000);
+          
+          return;
+        }
         else if (data.type === "remove_protoblock") {
           // This is an explicit message to remove the protoblock display
           console.log("Received explicit remove_protoblock message");
@@ -927,6 +1219,435 @@
     // Expose socket and cube for testing purposes
     window.socket = socket;
     window.cube = cube;
+  </script>
+  
+  <!-- File diff overlay -->
+  <div id="fileDiffOverlay">
+    <div id="fileDiffContent">
+      <div id="fileDiffHeader">
+        <h3 id="fileDiffTitle">File Changes</h3>
+        <div>
+          <button id="fileDiffViewToggle" title="Toggle between unified and split view">Split View</button>
+          <button id="fileDiffCloseBtn">×</button>
+        </div>
+      </div>
+      <div id="fileDiffBody"></div>
+      <div id="fileDiffSplitView" style="display: none;">
+        <div id="fileDiffLeft"></div>
+        <div id="fileDiffRight"></div>
+        <div id="fileDiffScrollContainer">
+          <div id="fileDiffScrollContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // File diff handling
+    const fileDiffOverlay = document.getElementById('fileDiffOverlay');
+    const fileDiffCloseBtn = document.getElementById('fileDiffCloseBtn');
+    const fileDiffBody = document.getElementById('fileDiffBody');
+    const fileDiffTitle = document.getElementById('fileDiffTitle');
+    const fileDiffSplitView = document.getElementById('fileDiffSplitView');
+    const fileDiffLeft = document.getElementById('fileDiffLeft');
+    const fileDiffRight = document.getElementById('fileDiffRight');
+    const fileDiffViewToggle = document.getElementById('fileDiffViewToggle');
+
+    let diffViewMode = 'unified'; // 'unified' or 'split'
+
+    // Toggle between unified and split view
+    fileDiffViewToggle.addEventListener('click', () => {
+      if (diffViewMode === 'unified') {
+        diffViewMode = 'split';
+        fileDiffBody.style.display = 'none';
+        fileDiffSplitView.style.display = 'flex';
+        fileDiffViewToggle.textContent = 'Unified View';
+        
+        // Set proper height for scroll container after switching to split view
+        setupSplitViewScrolling();
+      } else {
+        diffViewMode = 'unified';
+        fileDiffBody.style.display = 'block';
+        fileDiffSplitView.style.display = 'none';
+        fileDiffViewToggle.textContent = 'Split View';
+      }
+    });
+    
+    // Function to set up synchronized scrolling
+    function setupSplitViewScrolling() {
+      const scrollContainer = document.getElementById('fileDiffScrollContainer');
+      const scrollContent = document.getElementById('fileDiffScrollContent');
+      const leftPane = document.getElementById('fileDiffLeft');
+      const rightPane = document.getElementById('fileDiffRight');
+      
+      // Set height of scroll content based on line count
+      if (window.currentDiffLineCount) {
+        // Approximate line height of 22px
+        scrollContent.style.height = (window.currentDiffLineCount * 22) + 'px';
+      }
+      
+      // Synchronize panes with scroll container
+      scrollContainer.onscroll = function() {
+        leftPane.scrollTop = scrollContainer.scrollTop;
+        rightPane.scrollTop = scrollContainer.scrollTop;
+      };
+    }
+
+    // Function to parse a git diff and create the split view content
+    function parseDiffForSplitView(diff) {
+      const leftContent = [];
+      const rightContent = [];
+      
+      // Regular expressions for parsing diff parts
+      const fileHeaderRegex = /^diff --git a\/(.*) b\/(.*)$/;
+      const hunkHeaderRegex = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)$/;
+      
+      let leftLineNumber = 1;
+      let rightLineNumber = 1;
+      let currentFile = '';
+      let inHunk = false;
+      let diffLineCount = 0;
+      
+      // Split the diff into lines
+      const lines = diff.split('\n');
+      
+      // Add file header
+      leftContent.push('<div class="diff-file-header">Original</div>');
+      rightContent.push('<div class="diff-file-header">Modified</div>');
+      diffLineCount++;
+      
+      // Process each line of the diff
+      lines.forEach(line => {
+        // Check for file header
+        const fileHeaderMatch = line.match(fileHeaderRegex);
+        if (fileHeaderMatch) {
+          currentFile = fileHeaderMatch[1];
+          leftContent.push(`<div class="diff-section-header">${currentFile}</div>`);
+          rightContent.push(`<div class="diff-section-header">${currentFile}</div>`);
+          diffLineCount++;
+          return;
+        }
+        
+        // Check for hunk header
+        const hunkHeaderMatch = line.match(hunkHeaderRegex);
+        if (hunkHeaderMatch) {
+          const leftStart = parseInt(hunkHeaderMatch[1]);
+          const rightStart = parseInt(hunkHeaderMatch[3]);
+          
+          inHunk = true;
+          leftLineNumber = leftStart;
+          rightLineNumber = rightStart;
+          
+          leftContent.push(`<div class="diff-section-header">${line}</div>`);
+          rightContent.push(`<div class="diff-section-header">${line}</div>`);
+          diffLineCount++;
+          return;
+        }
+        
+        // Skip other headers or non-content lines
+        if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('index ')) {
+          return;
+        }
+        
+        // Process content lines
+        if (inHunk) {
+          if (line.startsWith('-')) {
+            // Line removed - show in left only
+            leftContent.push(`
+              <div class="diff-line diff-removed-line">
+                <span class="diff-line-number">${leftLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            rightContent.push(`<div class="diff-line diff-filler"></div>`);
+            leftLineNumber++;
+            diffLineCount++;
+          } else if (line.startsWith('+')) {
+            // Line added - show in right only
+            leftContent.push(`<div class="diff-line diff-filler"></div>`);
+            rightContent.push(`
+              <div class="diff-line diff-added-line">
+                <span class="diff-line-number">${rightLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            rightLineNumber++;
+            diffLineCount++;
+          } else if (line.startsWith(' ')) {
+            // Common line - show in both
+            leftContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${leftLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            rightContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${rightLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            leftLineNumber++;
+            rightLineNumber++;
+            diffLineCount++;
+          } else if (line.trim() === '') {
+            // Empty line - show in both
+            leftContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${leftLineNumber}</span>
+                <span class="diff-line-content"></span>
+              </div>
+            `);
+            rightContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${rightLineNumber}</span>
+                <span class="diff-line-content"></span>
+              </div>
+            `);
+            leftLineNumber++;
+            rightLineNumber++;
+            diffLineCount++;
+          }
+        }
+      });
+      
+      return {
+        left: leftContent.join(''),
+        right: rightContent.join(''),
+        lineCount: diffLineCount
+      };
+    }
+
+    // Helper function to escape HTML special characters
+    function escapeHtml(unsafe) {
+      return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+    }
+
+    // Close overlay when clicking the close button
+    fileDiffCloseBtn.addEventListener('click', () => {
+      fileDiffOverlay.style.display = 'none';
+    });
+
+    // Close overlay when clicking outside the content
+    fileDiffOverlay.addEventListener('click', (event) => {
+      if (event.target === fileDiffOverlay) {
+        fileDiffOverlay.style.display = 'none';
+      }
+    });
+
+    // Function to fetch and show file diff
+    async function showFileDiff(filename) {
+      fileDiffTitle.textContent = `Changes in ${filename}`;
+      fileDiffBody.innerHTML = 'Loading diff...';
+      fileDiffLeft.innerHTML = 'Loading...';
+      fileDiffRight.innerHTML = 'Loading...';
+      fileDiffOverlay.style.display = 'flex';
+      
+      // Send WebSocket request for file diff
+      requestFileDiff(filename);
+    }
+
+    // Function to make file list items clickable
+    function makeFilesClickable() {
+      const writeFilesList = document.getElementById('writeFilesList');
+      const contextFilesList = document.getElementById('contextFilesList');
+      
+      // Only apply click handlers if block execution was successful
+      const runtimeStatus = document.getElementById('runtimeStatus');
+      const isSuccess = runtimeStatus.textContent.includes("✅") || 
+                       runtimeStatus.textContent.includes("successful");
+      
+      if (isSuccess) {
+        // Make write files clickable
+        const writeFileItems = writeFilesList.querySelectorAll('li');
+        writeFileItems.forEach(item => {
+          item.classList.add('clickable-file');
+          item.addEventListener('click', () => {
+            showFileDiff(item.textContent);
+          });
+          
+          // Request file status to highlight modified files
+          checkFileStatus(item.textContent);
+        });
+        
+        // Make context files clickable too
+        const contextFileItems = contextFilesList.querySelectorAll('li');
+        contextFileItems.forEach(item => {
+          item.classList.add('clickable-file');
+          item.addEventListener('click', () => {
+            showFileDiff(item.textContent);
+          });
+          
+          // Request file status to highlight modified files
+          checkFileStatus(item.textContent);
+        });
+      }
+    }
+
+    // Function to check if a file has been modified
+    function checkFileStatus(filename) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const request = {
+          type: "file_status_request",
+          filename: filename
+        };
+        socket.send(JSON.stringify(request));
+      }
+    }
+
+    // Function to send message to server to request file diff
+    function requestFileDiff(filename) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const request = {
+          type: "file_diff_request",
+          filename: filename
+        };
+        socket.send(JSON.stringify(request));
+      }
+    }
+
+    // Update the displayProtoblockData function to make files clickable
+    const originalDisplayProtoblockData = displayProtoblockData;
+    displayProtoblockData = function(data) {
+      // Call the original function
+      originalDisplayProtoblockData(data);
+      
+      // Make files clickable after displaying protoblock data
+      setTimeout(makeFilesClickable, 200);
+    };
+
+    // Add handling for file_status_response messages
+    socket.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === "file_status_response") {
+          // Handle file status update
+          const { filename, is_modified, error } = data;
+          
+          if (error) {
+            console.log(`Error checking status for ${filename}: ${error}`);
+            return;
+          }
+          
+          // Find the file item in both lists
+          const allFileLists = [
+            document.getElementById('writeFilesList'),
+            document.getElementById('contextFilesList')
+          ];
+          
+          allFileLists.forEach(list => {
+            if (!list) return;
+            
+            const items = list.querySelectorAll('li');
+            items.forEach(item => {
+              if (item.textContent.trim() === filename.trim()) {
+                // Update class based on modification status
+                if (is_modified) {
+                  item.classList.add('modified-file');
+                } else {
+                  item.classList.remove('modified-file');
+                }
+              }
+            });
+          });
+        }
+      } catch (e) {
+        // Not JSON or not a file_status_response
+      }
+    });
+
+    // When we get a file_diff_response, handle both unified and split views
+    socket.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "file_diff_response") {
+          // Display the diff in the overlay
+          fileDiffTitle.textContent = `Changes in ${data.filename}`;
+          
+          // Format and display the diff with syntax highlighting
+          let formattedDiff = '';
+          
+          if (data.error) {
+            formattedDiff = `<div class="diff-error">Error: ${data.error}</div>`;
+            fileDiffBody.innerHTML = formattedDiff;
+            fileDiffLeft.innerHTML = formattedDiff;
+            fileDiffRight.innerHTML = formattedDiff;
+          } else if (!data.diff || data.diff.trim() === '') {
+            formattedDiff = '<div class="diff-empty">No changes detected for this file.</div>';
+            fileDiffBody.innerHTML = formattedDiff;
+            fileDiffLeft.innerHTML = formattedDiff;
+            fileDiffRight.innerHTML = formattedDiff;
+          } else {
+            // Handle the case where diff is just file content
+            if (data.diff.startsWith("Full file content") || data.diff.startsWith("File is tracked")) {
+              // Simple content display
+              const content = data.diff.replace(/^Full file content.*?\n/g, '');
+              formattedDiff = `<div class="diff-section">${data.diff.split('\n')[0]}</div>`;
+              formattedDiff += `<pre class="diff-unchanged">${escapeHtml(content)}</pre>`;
+              
+              // For split view, show the same content on both sides
+              fileDiffLeft.innerHTML = `<div class="diff-file-header">Original</div><pre>${escapeHtml(content)}</pre>`;
+              fileDiffRight.innerHTML = `<div class="diff-file-header">Modified</div><pre>${escapeHtml(content)}</pre>`;
+              window.currentDiffLineCount = content.split('\n').length + 5; // +5 for headers
+            } else {
+              // Process the diff for unified view
+              const diffLines = data.diff.split('\n');
+              let inSection = false;
+              
+              diffLines.forEach(line => {
+                if (line.startsWith("=== ") && line.endsWith(" ===")) {
+                  // Section header (staged/unstaged)
+                  formattedDiff += `<div class="diff-section">${line}</div>`;
+                  inSection = true;
+                } else if (line.startsWith('+') && !line.startsWith('+++')) {
+                  formattedDiff += `<div class="diff-added">${escapeHtml(line)}</div>`;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                  formattedDiff += `<div class="diff-removed">${escapeHtml(line)}</div>`;
+                } else if (line.startsWith('@@')) {
+                  formattedDiff += `<div class="diff-header">${escapeHtml(line)}</div>`;
+                } else if (line.startsWith('diff') || line.startsWith('---') || line.startsWith('+++')) {
+                  formattedDiff += `<div class="diff-header">${escapeHtml(line)}</div>`;
+                } else {
+                  formattedDiff += `<div class="diff-unchanged">${escapeHtml(line)}</div>`;
+                }
+              });
+              
+              // Create split view
+              const splitViewContent = parseDiffForSplitView(data.diff);
+              fileDiffLeft.innerHTML = splitViewContent.left;
+              fileDiffRight.innerHTML = splitViewContent.right;
+              window.currentDiffLineCount = splitViewContent.lineCount;
+            }
+            
+            fileDiffBody.innerHTML = formattedDiff;
+          }
+          
+          fileDiffOverlay.style.display = 'flex';
+          
+          // Set the view mode according to current setting
+          if (diffViewMode === 'unified') {
+            fileDiffBody.style.display = 'block';
+            fileDiffSplitView.style.display = 'none';
+            fileDiffViewToggle.textContent = 'Split View';
+          } else {
+            fileDiffBody.style.display = 'none';
+            fileDiffSplitView.style.display = 'flex';
+            fileDiffViewToggle.textContent = 'Unified View';
+            // Setup synchronized scrolling
+            setupSplitViewScrolling();
+          }
+        }
+      } catch (e) {
+        // Not JSON or not a file diff response
+        console.log("Error parsing message:", e);
+      }
+    });
   </script>
 </body>
 </html>
