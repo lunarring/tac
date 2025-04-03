@@ -263,6 +263,34 @@
       from { opacity: 0; transform: translateY(10px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    /* Error message styling - prominent red alert */
+    #errorMessage {
+      position: absolute;
+      top: 60px;
+      left: 0;
+      right: 0;
+      width: 75%;
+      margin: 0 auto;
+      color: #721c24;
+      font-size: 16px;
+      background-color: rgba(248, 215, 218, 0.95);
+      padding: 15px;
+      border-radius: 4px;
+      text-align: center;
+      z-index: 20; /* Higher than info message */
+      border-left: 4px solid #dc3545;
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+      display: none; /* Hidden by default */
+      animation: fadeInShake 0.7s;
+    }
+    @keyframes fadeInShake {
+      0% { opacity: 0; transform: translateY(-10px); }
+      60% { opacity: 1; transform: translateY(0); }
+      70% { transform: translateX(-5px); }
+      80% { transform: translateX(5px); }
+      90% { transform: translateX(-2px); }
+      100% { transform: translateX(0); }
+    }
     /* Protoblock display container styling */
     #protoblockContainer {
       display: none;
@@ -643,34 +671,34 @@
   <div id="splitContainer">
     <div id="leftPanel">
       <div id="chatHeader">
-        <span id="recipientName">vibe.tac</span>
+        <div id="recipientName">Vibe.tac Agent</div>
         <div id="typingAnimation">
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
         </div>
-        <span id="recipientStatus"><span class="statusDot"></span><span id="statusText">offline</span></span>
+        <div id="recipientStatus">
+          <span class="statusDot"></span>
+          <span id="statusText">connecting...</span>
+        </div>
       </div>
       <div id="messageContainer"></div>
-      <!-- Input container wrapping the textarea and a new button container -->
       <div id="inputContainer">
-        <textarea id="userInput" placeholder="Enter text here..."></textarea>
+        <textarea id="userInput" placeholder="Type your message here..." rows="2"></textarea>
         <div id="buttonContainer">
-          <button id="blockButton" class="action-button">
-            <!-- A canvas element for the rotating cube -->
-            <canvas id="cubeCanvas"></canvas>
-            <!-- Hidden text for accessibility/testing -->
-            <span style="display: none;">Cube</span>
-          </button>
-          <button id="micButton" class="action-button">🎤</button>
+          <div id="micButton" class="action-button">🎤</div>
+          <div id="blockButton" class="action-button">
+            <canvas id="cubeCanvas" width="32" height="32"></canvas>
+          </div>
         </div>
       </div>
     </div>
     <div id="rightPanel">
-      <!-- Three.js canvas will be injected here -->
-      <div id="runtimeStatus">waiting</div>
+      <div id="runtimeStatus">Ready...</div>
+      <div id="errorMessage"></div>
       <div id="infoMessage"></div>
-      
-      <!-- Protoblock display container -->
       <div id="protoblockContainer">
+        <!-- Protoblock container structure -->
         <div id="protoblockHeader">
           <h2>Protoblock</h2>
           <p id="protoblockAttempt">Attempt 1/4</p>
@@ -1010,6 +1038,24 @@
           
           return;
         } 
+        else if (data.type === "error_message") {
+          // Display prominent error message at the top of the right panel
+          const errorMessage = document.getElementById("errorMessage");
+          errorMessage.textContent = data.message;
+          errorMessage.style.display = "block";
+          
+          // Apply a slight shake animation by removing and re-adding the class
+          errorMessage.classList.remove("animated");
+          void errorMessage.offsetWidth; // Force reflow to restart animation
+          errorMessage.classList.add("animated");
+          
+          // Hide the error message after 30 seconds to allow plenty of time to read
+          setTimeout(() => {
+            errorMessage.style.display = "none";
+          }, 30000);
+          
+          return;
+        }
         else if (data.type === "info_message") {
           // Display info message at the bottom of the right panel
           const infoMessage = document.getElementById("infoMessage");

@@ -33,6 +33,23 @@ class UIManager:
         # Git manager for diffs
         self.git_manager = create_git_manager()
         # Config is already initialized when imported
+        # Pre-check git status at initialization
+        self.git_clean = None
+        self.git_status_message = None
+        
+        # Perform early git check during initialization
+        if self.git_manager and config.git.enabled:
+            try:
+                self.git_clean = self.git_manager.is_clean()
+                if not self.git_clean:
+                    self.git_status_message = "⚠️ Git workspace is not clean. Please commit or stash your changes before proceeding."
+            except Exception as e:
+                self.git_clean = False
+                self.git_status_message = f"⚠️ Git error: {str(e)}"
+        else:
+            self.git_clean = True
+            if not config.git.enabled:
+                self.git_status_message = "Git operations are disabled in config."
 
     def send_status_bar(self, message):
         """
@@ -150,15 +167,25 @@ class UIManager:
 
     async def check_git_status(self):
         """Check git status early to prevent issues later. Returns True if git is clean or not enabled."""
+        # Use cached result if available
+        if self.git_clean is not None:
+            if self.git_status_message:
+                await self.send_status_message(self.git_status_message)
+            return self.git_clean
+            
+        # If not cached, perform the check
         if not config.git.enabled:
-            await self.send_status_message("Git operations are disabled in config.")
+            self.git_status_message = "Git operations are disabled in config."
+            await self.send_status_message(self.git_status_message)
+            self.git_clean = True
             return True
             
         await self.send_status_message("Checking git status...")
         git_manager = create_git_manager()
         
         if not git_manager.is_clean():
-            await self.send_status_message("❌ Git workspace is not clean. Please commit or stash your changes before proceeding.")
+            self.git_status_message = "❌ Git workspace is not clean. Please commit or stash your changes before proceeding."
+            await self.send_status_message(self.git_status_message)
             
             # Check if auto-stash is enabled - get the value manually since safe_get doesn't accept a default parameter
             auto_stash = False
@@ -179,15 +206,21 @@ class UIManager:
                 await self.send_status_message("Auto-stash is enabled. Stashing changes...")
                 if git_manager.revert_changes():
                     await self.send_status_message("✅ Changes successfully stashed.")
+                    self.git_clean = True
+                    self.git_status_message = "✅ Git workspace is clean (auto-stashed)."
                     return True
                 else:
                     await self.send_status_message("❌ Failed to stash changes. Please clean your git workspace manually.")
+                    self.git_clean = False
                     return False
             else:
                 await self.send_status_message("Please commit or stash your changes before proceeding.")
+                self.git_clean = False
                 return False
         
-        await self.send_status_message("✅ Git workspace is clean.")
+        self.git_status_message = "✅ Git workspace is clean."
+        await self.send_status_message(self.git_status_message)
+        self.git_clean = True
         return True
 
     async def dummy_mic_click(self, websocket):
@@ -445,7 +478,16 @@ class UIManager:
         # Send initial status
         await self.send_status_message("Connected. Initializing...")
         
-        # Check git status early
+        # Display pre-checked git status as a prominent message if there are issues
+        if self.git_status_message and not self.git_clean:
+            # Send as an error_message for more visibility in the UI
+            await self.websocket.send(json.dumps({
+                "type": "error_message",
+                "message": self.git_status_message
+            }))
+            await self.send_status_message("Warning: Git status check failed. You can chat but execution may be limited.")
+        
+        # Check git status again (will use cached result from init if available)
         git_clean = await self.check_git_status()
         if not git_clean:
             # Still allow chat, but user will be notified of git issues
@@ -662,6 +704,37 @@ class UIManager:
 
     def launch_ui(self):
         try:
+            # Check git status before starting the server to catch issues early
+            if hasattr(self, 'git_manager') and self.git_manager:
+                if not config.git.enabled:
+                    print("Git operations are disabled in config.")
+                else:
+                    print("Checking git status...")
+                    if not self.git_manager.is_clean():
+                        print("⚠️ Git workspace is not clean. You may encounter issues during block execution.")
+                        print("Consider committing or stashing your changes before proceeding.")
+                        
+                        # Check if auto-stash is enabled
+                        auto_stash = False
+                        try:
+                            if hasattr(config.general, 'auto_stash'):
+                                auto_stash = config.general.auto_stash
+                            else:
+                                auto_stash_value = config.safe_get('general', 'auto_stash')
+                                if auto_stash_value is not None:
+                                    auto_stash = auto_stash_value
+                        except:
+                            pass
+                            
+                        if auto_stash:
+                            print("Auto-stash is enabled. Stashing changes...")
+                            if self.git_manager.revert_changes():
+                                print("✅ Changes successfully stashed.")
+                            else:
+                                print("❌ Failed to stash changes. Please clean your git workspace manually.")
+                    else:
+                        print("✅ Git workspace is clean.")
+            
             asyncio.run(self.run_server())
         except KeyboardInterrupt:
             print("WebSocket server stopped by user.")
