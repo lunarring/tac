@@ -30,6 +30,9 @@ from tac.agents.trusty.pytest import PytestTestingAgent as TestRunner
 from tac.agents.trusty.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
 from tac.utils.git_manager import create_git_manager, GitManager
+from tac.blocks.orchestrator import MultiBlockOrchestrator
+from tac.blocks.processor import BlockProcessor
+from tac.utils.ui import NullUIManager
 
 # Simple ImageAnalyzer placeholder
 class ImageAnalyzer:
@@ -526,14 +529,14 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     return parser, args
 
-def execute_command(task_instructions=None, config_overrides=None, ui_manager=None, file_path=None, file_content=None):
+def execute_command(task_instructions=None, config_overrides=None, ui_manager=NullUIManager(), file_path=None, file_content=None):
     """
     Execute a tac command based on provided task instructions or file content.
     
     Args:
         task_instructions: The natural language description of the task
         config_overrides: Dictionary of configuration overrides
-        ui_manager: Optional UI manager object for status updates
+        ui_manager: UI manager object for status updates (defaults to NullUIManager)
         file_path: Path to a file containing task instructions or protoblock JSON
         file_content: String content of task instructions or protoblock JSON
     
@@ -563,27 +566,23 @@ def execute_command(task_instructions=None, config_overrides=None, ui_manager=No
             if not config.safe_get('general', 'allow_dirty_git', default=False):
                 git_manager = create_git_manager()
                 if not git_manager.is_clean():
-                    if ui_manager:
-                        ui_manager.send_status_bar("❌ Git status check failed")
+                    ui_manager.send_status_bar("❌ Git status check failed")
                     if not config.safe_get('general', 'auto_stash', default=False):
                         print("Git workspace is not clean. Please commit or stash your changes.")
                         return False
         
         # Run automated tests before execution if enabled
         if config.general.run_tests_first:
-            if ui_manager:
-                ui_manager.send_status_bar("Running initial tests...")
+            ui_manager.send_status_bar("Running initial tests...")
             
             test_runner = TestRunner()
             if not test_runner.run():
-                if ui_manager:
-                    ui_manager.send_status_bar("❌ Initial tests failed. Fix tests before proceeding.")
+                ui_manager.send_status_bar("❌ Initial tests failed. Fix tests before proceeding.")
                 print("Initial tests failed. Please fix tests before proceeding.")
                 return False
         
         # Update project files summary
-        if ui_manager:
-            ui_manager.send_status_bar("Updating project files summary...")
+        ui_manager.send_status_bar("Updating project files summary...")
             
         project_files = ProjectFiles()
         project_files.analyze_all_files()
@@ -592,8 +591,7 @@ def execute_command(task_instructions=None, config_overrides=None, ui_manager=No
         
         # If an image is provided, process it 
         if config.image:
-            if ui_manager:
-                ui_manager.send_status_bar("Processing image...")
+            ui_manager.send_status_bar("Processing image...")
                 
             # Create an image analyzer and get description
             image_analyzer = ImageAnalyzer(config.image)
@@ -612,25 +610,21 @@ def execute_command(task_instructions=None, config_overrides=None, ui_manager=No
         if (task_instructions and len(task_instructions) > config.orchestration.chunk_threshold) or \
            (config.safe_get('general', 'force_split', default=False)):
             
-            if ui_manager:
-                ui_manager.send_status_bar("Initializing multi-block orchestrator...")
+            ui_manager.send_status_bar("Initializing multi-block orchestrator...")
                 
             # Create a multi-block orchestrator
             orchestrator = MultiBlockOrchestrator(task_instructions, ui_manager=ui_manager)
             success = orchestrator.run()
             
             if success:
-                if ui_manager:
-                    ui_manager.send_status_bar("✅ Multi-block orchestrator completed successfully!")
+                ui_manager.send_status_bar("✅ Multi-block orchestrator completed successfully!")
                 return True
             else:
-                if ui_manager:
-                    ui_manager.send_status_bar("❌ Multi-block orchestrator execution failed.")
+                ui_manager.send_status_bar("❌ Multi-block orchestrator execution failed.")
                 return False
         else:
             # Regular single-block processing
-            if ui_manager:
-                ui_manager.send_status_bar("Initializing block processor...")
+            ui_manager.send_status_bar("Initializing block processor...")
                 
             processor = BlockProcessor(
                 task_instructions=task_instructions,
@@ -642,7 +636,7 @@ def execute_command(task_instructions=None, config_overrides=None, ui_manager=No
             
             success = processor.run_loop()
             if success:
-                if ui_manager and processor.protoblock:
+                if processor.protoblock:
                     # If we have the protoblock and UI manager, send the protoblock data for display
                     attempt_number = f"{ui_manager.block_attempt_count}/{ui_manager.max_attempts}"
                     asyncio.run_coroutine_threadsafe(
@@ -650,19 +644,16 @@ def execute_command(task_instructions=None, config_overrides=None, ui_manager=No
                         ui_manager._get_loop()
                     )
                 
-                if ui_manager:
-                    ui_manager.send_status_bar("✅ Task completed successfully!")
+                ui_manager.send_status_bar("✅ Task completed successfully!")
                 return True
             else:
-                if ui_manager:
-                    ui_manager.send_status_bar("❌ Task execution failed.")
+                ui_manager.send_status_bar("❌ Task execution failed.")
                 return False
                 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        if ui_manager:
-            ui_manager.send_status_bar(f"❌ Error during execution: {type(e).__name__}")
+        ui_manager.send_status_bar(f"❌ Error during execution: {type(e).__name__}")
         print(f"Error during execution: {e}")
         return False
 
@@ -763,7 +754,7 @@ def main():
             success = execute_command(
                 task_instructions=voice_ui.task_instructions,
                 config_overrides=config_overrides,
-                ui_manager=None  # VoiceUI doesn't support send_status_bar
+                file_content=args.json if args.json else None
             )
             if not success:
                 sys.exit(1)
@@ -800,9 +791,8 @@ def main():
         
         success = execute_command(
             task_instructions=task_instructions,
-            protoblock=protoblock,
             config_overrides=config_overrides,
-            ui_manager=None
+            file_content=args.json if args.json else None
         )
         if not success:
             sys.exit(1)

@@ -11,10 +11,9 @@ from datetime import datetime
 import git
 
 from tac.blocks.model import ProtoBlock
-# Remove direct import to break circular dependency
-# from tac.blocks.generator import ProtoBlockGenerator
-# Remove direct import to break circular dependency
-# from tac.blocks.executor import BlockExecutor
+from tac.blocks.executor import BlockExecutor
+from tac.blocks.generator import ProtoBlockGenerator
+from tac.utils.ui import NullUIManager
 from tac.agents.coding.aider import AiderAgent
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
@@ -40,7 +39,7 @@ class BlockProcessor:
     
     Acts as the central coordinator between the generator and executor components.
     """
-    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None, ui_manager=None):
+    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None, ui_manager=NullUIManager()):
         # Input validation
         if protoblock is None and (task_instructions is None or codebase is None):
             raise ValueError("Either protoblock must be specified, or both task_instructions and codebase must be provided")
@@ -152,9 +151,8 @@ class BlockProcessor:
             # we only need to handle subsequent attempts here
             if idx_attempt > 0:
                 # Send status update at beginning of each attempt
-                if self.ui_manager:
-                    # Make sure the attempt number is correctly reflected
-                    self.ui_manager.send_status_bar(f"Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}")
+                # Make sure the attempt number is correctly reflected
+                self.ui_manager.send_status_bar(f"Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}")
                     
                 # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
                 if config.general.halt_after_fail:
@@ -177,68 +175,61 @@ class BlockProcessor:
                 # Generate a protoblock for subsequent attempts
                 try:
                     # SEND STATUS MESSAGE
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar(f"Creating new protoblock for attempt {idx_attempt + 1}...")
+                    self.ui_manager.send_status_bar(f"Creating new protoblock for attempt {idx_attempt + 1}...")
                     self.create_protoblock(idx_attempt, error_analysis)
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar(f"Protoblock created for attempt {idx_attempt + 1}!")
+                    self.ui_manager.send_status_bar(f"Protoblock created for attempt {idx_attempt + 1}!")
                         
-                        # For web UI, send the protoblock data to display the new protoblock
-                        if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket and self.protoblock:
-                            try:
-                                import json
-                                import asyncio
-                                from functools import partial
+                    # For web UI, send the protoblock data to display the new protoblock
+                    if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket and self.protoblock:
+                        try:
+                            import json
+                            import asyncio
+                            from functools import partial
                                 
-                                # Use run_coroutine_threadsafe with a partial function to send the protoblock data
-                                asyncio.run_coroutine_threadsafe(
-                                    self.ui_manager.send_protoblock_data(self.protoblock),
-                                    self.ui_manager._loop
-                                )
-                            except Exception as e:
-                                logger.error(f"Failed to send protoblock data: {e}")
+                            # Use run_coroutine_threadsafe with a partial function to send the protoblock data
+                            asyncio.run_coroutine_threadsafe(
+                                self.ui_manager.send_protoblock_data(self.protoblock),
+                                self.ui_manager._loop
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to send protoblock data: {e}")
                 except ValueError as exc:
                     error_analysis = str(exc)
                     logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar(f"❌ Protoblock generation failed: {error_analysis[:100]}...")
+                    self.ui_manager.send_status_bar(f"❌ Protoblock generation failed: {error_analysis[:100]}...")
                     self.store_previous_protoblock()
                     continue
 
             # Handle git branch setup only for first attempt
             if idx_attempt == 0:
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar("Setting up git branch...")
+                self.ui_manager.send_status_bar("Setting up git branch...")
                 if not self.handle_git_branch_setup():
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar("❌ Git branch setup failed")
+                    self.ui_manager.send_status_bar("❌ Git branch setup failed")
                     return False
 
             # Execute the protoblock using the builder
-            if self.ui_manager:
-                self.ui_manager.send_status_bar(f"Starting coding agent execution for attempt {idx_attempt + 1}...")
+            self.ui_manager.send_status_bar(f"Starting coding agent execution for attempt {idx_attempt + 1}...")
             
             execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar(f"❌ Execution attempt {idx_attempt + 1} failed: {failure_type}")
+                self.ui_manager.send_status_bar(f"❌ Execution attempt {idx_attempt + 1} failed: {failure_type}")
                     
-                    # For web UI, send an explicit message to remove the protoblock display after failure
-                    if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket:
-                        try:
-                            import json
-                            import asyncio
-                            asyncio.run_coroutine_threadsafe(
-                                self.ui_manager.websocket.send(json.dumps({
-                                    "type": "remove_protoblock",
-                                    "message": f"Execution attempt {idx_attempt + 1} failed"
-                                })),
-                                self.ui_manager._loop
-                            )
-                        except Exception as e:
-                            logger.error(f"Failed to send remove_protoblock message: {e}")
+                # For web UI, send an explicit message to remove the protoblock display after failure
+                if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket:
+                    try:
+                        import json
+                        import asyncio
+                        asyncio.run_coroutine_threadsafe(
+                            self.ui_manager.websocket.send(json.dumps({
+                                "type": "remove_protoblock",
+                                "message": f"Execution attempt {idx_attempt + 1} failed"
+                            })),
+                            self.ui_manager._loop
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send remove_protoblock message: {e}")
                 
                 # Only log error analysis if run_error_analysis is enabled in config
                 if config.general.trusty_agents.run_error_analysis and error_analysis:
@@ -251,8 +242,7 @@ class BlockProcessor:
                 if not config.general.trusty_agents.run_error_analysis:
                     error_analysis = ""
             else:
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar(f"✅ Execution successful for attempt {idx_attempt + 1}!")
+                self.ui_manager.send_status_bar(f"✅ Execution successful for attempt {idx_attempt + 1}!")
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
                     if config.safe_get('general', 'halt_after_verify'):

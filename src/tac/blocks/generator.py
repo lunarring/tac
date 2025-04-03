@@ -10,6 +10,8 @@ from tac.utils.file_gatherer import gather_python_files
 from tac.utils.project_files import ProjectFiles
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config
+from tac.core.log_config import setup_logging
+from tac.utils.ui import NullUIManager
 from .model import ProtoBlock
 from tac.agents.trusty.registry import TrustyAgentRegistry
 
@@ -51,7 +53,7 @@ class ProtoBlockGenerator:
     Uses LLM to transform abstract requirements into concrete implementation plans.
     """
     
-    def __init__(self, ui_manager=None):
+    def __init__(self, ui_manager=NullUIManager()):
         self.llm_client = LLMClient(llm_type="strong")
         self.project_files = ProjectFiles()
         self.ui_manager = ui_manager
@@ -339,12 +341,10 @@ And here a bit more detailed explanation of the output format:
         # If protoblock is provided, return it directly
         if protoblock is not None:
             logger.info("Using provided protoblock, skipping creation process")
-            if self.ui_manager:
-                self.ui_manager.send_status_bar("Using existing protoblock...")
+            self.ui_manager.send_status_bar("Using existing protoblock...")
             # Compute visual description if a reference image is provided.
             if protoblock.image_url:
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar("Processing image for protoblock...")
+                self.ui_manager.send_status_bar("Processing image for protoblock...")
                 protoblock.visual_description = compute_visual_description(protoblock.image_url)
             return protoblock
             
@@ -354,8 +354,7 @@ And here a bit more detailed explanation of the output format:
         
         if use_summaries:
             logger.info("Using file summaries for protoblock creation")
-            if self.ui_manager:
-                self.ui_manager.send_status_bar("Building file summaries for context...")
+            self.ui_manager.send_status_bar("Building file summaries for context...")
             # Update all summaries first to ensure they're current
             self.project_files.update_summaries()
         
@@ -369,30 +368,26 @@ And here a bit more detailed explanation of the output format:
         for attempt in range(max_retries):
             try:
                 logger.info(f"Attempting protoblock creation (attempt {attempt + 1}/{max_retries})")
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar(f"Generating protoblock...")
+                self.ui_manager.send_status_bar(f"Generating protoblock...")
                 
                 # Get response from LLM
                 response = self.llm_client.chat_completion(messages)
                 
                 # Check for empty or whitespace-only response
                 if not response or not response.strip():
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar("❌ Received empty response from LLM")
+                    self.ui_manager.send_status_bar("❌ Received empty response from LLM")
                     raise ValueError("Received empty response from LLM")
                     
                 # Clean code fences from response if needed
                 response = self.llm_client._clean_code_fences(response)
 
                 # Verify and parse the response
-                if self.ui_manager:
-                    self.ui_manager.send_status_bar("Verifying protoblock structure...")
+                self.ui_manager.send_status_bar("Verifying protoblock structure...")
                 is_valid, error_msg, data = self.verify_protoblock(response)
                 if not is_valid:
                     # Include part of the response in the error message for context
                     preview = response[:200] + "..." if len(response) > 200 else response
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar(f"❌ Invalid protoblock: {error_msg[:100]}...")
+                    self.ui_manager.send_status_bar(f"❌ Invalid protoblock: {error_msg[:100]}...")
                     raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
                 
                 # Ensure all paths are relative
@@ -432,8 +427,7 @@ And here a bit more detailed explanation of the output format:
                         # Ensure branch name starts with tac/
                         branch_name = f"tac/{branch_name.replace('tac/', '')}"
                         
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar("Creating protoblock with task specification...")
+                    self.ui_manager.send_status_bar("Creating protoblock with task specification...")
                     
                     # Create the protoblock
                     return ProtoBlock(
@@ -448,8 +442,7 @@ And here a bit more detailed explanation of the output format:
                         image_url=data.get("image_url", "")
                     )
                 except Exception as e:
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar(f"❌ Error creating protoblock: {type(e).__name__}")
+                    self.ui_manager.send_status_bar(f"❌ Error creating protoblock: {type(e).__name__}")
                     raise ValueError(f"Error creating ProtoBlock object: {str(e)}")
                     
             except Exception as e:
@@ -460,10 +453,8 @@ And here a bit more detailed explanation of the output format:
                     error_guidance = f"Previous attempt failed with error: {last_error}. Please correct the format and try again."
                     messages.append(Message(role="assistant", content=response if 'response' in locals() else ""))
                     messages.append(Message(role="user", content=error_guidance))
-                    if self.ui_manager:
-                        self.ui_manager.send_status_bar(f"Retrying protoblock creation ({attempt + 2}/{max_retries})...")
+                    self.ui_manager.send_status_bar(f"Retrying protoblock creation ({attempt + 2}/{max_retries})...")
         
-        if self.ui_manager:
-            self.ui_manager.send_status_bar("❌ Failed to create protoblock after multiple attempts")
+        self.ui_manager.send_status_bar("❌ Failed to create protoblock after multiple attempts")
         # Raise error after all retries
         raise ValueError(f"Failed to create valid protoblock after {max_retries} attempts. Last error: {last_error}") 
