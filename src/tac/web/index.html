@@ -543,6 +543,7 @@
       min-width: 40px;
       border-right: 1px solid #eee;
       margin-right: 10px;
+      font-size: 12px;
     }
     .diff-line-content {
       flex: 1;
@@ -664,6 +665,76 @@
       margin-right: 10px;
       font-size: 12px;
     }
+    
+    /* Git Operations Panel */
+    #gitOperationsPanel {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-top: 1px solid #e1e4e8;
+      margin-top: 5px;
+      margin-bottom: 10px;
+    }
+    
+    .git-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .git-button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #d0d0d0;
+      background-color: #f0f0f0;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+      width: 100%;
+      text-align: center;
+    }
+    
+    .git-button:hover {
+      background-color: #e0e0e0;
+    }
+    
+    .git-button:active {
+      background-color: #d0d0d0;
+    }
+    
+    .merge-container {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .branch-select {
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid #d0d0d0;
+      font-size: 14px;
+      width: 100%;
+    }
+    
+    #commitChangesBtn {
+      background-color: #dff0d8;
+      border-color: #c3e6cb;
+      color: #155724;
+    }
+    
+    #commitChangesBtn:hover {
+      background-color: #c3e6cb;
+    }
+    
+    #discardChangesBtn {
+      background-color: #f8d7da;
+      border-color: #f5c6cb;
+      color: #721c24;
+    }
+    
+    #discardChangesBtn:hover {
+      background-color: #f5c6cb;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -683,6 +754,19 @@
         </div>
       </div>
       <div id="messageContainer"></div>
+      <div id="gitOperationsPanel" style="display: none;">
+        <div class="section-title">Git Operations</div>
+        <div class="git-buttons">
+          <button id="commitChangesBtn" class="git-button">Commit Changes</button>
+          <button id="discardChangesBtn" class="git-button">Discard Changes</button>
+          <div class="merge-container">
+            <button id="mergeBtn" class="git-button">Merge with Branch</button>
+            <select id="branchSelect" class="branch-select">
+              <option value="">Select Branch</option>
+            </select>
+          </div>
+        </div>
+      </div>
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Type your message here..." rows="2"></textarea>
         <div id="buttonContainer">
@@ -926,6 +1010,13 @@
       
       // Show the protoblock display
       toggleProtoblockDisplay(true);
+      
+      // Check if we should attempt to make files clickable (only after success)
+      const runtimeStatus = document.getElementById('runtimeStatus');
+      if (runtimeStatus.textContent.includes("✅")) {
+        // Make files clickable after a delay to ensure the DOM is ready
+        setTimeout(makeFilesClickable, 300);
+      }
     }
 
     // Update renderer and camera on resize for rightPanel
@@ -1036,6 +1127,12 @@
             // Don't clear the data - just hide it
           }
           
+          // Show git operations panel after successful block execution
+          if (data.message === "✅ Block executed successfully! Displaying final results...") {
+            console.log("Block successful, showing git operations panel");
+            showGitOperationsPanel(true);
+          }
+          
           return;
         } 
         else if (data.type === "error_message") {
@@ -1118,9 +1215,12 @@
           micButton.classList.remove('transcribing');
           return;
         }
-        else if (data.type === "file_status_response" || data.type === "file_diff_response") {
+        else if (data.type === "file_status_response" || 
+                data.type === "file_diff_response" || 
+                data.type === "git_branch_response" || 
+                data.type === "git_operation_response") {
           // Ignore these types of messages - don't display in chat
-          console.log(`Received ${data.type} for ${data.filename}`);
+          console.log(`Received ${data.type}`);
           return;
         }
         else {
@@ -1268,6 +1368,189 @@
     // Expose socket and cube for testing purposes
     window.socket = socket;
     window.cube = cube;
+    
+    // Git Operations Functionality
+    let hasPendingChanges = false;
+    let availableBranches = [];
+    
+    // Function to show git operations panel after successful block execution
+    function showGitOperationsPanel(show) {
+      const gitPanel = document.getElementById('gitOperationsPanel');
+      const inputContainer = document.getElementById('inputContainer');
+      
+      if (!gitPanel) return;
+      
+      if (show) {
+        // Show git panel and hide input
+        gitPanel.style.display = 'block';
+        inputContainer.style.display = 'none';
+        
+        // Request available branches
+        requestBranchList();
+        
+        console.log("Git operations panel shown, chat input hidden");
+      } else {
+        // Hide git panel and show input
+        gitPanel.style.display = 'none';
+        inputContainer.style.display = 'flex';
+        
+        console.log("Git operations panel hidden, chat input shown");
+      }
+    }
+    
+    // Function to request list of available branches
+    function requestBranchList() {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        const request = {
+          type: "git_branch_request"
+        };
+        socket.send(JSON.stringify(request));
+      }
+    }
+    
+    // Function to handle commit changes button click
+    function handleCommitChanges() {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        // Get the task description to use as commit message
+        const taskDescription = document.getElementById('taskDescription').textContent.trim();
+        const commitMsg = taskDescription.length > 50 
+          ? taskDescription.substring(0, 47) + '...' 
+          : taskDescription;
+          
+        // Show operation in progress
+        document.getElementById("runtimeStatus").textContent = "Committing changes...";
+        
+        const request = {
+          type: "git_commit_request",
+          commit_message: commitMsg
+        };
+        socket.send(JSON.stringify(request));
+      }
+    }
+    
+    // Function to handle discard changes button click
+    function handleDiscardChanges() {
+      if (confirm("Are you sure you want to discard all changes?")) {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          // Show operation in progress
+          document.getElementById("runtimeStatus").textContent = "Discarding changes...";
+          
+          const request = {
+            type: "git_discard_request"
+          };
+          socket.send(JSON.stringify(request));
+        }
+      }
+    }
+    
+    // Function to handle merge with branch button click
+    function handleMergeBranch() {
+      const branchSelect = document.getElementById('branchSelect');
+      const selectedBranch = branchSelect.value;
+      
+      if (!selectedBranch) {
+        alert("Please select a branch to merge with");
+        return;
+      }
+      
+      if (confirm(`Are you sure you want to merge changes into ${selectedBranch} and delete the current branch?`)) {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          // Show operation in progress
+          document.getElementById("runtimeStatus").textContent = `Merging to ${selectedBranch}...`;
+          
+          const request = {
+            type: "git_merge_request",
+            target_branch: selectedBranch
+          };
+          socket.send(JSON.stringify(request));
+        }
+      }
+    }
+    
+    // Wait for DOMContentLoaded to ensure all elements are available
+    document.addEventListener('DOMContentLoaded', function() {
+      // Set up git operation button event listeners
+      const commitBtn = document.getElementById('commitChangesBtn');
+      const discardBtn = document.getElementById('discardChangesBtn');
+      const mergeBtn = document.getElementById('mergeBtn');
+      
+      if (commitBtn) {
+        commitBtn.addEventListener('click', handleCommitChanges);
+      }
+      
+      if (discardBtn) {
+        discardBtn.addEventListener('click', handleDiscardChanges);
+      }
+      
+      if (mergeBtn) {
+        mergeBtn.addEventListener('click', handleMergeBranch);
+      }
+      
+      // Listen for git-related responses
+      socket.addEventListener('message', function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Handle git branch response
+          if (data.type === "git_branch_response") {
+            // Populate branch dropdown
+            const branchSelect = document.getElementById('branchSelect');
+            availableBranches = data.branches || [];
+            
+            // Clear existing options
+            while (branchSelect.options.length > 1) {
+              branchSelect.remove(1);
+            }
+            
+            // Add new options
+            availableBranches.forEach(branch => {
+              const option = document.createElement('option');
+              option.value = branch;
+              option.textContent = branch;
+              branchSelect.appendChild(option);
+            });
+          }
+          
+          // Handle git operation response
+          else if (data.type === "git_operation_response") {
+            if (data.success) {
+              // Display success message
+              document.getElementById("runtimeStatus").textContent = `✅ ${data.message}`;
+              
+              // Update UI based on operation
+              if (data.operation === "commit") {
+                // Hide git panel after commit
+                document.getElementById('gitOperationsPanel').style.display = 'none';
+                
+                // Wait a bit and disable entirely
+                setTimeout(() => {
+                  showGitOperationsPanel(false);
+                }, 100);
+              }
+              else if (data.operation === "discard") {
+                // Hide git panel and refresh the page to show original state
+                document.getElementById('gitOperationsPanel').style.display = 'none';
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
+              }
+              else if (data.operation === "merge") {
+                // Hide git panel and refresh the page
+                document.getElementById('gitOperationsPanel').style.display = 'none';
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1000);
+              }
+            } else {
+              // Display error message
+              document.getElementById("runtimeStatus").textContent = `❌ ${data.message}`;
+            }
+          }
+        } catch (e) {
+          // Not JSON
+        }
+      });
+    });
   </script>
   
   <!-- File diff overlay -->
@@ -1506,35 +1789,54 @@
       const writeFilesList = document.getElementById('writeFilesList');
       const contextFilesList = document.getElementById('contextFilesList');
       
+      console.log("Making files clickable");
+      
       // Only apply click handlers if block execution was successful
       const runtimeStatus = document.getElementById('runtimeStatus');
       const isSuccess = runtimeStatus.textContent.includes("✅") || 
-                       runtimeStatus.textContent.includes("successful");
+                       runtimeStatus.textContent.includes("successful") ||
+                       runtimeStatus.textContent.includes("Ready");
       
       if (isSuccess) {
         // Make write files clickable
         const writeFileItems = writeFilesList.querySelectorAll('li');
+        console.log(`Found ${writeFileItems.length} write files to make clickable`);
+        
         writeFileItems.forEach(item => {
-          item.classList.add('clickable-file');
-          item.addEventListener('click', () => {
-            showFileDiff(item.textContent);
+          // Remove existing event listeners by cloning the node
+          const newItem = item.cloneNode(true);
+          item.parentNode.replaceChild(newItem, item);
+          
+          newItem.classList.add('clickable-file');
+          newItem.addEventListener('click', () => {
+            console.log(`Clicked on file: ${newItem.textContent}`);
+            showFileDiff(newItem.textContent);
           });
           
           // Request file status to highlight modified files
-          checkFileStatus(item.textContent);
+          checkFileStatus(newItem.textContent);
         });
         
         // Make context files clickable too
         const contextFileItems = contextFilesList.querySelectorAll('li');
+        console.log(`Found ${contextFileItems.length} context files to make clickable`);
+        
         contextFileItems.forEach(item => {
-          item.classList.add('clickable-file');
-          item.addEventListener('click', () => {
-            showFileDiff(item.textContent);
+          // Remove existing event listeners by cloning the node
+          const newItem = item.cloneNode(true);
+          item.parentNode.replaceChild(newItem, item);
+          
+          newItem.classList.add('clickable-file');
+          newItem.addEventListener('click', () => {
+            console.log(`Clicked on file: ${newItem.textContent}`);
+            showFileDiff(newItem.textContent);
           });
           
           // Request file status to highlight modified files
-          checkFileStatus(item.textContent);
+          checkFileStatus(newItem.textContent);
         });
+      } else {
+        console.log("Block execution not successful, not making files clickable");
       }
     }
 
@@ -1566,8 +1868,15 @@
       // Call the original function
       originalDisplayProtoblockData(data);
       
-      // Make files clickable after displaying protoblock data
-      setTimeout(makeFilesClickable, 200);
+      // Check if this is a successful block execution
+      const runtimeStatus = document.getElementById('runtimeStatus');
+      const isSuccess = runtimeStatus.textContent.includes("✅") || 
+                       runtimeStatus.textContent.includes("successful");
+                       
+      if (isSuccess) {
+        // Make files clickable after a delay to ensure the DOM is ready
+        setTimeout(makeFilesClickable, 300);
+      }
     };
 
     // Add handling for file_status_response messages

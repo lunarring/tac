@@ -527,6 +527,18 @@ class UIManager:
                             elif message_type == "file_status_request":
                                 await self.handle_file_status_request(data.get("filename", ""))
                                 continue
+                            elif message_type == "git_branch_request":
+                                await self.handle_git_branch_request()
+                                continue
+                            elif message_type == "git_commit_request":
+                                await self.handle_git_commit_request(data.get("commit_message", ""))
+                                continue
+                            elif message_type == "git_discard_request":
+                                await self.handle_git_discard_request()
+                                continue
+                            elif message_type == "git_merge_request":
+                                await self.handle_git_merge_request(data.get("target_branch", ""))
+                                continue
                             elif message_type in ["user_message", "transcribed_message"]:
                                 user_message = data.get("message", "").strip()
                         else:
@@ -667,6 +679,251 @@ class UIManager:
                 "type": "remove_protoblock",
                 "message": f"Error: {str(e)[:100]}"
             }))
+
+    async def handle_git_branch_request(self):
+        """Handle request to get all available git branches"""
+        if not self.websocket:
+            return
+            
+        await self.send_status_message("Fetching git branches...")
+        
+        branches = []
+        
+        try:
+            if self.git_manager and self.git_manager.repo:
+                # Get all branches
+                for branch in self.git_manager.repo.branches:
+                    branches.append(branch.name)
+                    
+                # Sort branches alphabetically
+                branches.sort()
+                
+                await self.websocket.send(json.dumps({
+                    "type": "git_branch_response",
+                    "branches": branches
+                }))
+                await self.send_status_message("Ready")
+            else:
+                await self.websocket.send(json.dumps({
+                    "type": "git_branch_response",
+                    "branches": [],
+                    "error": "Git repository not available"
+                }))
+                await self.send_status_message("Git repository not available")
+        except Exception as e:
+            print(f"Error getting git branches: {e}")
+            traceback.print_exc()
+            await self.websocket.send(json.dumps({
+                "type": "git_branch_response",
+                "branches": [],
+                "error": str(e)
+            }))
+            await self.send_status_message(f"Error: {str(e)}")
+            
+    async def handle_git_commit_request(self, commit_message):
+        """Handle request to commit changes"""
+        if not self.websocket:
+            return
+            
+        # Validate commit message
+        if not commit_message:
+            commit_message = "Changes from TAC block execution"
+        
+        await self.send_status_message("Committing changes...")
+        
+        try:
+            if self.git_manager and self.git_manager.repo:
+                # Use the commit method from GitManager
+                success = self.git_manager.commit(commit_message)
+                
+                if success:
+                    response_message = "Changes committed successfully"
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "commit",
+                        "success": True,
+                        "message": response_message
+                    }))
+                    await self.send_status_message(f"✅ {response_message}")
+                else:
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "commit",
+                        "success": False,
+                        "message": "Failed to commit changes"
+                    }))
+                    await self.send_status_message("❌ Failed to commit changes")
+            else:
+                await self.websocket.send(json.dumps({
+                    "type": "git_operation_response",
+                    "operation": "commit",
+                    "success": False,
+                    "message": "Git repository not available"
+                }))
+                await self.send_status_message("❌ Git repository not available")
+        except Exception as e:
+            print(f"Error committing changes: {e}")
+            traceback.print_exc()
+            await self.websocket.send(json.dumps({
+                "type": "git_operation_response",
+                "operation": "commit",
+                "success": False,
+                "message": f"Error: {str(e)}"
+            }))
+            await self.send_status_message(f"❌ Error committing changes: {str(e)}")
+    
+    async def handle_git_discard_request(self):
+        """Handle request to discard changes"""
+        if not self.websocket:
+            return
+            
+        await self.send_status_message("Discarding changes...")
+        
+        try:
+            if self.git_manager and self.git_manager.repo:
+                # Use the revert_changes method from GitManager
+                success = self.git_manager.revert_changes()
+                
+                if success:
+                    response_message = "Changes discarded successfully"
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "discard",
+                        "success": True,
+                        "message": response_message
+                    }))
+                    await self.send_status_message(f"✅ {response_message}")
+                else:
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "discard",
+                        "success": False,
+                        "message": "Failed to discard changes"
+                    }))
+                    await self.send_status_message("❌ Failed to discard changes")
+            else:
+                await self.websocket.send(json.dumps({
+                    "type": "git_operation_response",
+                    "operation": "discard",
+                    "success": False,
+                    "message": "Git repository not available"
+                }))
+                await self.send_status_message("❌ Git repository not available")
+        except Exception as e:
+            print(f"Error discarding changes: {e}")
+            traceback.print_exc()
+            await self.websocket.send(json.dumps({
+                "type": "git_operation_response",
+                "operation": "discard",
+                "success": False,
+                "message": f"Error: {str(e)}"
+            }))
+            await self.send_status_message(f"❌ Error discarding changes: {str(e)}")
+    
+    async def handle_git_merge_request(self, target_branch):
+        """Handle request to merge changes to a branch and delete current branch"""
+        if not self.websocket:
+            return
+            
+        # Validate target branch
+        if not target_branch:
+            await self.websocket.send(json.dumps({
+                "type": "git_operation_response",
+                "operation": "merge",
+                "success": False,
+                "message": "No target branch specified"
+            }))
+            await self.send_status_message("❌ No target branch specified")
+            return
+            
+        await self.send_status_message(f"Merging to {target_branch}...")
+        
+        try:
+            if self.git_manager and self.git_manager.repo:
+                # Get current branch
+                current_branch = self.git_manager.get_current_branch()
+                
+                if not current_branch:
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "merge",
+                        "success": False,
+                        "message": "Could not determine current branch"
+                    }))
+                    await self.send_status_message("❌ Could not determine current branch")
+                    return
+                
+                # First commit any pending changes
+                if not self.git_manager.is_clean():
+                    commit_success = self.git_manager.commit(f"Changes before merging to {target_branch}")
+                    if not commit_success:
+                        await self.websocket.send(json.dumps({
+                            "type": "git_operation_response",
+                            "operation": "merge",
+                            "success": False,
+                            "message": "Failed to commit pending changes before merge"
+                        }))
+                        await self.send_status_message("❌ Failed to commit pending changes before merge")
+                        return
+                
+                # Now perform the merge operation
+                try:
+                    # Switch to target branch
+                    self.git_manager.repo.git.checkout(target_branch)
+                    
+                    # Merge the current branch
+                    self.git_manager.repo.git.merge(current_branch)
+                    
+                    # Delete the current branch if not on the same branch
+                    if current_branch != target_branch:
+                        self.git_manager.repo.git.branch('-D', current_branch)
+                    
+                    response_message = f"Merged to {target_branch} and deleted {current_branch}"
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "merge",
+                        "success": True,
+                        "message": response_message
+                    }))
+                    await self.send_status_message(f"✅ {response_message}")
+                except git.GitCommandError as e:
+                    # Try to abort any failed merge
+                    try:
+                        self.git_manager.repo.git.merge('--abort')
+                    except:
+                        pass
+                        
+                    # Try to go back to original branch
+                    try:
+                        self.git_manager.repo.git.checkout(current_branch)
+                    except:
+                        pass
+                        
+                    await self.websocket.send(json.dumps({
+                        "type": "git_operation_response",
+                        "operation": "merge",
+                        "success": False,
+                        "message": f"Merge failed: {str(e)}"
+                    }))
+                    await self.send_status_message(f"❌ Merge failed: {str(e)}")
+            else:
+                await self.websocket.send(json.dumps({
+                    "type": "git_operation_response",
+                    "operation": "merge",
+                    "success": False,
+                    "message": "Git repository not available"
+                }))
+                await self.send_status_message("❌ Git repository not available")
+        except Exception as e:
+            print(f"Error merging branches: {e}")
+            traceback.print_exc()
+            await self.websocket.send(json.dumps({
+                "type": "git_operation_response",
+                "operation": "merge",
+                "success": False,
+                "message": f"Error: {str(e)}"
+            }))
+            await self.send_status_message(f"❌ Error merging branches: {str(e)}")
 
     async def run_server(self):
         try:
