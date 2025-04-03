@@ -1047,10 +1047,6 @@
           document.getElementById('protoblockContainer').style.display = 'block';
           document.querySelector('#rightPanel canvas').style.display = 'none';
           
-          // Clear any previous data if needed
-          // document.getElementById('protoblockContainer').innerHTML = '';
-          // rebuildProtoblockContainer();
-          
           // Display the data
           displayProtoblockData(data);
           
@@ -1074,7 +1070,14 @@
           micButton.classList.remove('recording');
           micButton.classList.remove('rotating');
           micButton.classList.remove('transcribing');
-        } else {
+          return;
+        }
+        else if (data.type === "file_status_response" || data.type === "file_diff_response") {
+          // Ignore these types of messages - don't display in chat
+          console.log(`Received ${data.type} for ${data.filename}`);
+          return;
+        }
+        else {
           // Regular AI response
           addChatMessage("AI", event.data);
           // Immediately hide typing indicator after full display of AI message
