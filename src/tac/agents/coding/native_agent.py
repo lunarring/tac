@@ -132,6 +132,7 @@ Three.js:
 - do not make a unit tests
 - be sure to produce valid threejs code and be careful about imports and that everything is contained. make something simple and reliable and that has good chances of working and not producing errors.
 - Always include all dependencies in the package.json file, including all necessary dependencies.
+- Don't include text or user inputs unless you are asked to do so.
 """
         
         # Add coding agent prompts if available

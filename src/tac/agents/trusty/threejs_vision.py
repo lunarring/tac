@@ -32,8 +32,8 @@ logger = setup_logging('tac.trusty_agents.threejs_vision')
 
 @trusty_agent(
     name="threejs_vision",
-    description="Use this trusty agent to verify the visual output of web applications. Use it for anything visual with web content like html, threejs, or webgl.",
-    protoblock_prompt="For this visual test, you describe the 3D scene you expect to see. Describe the visual elements such as shapes, colors, lighting, camera angle etc. Don't describe code changes, only describe what can be SEEN by LOOKING at the scene. The idea is that given an image of the scene and this description of yours, someone should be able to tell if the scene is correct or not.",
+    description="Use this trusty agent to verify the visual output of web applications IN CASE there is no visual comparison from a previous version available! For instance, if considering something where we don't have a base version and do it from scratch, use this agent. Otherwise use threejs_vision_before_after or threejs_vision_reference. Otherwise, use it for anything visual with web content like html, threejs, or webgl.",
+    protoblock_prompt="For this visual test, you describe the 3D scene you expect to see. Describe the visual elements such as shapes, colors, lighting, camera angle etc. Don't describe code changes, only describe what can be SEEN by LOOKING at the scene. The idea is that given an image of the scene and this description of yours, someone should be able to tell if the scene is correct or not. Directly describe the scene and what to expect.",
     prompt_target="coding_agent"
 )
 class ThreeJSVisionAgent(TrustyAgent):
