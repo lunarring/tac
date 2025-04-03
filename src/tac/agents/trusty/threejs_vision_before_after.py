@@ -166,6 +166,17 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             # Capture after state
             self.after_screenshot_path = self._capture_state()
             
+            # Verify that screenshots exist and have content
+            for img_path, img_name in [(self.before_screenshot_path, "Before"), (self.after_screenshot_path, "After")]:
+                if not os.path.exists(img_path):
+                    return False, f"{img_name} screenshot file not found: {img_path}", f"Missing {img_name.lower()} screenshot"
+                    
+                file_size = os.path.getsize(img_path)
+                if file_size == 0:
+                    return False, f"{img_name} screenshot file is empty: {img_path}", f"Empty {img_name.lower()} screenshot"
+                
+                logger.info(f"{img_name} screenshot verified: {img_path} ({file_size} bytes)")
+            
             # Create a temporary dummy image to act as the middle pane.
             # This dummy image is 1 pixel wide and filled with the border color.
             before_img = Image.open(self.before_screenshot_path)
@@ -194,6 +205,16 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             comparison_img.save(self.comparison_path)
             logger.info(f"Comparison image saved: {self.comparison_path}")
             
+            # Verify the comparison image was created properly
+            if not os.path.exists(self.comparison_path):
+                return False, "Failed to create comparison image", "Image stitching failed"
+                
+            comparison_file_size = os.path.getsize(self.comparison_path)
+            if comparison_file_size == 0:
+                return False, "Comparison image file is empty", "Empty comparison image"
+                
+            logger.info(f"Comparison image verified: {self.comparison_path} ({comparison_file_size} bytes)")
+            
             # Clean up the temporary dummy image file.
             os.unlink(dummy_image_path)
             
@@ -220,7 +241,38 @@ Focus on:
 - Any unexpected or missing changes"""
             
             logger.info(f"Analyzing comparison with prompt: {prompt}")
-            self.analysis_result = analyze_screenshot(self.comparison_path, prompt, self.llm_client)
+            
+            # Sleep to ensure the image is fully written to disk
+            time.sleep(2)
+            
+            # Direct call to LLM client for vision analysis to ensure image is passed correctly
+            messages = [
+                Message(role="system", content="""You are a helpful assistant that can analyze 3D visualizations created with Three.js.
+                You will grade the visualization on a scale from A to F where:
+                A: Perfect match with all expected elements present and correctly rendered
+                B: Good match with minor visual discrepancies
+                C: Acceptable but with noticeable issues
+                D: Minimum passing grade - basic elements present but with significant issues
+                F: Failed - major elements missing or severe rendering problems
+                
+                Provide your analysis in this format:
+                
+                GRADE: [A-F]
+                
+                ANALYSIS:
+                (Detailed analysis of what matches or doesn't match expectations)
+                
+                ISSUES:
+                (List any visual issues or missing elements)
+                
+                RECOMMENDATIONS:
+                (Suggestions for improvement if needed)"""),
+                Message(role="user", content=prompt)
+            ]
+            
+            # Use vision_chat_completion with the comparison image path
+            logger.info(f"Sending comparison image to vision model: {self.comparison_path}")
+            self.analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
             
             # Log the detailed analysis
             logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
