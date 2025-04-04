@@ -767,61 +767,105 @@
 
     /* Trusty Agent Prompt overlay styles */
     #trustyAgentOverlay {
-      display: none;
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: none;
       justify-content: center;
       align-items: center;
+      z-index: 1000;
     }
     #trustyAgentContent {
-      width: 90%;
-      max-width: 1200px;
-      height: 80%;
-      background-color: #fff;
+      background-color: white;
       border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      width: 80%;
+      max-width: 900px;
+      max-height: 90vh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
     #trustyAgentHeader {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 20px;
-      background-color: #f6f8fa;
-      border-bottom: 1px solid #e1e4e8;
+      padding: 12px 20px;
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
     }
-    #trustyAgentHeader h3 {
+    #trustyAgentTitle {
       margin: 0;
       font-size: 18px;
-      color: #24292e;
+      font-weight: 600;
+      color: #333;
     }
     #trustyAgentCloseBtn {
-      background: none;
-      border: none;
+      font-size: 24px;
       cursor: pointer;
-      font-size: 20px;
-      color: #586069;
+      border: none;
+      background: transparent;
+      color: #666;
+      transition: color 0.2s;
     }
     #trustyAgentCloseBtn:hover {
-      color: #24292e;
+      color: #333;
     }
     #trustyAgentBody {
-      flex: 1;
-      overflow: auto;
       padding: 20px;
-      font-family: monospace;
-      font-size: 14px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      background-color: #f8f8f8;
+      overflow-y: auto;
+      max-height: calc(90vh - 60px);
     }
+    .trusty-agent-section {
+      margin-bottom: 24px;
+    }
+    .trusty-agent-section-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #444;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 5px;
+    }
+    .code-block {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      font-family: 'Roboto Mono', monospace;
+      white-space: pre-wrap;
+      font-size: 14px;
+      overflow-x: auto;
+      border: 1px solid #e9ecef;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    #trustyAgentImageContainer {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    #mainImageContainer, 
+    #comparisonImageContainer {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #e9ecef;
+      text-align: center;
+    }
+    
+    #mainImageContainer h4, 
+    #comparisonImageContainer h4 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #555;
+    }
+    
     /* Style for trusty agent item in file list to show it's clickable */
     .trusty-agent-item {
       cursor: pointer;
@@ -834,10 +878,72 @@
       font-size: 10px;
       opacity: 0.7;
     }
+    .trusty-agent-item.has-results {
+      background-color: #d4edda;
+      border-color: #c3e6cb;
+      color: #155724;
+    }
+    .trusty-agent-item.has-results::after {
+      content: "👁️";
+      color: #155724;
+    }
     .trusty-agent-item:hover {
       background-color: #e6f7ff;
       border-color: #91d5ff;
       transform: translateY(-2px);
+    }
+    .trusty-agent-item.has-results:hover {
+      background-color: #c3e6cb;
+      border-color: #a3d9a5;
+    }
+    
+    /* Agent status styles */
+    .agent-status {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .agent-status.passed {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .agent-status.failed {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .agent-status.error {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+    }
+    
+    /* Agent type style */
+    .agent-type {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+      font-size: 12px;
+      background-color: #e2e3e5;
+      color: #383d41;
+      border: 1px solid #d6d8db;
+      margin-left: 10px;
+    }
+    
+    /* Summary block style */
+    .summary-block {
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      font-size: 14px;
+      line-height: 1.5;
     }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
@@ -1038,6 +1144,9 @@
     function displayProtoblockData(data) {
       console.log("Displaying protoblock data:", data);
       
+      // Ensure protoblock display is visible
+      toggleProtoblockDisplay(true);
+      
       // Update header
       document.getElementById('protoblockAttempt').textContent = `Attempt ${data.attempt}`;
       
@@ -1071,6 +1180,14 @@
       // Store trusty agent prompts data globally to access when popup is opened
       window.trustyAgentPrompts = data.trusty_agent_prompts || {};
       
+      // Store trusty agent results data globally to access when popup is opened
+      window.trustyAgentResults = data.trusty_agent_results || {};
+      
+      // Log trusty agent results for debugging
+      console.log("Trusty agent prompts:", window.trustyAgentPrompts);
+      console.log("Trusty agent results:", window.trustyAgentResults);
+      console.log("Trusty agents:", data.trusty_agents);
+      
       // Combined display logic for trusty agents and their prompts
       if (data.trusty_agents && data.trusty_agents.length > 0) {
         // Always show all agents in the list
@@ -1079,13 +1196,35 @@
           const li = document.createElement('li');
           li.textContent = agent;
           
-          // Add special class if this agent has a prompt
-          if (window.trustyAgentPrompts[agent]) {
-            li.classList.add('trusty-agent-item');
-            li.addEventListener('click', () => {
-              showTrustyAgentPrompt(agent);
-            });
+          // Convert agent name to lowercase for matching with results
+          // This ensures consistency with how the backend stores keys
+          const agentKey = agent.toLowerCase().replace(/agent$/, '');
+          
+          // Log whether this agent has results
+          const hasPrompt = window.trustyAgentPrompts[agent];
+          const resultObj = window.trustyAgentResults && 
+                        (window.trustyAgentResults[agent] || window.trustyAgentResults[agentKey]);
+          const hasResults = resultObj && (resultObj.output || resultObj.image_url);
+          
+          console.log(`Agent ${agent} (key: ${agentKey}): has prompt: ${!!hasPrompt}, has results: ${!!hasResults}`, resultObj);
+          
+          // Always make the agent clickable if it has a prompt (even without results)
+          li.classList.add('trusty-agent-item');
+            
+          // Add has-results class if agent has results
+          if (hasResults) {
+            li.classList.add('has-results');
+            console.log(`Adding has-results class to ${agent}`);
           }
+            
+          li.addEventListener('click', () => {
+            // Get the latest protoblock data for the agent
+            const protoblock = {
+              trusty_agent_prompts: window.trustyAgentPrompts || {},
+              trusty_agent_results: window.trustyAgentResults || {}
+            };
+            displayTrustyAgentPrompt(agent, protoblock);
+          });
           
           trustyAgentsList.appendChild(li);
         });
@@ -1095,9 +1234,6 @@
         li.textContent = 'No trusty agents specified';
         trustyAgentsList.appendChild(li);
       }
-      
-      // Show the protoblock display
-      toggleProtoblockDisplay(true);
       
       // Check if we should attempt to make files clickable (only after success)
       const runtimeStatus = document.getElementById('runtimeStatus');
@@ -1666,10 +1802,42 @@
   <div id="trustyAgentOverlay">
     <div id="trustyAgentContent">
       <div id="trustyAgentHeader">
-        <h3 id="trustyAgentTitle">Trusty Agent Prompt</h3>
+        <h3 id="trustyAgentTitle">Trusty Agent</h3>
         <button id="trustyAgentCloseBtn">×</button>
       </div>
-      <div id="trustyAgentBody"></div>
+      <div id="trustyAgentBody">
+        <div class="trusty-agent-section">
+          <div class="trusty-agent-section-title">Prompt</div>
+          <div id="trustyAgentPromptText" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section" id="trustyAgentResultSection" style="display: none;">
+          <div class="trusty-agent-section-title">Result</div>
+          <div id="trustyAgentResultStatus" class="agent-status"></div>
+          <div id="trustyAgentAgentType" class="agent-type"></div>
+          <div id="trustyAgentResultText" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section" id="trustyAgentImageSection" style="display: none;">
+          <div class="trusty-agent-section-title">Screenshots</div>
+          <div id="trustyAgentImageContainer">
+            <div id="mainImageContainer">
+              <h4>Main Screenshot</h4>
+              <img id="trustyAgentImage" alt="Trusty Agent Output Image" style="max-width: 100%; max-height: 400px;">
+            </div>
+            <div id="comparisonImageContainer" style="display: none; margin-top: 20px;">
+              <h4>Comparison Screenshot</h4>
+              <img id="trustyAgentComparisonImage" alt="Comparison Screenshot" style="max-width: 100%; max-height: 400px;">
+            </div>
+          </div>
+        </div>
+        <div class="trusty-agent-section" id="trustyAgentTestResultsSection" style="display: none;">
+          <div class="trusty-agent-section-title">Test Results</div>
+          <div id="trustyAgentTestResults" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section" id="trustyAgentSummarySection" style="display: none;">
+          <div class="trusty-agent-section-title">Summary</div>
+          <div id="trustyAgentSummary" class="summary-block"></div>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -2167,13 +2335,100 @@
     const trustyAgentTitle = document.getElementById('trustyAgentTitle');
 
     // Function to show a specific trusty agent prompt
-    function showTrustyAgentPrompt(agentName) {
-      if (!window.trustyAgentPrompts || !window.trustyAgentPrompts[agentName]) {
-        trustyAgentBody.innerHTML = `<div class="diff-empty">No prompt available for ${agentName}.</div>`;
+    function showTrustyAgentPrompt(agentName, agentKey) {
+      console.log(`Showing prompt for agent: ${agentName} (key: ${agentKey})`);
+      
+      // Set the title
+      trustyAgentTitle.textContent = `${agentName}`;
+      
+      // Get the prompt
+      const prompt = window.trustyAgentPrompts[agentName] || '';
+      console.log(`Prompt for ${agentName}:`, prompt ? 'exists' : 'not found');
+      
+      // Get the results (if any)
+      // Try both the full name and the key name to match backend storage
+      const results = window.trustyAgentResults && 
+                     (window.trustyAgentResults[agentName] || window.trustyAgentResults[agentKey] || null);
+      
+      console.log(`Results for ${agentName}:`, results || 'not found');
+      
+      // Set the prompt text
+      const promptTextElement = document.getElementById('trustyAgentPromptText');
+      promptTextElement.textContent = prompt || 'No prompt available for this agent.';
+      
+      // Process results if available
+      const resultSection = document.getElementById('trustyAgentResultSection');
+      const resultTextElement = document.getElementById('trustyAgentResultText');
+      const resultStatusElement = document.getElementById('trustyAgentResultStatus');
+      const imageSection = document.getElementById('trustyAgentImageSection');
+      const imageElement = document.getElementById('trustyAgentImage');
+      
+      // Get the runtime status to check if execution was successful
+      const runtimeStatus = document.getElementById('runtimeStatus');
+      const executionSuccessful = runtimeStatus.textContent.includes("✅");
+      
+      if (results && (results.output || results.image_url)) {
+        console.log(`${agentName} has results to display`);
+        
+        // Show result section if there's output text
+        if (results.output) {
+          console.log(`${agentName} output:`, results.output);
+          resultSection.style.display = 'block';
+          resultTextElement.textContent = results.output;
+          
+          // Set status indicator
+          if (results.status) {
+            resultStatusElement.className = 'agent-status ' + results.status;
+            let statusText = '';
+            switch (results.status) {
+              case 'passed':
+                statusText = 'Verification Passed ✅';
+                break;
+              case 'failed':
+                statusText = 'Verification Failed ❌';
+                break;
+              case 'error':
+                statusText = 'Execution Error ⚠️';
+                break;
+              default:
+                statusText = results.status;
+            }
+            resultStatusElement.textContent = statusText;
+            resultStatusElement.style.display = 'inline-block';
+          } else {
+            resultStatusElement.style.display = 'none';
+          }
+        } else {
+          resultSection.style.display = 'none';
+        }
+        
+        // Show image section if there's an image URL
+        if (results.image_url) {
+          console.log(`${agentName} image URL:`, results.image_url);
+          imageSection.style.display = 'block';
+          imageElement.src = results.image_url;
+        } else {
+          imageSection.style.display = 'none';
+        }
       } else {
-        trustyAgentTitle.textContent = `${agentName} Prompt`;
-        trustyAgentBody.textContent = window.trustyAgentPrompts[agentName];
+        console.log(`${agentName} has no results to display`);
+        
+        // Show message based on execution status
+        resultSection.style.display = 'block';
+        resultStatusElement.style.display = 'none';
+        
+        if (executionSuccessful) {
+          // Execution was successful but no results for this agent
+          resultTextElement.innerHTML = '<div class="diff-empty">This agent was executed but did not produce any output.</div>';
+        } else {
+          // Execution may still be in progress or failed
+          resultTextElement.innerHTML = '<div class="diff-empty">No results available yet for this agent.</div>';
+        }
+        
+        imageSection.style.display = 'none';
       }
+      
+      // Show the overlay
       trustyAgentOverlay.style.display = 'flex';
     }
 
@@ -2188,6 +2443,134 @@
         trustyAgentOverlay.style.display = 'none';
       }
     });
+
+    function displayTrustyAgentPrompt(agentName, protoblock) {
+      console.log("Displaying prompt for agent:", agentName);
+      const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
+      const trustyAgentTitle = document.getElementById('trustyAgentTitle');
+      const trustyAgentPromptText = document.getElementById('trustyAgentPromptText');
+      const trustyAgentResultSection = document.getElementById('trustyAgentResultSection');
+      const trustyAgentResultText = document.getElementById('trustyAgentResultText');
+      const trustyAgentImageSection = document.getElementById('trustyAgentImageSection');
+      const trustyAgentImage = document.getElementById('trustyAgentImage');
+      const trustyAgentAgentType = document.getElementById('trustyAgentAgentType');
+      const trustyAgentResultStatus = document.getElementById('trustyAgentResultStatus');
+      const trustyAgentComparisonImage = document.getElementById('trustyAgentComparisonImage');
+      const comparisonImageContainer = document.getElementById('comparisonImageContainer');
+      const trustyAgentTestResultsSection = document.getElementById('trustyAgentTestResultsSection');
+      const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
+      const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
+      const trustyAgentSummary = document.getElementById('trustyAgentSummary');
+
+      // Display the overlay
+      trustyAgentOverlay.style.display = 'flex';
+
+      // Set the title
+      trustyAgentTitle.textContent = `Trusty Agent: ${agentName}`;
+
+      // Set the prompt text
+      const agentKey = agentName.toLowerCase();
+      let agentPrompt = "";
+
+      // Check if the prompt exists for the agent
+      let hasPrompt = false;
+      if (protoblock.trusty_agent_prompts && protoblock.trusty_agent_prompts[agentKey]) {
+        hasPrompt = true;
+        agentPrompt = protoblock.trusty_agent_prompts[agentKey];
+      }
+
+      trustyAgentPromptText.textContent = hasPrompt ? agentPrompt : "No prompt found for this agent.";
+
+      // Check if there are results for this agent
+      let resultObj = null;
+      let hasResults = false;
+      
+      if (protoblock.trusty_agent_results) {
+        console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
+        
+        if (protoblock.trusty_agent_results[agentKey]) {
+          resultObj = protoblock.trusty_agent_results[agentKey];
+          hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
+          console.log(`Found results for ${agentKey}:`, resultObj);
+        }
+      }
+
+      // Display or hide the result section based on whether there are results
+      if (hasResults && resultObj) {
+        trustyAgentResultSection.style.display = 'block';
+        
+        // Set status badge
+        if (resultObj.status) {
+          trustyAgentResultStatus.textContent = resultObj.status;
+          trustyAgentResultStatus.className = 'agent-status';
+          if (resultObj.status.toLowerCase() === 'passed') {
+            trustyAgentResultStatus.classList.add('passed');
+          } else if (resultObj.status.toLowerCase() === 'failed') {
+            trustyAgentResultStatus.classList.add('failed');
+          } else {
+            trustyAgentResultStatus.classList.add('error');
+          }
+        } else {
+          trustyAgentResultStatus.textContent = '';
+          trustyAgentResultStatus.className = 'agent-status';
+        }
+        
+        // Set agent type if available
+        if (resultObj.agent_type) {
+          trustyAgentAgentType.textContent = resultObj.agent_type;
+          trustyAgentAgentType.style.display = 'inline-block';
+        } else {
+          trustyAgentAgentType.style.display = 'none';
+        }
+        
+        // Set result text content
+        trustyAgentResultText.textContent = resultObj.output || "No text output available";
+
+        // Check if there's an image URL and display it
+        if (resultObj.image_url) {
+          trustyAgentImageSection.style.display = 'block';
+          trustyAgentImage.src = resultObj.image_url;
+        } else {
+          trustyAgentImageSection.style.display = 'none';
+        }
+        
+        // Check for comparison image
+        if (resultObj.comparison_path) {
+          comparisonImageContainer.style.display = 'block';
+          trustyAgentComparisonImage.src = resultObj.comparison_path;
+        } else {
+          comparisonImageContainer.style.display = 'none';
+        }
+        
+        // Check for test results
+        if (resultObj.test_results) {
+          trustyAgentTestResultsSection.style.display = 'block';
+          trustyAgentTestResults.textContent = resultObj.test_results;
+        } else {
+          trustyAgentTestResultsSection.style.display = 'none';
+        }
+        
+        // Check for summary
+        if (resultObj.summary) {
+          trustyAgentSummarySection.style.display = 'block';
+          trustyAgentSummary.textContent = resultObj.summary;
+        } else {
+          trustyAgentSummarySection.style.display = 'none';
+        }
+      } else {
+        trustyAgentResultSection.style.display = 'none';
+        trustyAgentImageSection.style.display = 'none';
+        trustyAgentTestResultsSection.style.display = 'none';
+        trustyAgentSummarySection.style.display = 'none';
+        console.log(`No results found for agent: ${agentKey}`);
+      }
+
+      // Set up the close button event listener
+      const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
+      trustyAgentCloseBtn.onclick = function() {
+        trustyAgentOverlay.style.display = 'none';
+      };
+    }
   </script>
 </body>
 </html>

@@ -135,12 +135,83 @@ class BlockExecutor:
             
             # Send status update right before running the agent
             self.ui_manager.send_status_bar(f"Running verification agent: {agent_name}...")
+            
+            # Get the registry name to use as the key - do this before check() to ensure
+            # we have a consistent key for the agent in case of errors
+            registry_name = getattr(agent.__class__, 'agent_name', '')
+            if not registry_name:
+                # Extract name from class name if agent_name not set
+                registry_name = agent_name.lower()
+                if registry_name.endswith('agent'):
+                    registry_name = registry_name[:-5]  # Remove 'agent' suffix
+            
+            logger.info(f"Using registry name '{registry_name}' for agent {agent_name}")
                 
             try:
                 # Run the agent check
                 success, error_analysis, failure_type = agent.check(
                     self.protoblock, self.codebase, code_diff
                 )
+                
+                # Store the agent result in the protoblock
+                if hasattr(self, 'protoblock') and self.protoblock:
+                    if not self.protoblock.trusty_agent_results:
+                        self.protoblock.trusty_agent_results = {}
+                    
+                    # Determine the primary output text
+                    if not success:
+                        output_text = error_analysis
+                    else:
+                        # Try to use the best available detailed output:
+                        # 1. analysis_result from vision agents
+                        # 2. detailed_output attribute if it exists
+                        # 3. output attribute if it exists
+                        # 4. Fall back to a generic "success" message
+                        if hasattr(agent, 'analysis_result') and agent.analysis_result:
+                            output_text = agent.analysis_result
+                        elif hasattr(agent, 'detailed_output') and agent.detailed_output:
+                            output_text = agent.detailed_output
+                        elif hasattr(agent, 'output') and agent.output:
+                            output_text = agent.output
+                        else:
+                            output_text = 'Verification successful'
+                    
+                    # Create the base result dictionary
+                    result_dict = {
+                        'output': output_text,
+                        'status': 'passed' if success else 'failed',
+                        'agent_type': agent_name
+                    }
+                    
+                    # Add image URLs if they exist
+                    if hasattr(agent, 'image_url') and agent.image_url:
+                        result_dict['image_url'] = agent.image_url
+                    
+                    # Add screenshot path if it exists
+                    if hasattr(agent, 'screenshot_path') and agent.screenshot_path:
+                        result_dict['screenshot_path'] = agent.screenshot_path
+                        
+                    # Add comparison image if it exists (for vision comparison agents)
+                    if hasattr(agent, 'comparison_path') and agent.comparison_path:
+                        result_dict['comparison_path'] = agent.comparison_path
+                        
+                    # Add test results if it's a test runner
+                    if hasattr(agent, 'test_results') and agent.test_results:
+                        result_dict['test_results'] = agent.test_results
+                        
+                    # Add summary if it exists
+                    if hasattr(agent, 'summary') and agent.summary:
+                        result_dict['summary'] = agent.summary
+                    
+                    # Store all available results
+                    self.protoblock.trusty_agent_results[registry_name] = result_dict
+                    
+                    # Log the result we're storing
+                    logger.info(f"Stored result for agent {registry_name}: status={result_dict['status']}")
+                    logger.info(f"  Output length: {len(output_text)}")
+                    for key in result_dict:
+                        if key != 'output':  # Skip output as we logged its length above
+                            logger.info(f"  {key}: {result_dict[key]}")
                 
                 # Send immediate status update after the agent completes
                 if not success:
@@ -155,6 +226,22 @@ class BlockExecutor:
                 error_msg = f"Error during {agent_name} check: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg, exc_info=True)
                 self.ui_manager.send_status_bar(f"❌ Error in {agent_name}: {type(e).__name__}")
+                
+                # Store the error in the protoblock
+                if hasattr(self, 'protoblock') and self.protoblock:
+                    if not self.protoblock.trusty_agent_results:
+                        self.protoblock.trusty_agent_results = {}
+                    
+                    # Store error data
+                    self.protoblock.trusty_agent_results[registry_name] = {
+                        'output': error_msg,
+                        'status': 'error',
+                        'agent_type': agent_name
+                    }
+                    
+                    # Log the error result we're storing
+                    logger.info(f"Stored error result for agent {registry_name}: status=error")
+                
                 return False, error_msg, f"Exception in {agent_name} check"
         
         return True, "", ""

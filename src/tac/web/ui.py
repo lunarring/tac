@@ -252,7 +252,8 @@ class UIManager:
                 "context_files": protoblock.context_files,
                 "write_files": protoblock.write_files,
                 "trusty_agents": protoblock.trusty_agents,
-                "trusty_agent_prompts": protoblock.trusty_agent_prompts or {}
+                "trusty_agent_prompts": protoblock.trusty_agent_prompts or {},
+                "trusty_agent_results": protoblock.trusty_agent_results or {}
             }
             
             print(f"Sending protoblock data to client: {json.dumps(protoblock_data, indent=2)}")

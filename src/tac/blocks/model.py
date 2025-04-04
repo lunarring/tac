@@ -28,6 +28,7 @@ class ProtoBlock:
     block_id: str
     trusty_agents: List[str] = None
     trusty_agent_prompts: Dict[str, str] = None
+    trusty_agent_results: Dict[str, Dict[str, Any]] = None
     branch_name: str = None
     commit_message: str = None
     image_url: Optional[str] = None
@@ -42,6 +43,10 @@ class ProtoBlock:
         # Set default empty dict for trusty_agent_prompts if None
         if self.trusty_agent_prompts is None:
             self.trusty_agent_prompts = {}
+            
+        # Set default empty dict for trusty_agent_results if None
+        if self.trusty_agent_results is None:
+            self.trusty_agent_results = {}
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -81,6 +86,7 @@ class ProtoBlock:
         branch_name = version_data.get('branch_name', '')
         trusty_agents = version_data.get('trusty_agents', config.general.trusty_agents.default_trusty_agents)
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
+        trusty_agent_results = version_data.get('trusty_agent_results', {})
         image_url = version_data.get('image_url', None)
         visual_description = version_data.get('visual_description', None)
         attempt_number = version_data.get('attempt_number', 1)
@@ -95,6 +101,7 @@ class ProtoBlock:
             branch_name=branch_name,
             trusty_agents=trusty_agents,
             trusty_agent_prompts=trusty_agent_prompts,
+            trusty_agent_results=trusty_agent_results,
             image_url=image_url,
             visual_description=visual_description,
             attempt_number=attempt_number
@@ -124,6 +131,7 @@ class ProtoBlock:
             "branch_name": self.branch_name,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
+            "trusty_agent_results": self.trusty_agent_results,
             "timestamp": datetime.now().isoformat(),
             "image_url": self.image_url,
             "visual_description": self.visual_description,
@@ -176,6 +184,7 @@ class ProtoBlock:
             "block_id": self.block_id,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
+            "trusty_agent_results": self.trusty_agent_results,
             "image_url": self.image_url,
             "visual_description": self.visual_description,
             "attempt_number": self.attempt_number

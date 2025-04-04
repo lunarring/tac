@@ -7,6 +7,7 @@ import traceback
 from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
 import uuid
 import json
+import asyncio
 from datetime import datetime
 import git
 
@@ -243,6 +244,30 @@ class BlockProcessor:
                     error_analysis = ""
             else:
                 self.ui_manager.send_status_bar(f"✅ Execution successful for attempt {idx_attempt + 1}!")
+                
+                # Debug log to show if we have trusty agent results
+                if hasattr(self.protoblock, 'trusty_agent_results') and self.protoblock.trusty_agent_results:
+                    logger.info(f"Protoblock has {len(self.protoblock.trusty_agent_results)} trusty agent results")
+                    for agent_name, result in self.protoblock.trusty_agent_results.items():
+                        logger.info(f"Agent {agent_name} result: status={result.get('status', 'unknown')}")
+                else:
+                    logger.warning("No trusty agent results found in protoblock!")
+                
+                # Send updated protoblock with results
+                if hasattr(self.ui_manager, 'send_protoblock_data'):
+                    logger.info("Sending updated protoblock with results to UI...")
+                    if hasattr(self.protoblock, 'trusty_agent_results'):
+                        result_keys = list(self.protoblock.trusty_agent_results.keys())
+                        logger.info(f"Trusty agent result keys: {result_keys}")
+                    
+                    # Import asyncio here to make sure it's available
+                    import asyncio
+                    
+                    asyncio.run_coroutine_threadsafe(
+                        self.ui_manager.send_protoblock_data(self.protoblock),
+                        self.ui_manager._loop
+                    )
+                
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
                     if config.safe_get('general', 'halt_after_verify'):
