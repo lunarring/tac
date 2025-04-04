@@ -202,6 +202,15 @@ class BlockExecutor:
                     # Add summary if it exists
                     if hasattr(agent, 'summary') and agent.summary:
                         result_dict['summary'] = agent.summary
+                        
+                    # Add plausibility-specific fields if they exist
+                    if agent_name.lower() == 'plausibilitytestingagent' or registry_name == 'plausibility':
+                        if hasattr(agent, 'grade') and agent.grade:
+                            result_dict['grade'] = agent.grade
+                        if hasattr(agent, 'grade_info') and agent.grade_info:
+                            result_dict['grade_info'] = agent.grade_info
+                        if hasattr(agent, 'verification_info') and agent.verification_info:
+                            result_dict['verification_info'] = agent.verification_info
                     
                     # Store all available results
                     self.protoblock.trusty_agent_results[registry_name] = result_dict

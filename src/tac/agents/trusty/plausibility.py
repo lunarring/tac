@@ -148,6 +148,27 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             
             logger.info("Successfully received LLM analysis")
 
+            # Extract sections for UI display
+            summary = ""
+            if "BRIEF SUMMARY OF THE APPROACH" in analysis:
+                summary_parts = analysis.split("BRIEF SUMMARY OF THE APPROACH")
+                if len(summary_parts) > 1:
+                    end_marker = None
+                    for marker in ["DETAILED ANALYSIS:", "ROOT CAUSE:", "MISSING FILES:", "RECOMMENDATIONS:"]:
+                        if marker in summary_parts[1]:
+                            end_marker = marker
+                            break
+                    
+                    if end_marker:
+                        summary = summary_parts[1].split(end_marker)[0].strip()
+                    else:
+                        summary = summary_parts[1].strip()
+                    
+                    logger.info(f"Brief Summary: {summary[:100]}...")
+                    
+            # Store summary for UI display
+            self.summary = summary
+
             # Extract HUMAN VERIFICATION section if present
             human_verification = ""
             if "HUMAN VERIFICATION:" in analysis:
@@ -155,6 +176,9 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                 if len(human_verification_parts) > 1:
                     human_verification = human_verification_parts[1].strip()
                     logger.info(f"Human Verification: {human_verification}", heading=True)
+            
+            # Store verification info for UI display
+            self.verification_info = human_verification
 
             final_plausibility_score = ""
             if "PLAUSIBILITY SCORE RATING:" in analysis:
@@ -167,6 +191,18 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             
             # Strip any whitespace and ensure uppercase
             final_plausibility_score = final_plausibility_score.strip().upper()
+            
+            # Store grade for UI display
+            self.grade = final_plausibility_score
+            
+            # Add a field indicating the grading scale for UI display
+            self.grade_info = {
+                "A": "Excellent - Perfect match with requirements",
+                "B": "Good - Minor improvements possible",
+                "C": "Acceptable - Some issues exist",
+                "D": "Minimum Pass - Not ideal but functional",
+                "F": "Failed - Significant issues or non-functional"
+            }.get(final_plausibility_score, "Unknown grade")
 
             # Check if score meets minimum requirement
             is_plausible = self._is_score_passing(final_plausibility_score)

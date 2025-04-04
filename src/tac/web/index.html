@@ -945,6 +945,75 @@
       font-size: 14px;
       line-height: 1.5;
     }
+    
+    /* Plausibility display styles */
+    .plausibility-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .plausibility-grade-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .grade {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    
+    .grade[data-grade="A"] {
+      background-color: #d4edda;
+      color: #155724;
+      border: 2px solid #c3e6cb;
+    }
+    
+    .grade[data-grade="B"] {
+      background-color: #d1ecf1;
+      color: #0c5460;
+      border: 2px solid #bee5eb;
+    }
+    
+    .grade[data-grade="C"] {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffeeba;
+    }
+    
+    .grade[data-grade="D"] {
+      background-color: #ffe5d0;
+      color: #7d5a00;
+      border: 2px solid #ffdb9a;
+    }
+    
+    .grade[data-grade="F"] {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 2px solid #f5c6cb;
+    }
+    
+    .grade-info {
+      font-size: 14px;
+      flex: 1;
+    }
+    
+    .verification-info {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #eee;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-top: 5px;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -1816,6 +1885,16 @@
           <div id="trustyAgentAgentType" class="agent-type"></div>
           <div id="trustyAgentResultText" class="code-block"></div>
         </div>
+        <div class="trusty-agent-section" id="trustyAgentPlausibilitySection" style="display: none;">
+          <div class="trusty-agent-section-title">Plausibility Evaluation</div>
+          <div class="plausibility-container">
+            <div class="plausibility-grade-container">
+              <div id="trustyAgentGrade" class="grade"></div>
+              <div id="trustyAgentGradeInfo" class="grade-info"></div>
+            </div>
+            <div id="trustyAgentVerificationInfo" class="verification-info"></div>
+          </div>
+        </div>
         <div class="trusty-agent-section" id="trustyAgentImageSection" style="display: none;">
           <div class="trusty-agent-section-title">Screenshots</div>
           <div id="trustyAgentImageContainer">
@@ -2461,6 +2540,10 @@
       const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
       const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
       const trustyAgentSummary = document.getElementById('trustyAgentSummary');
+      const trustyAgentPlausibilitySection = document.getElementById('trustyAgentPlausibilitySection');
+      const trustyAgentGrade = document.getElementById('trustyAgentGrade');
+      const trustyAgentGradeInfo = document.getElementById('trustyAgentGradeInfo');
+      const trustyAgentVerificationInfo = document.getElementById('trustyAgentVerificationInfo');
 
       // Display the overlay
       trustyAgentOverlay.style.display = 'flex';
@@ -2488,48 +2571,120 @@
       if (protoblock.trusty_agent_results) {
         console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
         
-        if (protoblock.trusty_agent_results[agentKey]) {
-          resultObj = protoblock.trusty_agent_results[agentKey];
-          hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
-          console.log(`Found results for ${agentKey}:`, resultObj);
+        // Try both the full agent name and lowercase version to match backend storage
+        const possibleKeys = [agentName, agentKey, agentName.toLowerCase(), agentKey.replace('agent', '')];
+        
+        for (const key of possibleKeys) {
+          if (protoblock.trusty_agent_results[key]) {
+            resultObj = protoblock.trusty_agent_results[key];
+            hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
+            console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
+            break;
+          }
+        }
+      }
+      
+      // Helper function to make file paths usable in the browser
+      function makePathUsable(path) {
+        if (!path) return null;
+        
+        // If it's already a URL or a relative path, return as is
+        if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('./') || path.startsWith('/')) {
+          return path;
+        }
+        
+        // Convert absolute path to a file URL
+        try {
+          return 'file://' + path;
+        } catch (e) {
+          console.error('Error processing path:', e);
+          return path;
         }
       }
 
+      // Clear previous display state
+      trustyAgentResultSection.style.display = 'none';
+      trustyAgentImageSection.style.display = 'none';
+      trustyAgentTestResultsSection.style.display = 'none';
+      trustyAgentSummarySection.style.display = 'none';
+      trustyAgentPlausibilitySection.style.display = 'none';
+
       // Display or hide the result section based on whether there are results
       if (hasResults && resultObj) {
-        trustyAgentResultSection.style.display = 'block';
+        // Check if this is the plausibility agent
+        const isPlausibilityAgent = 
+          agentKey === 'plausibility' || 
+          agentName.toLowerCase().includes('plausibility') || 
+          (resultObj.agent_type && resultObj.agent_type.toLowerCase().includes('plausibility'));
         
-        // Set status badge
-        if (resultObj.status) {
-          trustyAgentResultStatus.textContent = resultObj.status;
-          trustyAgentResultStatus.className = 'agent-status';
-          if (resultObj.status.toLowerCase() === 'passed') {
-            trustyAgentResultStatus.classList.add('passed');
-          } else if (resultObj.status.toLowerCase() === 'failed') {
-            trustyAgentResultStatus.classList.add('failed');
+        if (isPlausibilityAgent) {
+          // Handle special plausibility display
+          trustyAgentPlausibilitySection.style.display = 'block';
+          
+          // Display grade
+          if (resultObj.grade) {
+            trustyAgentGrade.textContent = resultObj.grade;
+            trustyAgentGrade.setAttribute('data-grade', resultObj.grade);
+            trustyAgentGrade.style.display = 'flex';
           } else {
-            trustyAgentResultStatus.classList.add('error');
+            trustyAgentGrade.style.display = 'none';
           }
-        } else {
-          trustyAgentResultStatus.textContent = '';
-          trustyAgentResultStatus.className = 'agent-status';
+          
+          // Display grade info
+          if (resultObj.grade_info) {
+            trustyAgentGradeInfo.textContent = resultObj.grade_info;
+            trustyAgentGradeInfo.style.display = 'block';
+          } else {
+            trustyAgentGradeInfo.style.display = 'none';
+          }
+          
+          // Display verification info
+          if (resultObj.verification_info) {
+            trustyAgentVerificationInfo.textContent = resultObj.verification_info;
+            trustyAgentVerificationInfo.style.display = 'block';
+          } else {
+            trustyAgentVerificationInfo.style.display = 'none';
+          }
         }
-        
-        // Set agent type if available
-        if (resultObj.agent_type) {
-          trustyAgentAgentType.textContent = resultObj.agent_type;
-          trustyAgentAgentType.style.display = 'inline-block';
-        } else {
-          trustyAgentAgentType.style.display = 'none';
+
+        // Standard result section (text output)
+        if (resultObj.output) {
+          trustyAgentResultSection.style.display = 'block';
+          
+          // Set status badge
+          if (resultObj.status) {
+            trustyAgentResultStatus.textContent = resultObj.status;
+            trustyAgentResultStatus.className = 'agent-status';
+            if (resultObj.status.toLowerCase() === 'passed') {
+              trustyAgentResultStatus.classList.add('passed');
+            } else if (resultObj.status.toLowerCase() === 'failed') {
+              trustyAgentResultStatus.classList.add('failed');
+            } else {
+              trustyAgentResultStatus.classList.add('error');
+            }
+          } else {
+            trustyAgentResultStatus.textContent = '';
+            trustyAgentResultStatus.className = 'agent-status';
+          }
+          
+          // Set agent type if available
+          if (resultObj.agent_type) {
+            trustyAgentAgentType.textContent = resultObj.agent_type;
+            trustyAgentAgentType.style.display = 'inline-block';
+          } else {
+            trustyAgentAgentType.style.display = 'none';
+          }
+          
+          // Set result text content
+          trustyAgentResultText.textContent = resultObj.output || "No text output available";
         }
-        
-        // Set result text content
-        trustyAgentResultText.textContent = resultObj.output || "No text output available";
 
         // Check if there's an image URL and display it
         if (resultObj.image_url) {
           trustyAgentImageSection.style.display = 'block';
-          trustyAgentImage.src = resultObj.image_url;
+          const usablePath = makePathUsable(resultObj.image_url);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting main image src to: ${usablePath}`);
         } else {
           trustyAgentImageSection.style.display = 'none';
         }
@@ -2537,9 +2692,19 @@
         // Check for comparison image
         if (resultObj.comparison_path) {
           comparisonImageContainer.style.display = 'block';
-          trustyAgentComparisonImage.src = resultObj.comparison_path;
+          const usablePath = makePathUsable(resultObj.comparison_path);
+          trustyAgentComparisonImage.src = usablePath;
+          console.log(`Setting comparison image src to: ${usablePath}`);
         } else {
           comparisonImageContainer.style.display = 'none';
+        }
+        
+        // Check for screenshot path (which might be different from image_url)
+        if (!resultObj.image_url && resultObj.screenshot_path) {
+          trustyAgentImageSection.style.display = 'block';
+          const usablePath = makePathUsable(resultObj.screenshot_path);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting image from screenshot_path: ${usablePath}`);
         }
         
         // Check for test results
@@ -2558,10 +2723,11 @@
           trustyAgentSummarySection.style.display = 'none';
         }
       } else {
-        trustyAgentResultSection.style.display = 'none';
-        trustyAgentImageSection.style.display = 'none';
-        trustyAgentTestResultsSection.style.display = 'none';
-        trustyAgentSummarySection.style.display = 'none';
+        // No results found, show a message
+        trustyAgentResultSection.style.display = 'block';
+        trustyAgentResultStatus.style.display = 'none';
+        trustyAgentAgentType.style.display = 'none';
+        trustyAgentResultText.textContent = "No results found for this agent.";
         console.log(`No results found for agent: ${agentKey}`);
       }
 
