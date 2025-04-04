@@ -1062,6 +1062,104 @@
     #contextFilesList, #writeFilesList, #trustyAgentsList {
       max-height: 150px;
     }
+    
+    /* Button animations */
+    @keyframes button-pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(26, 115, 232, 0.4); }
+      50% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(26, 115, 232, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(26, 115, 232, 0); }
+    }
+    
+    @keyframes button-success {
+      0% { background-color: var(--background-color); }
+      20% { background-color: #d4edda; }
+      100% { background-color: var(--background-color); }
+    }
+    
+    @keyframes button-ripple {
+      0% { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0.5); }
+      100% { box-shadow: 0 0 0 15px rgba(26, 115, 232, 0); }
+    }
+    
+    @keyframes button-shimmer {
+      0% { background-position: -100px 0; }
+      100% { background-position: 100px 0; }
+    }
+    
+    /* Universal button animation class */
+    .button-clicked {
+      animation: button-pulse 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    
+    /* Additional animation for when an action is successful */
+    .button-success {
+      animation: button-success 1.5s ease;
+    }
+    
+    /* Ripple effect for buttons */
+    .button-ripple {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .button-ripple::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 5px;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.5);
+      opacity: 0;
+      border-radius: 100%;
+      transform: scale(1, 1) translate(-50%);
+      transform-origin: 50% 50%;
+    }
+    
+    .button-ripple:focus:not(:active)::after {
+      animation: ripple 1s ease-out;
+    }
+    
+    @keyframes ripple {
+      0% {
+        transform: scale(0, 0);
+        opacity: 0.5;
+      }
+      20% {
+        transform: scale(25, 25);
+        opacity: 0.3;
+      }
+      100% {
+        opacity: 0;
+        transform: scale(40, 40);
+      }
+    }
+    
+    /* Shimmer effect for buttons */
+    .button-shimmer {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .button-shimmer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        to right, 
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        rgba(255, 255, 255, 0) 100%
+      );
+      background-size: 200px 100%;
+      background-repeat: no-repeat;
+      background-position: -100px 0;
+      animation: button-shimmer 1s ease-in-out;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -1153,7 +1251,7 @@
     threeContainer.appendChild(renderer.domElement);
 
     // Create a polished cube with a refined material configured with wireframe: true
-    const geometry = new THREE.BoxGeometry();
+    const geometry = new THREE.BoxGeometry(1, 1, 1, 2, 2, 2);  // Add more segments for better deformation effects
     const cubeMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x0078d7, 
       shininess: 100, 
@@ -1173,6 +1271,18 @@
     const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
     const wireframe = new THREE.LineSegments(edges, lineMaterial);
     cube.add(wireframe);
+    
+    // Add a glow effect with a larger transparent cube
+    const glowGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+    const glowMaterial = new THREE.MeshPhongMaterial({
+      color: 0x0078d7,
+      transparent: true,
+      opacity: 0.15,
+      wireframe: false,
+      side: THREE.BackSide // Only render inside faces
+    });
+    const glowCube = new THREE.Mesh(glowGeometry, glowMaterial);
+    cube.add(glowCube);
 
     // Position the camera and add lights for a refined look
     camera.position.set(3, 3, 5);
@@ -1183,13 +1293,174 @@
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
+    // Animation variables
+    let rotationSpeed = 0.01;
+    let targetRotationSpeed = 0.01;
+    let isAnimating = false;
+    let targetPosition = new THREE.Vector3(0, 0, 0);
+    let targetColor = new THREE.Color(0x0078d7);
+    let currentColor = new THREE.Color(0x0078d7);
+    let animationStartTime = 0;
+    let animationDuration = 2000; // 2 seconds
+    let targetScale = new THREE.Vector3(1, 1, 1);
+    let originalScale = new THREE.Vector3(1, 1, 1);
+    let swooshActive = false;
+    let swooshDirection = new THREE.Vector3(1, 1, 0);
+    let swooshSpeed = 0;
+    let swooshDistance = 0;
+    
+    // Update glow color when cube color changes
+    function updateGlowColor() {
+      glowMaterial.color.copy(currentColor);
+      lineMaterial.color.set(0xffffff); // Keep wireframe white for contrast
+    }
+    
+    // Color palette for random color selection
+    const colorPalette = [
+      0x1a73e8, // Google Blue
+      0x4285f4, // Material Blue
+      0xea4335, // Google Red
+      0xfbbc05, // Google Yellow
+      0x34a853, // Google Green
+      0x9c27b0, // Purple
+      0xff6d00, // Orange
+      0x00bcd4  // Cyan
+    ];
+
     function animate() {
       requestAnimationFrame(animate);
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.01;
+      
+      // Smoothly interpolate rotation speed
+      rotationSpeed += (targetRotationSpeed - rotationSpeed) * 0.05;
+      
+      cube.rotation.x += rotationSpeed;
+      cube.rotation.y += rotationSpeed * 1.2;
+      
+      // Handle animation if active
+      if (isAnimating) {
+        const elapsed = Date.now() - animationStartTime;
+        const progress = Math.min(elapsed / animationDuration, 1);
+        
+        // Ease in/out function for smooth transitions
+        const easeInOut = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        const easedProgress = easeInOut(progress);
+        
+        // Interpolate position
+        cube.position.x = THREE.MathUtils.lerp(cube.position.x, targetPosition.x, easedProgress * 0.05);
+        cube.position.y = THREE.MathUtils.lerp(cube.position.y, targetPosition.y, easedProgress * 0.05);
+        cube.position.z = THREE.MathUtils.lerp(cube.position.z, targetPosition.z, easedProgress * 0.05);
+        
+        // Interpolate color
+        currentColor.r = THREE.MathUtils.lerp(currentColor.r, targetColor.r, easedProgress * 0.05);
+        currentColor.g = THREE.MathUtils.lerp(currentColor.g, targetColor.g, easedProgress * 0.05);
+        currentColor.b = THREE.MathUtils.lerp(currentColor.b, targetColor.b, easedProgress * 0.05);
+        
+        // Apply color to materials
+        cubeMaterial.color.copy(currentColor);
+        cubeMaterial.emissive.copy(currentColor);
+        updateGlowColor();
+        
+        // Interpolate scale
+        cube.scale.x = THREE.MathUtils.lerp(cube.scale.x, targetScale.x, easedProgress * 0.05);
+        cube.scale.y = THREE.MathUtils.lerp(cube.scale.y, targetScale.y, easedProgress * 0.05);
+        cube.scale.z = THREE.MathUtils.lerp(cube.scale.z, targetScale.z, easedProgress * 0.05);
+        
+        // End animation if completed
+        if (progress >= 1) {
+          isAnimating = false;
+        }
+      }
+      
+      // Handle swoosh animation
+      if (swooshActive) {
+        // Move the cube in swoosh direction
+        cube.position.x += swooshDirection.x * swooshSpeed;
+        cube.position.y += swooshDirection.y * swooshSpeed;
+        cube.position.z += swooshDirection.z * swooshSpeed;
+        
+        // Update swoosh distance
+        swooshDistance += swooshSpeed;
+        
+        // Apply a slight deformation to the cube during swoosh
+        const deformFactor = Math.sin(swooshDistance * 2) * 0.2;
+        cube.scale.x = 1 + deformFactor;
+        cube.scale.z = 1 - deformFactor * 0.5;
+        
+        // Reduce swoosh speed gradually
+        swooshSpeed *= 0.95;
+        
+        // End swoosh when speed gets too low
+        if (swooshSpeed < 0.01) {
+          swooshActive = false;
+          // Return to center and original scale
+          targetPosition.set(0, 0, 0);
+          targetScale.copy(originalScale);
+        }
+      }
+      
       renderer.render(scene, camera);
     }
     animate();
+    
+    // Function to trigger cube animation on click
+    function triggerCubeAnimation() {
+      // Set new target rotation speed
+      targetRotationSpeed = 0.05 + Math.random() * 0.1;
+      
+      // Set random swoosh direction
+      swooshDirection.set(
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+        (Math.random() - 0.5) * 0.5
+      ).normalize();
+      
+      // Set swoosh speed and activate
+      swooshSpeed = 0.2 + Math.random() * 0.3;
+      swooshDistance = 0;
+      swooshActive = true;
+      
+      // Set new target position (will be used after swoosh)
+      targetPosition.set(
+        (Math.random() - 0.5) * 3,  // x: -1.5 to 1.5
+        (Math.random() - 0.5) * 2,  // y: -1 to 1
+        (Math.random() - 0.5) * 2   // z: -1 to 1
+      );
+      
+      // Set new target scale
+      targetScale.set(
+        0.8 + Math.random() * 0.4,
+        0.8 + Math.random() * 0.4,
+        0.8 + Math.random() * 0.4
+      );
+      
+      // Set new target color
+      const newColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+      targetColor.set(newColor);
+      
+      // Start animation
+      isAnimating = true;
+      animationStartTime = Date.now();
+      animationDuration = 1000 + Math.random() * 2000; // 1-3 seconds
+      
+      // Gradually return to normal rotation speed
+      setTimeout(() => {
+        targetRotationSpeed = 0.01;
+      }, animationDuration);
+      
+      // Gradually return to center and original scale
+      setTimeout(() => {
+        targetPosition.set(0, 0, 0);
+        targetScale.copy(originalScale);
+      }, animationDuration + 1000);
+    }
+    
+    // Add click event listener to the canvas
+    renderer.domElement.addEventListener('click', function(event) {
+      // Only trigger if the cube is visible (not showing protoblock)
+      if (renderer.domElement.style.display !== 'none') {
+        triggerCubeAnimation();
+      }
+    });
 
     // Function to toggle between 3D cube and protoblock display
     function toggleProtoblockDisplay(show) {
@@ -1621,65 +1892,82 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Immediately update the runtime status to reflect the protoblock execution process.
-      document.getElementById("runtimeStatus").textContent = "Executing protoblock";
-      
-      // Hide the protoblock display when starting a new block generation
-      toggleProtoblockDisplay(false);
-      
-      // Clear any existing protoblock data
-      document.getElementById('protoblockContainer').innerHTML = '';
-      rebuildProtoblockContainer();
-      
-      // Add active class to trigger animation
-      blockButton.classList.add('active');
-      // Remove active class after a short delay to revert to original state
-      setTimeout(() => {
-        blockButton.classList.remove('active');
-      }, 300);
-      
-      // If there is a message typed in, send it first to the chat system
-      const text = userInput.value.trim();
-      if (text !== "") {
-        addChatMessage("User", text);
-        const messagePayload = {
-          type: "user_message",
-          message: text
+      if (socket.readyState === WebSocket.OPEN) {
+        // Add button animation
+        blockButton.classList.add('button-clicked');
+        
+        // Immediately update the runtime status to reflect the protoblock execution process.
+        document.getElementById("runtimeStatus").textContent = "Executing protoblock";
+        
+        // Hide the protoblock display when starting a new block generation
+        toggleProtoblockDisplay(false);
+        
+        // Clear any existing protoblock data
+        document.getElementById('protoblockContainer').innerHTML = '';
+        rebuildProtoblockContainer();
+        
+        // Trigger cube animation on block button click
+        blockButton.classList.add('active');
+        triggerCubeAnimation();
+        
+        // Remove active class after animation is complete
+        setTimeout(function() {
+          blockButton.classList.remove('active');
+          blockButton.classList.remove('button-clicked');
+        }, 500);
+        
+        // If there is a message typed in, send it first to the chat system
+        const text = userInput.value.trim();
+        if (text !== "") {
+          addChatMessage("User", text);
+          const messagePayload = {
+            type: "user_message",
+            message: text
+          };
+          socket.send(JSON.stringify(messagePayload));
+          showTypingIndicator();
+          userInput.value = "";
+        }
+        
+        // Initiate block processing by sending the block_click payload
+        const payload = {
+          type: "block_click"
         };
-        socket.send(JSON.stringify(messagePayload));
-        showTypingIndicator();
-        userInput.value = "";
+        socket.send(JSON.stringify(payload));
       }
-      
-      // Initiate block processing by sending the block_click payload
-      const payload = {
-        type: "block_click"
-      };
-      socket.send(JSON.stringify(payload));
     });
 
     // Bind click event to the microphone button to send the 'mic_click' event to the backend
-    let isRecording = false; // flag to track recording state
-
+    // Also toggle a rotating class on the button to indicate recording status
+    // When rotation is stopped, a 'transcribing' class is added to indicate processing
     micButton.addEventListener('click', function() {
-      // Toggle the recording state
-      isRecording = !isRecording;
-      if (isRecording) {
-        // Start recording: add 'recording' class to display red indicator and remove rotating if set
-        micButton.classList.add('recording');
-        micButton.classList.remove('rotating');
-        micButton.classList.remove('transcribing');
-      } else {
-        // Stop recording: remove 'recording' class and add 'transcribing' class to indicate ongoing transcription
-        micButton.classList.remove('recording');
-        micButton.classList.remove('rotating');
-        micButton.classList.add('transcribing');
+      if (socket.readyState === WebSocket.OPEN) {
+        // Add button animation
+        micButton.classList.add('button-clicked');
+        
+        // If not already recording, add recording class
+        if (!micButton.classList.contains('recording')) {
+          micButton.classList.add('recording');
+          micButton.classList.remove('rotating');
+          micButton.classList.remove('transcribing');
+        } else {
+          // If already recording, stop recording and add transcribing class
+          micButton.classList.remove('recording');
+          micButton.classList.remove('rotating');
+          micButton.classList.add('transcribing');
+        }
+        
+        // Clean up animation after it completes
+        setTimeout(() => {
+          micButton.classList.remove('button-clicked');
+        }, 500);
+        
+        // Send the mic_click event to the backend
+        const message = {
+          type: "mic_click"
+        };
+        socket.send(JSON.stringify(message));
       }
-      const payload = {
-        type: "mic_click",
-        recording: isRecording
-      };
-      socket.send(JSON.stringify(payload));
     });
 
     // Initialize Three.js scene for the rotating cube inside the block button
@@ -1770,6 +2058,15 @@
     // Function to handle commit changes button click
     function handleCommitChanges() {
       if (socket && socket.readyState === WebSocket.OPEN) {
+        // Animate the button
+        const commitBtn = document.getElementById('commitChangesBtn');
+        commitBtn.classList.add('button-clicked');
+        
+        // Clean up animation after it completes
+        setTimeout(() => {
+          commitBtn.classList.remove('button-clicked');
+        }, 500);
+        
         // Get the commit message 
         const commitMsg = document.getElementById('commitMessage').textContent.trim();
           
@@ -1788,6 +2085,15 @@
     function handleDiscardChanges() {
       if (confirm("Are you sure you want to discard all changes?")) {
         if (socket && socket.readyState === WebSocket.OPEN) {
+          // Animate the button
+          const discardBtn = document.getElementById('discardChangesBtn');
+          discardBtn.classList.add('button-clicked');
+          
+          // Clean up animation after it completes
+          setTimeout(() => {
+            discardBtn.classList.remove('button-clicked');
+          }, 500);
+          
           // Show operation in progress
           document.getElementById("runtimeStatus").textContent = "Discarding changes...";
           
@@ -1811,6 +2117,15 @@
       
       if (confirm(`Are you sure you want to merge changes into ${selectedBranch} and delete the current branch?`)) {
         if (socket && socket.readyState === WebSocket.OPEN) {
+          // Animate the button
+          const mergeBtn = document.getElementById('mergeBtn');
+          mergeBtn.classList.add('button-clicked');
+          
+          // Clean up animation after it completes
+          setTimeout(() => {
+            mergeBtn.classList.remove('button-clicked');
+          }, 500);
+          
           // Show operation in progress
           document.getElementById("runtimeStatus").textContent = `Merging to ${selectedBranch}...`;
           
@@ -2006,847 +2321,85 @@
     const fileDiffLeft = document.getElementById('fileDiffLeft');
     const fileDiffRight = document.getElementById('fileDiffRight');
     const fileDiffViewToggle = document.getElementById('fileDiffViewToggle');
-
-    let diffViewMode = 'unified'; // 'unified' or 'split'
-
-    // Toggle between unified and split view
-    fileDiffViewToggle.addEventListener('click', () => {
-      if (diffViewMode === 'unified') {
-        diffViewMode = 'split';
-        fileDiffBody.style.display = 'none';
-        fileDiffSplitView.style.display = 'flex';
-        fileDiffViewToggle.textContent = 'Unified View';
-        
-        // Set proper height for scroll container after switching to split view
-        setupSplitViewScrolling();
-      } else {
-        diffViewMode = 'unified';
-        fileDiffBody.style.display = 'block';
-        fileDiffSplitView.style.display = 'none';
-        fileDiffViewToggle.textContent = 'Split View';
-      }
-    });
-    
-    // Function to set up synchronized scrolling
-    function setupSplitViewScrolling() {
-      const scrollContainer = document.getElementById('fileDiffScrollContainer');
-      const scrollContent = document.getElementById('fileDiffScrollContent');
-      const leftPane = document.getElementById('fileDiffLeft');
-      const rightPane = document.getElementById('fileDiffRight');
-      
-      // Set height of scroll content based on line count
-      if (window.currentDiffLineCount) {
-        // Approximate line height of 22px
-        scrollContent.style.height = (window.currentDiffLineCount * 22) + 'px';
-      }
-      
-      // Synchronize panes with scroll container
-      scrollContainer.onscroll = function() {
-        leftPane.scrollTop = scrollContainer.scrollTop;
-        rightPane.scrollTop = scrollContainer.scrollTop;
-      };
-    }
-
-    // Function to parse a git diff and create the split view content
-    function parseDiffForSplitView(diff) {
-      const leftContent = [];
-      const rightContent = [];
-      
-      // Regular expressions for parsing diff parts
-      const fileHeaderRegex = /^diff --git a\/(.*) b\/(.*)$/;
-      const hunkHeaderRegex = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)$/;
-      
-      let leftLineNumber = 1;
-      let rightLineNumber = 1;
-      let currentFile = '';
-      let inHunk = false;
-      let diffLineCount = 0;
-      
-      // Split the diff into lines
-      const lines = diff.split('\n');
-      
-      // Add file header
-      leftContent.push('<div class="diff-file-header">Original</div>');
-      rightContent.push('<div class="diff-file-header">Modified</div>');
-      diffLineCount++;
-      
-      // Process each line of the diff
-      lines.forEach(line => {
-        // Check for file header
-        const fileHeaderMatch = line.match(fileHeaderRegex);
-        if (fileHeaderMatch) {
-          currentFile = fileHeaderMatch[1];
-          leftContent.push(`<div class="diff-section-header">${currentFile}</div>`);
-          rightContent.push(`<div class="diff-section-header">${currentFile}</div>`);
-          diffLineCount++;
-          return;
-        }
-        
-        // Check for hunk header
-        const hunkHeaderMatch = line.match(hunkHeaderRegex);
-        if (hunkHeaderMatch) {
-          const leftStart = parseInt(hunkHeaderMatch[1]);
-          const rightStart = parseInt(hunkHeaderMatch[3]);
-          
-          inHunk = true;
-          leftLineNumber = leftStart;
-          rightLineNumber = rightStart;
-          
-          leftContent.push(`<div class="diff-section-header">${line}</div>`);
-          rightContent.push(`<div class="diff-section-header">${line}</div>`);
-          diffLineCount++;
-          return;
-        }
-        
-        // Skip other headers or non-content lines
-        if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('index ')) {
-          return;
-        }
-        
-        // Process content lines
-        if (inHunk) {
-          if (line.startsWith('-')) {
-            // Line removed - show in left only
-            leftContent.push(`
-              <div class="diff-line diff-removed-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightContent.push(`<div class="diff-line diff-filler"></div>`);
-            leftLineNumber++;
-            diffLineCount++;
-          } else if (line.startsWith('+')) {
-            // Line added - show in right only
-            leftContent.push(`<div class="diff-line diff-filler"></div>`);
-            rightContent.push(`
-              <div class="diff-line diff-added-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightLineNumber++;
-            diffLineCount++;
-          } else if (line.startsWith(' ')) {
-            // Common line - show in both
-            leftContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            leftLineNumber++;
-            rightLineNumber++;
-            diffLineCount++;
-          } else if (line.trim() === '') {
-            // Empty line - show in both
-            leftContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content"></span>
-              </div>
-            `);
-            rightContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content"></span>
-              </div>
-            `);
-            leftLineNumber++;
-            rightLineNumber++;
-            diffLineCount++;
-          }
-        }
-      });
-      
-      return {
-        left: leftContent.join(''),
-        right: rightContent.join(''),
-        lineCount: diffLineCount
-      };
-    }
-
-    // Helper function to escape HTML special characters
-    function escapeHtml(unsafe) {
-      return unsafe
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-    }
-
-    // Close overlay when clicking the close button
-    fileDiffCloseBtn.addEventListener('click', () => {
-      fileDiffOverlay.style.display = 'none';
-    });
-
-    // Close overlay when clicking outside the content
-    fileDiffOverlay.addEventListener('click', (event) => {
-      if (event.target === fileDiffOverlay) {
-        fileDiffOverlay.style.display = 'none';
-      }
-    });
-
-    // Function to fetch and show file diff
-    async function showFileDiff(filename) {
-      fileDiffTitle.textContent = `Changes in ${filename}`;
-      fileDiffBody.innerHTML = 'Loading diff...';
-      fileDiffLeft.innerHTML = 'Loading...';
-      fileDiffRight.innerHTML = 'Loading...';
-      fileDiffOverlay.style.display = 'flex';
-      
-      // Send WebSocket request for file diff
-      requestFileDiff(filename);
-    }
-
-    // Function to make file list items clickable
-    function makeFilesClickable() {
-      const writeFilesList = document.getElementById('writeFilesList');
-      const contextFilesList = document.getElementById('contextFilesList');
-      
-      console.log("Making files clickable");
-      
-      // Only apply click handlers if block execution was successful
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const isSuccess = runtimeStatus.textContent.includes("✅") || 
-                       runtimeStatus.textContent.includes("successful") ||
-                       runtimeStatus.textContent.includes("Ready");
-      
-      if (isSuccess) {
-        // Make write files clickable
-        const writeFileItems = writeFilesList.querySelectorAll('li');
-        console.log(`Found ${writeFileItems.length} write files to make clickable`);
-        
-        writeFileItems.forEach(item => {
-          // Remove existing event listeners by cloning the node
-          const newItem = item.cloneNode(true);
-          item.parentNode.replaceChild(newItem, item);
-          
-          // Extract just the filename without any badges or added elements
-          const filename = newItem.childNodes[0].textContent.trim();
-          
-          newItem.classList.add('clickable-file');
-          newItem.addEventListener('click', (event) => {
-            // Prevent clicks on badges from triggering the diff view
-            if (event.target.closest('.line-count-badge')) {
-              return;
-            }
-            
-            console.log(`Clicked on file: ${filename}`);
-            showFileDiff(filename);
-          });
-          
-          // Request file status to highlight modified files
-          checkFileStatus(filename);
-        });
-        
-        // Context files should NOT be clickable in the same way write files are
-        const contextFileItems = contextFilesList.querySelectorAll('li');
-        console.log(`Found ${contextFileItems.length} context files`);
-        
-        contextFileItems.forEach(item => {
-          // Remove any clickable styling or event listeners
-          const newItem = item.cloneNode(true);
-          item.parentNode.replaceChild(newItem, item);
-          
-          // Make them non-clickable by default
-          newItem.classList.remove('clickable-file');
-          newItem.classList.remove('modified-file');
-          
-          // Still check file status, but don't make them clickable for diffs
-          const filename = newItem.childNodes[0].textContent.trim();
-          checkFileStatus(filename);
-        });
-      } else {
-        console.log("Block execution not successful, not making files clickable");
-      }
-    }
-
-    // Function to check if a file has been modified
-    function checkFileStatus(filename) {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const request = {
-          type: "file_status_request",
-          filename: filename
-        };
-        socket.send(JSON.stringify(request));
-      }
-    }
-
-    // Function to send message to server to request file diff
-    function requestFileDiff(filename) {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const request = {
-          type: "file_diff_request",
-          filename: filename
-        };
-        socket.send(JSON.stringify(request));
-      }
-    }
-
-    // Update the displayProtoblockData function to make files clickable
-    const originalDisplayProtoblockData = displayProtoblockData;
-    displayProtoblockData = function(data) {
-      // Call the original function
-      originalDisplayProtoblockData(data);
-      
-      // Check if this is a successful block execution
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const isSuccess = runtimeStatus.textContent.includes("✅") || 
-                       runtimeStatus.textContent.includes("successful");
-                       
-      if (isSuccess) {
-        // Make files clickable after a delay to ensure the DOM is ready
-        setTimeout(makeFilesClickable, 300);
-      }
-    };
-
-    // Add handling for file_status_response messages
-    socket.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === "file_status_response") {
-          // Handle file status update
-          const { filename, is_modified, error, added_lines, removed_lines } = data;
-          
-          if (error) {
-            console.log(`Error checking status for ${filename}: ${error}`);
-            return;
-          }
-          
-          // Find the file item in both lists
-          const allFileLists = [
-            document.getElementById('writeFilesList'),
-            document.getElementById('contextFilesList')
-          ];
-          
-          allFileLists.forEach(list => {
-            if (!list) return;
-            
-            const items = list.querySelectorAll('li');
-            items.forEach(item => {
-              // Extract the actual filename from the first text node
-              let itemFilename = '';
-              if (item.childNodes.length > 0 && item.childNodes[0].nodeType === Node.TEXT_NODE) {
-                itemFilename = item.childNodes[0].textContent.trim();
-              } else {
-                itemFilename = item.textContent.trim();
-              }
-              
-              if (itemFilename === filename.trim()) {
-                // For context files, we don't want to highlight them as modified
-                if (list.id === 'contextFilesList') {
-                  // Don't add modification styling to context files
-                  return;
-                }
-                
-                // Update class based on modification status
-                if (is_modified) {
-                  item.classList.add('modified-file');
-                  
-                  // Add line counts if available
-                  if (added_lines > 0 || removed_lines > 0) {
-                    // Create line count display
-                    let lineCountHTML = '';
-                    
-                    if (added_lines > 0) {
-                      lineCountHTML += `<span class="line-count-added">+${added_lines}</span>`;
-                    }
-                    
-                    if (removed_lines > 0) {
-                      lineCountHTML += `<span class="line-count-removed">-${removed_lines}</span>`;
-                    }
-                    
-                    // Add the line count badge
-                    const badge = document.createElement('span');
-                    badge.className = 'line-count-badge';
-                    badge.innerHTML = lineCountHTML;
-                    
-                    // Remove any existing badge first
-                    const existingBadge = item.querySelector('.line-count-badge');
-                    if (existingBadge) {
-                      item.removeChild(existingBadge);
-                    }
-                    
-                    // Add new badge
-                    item.appendChild(badge);
-                  }
-                } else {
-                  item.classList.remove('modified-file');
-                  // Remove any existing line count badge
-                  const existingBadge = item.querySelector('.line-count-badge');
-                  if (existingBadge) {
-                    item.removeChild(existingBadge);
-                  }
-                }
-              }
-            });
-          });
-        }
-      } catch (e) {
-        // Not JSON or not a file_status_response
-      }
-    });
-
-    // When we get a file_diff_response, handle both unified and split views
-    socket.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "file_diff_response") {
-          // Display the diff in the overlay
-          fileDiffTitle.textContent = `Changes in ${data.filename}`;
-          
-          // Format and display the diff with syntax highlighting
-          let formattedDiff = '';
-          
-          if (data.error) {
-            formattedDiff = `<div class="diff-error">Error: ${data.error}</div>`;
-            fileDiffBody.innerHTML = formattedDiff;
-            fileDiffLeft.innerHTML = formattedDiff;
-            fileDiffRight.innerHTML = formattedDiff;
-          } else if (!data.diff || data.diff.trim() === '') {
-            formattedDiff = '<div class="diff-empty">No changes detected for this file.</div>';
-            fileDiffBody.innerHTML = formattedDiff;
-            fileDiffLeft.innerHTML = formattedDiff;
-            fileDiffRight.innerHTML = formattedDiff;
-          } else {
-            // Handle the case where diff is just file content
-            if (data.diff.startsWith("Full file content") || data.diff.startsWith("File is tracked")) {
-              // Simple content display
-              const content = data.diff.replace(/^Full file content.*?\n/g, '');
-              formattedDiff = `<div class="diff-section">${data.diff.split('\n')[0]}</div>`;
-              formattedDiff += `<pre class="diff-unchanged">${escapeHtml(content)}</pre>`;
-              
-              // For split view, show the same content on both sides
-              fileDiffLeft.innerHTML = `<div class="diff-file-header">Original</div><pre>${escapeHtml(content)}</pre>`;
-              fileDiffRight.innerHTML = `<div class="diff-file-header">Modified</div><pre>${escapeHtml(content)}</pre>`;
-              window.currentDiffLineCount = content.split('\n').length + 5; // +5 for headers
-            } else {
-              // Process the diff for unified view
-              const diffLines = data.diff.split('\n');
-              let inSection = false;
-              
-              diffLines.forEach(line => {
-                if (line.startsWith("=== ") && line.endsWith(" ===")) {
-                  // Section header (staged/unstaged)
-                  formattedDiff += `<div class="diff-section">${line}</div>`;
-                  inSection = true;
-                } else if (line.startsWith('+') && !line.startsWith('+++')) {
-                  formattedDiff += `<div class="diff-added">${escapeHtml(line)}</div>`;
-                } else if (line.startsWith('-') && !line.startsWith('---')) {
-                  formattedDiff += `<div class="diff-removed">${escapeHtml(line)}</div>`;
-                } else if (line.startsWith('@@')) {
-                  formattedDiff += `<div class="diff-header">${escapeHtml(line)}</div>`;
-                } else if (line.startsWith('diff') || line.startsWith('---') || line.startsWith('+++')) {
-                  formattedDiff += `<div class="diff-header">${escapeHtml(line)}</div>`;
-                } else {
-                  formattedDiff += `<div class="diff-unchanged">${escapeHtml(line)}</div>`;
-                }
-              });
-              
-              // Create split view
-              const splitViewContent = parseDiffForSplitView(data.diff);
-              fileDiffLeft.innerHTML = splitViewContent.left;
-              fileDiffRight.innerHTML = splitViewContent.right;
-              window.currentDiffLineCount = splitViewContent.lineCount;
-            }
-            
-            fileDiffBody.innerHTML = formattedDiff;
-          }
-          
-          fileDiffOverlay.style.display = 'flex';
-          
-          // Set the view mode according to current setting
-          if (diffViewMode === 'unified') {
-            fileDiffBody.style.display = 'block';
-            fileDiffSplitView.style.display = 'none';
-            fileDiffViewToggle.textContent = 'Split View';
-          } else {
-            fileDiffBody.style.display = 'none';
-            fileDiffSplitView.style.display = 'flex';
-            fileDiffViewToggle.textContent = 'Unified View';
-            // Setup synchronized scrolling
-            setupSplitViewScrolling();
-          }
-        }
-      } catch (e) {
-        // Not JSON or not a file diff response
-        console.log("Error parsing message:", e);
-      }
-    });
-
-    // Trusty Agent Prompt Overlay functionality
     const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
     const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
-    const trustyAgentBody = document.getElementById('trustyAgentBody');
-    const trustyAgentTitle = document.getElementById('trustyAgentTitle');
 
-    // Function to show a specific trusty agent prompt
-    function showTrustyAgentPrompt(agentName, agentKey) {
-      console.log(`Showing prompt for agent: ${agentName} (key: ${agentKey})`);
-      
-      // Set the title
-      trustyAgentTitle.textContent = `${agentName}`;
-      
-      // Get the prompt
-      const prompt = window.trustyAgentPrompts[agentName] || '';
-      console.log(`Prompt for ${agentName}:`, prompt ? 'exists' : 'not found');
-      
-      // Get the results (if any)
-      // Try both the full name and the key name to match backend storage
-      const results = window.trustyAgentResults && 
-                     (window.trustyAgentResults[agentName] || window.trustyAgentResults[agentKey] || null);
-      
-      console.log(`Results for ${agentName}:`, results || 'not found');
-      
-      // Set the prompt text
-      const promptTextElement = document.getElementById('trustyAgentPromptText');
-      promptTextElement.textContent = prompt || 'No prompt available for this agent.';
-      
-      // Process results if available
-      const resultSection = document.getElementById('trustyAgentResultSection');
-      const resultTextElement = document.getElementById('trustyAgentResultText');
-      const resultStatusElement = document.getElementById('trustyAgentResultStatus');
-      const imageSection = document.getElementById('trustyAgentImageSection');
-      const imageElement = document.getElementById('trustyAgentImage');
-      
-      // Get the runtime status to check if execution was successful
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const executionSuccessful = runtimeStatus.textContent.includes("✅");
-      
-      if (results && (results.output || results.image_url)) {
-        console.log(`${agentName} has results to display`);
-        
-        // Show result section if there's output text
-        if (results.output) {
-          console.log(`${agentName} output:`, results.output);
-          resultSection.style.display = 'block';
-          resultTextElement.textContent = results.output;
-          
-          // Set status indicator
-          if (results.status) {
-            resultStatusElement.className = 'agent-status ' + results.status;
-            let statusText = '';
-            switch (results.status) {
-              case 'passed':
-                statusText = 'Verification Passed ✅';
-                break;
-              case 'failed':
-                statusText = 'Verification Failed ❌';
-                break;
-              case 'error':
-                statusText = 'Execution Error ⚠️';
-                break;
-              default:
-                statusText = results.status;
-            }
-            resultStatusElement.textContent = statusText;
-            resultStatusElement.style.display = 'inline-block';
-          } else {
-            resultStatusElement.style.display = 'none';
-          }
-        } else {
-          resultSection.style.display = 'none';
-        }
-        
-        // Show image section if there's an image URL
-        if (results.image_url) {
-          console.log(`${agentName} image URL:`, results.image_url);
-          imageSection.style.display = 'block';
-          imageElement.src = results.image_url;
-        } else {
-          imageSection.style.display = 'none';
-        }
-      } else {
-        console.log(`${agentName} has no results to display`);
-        
-        // Show message based on execution status
-        resultSection.style.display = 'block';
-        resultStatusElement.style.display = 'none';
-        
-        if (executionSuccessful) {
-          // Execution was successful but no results for this agent
-          resultTextElement.innerHTML = '<div class="diff-empty">This agent was executed but did not produce any output.</div>';
-        } else {
-          // Execution may still be in progress or failed
-          resultTextElement.innerHTML = '<div class="diff-empty">No results available yet for this agent.</div>';
-        }
-        
-        imageSection.style.display = 'none';
-      }
-      
-      // Show the overlay
-      trustyAgentOverlay.style.display = 'flex';
-    }
-
-    // Close overlay when clicking the close button
+    let diffViewMode = 'unified'; // 'unified' or 'split'
+    
+    // Close trusty agent overlay
     trustyAgentCloseBtn.addEventListener('click', () => {
-      trustyAgentOverlay.style.display = 'none';
-    });
-
-    // Close overlay when clicking outside the content
-    trustyAgentOverlay.addEventListener('click', (event) => {
-      if (event.target === trustyAgentOverlay) {
+      // Add animation to the button
+      trustyAgentCloseBtn.classList.add('button-clicked');
+      
+      // Hide overlay after a short delay
+      setTimeout(() => {
         trustyAgentOverlay.style.display = 'none';
-      }
+      }, 300);
     });
-
-    function displayTrustyAgentPrompt(agentName, protoblock) {
-      console.log("Displaying prompt for agent:", agentName);
-      const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
-      const trustyAgentTitle = document.getElementById('trustyAgentTitle');
-      const trustyAgentPromptText = document.getElementById('trustyAgentPromptText');
-      const trustyAgentResultSection = document.getElementById('trustyAgentResultSection');
-      const trustyAgentResultText = document.getElementById('trustyAgentResultText');
-      const trustyAgentImageSection = document.getElementById('trustyAgentImageSection');
-      const trustyAgentImage = document.getElementById('trustyAgentImage');
-      const trustyAgentAgentType = document.getElementById('trustyAgentAgentType');
-      const trustyAgentResultStatus = document.getElementById('trustyAgentResultStatus');
-      const trustyAgentComparisonImage = document.getElementById('trustyAgentComparisonImage');
-      const comparisonImageContainer = document.getElementById('comparisonImageContainer');
-      const individualScreenshotsContainer = document.querySelector('.individual-screenshots-container');
-      const trustyAgentBeforeImage = document.getElementById('trustyAgentBeforeImage');
-      const trustyAgentAfterImage = document.getElementById('trustyAgentAfterImage');
-      const trustyAgentTestResultsSection = document.getElementById('trustyAgentTestResultsSection');
-      const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
-      const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
-      const trustyAgentSummary = document.getElementById('trustyAgentSummary');
-      const trustyAgentPlausibilitySection = document.getElementById('trustyAgentPlausibilitySection');
-      const trustyAgentGrade = document.getElementById('trustyAgentGrade');
-      const trustyAgentGradeInfo = document.getElementById('trustyAgentGradeInfo');
-      const trustyAgentVerificationInfo = document.getElementById('trustyAgentVerificationInfo');
-
-      // Display the overlay
-      trustyAgentOverlay.style.display = 'flex';
-
-      // Set the title
-      trustyAgentTitle.textContent = `Trusty Agent: ${agentName}`;
-
-      // Set the prompt text
-      const agentKey = agentName.toLowerCase();
-      let agentPrompt = "";
-
-      // Check if the prompt exists for the agent
-      let hasPrompt = false;
-      if (protoblock.trusty_agent_prompts && protoblock.trusty_agent_prompts[agentKey]) {
-        hasPrompt = true;
-        agentPrompt = protoblock.trusty_agent_prompts[agentKey];
-      }
-
-      trustyAgentPromptText.textContent = hasPrompt ? agentPrompt : "No prompt found for this agent.";
-
-      // Check if there are results for this agent
-      let resultObj = null;
-      let hasResults = false;
+    
+    // Toggle between unified and split view
+    fileDiffViewToggle.addEventListener('click', () => {
+      // Add animation to the button
+      fileDiffViewToggle.classList.add('button-clicked');
       
-      if (protoblock.trusty_agent_results) {
-        console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
-        
-        // Try both the full agent name and lowercase version to match backend storage
-        const possibleKeys = [agentName, agentKey, agentName.toLowerCase(), agentKey.replace('agent', '')];
-        
-        for (const key of possibleKeys) {
-          if (protoblock.trusty_agent_results[key]) {
-            resultObj = protoblock.trusty_agent_results[key];
-            hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
-            console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
-            break;
-          }
-        }
-      }
+      // Toggle between unified and split view modes
+      const splitView = document.getElementById('fileDiffSplitView');
+      const unifiedView = document.getElementById('fileDiffBody');
       
-      // Helper function to make file paths usable in the browser
-      function makePathUsable(path) {
-        if (!path) return null;
-        
-        // If it's already a URL or a relative path, return as is
-        if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('./') || path.startsWith('/')) {
-          return path;
-        }
-        
-        // Convert absolute path to a file URL
-        try {
-          return 'file://' + path;
-        } catch (e) {
-          console.error('Error processing path:', e);
-          return path;
-        }
-      }
-
-      // Clear previous display state
-      trustyAgentResultSection.style.display = 'none';
-      trustyAgentImageSection.style.display = 'none';
-      trustyAgentTestResultsSection.style.display = 'none';
-      trustyAgentSummarySection.style.display = 'none';
-      trustyAgentPlausibilitySection.style.display = 'none';
-
-      // Display or hide the result section based on whether there are results
-      if (hasResults && resultObj) {
-        // Check if this is the plausibility agent
-        const isPlausibilityAgent = 
-          agentKey === 'plausibility' || 
-          agentName.toLowerCase().includes('plausibility') || 
-          (resultObj.agent_type && resultObj.agent_type.toLowerCase().includes('plausibility'));
-        
-        if (isPlausibilityAgent) {
-          // Handle special plausibility display
-          trustyAgentPlausibilitySection.style.display = 'block';
-          
-          // Display grade
-          if (resultObj.grade) {
-            trustyAgentGrade.textContent = resultObj.grade;
-            trustyAgentGrade.setAttribute('data-grade', resultObj.grade);
-            trustyAgentGrade.style.display = 'flex';
-          } else {
-            trustyAgentGrade.style.display = 'none';
-          }
-          
-          // Display grade info
-          if (resultObj.grade_info) {
-            trustyAgentGradeInfo.textContent = resultObj.grade_info;
-            trustyAgentGradeInfo.style.display = 'block';
-          } else {
-            trustyAgentGradeInfo.style.display = 'none';
-          }
-          
-          // Display verification info
-          if (resultObj.verification_info) {
-            trustyAgentVerificationInfo.textContent = resultObj.verification_info;
-            trustyAgentVerificationInfo.style.display = 'block';
-          } else {
-            trustyAgentVerificationInfo.style.display = 'none';
-          }
-        }
-
-        // Standard result section (text output)
-        if (resultObj.output) {
-          trustyAgentResultSection.style.display = 'block';
-          
-          // Set status badge
-          if (resultObj.status) {
-            trustyAgentResultStatus.textContent = resultObj.status;
-            trustyAgentResultStatus.className = 'agent-status';
-            if (resultObj.status.toLowerCase() === 'passed') {
-              trustyAgentResultStatus.classList.add('passed');
-            } else if (resultObj.status.toLowerCase() === 'failed') {
-              trustyAgentResultStatus.classList.add('failed');
-            } else {
-              trustyAgentResultStatus.classList.add('error');
-            }
-          } else {
-            trustyAgentResultStatus.textContent = '';
-            trustyAgentResultStatus.className = 'agent-status';
-          }
-          
-          // Set agent type if available
-          if (resultObj.agent_type) {
-            trustyAgentAgentType.textContent = resultObj.agent_type;
-            trustyAgentAgentType.style.display = 'inline-block';
-          } else {
-            trustyAgentAgentType.style.display = 'none';
-          }
-          
-          // Set result text content
-          trustyAgentResultText.textContent = resultObj.output || "No text output available";
-        }
-
-        // --- Image Display Logic ---
-        // First reset all image displays
-        trustyAgentImageSection.style.display = 'none';
-        comparisonImageContainer.style.display = 'none';
-        individualScreenshotsContainer.style.display = 'none';
-        
-        // Check if there's any type of image to display
-        const hasAnyImages = 
-          resultObj.image_url || 
-          resultObj.comparison_path || 
-          resultObj.screenshot_path || 
-          (resultObj.before_screenshot_path && resultObj.after_screenshot_path);
-        
-        if (hasAnyImages) {
-          trustyAgentImageSection.style.display = 'block';
-        }
-        
-        // Check if there's an image URL and display it
-        if (resultObj.image_url) {
-          const usablePath = makePathUsable(resultObj.image_url);
-          trustyAgentImage.src = usablePath;
-          console.log(`Setting main image src to: ${usablePath}`);
-        } else if (resultObj.screenshot_path) {
-          // Use screenshot_path as main image if image_url not available
-          const usablePath = makePathUsable(resultObj.screenshot_path);
-          trustyAgentImage.src = usablePath;
-          console.log(`Setting image from screenshot_path: ${usablePath}`);
-        } else if (resultObj.after_screenshot_path) {
-          // Use after_screenshot as main image if no other main image is available
-          const usablePath = makePathUsable(resultObj.after_screenshot_path);
-          trustyAgentImage.src = usablePath;
-          console.log(`Setting main image from after_screenshot_path: ${usablePath}`);
-        }
-        
-        // Check for comparison image
-        if (resultObj.comparison_path) {
-          comparisonImageContainer.style.display = 'block';
-          const usablePath = makePathUsable(resultObj.comparison_path);
-          trustyAgentComparisonImage.src = usablePath;
-          console.log(`Setting comparison image src to: ${usablePath}`);
-        }
-        
-        // Check if this is a ThreeJSVisionBeforeAfterAgent with individual screenshots
-        const hasBeforeAfterScreenshots = 
-          resultObj.before_screenshot_path && 
-          resultObj.after_screenshot_path;
-        
-        if (hasBeforeAfterScreenshots) {
-          individualScreenshotsContainer.style.display = 'block';
-          
-          const beforePath = makePathUsable(resultObj.before_screenshot_path);
-          const afterPath = makePathUsable(resultObj.after_screenshot_path);
-          
-          trustyAgentBeforeImage.src = beforePath;
-          trustyAgentAfterImage.src = afterPath;
-          
-          console.log(`Setting before screenshot: ${beforePath}`);
-          console.log(`Setting after screenshot: ${afterPath}`);
-        }
-        
-        // Check for test results
-        if (resultObj.test_results) {
-          trustyAgentTestResultsSection.style.display = 'block';
-          trustyAgentTestResults.textContent = resultObj.test_results;
-        } else {
-          trustyAgentTestResultsSection.style.display = 'none';
-        }
-        
-        // Check for summary
-        if (resultObj.summary) {
-          trustyAgentSummarySection.style.display = 'block';
-          trustyAgentSummary.textContent = resultObj.summary;
-        } else {
-          trustyAgentSummarySection.style.display = 'none';
-        }
+      if (splitView.style.display === 'none') {
+        // Switch to split view
+        unifiedView.style.display = 'none';
+        splitView.style.display = 'flex';
+        fileDiffViewToggle.textContent = 'Unified View';
       } else {
-        // No results found, show a message
-        trustyAgentResultSection.style.display = 'block';
-        trustyAgentResultStatus.style.display = 'none';
-        trustyAgentAgentType.style.display = 'none';
-        trustyAgentResultText.textContent = "No results found for this agent.";
-        console.log(`No results found for agent: ${agentKey}`);
+        // Switch to unified view
+        splitView.style.display = 'none';
+        unifiedView.style.display = 'block';
+        fileDiffViewToggle.textContent = 'Split View';
       }
-
-      // Set up the close button event listener
-      const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
-      trustyAgentCloseBtn.onclick = function() {
-        trustyAgentOverlay.style.display = 'none';
-      };
+      
+      // Clean up animation after it completes
+      setTimeout(() => {
+        fileDiffViewToggle.classList.remove('button-clicked');
+      }, 500);
+    });
+    
+    // Close file diff overlay
+    fileDiffCloseBtn.addEventListener('click', () => {
+      // Add animation to the button
+      fileDiffCloseBtn.classList.add('button-clicked');
+      
+      // Hide overlay after a short delay
+      setTimeout(() => {
+        fileDiffOverlay.style.display = 'none';
+      }, 300);
+    });
+    
+    // Add ripple effect to all buttons
+    function addRippleToButtons() {
+      const buttons = document.querySelectorAll('button');
+      buttons.forEach(button => {
+        if (!button.classList.contains('button-ripple')) {
+          button.classList.add('button-ripple');
+        }
+      });
+    }
+    
+    // Call after DOM is loaded
+    document.addEventListener('DOMContentLoaded', addRippleToButtons);
+    
+    // Function to toggle between 3D cube and protoblock display
+    function toggleProtoblockDisplay(show) {
+      const protoblockContainer = document.getElementById('protoblockContainer');
+      const canvas = renderer.domElement;
+      
+      if (show) {
+        canvas.style.display = 'none';
+        protoblockContainer.style.display = 'block';
+      } else {
+        canvas.style.display = 'block';
+        protoblockContainer.style.display = 'none';
+      }
     }
   </script>
 </body>
