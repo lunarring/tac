@@ -304,30 +304,46 @@
       font-size: 14px;
     }
     #protoblockHeader {
-      text-align: center;
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background-color: #f2f6fc;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 15px;
+      border-radius: 4px;
     }
     #protoblockHeader h2 {
-      margin: 0 0 5px;
-      color: #333;
-      font-size: 22px;
-    }
-    #protoblockHeader p {
       margin: 0;
-      color: #666;
+      color: #1a73e8;
+      font-size: 22px;
+      font-weight: 500;
+    }
+    #protoblockAttempt {
+      background-color: #e8f0fe;
+      color: #1967d2;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 14px;
+      margin: 0;
     }
     .section {
       margin-bottom: 20px;
+      background-color: #fff;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
     }
     .section-title {
-      font-weight: 500;
-      color: #007bff;
-      font-size: 16px;
-      margin-bottom: 10px;
-      padding-bottom: 5px;
+      padding: 12px 15px;
+      background-color: #f8f9fa;
       border-bottom: 1px solid #eee;
+      font-size: 16px;
+      color: #333;
+    }
+    .section-title strong {
+      font-weight: 600;
+      color: #1a73e8;
     }
     .file-list {
       list-style-type: none;
@@ -378,16 +394,15 @@
       margin-left: 8px;
     }
     .code-block {
-      background-color: #f8f8f8;
-      font-family: monospace;
+      background-color: #f8f9fa;
       padding: 15px;
-      border-radius: 4px;
+      border-radius: 0;
+      font-family: 'Roboto Mono', monospace;
       white-space: pre-wrap;
+      font-size: 14px;
       overflow-x: auto;
-      font-size: 12px;
-      max-height: 300px;
-      overflow-y: auto;
-      border: 1px solid #eee;
+      line-height: 1.5;
+      color: #444;
     }
     /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
@@ -833,14 +848,13 @@
     .code-block {
       background-color: #f8f9fa;
       padding: 15px;
-      border-radius: 4px;
+      border-radius: 0;
       font-family: 'Roboto Mono', monospace;
       white-space: pre-wrap;
       font-size: 14px;
       overflow-x: auto;
-      border: 1px solid #e9ecef;
-      max-height: 400px;
-      overflow-y: auto;
+      line-height: 1.5;
+      color: #444;
     }
     
     #trustyAgentImageContainer {
@@ -1085,23 +1099,27 @@
       <div id="protoblockContainer">
         <!-- Protoblock container structure -->
         <div id="protoblockHeader">
-          <h2>Protoblock</h2>
+          <h2>Protocore</h2>
           <p id="protoblockAttempt">Attempt 1/4</p>
         </div>
         <div class="section">
-          <div class="section-title">Task Description</div>
+          <div class="section-title"><strong>Task Description</strong></div>
           <div id="taskDescription" class="code-block"></div>
         </div>
         <div class="section">
-          <div class="section-title">Context Files</div>
+          <div class="section-title"><strong>Commit Message</strong></div>
+          <div id="commitMessage" class="code-block"></div>
+        </div>
+        <div class="section">
+          <div class="section-title"><strong>Context Files</strong></div>
           <ul id="contextFilesList" class="file-list"></ul>
         </div>
         <div class="section">
-          <div class="section-title">Files to Modify</div>
+          <div class="section-title"><strong>Files to Modify</strong></div>
           <ul id="writeFilesList" class="file-list"></ul>
         </div>
         <div class="section">
-          <div class="section-title">Trusty Agents</div>
+          <div class="section-title"><strong>Trusty Agents</strong></div>
           <div id="trustyAgentsSection">
             <ul id="trustyAgentsList" class="file-list"></ul>
             
@@ -1197,34 +1215,41 @@
       // Header
       const header = document.createElement('div');
       header.id = 'protoblockHeader';
-      header.innerHTML = '<h2>Protoblock</h2><p id="protoblockAttempt">Attempt 1/4</p>';
+      header.innerHTML = '<h2>Protocore</h2><p id="protoblockAttempt">Attempt 1/4</p>';
       container.appendChild(header);
       
       // Task Description
       const taskSection = document.createElement('div');
       taskSection.className = 'section';
-      taskSection.innerHTML = '<div class="section-title">Task Description</div>' +
+      taskSection.innerHTML = '<div class="section-title"><strong>Task Description</strong></div>' +
                               '<div id="taskDescription" class="code-block"></div>';
       container.appendChild(taskSection);
+      
+      // Commit Message
+      const commitSection = document.createElement('div');
+      commitSection.className = 'section';
+      commitSection.innerHTML = '<div class="section-title"><strong>Commit Message</strong></div>' +
+                               '<div id="commitMessage" class="code-block"></div>';
+      container.appendChild(commitSection);
       
       // Context Files
       const contextFilesSection = document.createElement('div');
       contextFilesSection.className = 'section';
-      contextFilesSection.innerHTML = '<div class="section-title">Context Files</div>' +
+      contextFilesSection.innerHTML = '<div class="section-title"><strong>Context Files</strong></div>' +
                                      '<ul id="contextFilesList" class="file-list"></ul>';
       container.appendChild(contextFilesSection);
       
       // Files to Modify
       const writeFilesSection = document.createElement('div');
       writeFilesSection.className = 'section';
-      writeFilesSection.innerHTML = '<div class="section-title">Files to Modify</div>' +
+      writeFilesSection.innerHTML = '<div class="section-title"><strong>Files to Modify</strong></div>' +
                                    '<ul id="writeFilesList" class="file-list"></ul>';
       container.appendChild(writeFilesSection);
       
       // Trusty Agents
       const trustyAgentsSection = document.createElement('div');
       trustyAgentsSection.className = 'section';
-      trustyAgentsSection.innerHTML = '<div class="section-title">Trusty Agents</div>' +
+      trustyAgentsSection.innerHTML = '<div class="section-title"><strong>Trusty Agents</strong></div>' +
                                      '<div id="trustyAgentsSection">' +
                                      '<ul id="trustyAgentsList" class="file-list"></ul>' +
                                      '</div>';
@@ -1243,6 +1268,13 @@
       
       // Update task description
       document.getElementById('taskDescription').textContent = data.task_description;
+      
+      // Generate and update commit message based on task description
+      const taskDescription = data.task_description;
+      const commitMsg = taskDescription.length > 50 
+        ? taskDescription.substring(0, 47) + '...' 
+        : taskDescription;
+      document.getElementById('commitMessage').textContent = commitMsg;
       
       // Update files to modify
       const writeFilesList = document.getElementById('writeFilesList');
@@ -1726,11 +1758,8 @@
     // Function to handle commit changes button click
     function handleCommitChanges() {
       if (socket && socket.readyState === WebSocket.OPEN) {
-        // Get the task description to use as commit message
-        const taskDescription = document.getElementById('taskDescription').textContent.trim();
-        const commitMsg = taskDescription.length > 50 
-          ? taskDescription.substring(0, 47) + '...' 
-          : taskDescription;
+        // Get the commit message 
+        const commitMsg = document.getElementById('commitMessage').textContent.trim();
           
         // Show operation in progress
         document.getElementById("runtimeStatus").textContent = "Committing changes...";
