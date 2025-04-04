@@ -307,38 +307,38 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 15px;
+      padding: 8px 12px;
       background-color: #f2f6fc;
       border-bottom: 1px solid #ddd;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
       border-radius: 4px;
     }
     #protoblockHeader h2 {
       margin: 0;
       color: #1a73e8;
-      font-size: 22px;
+      font-size: 18px;
       font-weight: 500;
     }
     #protoblockAttempt {
       background-color: #e8f0fe;
       color: #1967d2;
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 14px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 12px;
       margin: 0;
     }
     .section {
-      margin-bottom: 20px;
+      margin-bottom: 8px;
       background-color: #fff;
       border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
       overflow: hidden;
     }
     .section-title {
-      padding: 12px 15px;
+      padding: 6px 10px;
       background-color: #f8f9fa;
       border-bottom: 1px solid #eee;
-      font-size: 16px;
+      font-size: 14px;
       color: #333;
     }
     .section-title strong {
@@ -349,26 +349,22 @@
       list-style-type: none;
       padding: 0;
       margin: 0;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      max-height: 250px;
+      overflow-y: auto;
     }
     .file-list li {
-      background-color: #f5f5f5;
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-family: monospace;
-      font-size: 12px;
-      border: 1px solid #ddd;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      display: inline-block;
+      padding: 6px 10px;
+      border-bottom: 1px solid #f0f0f0;
       cursor: pointer;
-      transition: background-color 0.2s, transform 0.2s;
+      font-size: 13px;
+      transition: background-color 0.2s;
+      font-family: 'Roboto Mono', monospace;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .file-list li:hover {
-      background-color: #e6f7ff;
-      border-color: #91d5ff;
-      transform: translateY(-2px);
+      background-color: #f0f7ff;
     }
     .clickable-file {
       position: relative;
@@ -395,14 +391,16 @@
     }
     .code-block {
       background-color: #f8f9fa;
-      padding: 15px;
+      padding: 8px 10px;
       border-radius: 0;
       font-family: 'Roboto Mono', monospace;
       white-space: pre-wrap;
-      font-size: 14px;
+      font-size: 13px;
       overflow-x: auto;
-      line-height: 1.5;
+      line-height: 1.4;
       color: #444;
+      max-height: 250px;
+      overflow-y: auto;
     }
     /* Chat bubble styles revamped for a sleek contemporary look */
     .chat-bubble {
@@ -903,12 +901,10 @@
     }
     .trusty-agent-item:hover {
       background-color: #e6f7ff;
-      border-color: #91d5ff;
-      transform: translateY(-2px);
+      transform: translateY(-1px);
     }
     .trusty-agent-item.has-results:hover {
       background-color: #c3e6cb;
-      border-color: #a3d9a5;
     }
     
     /* Agent status styles */
@@ -1050,6 +1046,22 @@
       line-height: 1.5;
       margin-top: 5px;
     }
+    
+    /* Set specific heights for different sections */
+    #taskDescription {
+      max-height: 120px;
+    }
+    
+    #commitMessage {
+      max-height: 60px;
+      font-weight: 500;
+      background-color: #f5f8ff;
+      border-left: 3px solid #1a73e8;
+    }
+    
+    #contextFilesList, #writeFilesList, #trustyAgentsList {
+      max-height: 150px;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -1099,7 +1111,7 @@
       <div id="protoblockContainer">
         <!-- Protoblock container structure -->
         <div id="protoblockHeader">
-          <h2>Protocore</h2>
+          <h2>Protoblock</h2>
           <p id="protoblockAttempt">Attempt 1/4</p>
         </div>
         <div class="section">
@@ -1215,7 +1227,7 @@
       // Header
       const header = document.createElement('div');
       header.id = 'protoblockHeader';
-      header.innerHTML = '<h2>Protocore</h2><p id="protoblockAttempt">Attempt 1/4</p>';
+      header.innerHTML = '<h2>Protoblock</h2><p id="protoblockAttempt">Attempt 1/4</p>';
       container.appendChild(header);
       
       // Task Description
