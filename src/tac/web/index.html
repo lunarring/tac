@@ -959,6 +959,28 @@
       gap: 15px;
     }
     
+    /* Screenshots grid styles */
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    
+    .screenshot-item {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      border: 1px solid #e9ecef;
+      text-align: center;
+    }
+    
+    .screenshot-item h5 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 14px;
+      color: #555;
+    }
+    
     .grade {
       display: flex;
       justify-content: center;
@@ -1903,8 +1925,21 @@
               <img id="trustyAgentImage" alt="Trusty Agent Output Image" style="max-width: 100%; max-height: 400px;">
             </div>
             <div id="comparisonImageContainer" style="display: none; margin-top: 20px;">
-              <h4>Comparison Screenshot</h4>
+              <h4>Comparison (Before/After)</h4>
               <img id="trustyAgentComparisonImage" alt="Comparison Screenshot" style="max-width: 100%; max-height: 400px;">
+            </div>
+            <div class="individual-screenshots-container" style="display: none; margin-top: 20px;">
+              <h4>Individual Screenshots</h4>
+              <div class="screenshots-grid">
+                <div class="screenshot-item">
+                  <h5>Before</h5>
+                  <img id="trustyAgentBeforeImage" alt="Before Screenshot" style="max-width: 100%; max-height: 300px;">
+                </div>
+                <div class="screenshot-item">
+                  <h5>After</h5>
+                  <img id="trustyAgentAfterImage" alt="After Screenshot" style="max-width: 100%; max-height: 300px;">
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2536,6 +2571,9 @@
       const trustyAgentResultStatus = document.getElementById('trustyAgentResultStatus');
       const trustyAgentComparisonImage = document.getElementById('trustyAgentComparisonImage');
       const comparisonImageContainer = document.getElementById('comparisonImageContainer');
+      const individualScreenshotsContainer = document.querySelector('.individual-screenshots-container');
+      const trustyAgentBeforeImage = document.getElementById('trustyAgentBeforeImage');
+      const trustyAgentAfterImage = document.getElementById('trustyAgentAfterImage');
       const trustyAgentTestResultsSection = document.getElementById('trustyAgentTestResultsSection');
       const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
       const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
@@ -2679,14 +2717,38 @@
           trustyAgentResultText.textContent = resultObj.output || "No text output available";
         }
 
+        // --- Image Display Logic ---
+        // First reset all image displays
+        trustyAgentImageSection.style.display = 'none';
+        comparisonImageContainer.style.display = 'none';
+        individualScreenshotsContainer.style.display = 'none';
+        
+        // Check if there's any type of image to display
+        const hasAnyImages = 
+          resultObj.image_url || 
+          resultObj.comparison_path || 
+          resultObj.screenshot_path || 
+          (resultObj.before_screenshot_path && resultObj.after_screenshot_path);
+        
+        if (hasAnyImages) {
+          trustyAgentImageSection.style.display = 'block';
+        }
+        
         // Check if there's an image URL and display it
         if (resultObj.image_url) {
-          trustyAgentImageSection.style.display = 'block';
           const usablePath = makePathUsable(resultObj.image_url);
           trustyAgentImage.src = usablePath;
           console.log(`Setting main image src to: ${usablePath}`);
-        } else {
-          trustyAgentImageSection.style.display = 'none';
+        } else if (resultObj.screenshot_path) {
+          // Use screenshot_path as main image if image_url not available
+          const usablePath = makePathUsable(resultObj.screenshot_path);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting image from screenshot_path: ${usablePath}`);
+        } else if (resultObj.after_screenshot_path) {
+          // Use after_screenshot as main image if no other main image is available
+          const usablePath = makePathUsable(resultObj.after_screenshot_path);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting main image from after_screenshot_path: ${usablePath}`);
         }
         
         // Check for comparison image
@@ -2695,16 +2757,24 @@
           const usablePath = makePathUsable(resultObj.comparison_path);
           trustyAgentComparisonImage.src = usablePath;
           console.log(`Setting comparison image src to: ${usablePath}`);
-        } else {
-          comparisonImageContainer.style.display = 'none';
         }
         
-        // Check for screenshot path (which might be different from image_url)
-        if (!resultObj.image_url && resultObj.screenshot_path) {
-          trustyAgentImageSection.style.display = 'block';
-          const usablePath = makePathUsable(resultObj.screenshot_path);
-          trustyAgentImage.src = usablePath;
-          console.log(`Setting image from screenshot_path: ${usablePath}`);
+        // Check if this is a ThreeJSVisionBeforeAfterAgent with individual screenshots
+        const hasBeforeAfterScreenshots = 
+          resultObj.before_screenshot_path && 
+          resultObj.after_screenshot_path;
+        
+        if (hasBeforeAfterScreenshots) {
+          individualScreenshotsContainer.style.display = 'block';
+          
+          const beforePath = makePathUsable(resultObj.before_screenshot_path);
+          const afterPath = makePathUsable(resultObj.after_screenshot_path);
+          
+          trustyAgentBeforeImage.src = beforePath;
+          trustyAgentAfterImage.src = afterPath;
+          
+          console.log(`Setting before screenshot: ${beforePath}`);
+          console.log(`Setting after screenshot: ${afterPath}`);
         }
         
         // Check for test results

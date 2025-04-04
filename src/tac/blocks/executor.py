@@ -194,6 +194,13 @@ class BlockExecutor:
                     # Add comparison image if it exists (for vision comparison agents)
                     if hasattr(agent, 'comparison_path') and agent.comparison_path:
                         result_dict['comparison_path'] = agent.comparison_path
+                    
+                    # Add before and after screenshots for ThreeJSVisionBeforeAfterAgent
+                    if hasattr(agent, 'before_screenshot_path') and agent.before_screenshot_path:
+                        result_dict['before_screenshot_path'] = agent.before_screenshot_path
+                    
+                    if hasattr(agent, 'after_screenshot_path') and agent.after_screenshot_path:
+                        result_dict['after_screenshot_path'] = agent.after_screenshot_path
                         
                     # Add test results if it's a test runner
                     if hasattr(agent, 'test_results') and agent.test_results:
