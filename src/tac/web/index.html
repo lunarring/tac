@@ -764,6 +764,81 @@
       float: right;
       margin-right: 4px;
     }
+
+    /* Trusty Agent Prompt overlay styles */
+    #trustyAgentOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    #trustyAgentContent {
+      width: 90%;
+      max-width: 1200px;
+      height: 80%;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #trustyAgentHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      background-color: #f6f8fa;
+      border-bottom: 1px solid #e1e4e8;
+    }
+    #trustyAgentHeader h3 {
+      margin: 0;
+      font-size: 18px;
+      color: #24292e;
+    }
+    #trustyAgentCloseBtn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      color: #586069;
+    }
+    #trustyAgentCloseBtn:hover {
+      color: #24292e;
+    }
+    #trustyAgentBody {
+      flex: 1;
+      overflow: auto;
+      padding: 20px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      background-color: #f8f8f8;
+    }
+    /* Style for trusty agent item in file list to show it's clickable */
+    .trusty-agent-item {
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.2s;
+      position: relative;
+    }
+    .trusty-agent-item::after {
+      content: "👁️";
+      margin-left: 5px;
+      font-size: 10px;
+      opacity: 0.7;
+    }
+    .trusty-agent-item:hover {
+      background-color: #e6f7ff;
+      border-color: #91d5ff;
+      transform: translateY(-2px);
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -832,7 +907,7 @@
           <div class="section-title">Trusty Agents</div>
           <div id="trustyAgentsSection">
             <ul id="trustyAgentsList" class="file-list"></ul>
-            <div id="trustyAgentPrompts"></div>
+            
           </div>
         </div>
       </div>
@@ -955,7 +1030,7 @@
       trustyAgentsSection.innerHTML = '<div class="section-title">Trusty Agents</div>' +
                                      '<div id="trustyAgentsSection">' +
                                      '<ul id="trustyAgentsList" class="file-list"></ul>' +
-                                     '<div id="trustyAgentPrompts"></div></div>';
+                                     '</div>';
       container.appendChild(trustyAgentsSection);
     }
 
@@ -993,9 +1068,8 @@
       const trustyAgentsList = document.getElementById('trustyAgentsList');
       trustyAgentsList.innerHTML = '';
       
-      // Update trusty agent prompts
-      const trustyAgentPromptsContainer = document.getElementById('trustyAgentPrompts');
-      trustyAgentPromptsContainer.innerHTML = '';
+      // Store trusty agent prompts data globally to access when popup is opened
+      window.trustyAgentPrompts = data.trusty_agent_prompts || {};
       
       // Combined display logic for trusty agents and their prompts
       if (data.trusty_agents && data.trusty_agents.length > 0) {
@@ -1004,39 +1078,22 @@
         data.trusty_agents.forEach(agent => {
           const li = document.createElement('li');
           li.textContent = agent;
+          
+          // Add special class if this agent has a prompt
+          if (window.trustyAgentPrompts[agent]) {
+            li.classList.add('trusty-agent-item');
+            li.addEventListener('click', () => {
+              showTrustyAgentPrompt(agent);
+            });
+          }
+          
           trustyAgentsList.appendChild(li);
         });
-        
-        // Show prompts only for agents that have them
-        if (data.trusty_agent_prompts && Object.keys(data.trusty_agent_prompts).length > 0) {
-          trustyAgentPromptsContainer.style.display = 'block';
-          // Create a div for each trusty agent prompt
-          for (const [agent, prompt] of Object.entries(data.trusty_agent_prompts)) {
-            const promptSection = document.createElement('div');
-            promptSection.className = 'prompt-section';
-            
-            const agentName = document.createElement('div');
-            agentName.className = 'agent-name';
-            agentName.textContent = agent;
-            
-            const promptText = document.createElement('div');
-            promptText.className = 'code-block';
-            promptText.textContent = prompt;
-            
-            promptSection.appendChild(agentName);
-            promptSection.appendChild(promptText);
-            trustyAgentPromptsContainer.appendChild(promptSection);
-          }
-        } else {
-          // No prompts available
-          trustyAgentPromptsContainer.style.display = 'none';
-        }
       } else {
         // No agents at all
         const li = document.createElement('li');
         li.textContent = 'No trusty agents specified';
         trustyAgentsList.appendChild(li);
-        trustyAgentPromptsContainer.style.display = 'none';
       }
       
       // Show the protoblock display
@@ -1605,6 +1662,17 @@
     </div>
   </div>
   
+  <!-- Trusty Agent Prompt overlay -->
+  <div id="trustyAgentOverlay">
+    <div id="trustyAgentContent">
+      <div id="trustyAgentHeader">
+        <h3 id="trustyAgentTitle">Trusty Agent Prompt</h3>
+        <button id="trustyAgentCloseBtn">×</button>
+      </div>
+      <div id="trustyAgentBody"></div>
+    </div>
+  </div>
+  
   <script>
     // File diff handling
     const fileDiffOverlay = document.getElementById('fileDiffOverlay');
@@ -2089,6 +2157,35 @@
       } catch (e) {
         // Not JSON or not a file diff response
         console.log("Error parsing message:", e);
+      }
+    });
+
+    // Trusty Agent Prompt Overlay functionality
+    const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
+    const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
+    const trustyAgentBody = document.getElementById('trustyAgentBody');
+    const trustyAgentTitle = document.getElementById('trustyAgentTitle');
+
+    // Function to show a specific trusty agent prompt
+    function showTrustyAgentPrompt(agentName) {
+      if (!window.trustyAgentPrompts || !window.trustyAgentPrompts[agentName]) {
+        trustyAgentBody.innerHTML = `<div class="diff-empty">No prompt available for ${agentName}.</div>`;
+      } else {
+        trustyAgentTitle.textContent = `${agentName} Prompt`;
+        trustyAgentBody.textContent = window.trustyAgentPrompts[agentName];
+      }
+      trustyAgentOverlay.style.display = 'flex';
+    }
+
+    // Close overlay when clicking the close button
+    trustyAgentCloseBtn.addEventListener('click', () => {
+      trustyAgentOverlay.style.display = 'none';
+    });
+
+    // Close overlay when clicking outside the content
+    trustyAgentOverlay.addEventListener('click', (event) => {
+      if (event.target === trustyAgentOverlay) {
+        trustyAgentOverlay.style.display = 'none';
       }
     });
   </script>
