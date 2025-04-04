@@ -792,12 +792,12 @@
           <div id="taskDescription" class="code-block"></div>
         </div>
         <div class="section">
-          <div class="section-title">Files to Modify</div>
-          <ul id="writeFilesList" class="file-list"></ul>
-        </div>
-        <div class="section">
           <div class="section-title">Context Files</div>
           <ul id="contextFilesList" class="file-list"></ul>
+        </div>
+        <div class="section">
+          <div class="section-title">Files to Modify</div>
+          <ul id="writeFilesList" class="file-list"></ul>
         </div>
         <div class="section">
           <div class="section-title">Trusty Agents</div>
@@ -906,19 +906,19 @@
                               '<div id="taskDescription" class="code-block"></div>';
       container.appendChild(taskSection);
       
-      // Files to Modify
-      const writeFilesSection = document.createElement('div');
-      writeFilesSection.className = 'section';
-      writeFilesSection.innerHTML = '<div class="section-title">Files to Modify</div>' +
-                                   '<ul id="writeFilesList" class="file-list"></ul>';
-      container.appendChild(writeFilesSection);
-      
       // Context Files
       const contextFilesSection = document.createElement('div');
       contextFilesSection.className = 'section';
       contextFilesSection.innerHTML = '<div class="section-title">Context Files</div>' +
                                      '<ul id="contextFilesList" class="file-list"></ul>';
       container.appendChild(contextFilesSection);
+      
+      // Files to Modify
+      const writeFilesSection = document.createElement('div');
+      writeFilesSection.className = 'section';
+      writeFilesSection.innerHTML = '<div class="section-title">Files to Modify</div>' +
+                                   '<ul id="writeFilesList" class="file-list"></ul>';
+      container.appendChild(writeFilesSection);
       
       // Trusty Agents
       const trustyAgentsSection = document.createElement('div');
