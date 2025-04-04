@@ -16,6 +16,7 @@ from tac.cli.main import execute_command
 from tac.core.llm import LLMClient, Message
 from tac.core.config import config, ConfigManager
 from tac.utils.git_manager import create_git_manager
+from tac.agents.trusty.pytest import PytestTestingAgent
 
 class UIManager:
     def __init__(self, base_dir="."):
@@ -37,6 +38,10 @@ class UIManager:
         self.git_clean = None
         self.git_status_message = None
         
+        # Background task trackers
+        self._background_tasks = {}
+        self._test_runner = PytestTestingAgent()
+        
         # Perform early git check during initialization
         if self.git_manager and config.git.enabled:
             try:
@@ -50,6 +55,106 @@ class UIManager:
             self.git_clean = True
             if not config.git.enabled:
                 self.git_status_message = "Git operations are disabled in config."
+
+    async def start_background_tasks(self):
+        """Start essential background tasks when the UI starts"""
+        # Start file indexing task if not already running
+        if 'file_indexer' not in self._background_tasks or self._background_tasks['file_indexer'].done():
+            self._background_tasks['file_indexer'] = asyncio.create_task(self._background_file_indexer())
+        
+        # If test running is enabled in config, start the test runner
+        if config.safe_get('general', 'run_tests_in_background', False):
+            if 'test_runner' not in self._background_tasks or self._background_tasks['test_runner'].done():
+                self._background_tasks['test_runner'] = asyncio.create_task(self._background_test_runner())
+
+    async def _background_file_indexer(self):
+        """Background task that periodically updates file summaries"""
+        try:
+            await self.send_status_message("Starting file indexing in background...")
+            first_run = True
+            
+            while True:
+                try:
+                    # Run in executor to prevent blocking the event loop
+                    loop = asyncio.get_event_loop()
+                    stats = await loop.run_in_executor(None, self.project_files.update_summaries)
+                    
+                    # Only send status message for the first run or if there were changes
+                    if first_run or sum([stats[key] for key in ['added', 'updated', 'removed']]) > 0:
+                        await self.send_status_message(
+                            f"File indexing: +{stats['added']}, ~{stats['updated']}, -{stats['removed']} files"
+                        )
+                        first_run = False
+                    
+                    # Wait before next update - 5 minutes (300 seconds)
+                    await asyncio.sleep(300)
+                except Exception as e:
+                    print(f"Error in file indexer background task: {e}")
+                    # Don't exit the loop on error, just try again after waiting
+                    await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            # Task was cancelled, clean exit
+            print("File indexer background task cancelled")
+            raise
+        except Exception as e:
+            # Unexpected error
+            print(f"Unexpected error in file indexer background task: {e}")
+            traceback.print_exc()
+
+    async def _background_test_runner(self):
+        """Background task that periodically runs tests"""
+        # Store as instance attribute to allow access from notify_tests_run
+        self.last_run_time = 0
+        
+        try:
+            await self.send_status_message("Starting test runner in background...")
+            
+            while True:
+                try:
+                    current_time = asyncio.get_event_loop().time()
+                    
+                    # If a block was recently executed, check if we need to wait
+                    # Skip test run if we've run tests in the last 5 minutes
+                    if current_time - self.last_run_time < 300:  # 5 minutes
+                        await self.send_status_message("Skipping background tests (recently run)")
+                        await asyncio.sleep(300)
+                        continue
+                    
+                    # Run tests in executor to prevent blocking the event loop
+                    loop = asyncio.get_event_loop()
+                    test_path = config.general.test_path
+                    await self.send_status_message("Running background tests...")
+                    success = await loop.run_in_executor(None, lambda: self._test_runner.run_tests(test_path))
+                    
+                    # Update last run time
+                    self.last_run_time = asyncio.get_event_loop().time()
+                    
+                    test_stats = self._test_runner.get_test_stats()
+                    total = sum(test_stats.values())
+                    
+                    if success:
+                        await self.send_status_message(
+                            f"Background tests: {test_stats['passed']}/{total} passed"
+                        )
+                    else:
+                        await self.send_status_message(
+                            f"Background tests: {test_stats['failed']} failed, {test_stats['error']} errors"
+                        )
+                    
+                    # Wait before next test run - 5 minutes (300 seconds)
+                    await asyncio.sleep(300)
+                except Exception as e:
+                    print(f"Error in test runner background task: {e}")
+                    # Don't exit the loop on error, just try again after waiting
+                    await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            # Task was cancelled, clean exit
+            print("Test runner background task cancelled")
+            raise
+        except Exception as e:
+            # Unexpected error
+            print(f"Unexpected error in test runner background task: {e}")
+            traceback.print_exc()
 
     def send_status_bar(self, message):
         """
@@ -532,6 +637,9 @@ class UIManager:
         # Send initial status
         await self.send_status_message("Connected. Initializing...")
         
+        # Start background tasks
+        await self.start_background_tasks()
+        
         # Display pre-checked git status as a prominent message if there are issues
         if self.git_status_message and not self.git_clean:
             # Send as an error_message for more visibility in the UI
@@ -620,8 +728,29 @@ class UIManager:
                     await self._status_processor
                 except asyncio.CancelledError:
                     pass
+            
+            # Cancel all background tasks
+            for task_name, task in self._background_tasks.items():
+                if not task.done():
+                    print(f"Cancelling background task: {task_name}")
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+            
             # Clear websocket reference
             self.websocket = None
+
+    async def notify_tests_run(self):
+        """
+        Notify the background test runner that tests were recently executed.
+        This prevents duplicate test runs in a short time period.
+        """
+        if 'test_runner' in self._background_tasks and not self._background_tasks['test_runner'].done():
+            # Set last_run_time directly on self since the background method is a method of this class
+            self.last_run_time = asyncio.get_event_loop().time()
+            await self.send_status_message("Background test runner notified of manual test run")
 
     async def handle_block_click(self, websocket, chat_agent):
         try:
@@ -656,6 +785,13 @@ class UIManager:
             for attr in ['llm_type', 'model', 'api_base', 'json_mode']:
                 config_overrides[attr] = None
 
+            # If tests are running in the background, set run_tests_first to False to avoid duplication
+            run_tests_first = config.safe_get('general', 'run_tests_first', True)
+            if config.safe_get('general', 'run_tests_in_background', False) and 'test_runner' in self._background_tasks and not self._background_tasks['test_runner'].done():
+                config_overrides['general'] = {
+                    'run_tests_first': False
+                }
+            
             # Send status update before creating processor
             await self.send_status_message("Initializing task processor...")
 
@@ -703,6 +839,11 @@ class UIManager:
             
             loop = asyncio.get_event_loop()
             success = await loop.run_in_executor(None, processor.run_loop)
+            
+            # If tests were run during block execution and background tests are enabled,
+            # notify the background test runner
+            if run_tests_first and config.safe_get('general', 'run_tests_in_background', False):
+                await self.notify_tests_run()
 
             # Check if execution was successful and we have a protoblock
             if success and processor.protoblock:
@@ -1046,6 +1187,15 @@ class UIManager:
                     else:
                         print("✅ Git workspace is clean.")
             
+            # Check background tasks configuration
+            if config.safe_get('general', 'run_tests_in_background', False):
+                print("Background test runner is enabled")
+            else:
+                print("Background test runner is disabled (enable with general.run_tests_in_background=true in config)")
+            
+            print("Background file indexer is always enabled")
+            
+            # Run the server
             asyncio.run(self.run_server())
         except KeyboardInterrupt:
             print("WebSocket server stopped by user.")
