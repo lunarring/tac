@@ -1854,13 +1854,37 @@
           return;
         }
         else {
-          // Regular AI response
+          // Regular AI response - make sure we don't display protoblock_data json here
+          if (data && data.type && data.type === "protoblock_data") {
+            console.log("Ignoring protoblock_data that was sent to chat channel");
+            return;
+          }
+          
           addChatMessage("AI", event.data);
           // Immediately hide typing indicator after full display of AI message
           hideTypingIndicator();
         }
       } catch (e) {
         // If not JSON or parsing fails, treat as a regular message
+        // Check if this looks like a protoblock_data JSON message
+        if (event.data && typeof event.data === 'string' && 
+            event.data.includes('"type":"protoblock_data"')) {
+          console.log("Caught protoblock_data in raw form, handling appropriately");
+          
+          try {
+            const parsedData = JSON.parse(event.data);
+            if (parsedData.type === "protoblock_data") {
+              // Handle protoblock data properly
+              document.getElementById('protoblockContainer').style.display = 'block';
+              document.querySelector('#rightPanel canvas').style.display = 'none';
+              displayProtoblockData(parsedData);
+              return;
+            }
+          } catch (innerError) {
+            console.error("Failed to parse potential protoblock data:", innerError);
+          }
+        }
+        
         addChatMessage("AI", event.data);
         hideTypingIndicator();
       }
