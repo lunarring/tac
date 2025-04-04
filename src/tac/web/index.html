@@ -364,15 +364,18 @@
       opacity: 0.7;
     }
     .modified-file {
-      background-color: #e6ffed !important;
-      border-color: #85e89d !important;
-      font-weight: 500;
+      font-weight: bold;
+      color: #28a745;
+      position: relative;
     }
     .modified-file::after {
-      content: "📝";
-      margin-left: 5px;
-      font-size: 12px;
-      color: #28a745;
+      content: "";
+      background-color: #f9a825;
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-left: 8px;
     }
     .code-block {
       background-color: #f8f8f8;
@@ -735,6 +738,32 @@
     #discardChangesBtn:hover {
       background-color: #f5c6cb;
     }
+    
+    /* Line count badge styles */
+    .line-count-badge {
+      display: inline-flex;
+      margin-left: 8px;
+      font-size: 0.8em;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .line-count-added {
+      background-color: #c8e6c9;
+      color: #2e7d32;
+      padding: 2px 4px;
+    }
+    
+    .line-count-removed {
+      background-color: #ffcdd2;
+      color: #c62828;
+      padding: 2px 4px;
+    }
+    
+    .clickable-file .line-count-badge {
+      float: right;
+      margin-right: 4px;
+    }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
 </head>
@@ -945,7 +974,8 @@
       writeFilesList.innerHTML = '';
       data.write_files.forEach(file => {
         const li = document.createElement('li');
-        li.textContent = file;
+        // Create text node to ensure we can reference just the filename later
+        li.appendChild(document.createTextNode(file));
         writeFilesList.appendChild(li);
       });
       
@@ -954,7 +984,8 @@
       contextFilesList.innerHTML = '';
       data.context_files.forEach(file => {
         const li = document.createElement('li');
-        li.textContent = file;
+        // Create text node to ensure we can reference just the filename later
+        li.appendChild(document.createTextNode(file));
         contextFilesList.appendChild(li);
       });
       
@@ -1807,33 +1838,40 @@
           const newItem = item.cloneNode(true);
           item.parentNode.replaceChild(newItem, item);
           
+          // Extract just the filename without any badges or added elements
+          const filename = newItem.childNodes[0].textContent.trim();
+          
           newItem.classList.add('clickable-file');
-          newItem.addEventListener('click', () => {
-            console.log(`Clicked on file: ${newItem.textContent}`);
-            showFileDiff(newItem.textContent);
+          newItem.addEventListener('click', (event) => {
+            // Prevent clicks on badges from triggering the diff view
+            if (event.target.closest('.line-count-badge')) {
+              return;
+            }
+            
+            console.log(`Clicked on file: ${filename}`);
+            showFileDiff(filename);
           });
           
           // Request file status to highlight modified files
-          checkFileStatus(newItem.textContent);
+          checkFileStatus(filename);
         });
         
-        // Make context files clickable too
+        // Context files should NOT be clickable in the same way write files are
         const contextFileItems = contextFilesList.querySelectorAll('li');
-        console.log(`Found ${contextFileItems.length} context files to make clickable`);
+        console.log(`Found ${contextFileItems.length} context files`);
         
         contextFileItems.forEach(item => {
-          // Remove existing event listeners by cloning the node
+          // Remove any clickable styling or event listeners
           const newItem = item.cloneNode(true);
           item.parentNode.replaceChild(newItem, item);
           
-          newItem.classList.add('clickable-file');
-          newItem.addEventListener('click', () => {
-            console.log(`Clicked on file: ${newItem.textContent}`);
-            showFileDiff(newItem.textContent);
-          });
+          // Make them non-clickable by default
+          newItem.classList.remove('clickable-file');
+          newItem.classList.remove('modified-file');
           
-          // Request file status to highlight modified files
-          checkFileStatus(newItem.textContent);
+          // Still check file status, but don't make them clickable for diffs
+          const filename = newItem.childNodes[0].textContent.trim();
+          checkFileStatus(filename);
         });
       } else {
         console.log("Block execution not successful, not making files clickable");
@@ -1886,7 +1924,7 @@
         
         if (data.type === "file_status_response") {
           // Handle file status update
-          const { filename, is_modified, error } = data;
+          const { filename, is_modified, error, added_lines, removed_lines } = data;
           
           if (error) {
             console.log(`Error checking status for ${filename}: ${error}`);
@@ -1904,12 +1942,59 @@
             
             const items = list.querySelectorAll('li');
             items.forEach(item => {
-              if (item.textContent.trim() === filename.trim()) {
+              // Extract the actual filename from the first text node
+              let itemFilename = '';
+              if (item.childNodes.length > 0 && item.childNodes[0].nodeType === Node.TEXT_NODE) {
+                itemFilename = item.childNodes[0].textContent.trim();
+              } else {
+                itemFilename = item.textContent.trim();
+              }
+              
+              if (itemFilename === filename.trim()) {
+                // For context files, we don't want to highlight them as modified
+                if (list.id === 'contextFilesList') {
+                  // Don't add modification styling to context files
+                  return;
+                }
+                
                 // Update class based on modification status
                 if (is_modified) {
                   item.classList.add('modified-file');
+                  
+                  // Add line counts if available
+                  if (added_lines > 0 || removed_lines > 0) {
+                    // Create line count display
+                    let lineCountHTML = '';
+                    
+                    if (added_lines > 0) {
+                      lineCountHTML += `<span class="line-count-added">+${added_lines}</span>`;
+                    }
+                    
+                    if (removed_lines > 0) {
+                      lineCountHTML += `<span class="line-count-removed">-${removed_lines}</span>`;
+                    }
+                    
+                    // Add the line count badge
+                    const badge = document.createElement('span');
+                    badge.className = 'line-count-badge';
+                    badge.innerHTML = lineCountHTML;
+                    
+                    // Remove any existing badge first
+                    const existingBadge = item.querySelector('.line-count-badge');
+                    if (existingBadge) {
+                      item.removeChild(existingBadge);
+                    }
+                    
+                    // Add new badge
+                    item.appendChild(badge);
+                  }
                 } else {
                   item.classList.remove('modified-file');
+                  // Remove any existing line count badge
+                  const existingBadge = item.querySelector('.line-count-badge');
+                  if (existingBadge) {
+                    item.removeChild(existingBadge);
+                  }
                 }
               }
             });

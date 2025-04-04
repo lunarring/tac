@@ -239,6 +239,30 @@ class UIManager:
                 }
                 await self.websocket.send(json.dumps(payload))
 
+    def count_diff_lines(self, diff_text):
+        """Count added and removed lines in a diff.
+        
+        Args:
+            diff_text: The diff text to analyze
+            
+        Returns:
+            tuple: (added_lines, removed_lines)
+        """
+        if not diff_text or not isinstance(diff_text, str):
+            return 0, 0
+            
+        added = 0
+        removed = 0
+        
+        # Count lines that start with + or - but not ++ or --
+        for line in diff_text.splitlines():
+            if line.startswith('+') and not line.startswith('+++'):
+                added += 1
+            elif line.startswith('-') and not line.startswith('---'):
+                removed += 1
+                
+        return added, removed
+
     async def handle_file_diff_request(self, filename):
         """
         Handles a request for a diff of a specific file.
@@ -393,6 +417,9 @@ class UIManager:
                 return
             
             is_modified = False
+            added_lines = 0
+            removed_lines = 0
+            diff_text = ""
             
             # Check if file is modified using git
             if self.git_manager and hasattr(self.git_manager, 'repo') and self.git_manager.repo:
@@ -422,13 +449,22 @@ class UIManager:
                     except Exception:
                         pass
                     
-                    # Determine if the file is modified
-                    if unstaged_diff or staged_diff:
-                        # Has diff changes
+                    # Determine if the file is modified and get diff for line counting
+                    if unstaged_diff:
+                        # Has unstaged diff changes
                         is_modified = True
+                        diff_text = unstaged_diff
+                    elif staged_diff:
+                        # Has staged diff changes
+                        is_modified = True
+                        diff_text = staged_diff
                     elif is_untracked:
-                        # New file
+                        # New file - all lines are added
                         is_modified = True
+                        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                            content = f.read()
+                        added_lines = len(content.splitlines())
+                        removed_lines = 0
                     elif is_tracked:
                         # Tracked but no git diff - check content manually
                         try:
@@ -436,12 +472,27 @@ class UIManager:
                                 current_content = f.read()
                             original_content = self.git_manager.repo.git.show(f"HEAD:{filename}")
                             is_modified = original_content != current_content
+                            
+                            if is_modified:
+                                # Generate diff for line counting
+                                diff_lines = difflib.unified_diff(
+                                    original_content.splitlines(),
+                                    current_content.splitlines(),
+                                    fromfile=f'a/{filename}',
+                                    tofile=f'b/{filename}',
+                                    lineterm=''
+                                )
+                                diff_text = '\n'.join(diff_lines)
                         except Exception:
                             # Can't determine, assume unmodified
                             is_modified = False
                     else:
                         # Unknown status
                         is_modified = False
+                    
+                    # Count lines if we have a diff
+                    if diff_text:
+                        added_lines, removed_lines = self.count_diff_lines(diff_text)
                         
                 except Exception as git_err:
                     # Error checking git status, assume unmodified
@@ -450,12 +501,15 @@ class UIManager:
             else:
                 # No git, all files are considered modified in UI mode
                 is_modified = True
+                # Can't count lines without git, so just return is_modified
             
-            # Send the response
+            # Send the response with line counts
             await self.websocket.send(json.dumps({
                 "type": "file_status_response",
                 "filename": filename,
-                "is_modified": is_modified
+                "is_modified": is_modified,
+                "added_lines": added_lines,
+                "removed_lines": removed_lines
             }))
             
         except Exception as e:
