@@ -853,10 +853,11 @@ class UIManager:
                 await self.send_protoblock_data(processor.protoblock)
                 
                 # Inform user that changes are uncommitted and can be viewed
-                await self.websocket.send(json.dumps({
-                    "type": "info_message",
-                    "message": "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
-                }))
+                # This popup is redundant as git features are already available on the left side
+                # await self.websocket.send(json.dumps({
+                #     "type": "info_message",
+                #     "message": "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
+                # }))
             else:
                 # If block execution failed, send explicit failure message
                 await self.send_status_message("❌ Block execution failed!")
