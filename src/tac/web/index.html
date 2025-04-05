@@ -2806,7 +2806,8 @@
           resultObj.after_screenshot_path;
         
         if (hasBeforeAfterScreenshots) {
-          individualScreenshotsContainer.style.display = 'block';
+          // No longer showing individual screenshots, only keep them for reference
+          individualScreenshotsContainer.style.display = 'none';
           
           const beforePath = makePathUsable(resultObj.before_screenshot_path);
           const afterPath = makePathUsable(resultObj.after_screenshot_path);
@@ -2814,8 +2815,8 @@
           trustyAgentBeforeImage.src = beforePath;
           trustyAgentAfterImage.src = afterPath;
           
-          console.log(`Setting before screenshot: ${beforePath}`);
-          console.log(`Setting after screenshot: ${afterPath}`);
+          console.log(`Loaded before screenshot: ${beforePath}`);
+          console.log(`Loaded after screenshot: ${afterPath}`);
         }
         
         // Check for test results
