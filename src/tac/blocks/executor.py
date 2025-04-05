@@ -219,6 +219,10 @@ class BlockExecutor:
                         if hasattr(agent, 'verification_info') and agent.verification_info:
                             result_dict['verification_info'] = agent.verification_info
                     
+                    # Store agent-specific results properties
+                    if hasattr(agent, 'stars') and agent.stars is not None:
+                        result_dict['stars'] = agent.stars
+                    
                     # Store all available results
                     self.protoblock.trusty_agent_results[registry_name] = result_dict
                     

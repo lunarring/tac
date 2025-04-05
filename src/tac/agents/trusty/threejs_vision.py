@@ -195,19 +195,20 @@ class ThreeJSVisionAgent(TrustyAgent):
                 
             logger.info(f"Screenshot file verified: {self.screenshot_path} ({file_size} bytes)")
             
-            # Create messages for the vision model with updated grading system
+            # Create messages for the vision model with updated star rating system
             vision_messages = [
                 Message(role="system", content="""You are a helpful assistant that can analyze 3D visualizations created with Three.js.
-                You will grade the visualization on a scale from A to F where:
-                A: Perfect match with all expected elements present and correctly rendered
-                B: Good match with minor visual discrepancies
-                C: Acceptable but with noticeable issues
-                D: Minimum passing grade - basic elements present but with significant issues
-                F: Failed - major elements missing or severe rendering problems
+                You will rate the visualization on a scale from 0 to 5 stars where:
+                5.0 stars: Perfect match with all expected elements present and correctly rendered
+                4.0 stars: Good match with minor visual discrepancies
+                3.0 stars: Acceptable but with noticeable issues
+                2.0 stars: Poor with significant rendering problems but basic elements visible
+                1.0 stars: Very poor with major elements incorrectly rendered
+                0.0 stars: Failed - major elements missing or severe rendering problems
                 
                 Provide your analysis in this format:
                 
-                GRADE: [A-F]
+                STAR RATING: [0.0-5.0]
                 
                 ANALYSIS:
                 (Detailed analysis of what matches or doesn't match expectations)
@@ -230,47 +231,79 @@ class ThreeJSVisionAgent(TrustyAgent):
 
     def _determine_success(self, analysis_result: str) -> bool:
         """
-        Determine if the vision analysis indicates success based on the grade.
+        Determine if the vision analysis indicates success based on the star rating.
         
         Args:
             analysis_result: The result of the vision analysis
             
         Returns:
-            bool: True if the grade meets or exceeds the minimum required grade from config
+            bool: True if the star rating meets or exceeds the minimum required rating from config
         """
         try:
-            # Get minimum passing grade from config
-            min_grade = config.general.trusty_agents.minimum_vision_score.upper()
-            if min_grade not in {"A", "B", "C", "D", "F"}:
-                logger.warning(f"Invalid minimum_vision_score in config: {min_grade}, defaulting to 'B'")
-                min_grade = "B"
+            # Get minimum passing star rating from config
+            min_stars = config.general.trusty_agents.minimum_vision_score
             
-            # Define grade values (A=4, B=3, C=2, D=1, F=0)
-            grade_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
-            min_grade_value = grade_values[min_grade]
-            
-            # Extract grade from the analysis
-            if "GRADE:" in analysis_result:
-                grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
-                grade = grade_line[0].upper()  # Take first character as grade
+            # Extract star rating from the analysis
+            if "STAR RATING:" in analysis_result:
+                rating_line = analysis_result.split("STAR RATING:")[1].split("\n")[0].strip()
                 
-                if grade not in grade_values:
-                    logger.error(f"Invalid grade found in analysis: {grade}")
+                # Clean up any markdown formatting (e.g., ** for bold)
+                rating_line = rating_line.replace("*", "")
+                
+                # Try to extract a number from the line
+                import re
+                numbers = re.findall(r'\d+\.?\d*', rating_line)
+                if numbers:
+                    try:
+                        stars = float(numbers[0])
+                        # Ensure the rating is within bounds
+                        stars = max(0.0, min(5.0, stars))
+                        
+                        # Store the star rating for UI display
+                        self.stars = stars
+                        self.grade = f"{stars:.1f}"
+                        
+                        # Add a field indicating the star rating scale for UI display
+                        self.grade_info = {
+                            5.0: "Excellent - Perfect match with requirements",
+                            4.5: "Very good - Almost perfect with minor issues",
+                            4.0: "Good - Minor visual discrepancies", 
+                            3.5: "Above average - Some issues but mostly good",
+                            3.0: "Acceptable - Noticeable issues",
+                            2.5: "Below average - Multiple issues",
+                            2.0: "Poor - Significant rendering problems",
+                            1.5: "Very poor - Major issues",
+                            1.0: "Very poor - Major elements incorrect",
+                            0.5: "Almost failed - Barely recognizable",
+                            0.0: "Failed - Major elements missing"
+                        }.get(round(stars * 2) / 2, f"{stars:.1f} stars")
+                        
+                        # Debug log with more details
+                        logger.info(f"Extracted star rating from line '{rating_line}': {stars}, Grade: {self.grade}, Info: {self.grade_info}")
+                        
+                        # Compare star ratings
+                        return stars >= min_stars
+                    except (ValueError, IndexError):
+                        logger.error(f"Failed to parse star rating from: {rating_line}")
+                        return False
+                else:
+                    logger.error(f"No numeric rating found in: {rating_line}")
                     return False
-                
-                # Compare grade values
-                return grade_values[grade] >= min_grade_value
             
-            # Fallback to old YES/NO format if no grade found
+            # Fallback to old YES/NO format if no rating found
             lines = analysis_result.strip().split('\n')
             if lines and lines[0].strip().upper() in ["YES", "NO"]:
-                logger.warning("Using legacy YES/NO format - treating YES as grade 'B' and NO as grade 'F'")
-                return lines[0].strip().upper() == "YES"
+                logger.warning("Using legacy YES/NO format - treating YES as 4.0 stars and NO as 0.0 stars")
+                answer = lines[0].strip().upper() == "YES"
+                self.stars = 4.0 if answer else 0.0
+                self.grade = "4.0" if answer else "0.0"
+                self.grade_info = "Legacy YES format" if answer else "Legacy NO format"
+                return answer
             
             return False
             
         except Exception as e:
-            logger.error(f"Error determining success from grade: {e}")
+            logger.error(f"Error determining success from star rating: {e}")
             return False
 
 

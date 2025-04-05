@@ -11,7 +11,7 @@ logger = setup_logging('tac.trusty_agents.plausibility')
 
 @trusty_agent(
     name="plausibility",
-    description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility.",
+    description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a star rating (0-5 stars) based on plausibility.",
     protoblock_prompt="Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description."
 )
 class PlausibilityTestingAgent(TrustyAgent):
@@ -23,24 +23,21 @@ class PlausibilityTestingAgent(TrustyAgent):
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
         self.llm_client = LLMClient(llm_type="strong")
-        self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
         self._min_score = config.general.trusty_agents.minimum_plausibility_score
 
         logger.info("Initializing PlausibilityTestingAgent")
 
-    def _is_score_passing(self, score: str) -> bool:
+    def _is_score_passing(self, score: float) -> bool:
         """
         Determines if a score meets the minimum passing threshold.
         
         Args:
-            score: The letter grade (A, B, C, D, or F)
+            score: The star rating (0.0 to 5.0 stars)
             
         Returns:
             bool: True if the score meets or exceeds the minimum passing score
         """
-        score_value = self._score_values.get(score.upper(), -1)
-        min_score_value = self._score_values.get(config.general.trusty_agents.minimum_plausibility_score.upper(), 1)  # Default to D if invalid
-        return score_value >= min_score_value
+        return score >= self._min_score
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
         """
@@ -100,7 +97,7 @@ Plausibility Prompt: {protoblock.trusty_agent_prompts.get("plausibility", "Use c
 5. Look for any missing requirements or incomplete implementations
 6. Look if there are any external dependencies that may have been hallucinated by the junior developer.
 7. Find out whether existing functionality is broken by the changes.
-8. Finally, come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
+8. Finally, come up with a PLAUSIBILITY STAR RATING based on the analysis, where 5 stars is the best and 0 stars is failed. The minimum passing score is 3.0 stars. Your rating should be a number between 0.0 and 5.0 (can include decimal places for precision).
 </analysis_rules>
 
 <output_format>
@@ -121,13 +118,14 @@ MISSING FILES:
 RECOMMENDATIONS:
 (List specific suggestions for improvement if needed)
 
-PLAUSIBILITY SCORE RATING:
-(answer only with one letter with the rating, where:
-"A" is the best possible score
-"B" is good, but not perfect because some minor things that could have been done better
-"C" is acceptable, but there are some issues
-"D" is the minimum passing score, not a nice implementation but it will work
-"F" is failed, because the implementation is not even close to the requirements, or because it probably will not work or breaks something.)
+PLAUSIBILITY STAR RATING:
+(Provide a numeric rating between 0.0 and 5.0 stars, where:
+5.0 stars = Perfect match with requirements
+4.0 stars = Good implementation with minor improvements possible
+3.0 stars = Acceptable implementation with some issues
+2.0 stars = Poor implementation with significant issues but partially works
+1.0 stars = Very poor implementation with major issues
+0.0 stars = Failed implementation that does not meet requirements at all)
 
 HUMAN VERIFICATION:
 Provide me here briefly how I can run the code myself to verify the changes. This could be for instance "python main.py" or "python -m tests.test_piano_trainer_main" or similar.
@@ -180,34 +178,49 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             # Store verification info for UI display
             self.verification_info = human_verification
 
-            final_plausibility_score = ""
-            if "PLAUSIBILITY SCORE RATING:" in analysis:
-                score_section = analysis.split("PLAUSIBILITY SCORE RATING:")[1].strip()
-                # Extract just the letter grade, ignoring any additional text
-                for char in score_section:
-                    if char in "ABCDF":
-                        final_plausibility_score = char
-                        break
+            # Extract star rating
+            star_rating = 0.0
+            if "PLAUSIBILITY STAR RATING:" in analysis:
+                rating_section = analysis.split("PLAUSIBILITY STAR RATING:")[1].strip()
+                # Extract just the numeric rating
+                rating_text = ""
+                for line in rating_section.split("\n"):
+                    line = line.strip()
+                    if line:
+                        # Try to extract a number from the line
+                        import re
+                        numbers = re.findall(r'\d+\.?\d*', line)
+                        if numbers:
+                            rating_text = numbers[0]
+                            break
+                
+                try:
+                    star_rating = float(rating_text)
+                    # Ensure the rating is within bounds
+                    star_rating = max(0.0, min(5.0, star_rating))
+                except (ValueError, IndexError):
+                    logger.error(f"Failed to parse star rating from: {rating_text}")
+                    star_rating = 0.0
             
-            # Strip any whitespace and ensure uppercase
-            final_plausibility_score = final_plausibility_score.strip().upper()
+            # Store stars for UI display (formatted to 1 decimal place)
+            self.stars = star_rating
+            formatted_stars = f"{star_rating:.1f}"
+            self.grade = formatted_stars
             
-            # Store grade for UI display
-            self.grade = final_plausibility_score
-            
-            # Add a field indicating the grading scale for UI display
+            # Add a field indicating the star rating scale for UI display
             self.grade_info = {
-                "A": "Excellent - Perfect match with requirements",
-                "B": "Good - Minor improvements possible",
-                "C": "Acceptable - Some issues exist",
-                "D": "Minimum Pass - Not ideal but functional",
-                "F": "Failed - Significant issues or non-functional"
-            }.get(final_plausibility_score, "Unknown grade")
+                5.0: "Excellent - Perfect match with requirements",
+                4.0: "Good - Minor improvements possible", 
+                3.0: "Acceptable - Some issues exist",
+                2.0: "Poor - Significant issues but partially works",
+                1.0: "Very poor - Major issues",
+                0.0: "Failed - Does not meet requirements"
+            }.get(round(star_rating), f"{formatted_stars} stars")
 
             # Check if score meets minimum requirement
-            is_plausible = self._is_score_passing(final_plausibility_score)
+            is_plausible = self._is_score_passing(star_rating)
 
-            logger.info(f"Plausibility score: {final_plausibility_score}")
+            logger.info(f"Plausibility star rating: {formatted_stars}")
             
             if is_plausible:
                 return True, "", ""

@@ -168,7 +168,7 @@ TAC provides a comprehensive set of command-line options for customizing behavio
 - `--confirm-multiblock-execution`: Prompt for confirmation before executing multi-block tasks (default: true)
 - `--coding-agent`: Choose between "aider" or "native" coding agents (default: native)
 - `--reasoning-effort`: Set reasoning effort level ("low", "medium", "high") (default: medium)
-- `--minimum-plausibility-score`: Set the minimum grade (A-F) for plausibility tests (default: B)
+- `--minimum-plausibility-score`: Set the minimum star rating (0.0-5.0) for plausibility tests (default: 3.0)
 
 - `--max-retries-block-creation`: Maximum number of retry attempts for block creation (default: 4)
 - `--max-retries-protoblock-creation`: Maximum number of retry attempts for protoblock creation (default: 4)

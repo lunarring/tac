@@ -880,31 +880,53 @@
     
     /* Style for trusty agent item in file list to show it's clickable */
     .trusty-agent-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      margin-bottom: 5px;
+      border-radius: 4px;
       cursor: pointer;
-      transition: background-color 0.2s, transform 0.2s;
-      position: relative;
+      transition: background-color 0.2s;
     }
-    .trusty-agent-item::after {
-      content: "👁️";
-      margin-left: 5px;
-      font-size: 10px;
-      opacity: 0.7;
-    }
-    .trusty-agent-item.has-results {
-      background-color: #d4edda;
-      border-color: #c3e6cb;
-      color: #155724;
-    }
-    .trusty-agent-item.has-results::after {
-      content: "👁️";
-      color: #155724;
-    }
+
     .trusty-agent-item:hover {
-      background-color: #e6f7ff;
-      transform: translateY(-1px);
+      background-color: #f0f2f5;
     }
-    .trusty-agent-item.has-results:hover {
-      background-color: #c3e6cb;
+
+    .trusty-agent-name {
+      flex-grow: 1;
+    }
+
+    .trusty-agent-status {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+
+    .trusty-agent-status.passed {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .trusty-agent-status.failed {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+
+    .trusty-agent-status.pending {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+
+    .trusty-agent-stars {
+      margin-left: 5px;
+      color: gold;
+      font-weight: bold;
+      text-shadow: 1px 1px 1px rgba(0,0,0,0.5), -1px -1px 1px rgba(0,0,0,0.5), 1px -1px 1px rgba(0,0,0,0.5), -1px 1px 1px rgba(0,0,0,0.5);
     }
     
     /* Agent status styles */
@@ -1061,6 +1083,75 @@
     
     #contextFilesList, #writeFilesList, #trustyAgentsList {
       max-height: 150px;
+    }
+    
+    /* Star rating styles */
+    .star-rating {
+      display: flex;
+      align-items: center;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 10px;
+      border-radius: 8px;
+      color: #555;
+      background-color: #f8f9fa;
+      border: 1px solid #e9ecef;
+    }
+    
+    .star-value {
+      font-size: 22px;
+      margin-right: 6px;
+    }
+    
+    .stars {
+      color: gold;
+      margin-left: 5px;
+      text-shadow: 1px 1px 1px rgba(0,0,0,0.8), -1px -1px 1px rgba(0,0,0,0.8), 1px -1px 1px rgba(0,0,0,0.8), -1px 1px 1px rgba(0,0,0,0.8), 
+                   2px 0px 1px rgba(0,0,0,0.5), -2px 0px 1px rgba(0,0,0,0.5), 0px 2px 1px rgba(0,0,0,0.5), 0px -2px 1px rgba(0,0,0,0.5);
+      font-size: 18px;
+      letter-spacing: 2px;
+    }
+    
+    /* Star colors based on rating */
+    .star-rating[data-stars="5"],
+    .star-rating[data-stars="4.5"] {
+      background-color: #d4edda;
+      color: #155724;
+      border-color: #c3e6cb;
+    }
+    
+    .star-rating[data-stars="4"],
+    .star-rating[data-stars="3.5"] {
+      background-color: #d1ecf1;
+      color: #0c5460;
+      border-color: #bee5eb;
+    }
+    
+    .star-rating[data-stars="3"],
+    .star-rating[data-stars="2.5"] {
+      background-color: #fff3cd;
+      color: #856404;
+      border-color: #ffeeba;
+    }
+    
+    .star-rating[data-stars="2"],
+    .star-rating[data-stars="1.5"] {
+      background-color: #ffe5d0;
+      color: #7d5a00;
+      border-color: #ffdb9a;
+    }
+    
+    .star-rating[data-stars="1"],
+    .star-rating[data-stars="0.5"],
+    .star-rating[data-stars="0"] {
+      background-color: #f8d7da;
+      color: #721c24;
+      border-color: #f5c6cb;
+    }
+    
+    .grade-info {
+      font-size: 14px;
+      flex: 1;
     }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
@@ -1549,8 +1640,8 @@
           document.getElementById('protoblockContainer').style.display = 'block';
           document.querySelector('#rightPanel canvas').style.display = 'none';
           
-          // Display the data
-          displayProtoblockData(data);
+          // Use our new standardized function for displaying protoblock data
+          displayProtoblock(data);
           
           console.log("Protoblock is now visible");
           return;
@@ -2701,9 +2792,71 @@
           trustyAgentPlausibilitySection.style.display = 'block';
           
           // Display grade
-          if (resultObj.grade) {
-            trustyAgentGrade.textContent = resultObj.grade;
-            trustyAgentGrade.setAttribute('data-grade', resultObj.grade);
+          if (resultObj.grade || resultObj.stars) {
+            // Debug log all properties to help diagnose issues
+            console.log(`Agent ${agentName} Properties:`, {
+              grade: resultObj.grade,
+              stars: resultObj.stars,
+              grade_info: resultObj.grade_info,
+              status: resultObj.status
+            });
+            
+            // First try to get numeric rating from stars property if available
+            let starRating = resultObj.stars ? parseFloat(resultObj.stars) : null;
+            
+            // If no stars property, try to parse from grade property
+            if (starRating === null && resultObj.grade) {
+              starRating = parseFloat(resultObj.grade);
+            }
+            
+            if (!isNaN(starRating)) {
+              // Star rating system - convert the old grade element to a star rating element
+              trustyAgentGrade.className = 'star-rating';
+              trustyAgentGrade.innerHTML = '';
+              
+              // Create rating value
+              const valueSpan = document.createElement('span');
+              valueSpan.className = 'star-value';
+              valueSpan.textContent = starRating.toFixed(1);
+              trustyAgentGrade.appendChild(valueSpan);
+              
+              // Create stars
+              const starsSpan = document.createElement('span');
+              starsSpan.className = 'stars';
+              
+              // Round to nearest half star
+              const roundedStars = Math.round(starRating * 2) / 2;
+              let starsHTML = '';
+              
+              // Add full stars
+              const fullStars = Math.floor(roundedStars);
+              for (let i = 0; i < fullStars; i++) {
+                starsHTML += '★';
+              }
+              
+              // Add half star if needed
+              if (roundedStars % 1 !== 0) {
+                starsHTML += '☆';
+              }
+              
+              // Add empty stars
+              const emptyStars = 5 - Math.ceil(roundedStars);
+              for (let i = 0; i < emptyStars; i++) {
+                starsHTML += '☆';
+              }
+              
+              starsSpan.innerHTML = starsHTML;
+              trustyAgentGrade.appendChild(starsSpan);
+              
+              // Use the rounded value for the data attribute for CSS styling
+              const roundedForCSS = Math.floor(starRating * 2) / 2; // Round to nearest 0.5
+              trustyAgentGrade.setAttribute('data-stars', roundedForCSS);
+            } else {
+              // Legacy letter grade system (for backward compatibility)
+              trustyAgentGrade.textContent = resultObj.grade || "N/A";
+              trustyAgentGrade.className = 'grade';
+              trustyAgentGrade.setAttribute('data-grade', resultObj.grade || "N/A");
+            }
             trustyAgentGrade.style.display = 'flex';
           } else {
             trustyAgentGrade.style.display = 'none';
@@ -2724,6 +2877,91 @@
           } else {
             trustyAgentVerificationInfo.style.display = 'none';
           }
+        }
+        // For any agent that has stars or grade, show the plausibility section
+        // This allows us to display star ratings for all agents, not just plausibility
+        else if (resultObj.stars || (resultObj.grade && !isNaN(parseFloat(resultObj.grade)))) {
+          // Show the plausibility section for star ratings
+          trustyAgentPlausibilitySection.style.display = 'block';
+          
+          // Debug log all properties to help diagnose issues
+          console.log(`Non-plausibility agent ${agentName} with rating:`, {
+            grade: resultObj.grade,
+            stars: resultObj.stars,
+            grade_info: resultObj.grade_info,
+            status: resultObj.status
+          });
+          
+          // First try to get numeric rating from stars property if available
+          let starRating = resultObj.stars ? parseFloat(resultObj.stars) : null;
+          
+          // If no stars property, try to parse from grade property
+          if (starRating === null && resultObj.grade) {
+            starRating = parseFloat(resultObj.grade);
+          }
+          
+          if (!isNaN(starRating)) {
+            // Star rating system - convert the old grade element to a star rating element
+            trustyAgentGrade.className = 'star-rating';
+            trustyAgentGrade.innerHTML = '';
+            
+            // Create rating value
+            const valueSpan = document.createElement('span');
+            valueSpan.className = 'star-value';
+            valueSpan.textContent = starRating.toFixed(1);
+            trustyAgentGrade.appendChild(valueSpan);
+            
+            // Create stars
+            const starsSpan = document.createElement('span');
+            starsSpan.className = 'stars';
+            
+            // Round to nearest half star
+            const roundedStars = Math.round(starRating * 2) / 2;
+            let starsHTML = '';
+            
+            // Add full stars
+            const fullStars = Math.floor(roundedStars);
+            for (let i = 0; i < fullStars; i++) {
+              starsHTML += '★';
+            }
+            
+            // Add half star if needed
+            if (roundedStars % 1 !== 0) {
+              starsHTML += '☆';
+            }
+            
+            // Add empty stars
+            const emptyStars = 5 - Math.ceil(roundedStars);
+            for (let i = 0; i < emptyStars; i++) {
+              starsHTML += '☆';
+            }
+            
+            starsSpan.innerHTML = starsHTML;
+            trustyAgentGrade.appendChild(starsSpan);
+            
+            // Use the rounded value for the data attribute for CSS styling
+            const roundedForCSS = Math.floor(starRating * 2) / 2; // Round to nearest 0.5
+            trustyAgentGrade.setAttribute('data-stars', roundedForCSS);
+          } else {
+            // Legacy letter grade system (for backward compatibility)
+            trustyAgentGrade.textContent = resultObj.grade || "N/A";
+            trustyAgentGrade.className = 'grade';
+            trustyAgentGrade.setAttribute('data-grade', resultObj.grade || "N/A");
+          }
+          trustyAgentGrade.style.display = 'flex';
+          
+          // Display grade info if available
+          if (resultObj.grade_info) {
+            trustyAgentGradeInfo.textContent = typeof resultObj.grade_info === 'string' ? 
+              resultObj.grade_info : 
+              JSON.stringify(resultObj.grade_info);
+            trustyAgentGradeInfo.style.display = 'block';
+          } else {
+            trustyAgentGradeInfo.style.display = 'none';
+          }
+          
+          // Hide verification info for non-plausibility agents
+          trustyAgentVerificationInfo.style.display = 'none';
         }
 
         // Standard result section (text output)
@@ -2848,6 +3086,196 @@
       trustyAgentCloseBtn.onclick = function() {
         trustyAgentOverlay.style.display = 'none';
       };
+    }
+
+    // Function to update the trusty agents list with results
+    function updateTrustyAgentsList(protoblock) {
+      if (!protoblock.trusty_agents || !Array.isArray(protoblock.trusty_agents)) {
+        return;
+      }
+
+      const trustyAgentsList = document.getElementById('trustyAgentsList');
+      trustyAgentsList.innerHTML = '';
+
+      // Render each trusty agent with its status and star rating
+      protoblock.trusty_agents.forEach(agent => {
+        const agentKey = agent.toLowerCase();
+        const resultKey = getResultKey(protoblock, agentKey);
+        
+        const listItem = document.createElement('li');
+        listItem.className = 'trusty-agent-item';
+        listItem.setAttribute('data-agent', agentKey);
+        
+        // Create agent name span
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'trusty-agent-name';
+        nameSpan.textContent = agent;
+        listItem.appendChild(nameSpan);
+        
+        // Check if we have results for this agent
+        const hasResults = resultKey && protoblock.trusty_agent_results && protoblock.trusty_agent_results[resultKey];
+        if (hasResults) {
+          const resultObj = protoblock.trusty_agent_results[resultKey];
+          const status = resultObj.status ? resultObj.status.toLowerCase() : '';
+          
+          // Create status badge
+          const statusSpan = document.createElement('span');
+          statusSpan.className = `trusty-agent-status ${status}`;
+          
+          // If we have a numeric star rating, include it
+          let starRating = null;
+          if (resultObj.grade) {
+            const parsedRating = parseFloat(resultObj.grade);
+            if (!isNaN(parsedRating)) {
+              starRating = parsedRating;
+            }
+          } else if (resultObj.stars) {
+            starRating = parseFloat(resultObj.stars);
+          }
+          
+          // Debug log to help identify issues
+          console.log(`Agent ${agent} (${resultKey}) - Grade: ${resultObj.grade}, Stars: ${resultObj.stars}, Rating: ${starRating}`);
+          
+          // Display status text
+          if (status) {
+            statusSpan.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+          } else {
+            statusSpan.textContent = 'View';
+            statusSpan.classList.add('pending');
+          }
+          
+          // If we have a star rating, add stars to the status
+          if (starRating !== null) {
+            const starsSpan = document.createElement('span');
+            starsSpan.className = 'trusty-agent-stars';
+            
+            // Format to 1 decimal place
+            const formattedRating = starRating.toFixed(1);
+            
+            // Add the stars
+            const fullStars = Math.floor(starRating);
+            let starsHTML = ` ${formattedRating} `;
+            
+            // Add star icons
+            for (let i = 0; i < 5; i++) {
+              if (i < fullStars) {
+                starsHTML += '★'; // Full star
+              } else if (i === fullStars && starRating % 1 >= 0.5) {
+                starsHTML += '★'; // Full star for half stars (simplified)
+              } else {
+                starsHTML += '☆'; // Empty star
+              }
+            }
+            
+            starsSpan.innerHTML = starsHTML;
+            statusSpan.appendChild(starsSpan);
+          }
+          
+          listItem.appendChild(statusSpan);
+        } else {
+          // No results yet
+          const statusSpan = document.createElement('span');
+          statusSpan.className = 'trusty-agent-status pending';
+          statusSpan.textContent = 'Pending';
+          listItem.appendChild(statusSpan);
+        }
+        
+        // Add click handler
+        listItem.addEventListener('click', function() {
+          displayTrustyAgentPrompt(agent, protoblock);
+        });
+        
+        trustyAgentsList.appendChild(listItem);
+      });
+    }
+
+    // Helper function to find the correct result key for an agent
+    function getResultKey(protoblock, agentKey) {
+      if (!protoblock.trusty_agent_results) {
+        return null;
+      }
+      
+      // Try different possible keys
+      const possibleKeys = [
+        agentKey,
+        agentKey.replace('agent', ''),
+        agentKey.replace('_agent', '')
+      ];
+      
+      for (const key of possibleKeys) {
+        if (protoblock.trusty_agent_results[key]) {
+          return key;
+        }
+      }
+      
+      return null;
+    }
+
+    function displayProtoblock(data) {
+      console.log("Displaying protoblock data:", data);
+      
+      // Update attempt number
+      document.getElementById("protoblockAttempt").textContent = data.attempt || "Attempt 1/4";
+      
+      // Update task description
+      const taskDescriptionElement = document.getElementById("taskDescription");
+      taskDescriptionElement.textContent = data.task_description || "No task description provided";
+      
+      // Set a default commit message if none is provided
+      const commitMessage = data.commit_message || "Code changes for task: " + (data.task_description || "").substring(0, 40) + "...";
+      document.getElementById("commitMessage").textContent = commitMessage;
+      
+      // Update context files list
+      const contextFilesList = document.getElementById("contextFilesList");
+      contextFilesList.innerHTML = "";
+      if (data.context_files && data.context_files.length > 0) {
+        data.context_files.forEach(file => {
+          const li = document.createElement("li");
+          li.textContent = file;
+          contextFilesList.appendChild(li);
+        });
+      } else {
+        const li = document.createElement("li");
+        li.textContent = "No context files specified";
+        contextFilesList.appendChild(li);
+      }
+      
+      // Update write files list
+      const writeFilesList = document.getElementById("writeFilesList");
+      writeFilesList.innerHTML = "";
+      if (data.write_files && data.write_files.length > 0) {
+        data.write_files.forEach(file => {
+          const li = document.createElement("li");
+          li.className = "write-file-item";
+          li.textContent = file;
+          
+          // Add click event for getting diff
+          li.addEventListener("click", function() {
+            getFileDiff(file);
+          });
+          
+          writeFilesList.appendChild(li);
+        });
+      } else {
+        const li = document.createElement("li");
+        li.textContent = "No files to modify specified";
+        writeFilesList.appendChild(li);
+      }
+      
+      // Update trusty agents list
+      const trustyAgentsList = document.getElementById("trustyAgentsList");
+      trustyAgentsList.innerHTML = "";
+      if (data.trusty_agents && data.trusty_agents.length > 0) {
+        // Use our new standardized function to update the trusty agents list
+        updateTrustyAgentsList(data);
+      } else {
+        const li = document.createElement("li");
+        li.textContent = "No trusty agents specified";
+        trustyAgentsList.appendChild(li);
+      }
+      
+      // Show the protoblock container
+      document.getElementById("protoblockContainer").style.display = "block";
     }
   </script>
 </body>

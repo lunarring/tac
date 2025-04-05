@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Tuple, Optional, Any
 import platform
 import uuid
+import re
 
 from playwright.sync_api import sync_playwright
 
@@ -59,6 +60,9 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
         self.context = None
         self.page = None
         self.protoblock = None
+        self.stars = None
+        self.grade = None
+        self.grade_info = None
 
     def set_protoblock(self, protoblock: ProtoBlock) -> None:
         """Set the protoblock for use in state capture."""
@@ -167,35 +171,93 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
 
     def _determine_success(self, analysis_result: str) -> bool:
         """
-        Determine if the visual comparison analysis indicates success based on a grade.
-        Only an A grade is considered acceptable.
+        Determine if the visual comparison analysis indicates success based on a star rating.
+        Only a 5-star rating is considered acceptable for reference matching.
         
         Args:
-            analysis_result: The result from the vision analysis, expected to contain a grade.
+            analysis_result: The result from the vision analysis, expected to contain a star rating.
             
         Returns:
-            bool: True if the grade is an A; False otherwise.
+            bool: True if the rating is 5 stars; False otherwise.
         """
         try:
+            if "STAR RATING:" in analysis_result:
+                rating_line = analysis_result.split("STAR RATING:")[1].split("\n")[0].strip()
+                if not rating_line:
+                    logger.error("No star rating found after 'STAR RATING:'")
+                    return False
+                
+                # Clean up any markdown formatting (e.g., ** for bold)
+                rating_line = rating_line.replace("*", "")
+                
+                # Try to extract a number from the line
+                numbers = re.findall(r'\d+\.?\d*', rating_line)
+                if numbers:
+                    try:
+                        stars = float(numbers[0])
+                        # Ensure the rating is within bounds
+                        stars = max(0.0, min(5.0, stars))
+                        
+                        # Store the star rating for UI display
+                        self.stars = stars
+                        self.grade = f"{stars:.1f}"
+                        
+                        # Add a field indicating the star rating scale for UI display
+                        self.grade_info = {
+                            5.0: "Perfect match with reference image",
+                            4.5: "Almost perfect with tiny differences",
+                            4.0: "Good match with minor differences",
+                            3.5: "Above average match with some differences",
+                            3.0: "Acceptable match with noticeable differences",
+                            2.5: "Below average with multiple differences",
+                            2.0: "Poor match with significant differences",
+                            1.5: "Very poor match with major differences",
+                            1.0: "Very poor match with major differences",
+                            0.5: "Almost entirely different",
+                            0.0: "Failed - completely different from reference"
+                        }.get(round(stars * 2) / 2, f"{stars:.1f} stars")
+                        
+                        # Debug log with more details
+                        logger.info(f"Extracted star rating from line '{rating_line}': {stars}, Grade: {self.grade}, Info: {self.grade_info}")
+                        
+                        # Only 5 stars is acceptable for reference matching
+                        return stars >= 4.8
+                    except (ValueError, IndexError):
+                        logger.error(f"Failed to parse star rating from: {rating_line}")
+                        return False
+                else:
+                    logger.error(f"No numeric rating found in: {rating_line}")
+                    return False
+            
+            # Check for legacy GRADE format
             if "GRADE:" in analysis_result:
                 grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
                 if not grade_line:
                     logger.error("No grade found after 'GRADE:'")
                     return False
                 grade = grade_line[0].upper()  # Take first character as grade
-                if grade == "A":
-                    return True
-                else:
-                    logger.info(f"Grade provided is {grade}, which does not meet the required A grade")
-                    return False
-            # Fallback to legacy YES/NO format if no grade found; legacy responses are not acceptable since only A passes.
+                
+                # Convert grade to star rating for UI display
+                grade_to_stars = {"A": 5.0, "B": 4.0, "C": 3.0, "D": 2.0, "F": 0.0}
+                self.stars = grade_to_stars.get(grade, 0.0)
+                self.grade = f"{self.stars:.1f}"
+                self.grade_info = f"Converted from legacy grade {grade}"
+                
+                # Only A grade (5 stars) passes
+                return grade == "A"
+                
+            # Fallback to legacy YES/NO format
             lines = analysis_result.strip().splitlines()
             if lines and lines[0].strip().upper() in ["YES", "NO"]:
-                logger.warning("Legacy YES/NO format used, failing because only an A grade is acceptable")
+                logger.warning("Legacy YES/NO format used, failing because only 5 stars is acceptable")
+                self.stars = 4.0 if lines[0].strip().upper() == "YES" else 0.0
+                self.grade = f"{self.stars:.1f}"
+                self.grade_info = "Legacy format - not sufficient for reference comparison"
                 return False
+                
             return False
         except Exception as e:
-            logger.error(f"Error determining grade: {e}")
+            logger.error(f"Error determining star rating: {e}")
             return False
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
@@ -264,12 +326,12 @@ Expected changes: {expected_changes}
 
 Please provide your analysis in the following format:
 
-GRADE: [A-F]
-"A" is the best possible score, if it really looks the same
-"B" is good, going the right direction but not quite the same
-"C" means some things are in place but some are missing or wrong
-"D" is not really right, not close to the reference image
-"F" is failed, because the implementation is far away from the reference image 
+STAR RATING: [0-5]
+"5" is the best possible score, if it really looks the same
+"4" is good, going the right direction but not quite the same
+"3" means some things are in place but some are missing or wrong
+"2" is not really right, not close to the reference image
+"1" is failed, because the implementation is far away from the reference image 
 
 ANALYSIS:
 (Detailed explanation)

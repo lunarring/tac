@@ -8,6 +8,7 @@ import logging
 from typing import Dict, Tuple, Optional, Union, Any
 import platform
 import uuid
+import re
 
 from playwright.sync_api import sync_playwright
 
@@ -55,6 +56,9 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
         self.context = None
         self.page = None
         self.protoblock = None
+        self.stars = None
+        self.grade = None
+        self.grade_info = None
 
     def set_protoblock(self, protoblock: ProtoBlock) -> None:
         """Set the protoblock for use in state capture."""
@@ -230,9 +234,9 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
 - Expected changes: {expected_changes}
 
 Please provide:
-1. GRADE: [A-F] - Overall grade for the implementation
-2. ANALYSIS: Detailed explanation of what changed and why the grade was given
-3. IMPROVEMENTS: Specific suggestions for improvement if grade is below A
+1. STAR RATING: [0.0-5.0] - Overall rating for the implementation
+2. ANALYSIS: Detailed explanation of what changed and why the rating was given
+3. IMPROVEMENTS: Specific suggestions for improvement if rating is below 4.0
 
 Focus on:
 - Visual accuracy of the changes
@@ -248,16 +252,17 @@ Focus on:
             # Direct call to LLM client for vision analysis to ensure image is passed correctly
             messages = [
                 Message(role="system", content="""You are a helpful assistant that can analyze 3D visualizations created with Three.js.
-                You will grade the visualization on a scale from A to F where:
-                A: Perfect match with all expected elements present and correctly rendered
-                B: Good match with minor visual discrepancies
-                C: Acceptable but with noticeable issues
-                D: Minimum passing grade - basic elements present but with significant issues
-                F: Failed - major elements missing or severe rendering problems
+                You will rate the visualization on a scale from 0 to 5 stars where:
+                5.0 stars: Perfect match with all expected elements present and correctly rendered
+                4.0 stars: Good match with minor visual discrepancies
+                3.0 stars: Acceptable but with noticeable issues
+                2.0 stars: Poor with significant rendering problems but basic elements visible
+                1.0 stars: Very poor with major elements incorrectly rendered
+                0.0 stars: Failed - major elements missing or severe rendering problems
                 
                 Provide your analysis in this format:
                 
-                GRADE: [A-F]
+                STAR RATING: [0.0-5.0]
                 
                 ANALYSIS:
                 (Detailed analysis of what matches or doesn't match expectations)
@@ -277,8 +282,126 @@ Focus on:
             # Log the detailed analysis
             logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
             
-            # Determine success with minimum grade B
-            success = determine_vision_success(self.analysis_result, "B")
+            # Determine success with minimum star rating 4.0
+            success = determine_vision_success(self.analysis_result, 4.0)
+            
+            # Store star rating for UI display if available
+            try:
+                if "STAR RATING:" in self.analysis_result:
+                    rating_line = self.analysis_result.split("STAR RATING:")[1].split("\n")[0].strip()
+                    # Clean up any markdown formatting (e.g., ** for bold)
+                    rating_line = rating_line.replace("*", "")
+                    
+                    # More robust regex to extract numeric values
+                    numbers = re.findall(r'\d+\.?\d*', rating_line)
+                    if numbers:
+                        stars = float(numbers[0])
+                        # Ensure the rating is within bounds
+                        stars = max(0.0, min(5.0, stars))
+                        
+                        # Store the star rating for UI display - ensure both properties are set
+                        self.stars = stars
+                        self.grade = f"{stars:.1f}"  # Format to 1 decimal place as string
+                        
+                        # Add a field indicating the star rating scale for UI display
+                        self.grade_info = {
+                            5.0: "Excellent - Perfect match with requirements",
+                            4.5: "Very good - Almost perfect with minor issues",
+                            4.0: "Good - Minor visual discrepancies", 
+                            3.5: "Above average - Some issues but mostly good",
+                            3.0: "Acceptable - Noticeable issues",
+                            2.5: "Below average - Multiple issues",
+                            2.0: "Poor - Significant rendering problems",
+                            1.5: "Very poor - Major issues",
+                            1.0: "Very poor - Major elements incorrect",
+                            0.5: "Almost failed - Barely recognizable",
+                            0.0: "Failed - Major elements missing"
+                        }.get(round(stars * 2) / 2, f"{stars:.1f} stars")
+                        
+                        # Debug log with more details
+                        logger.info(f"Extracted star rating from line '{rating_line}': {stars}, Grade: {self.grade}, Info: {self.grade_info}")
+                elif "GRADE:" in self.analysis_result:
+                    # Legacy grade format - convert to stars
+                    grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                    grade = grade_line[0].upper() if grade_line else ""
+                    
+                    # Convert letter grade to stars
+                    grade_to_stars = {"A": 5.0, "B": 4.0, "C": 3.0, "D": 2.0, "F": 0.0}
+                    if grade in grade_to_stars:
+                        self.stars = grade_to_stars[grade]
+                        self.grade = f"{self.stars:.1f}"
+                        self.grade_info = f"Converted from grade {grade}"
+                        logger.info(f"Converted grade {grade} to stars: {self.stars}")
+            except Exception as e:
+                logger.error(f"Error processing star rating for UI: {e}")
+                
+            # Ensure we have grade and stars properties set for UI display
+            if self.grade is None and success:
+                self.grade = "4.0"  # Default to 4.0 stars for success
+                self.stars = 4.0
+                self.grade_info = "Default success rating"
+            elif self.grade is None and not success:
+                self.grade = "2.0"  # Default to 2.0 stars for failure
+                self.stars = 2.0
+                self.grade_info = "Default failure rating"
+            
+            # Check if we've properly set the star rating and make sure it's available for the UI
+            logger.info(f"### DEBUG - Before final return: stars={self.stars}, grade={self.grade}, grade_info={self.grade_info}")
+            
+            # Final check before returning to ensure star rating properties are set
+            if self.stars is None or self.grade is None:
+                # Fallback - extract from the analysis_result again
+                try:
+                    if "STAR RATING:" in self.analysis_result:
+                        rating_line = self.analysis_result.split("STAR RATING:")[1].split("\n")[0].strip()
+                        # Clean up any markdown formatting
+                        rating_line = rating_line.replace("*", "")
+                        
+                        # Extract numeric value
+                        import re
+                        numbers = re.findall(r'\d+\.?\d*', rating_line)
+                        if numbers:
+                            stars = float(numbers[0])
+                            # Ensure the rating is within bounds
+                            stars = max(0.0, min(5.0, stars))
+                            
+                            # Set properties for UI display
+                            self.stars = stars
+                            self.grade = f"{stars:.1f}"
+                            
+                            # Use detailed grade_info mapping
+                            self.grade_info = {
+                                5.0: "Excellent - Perfect match with requirements",
+                                4.5: "Very good - Almost perfect with minor issues",
+                                4.0: "Good - Minor visual discrepancies", 
+                                3.5: "Above average - Some issues but mostly good",
+                                3.0: "Acceptable - Noticeable issues",
+                                2.5: "Below average - Multiple issues",
+                                2.0: "Poor - Significant rendering problems",
+                                1.5: "Very poor - Major issues",
+                                1.0: "Very poor - Major elements incorrect",
+                                0.5: "Almost failed - Barely recognizable",
+                                0.0: "Failed - Major elements missing"
+                            }.get(round(stars * 2) / 2, f"{stars:.1f} stars")
+                            
+                            logger.info(f"Final extraction - Star rating: {stars}, Grade: {self.grade}")
+                except Exception as e:
+                    logger.error(f"Final extraction error: {e}")
+                    # Last resort default values
+                    if success and not self.stars:
+                        self.stars = 4.0
+                        self.grade = "4.0"
+                        self.grade_info = "Default success rating"
+                    elif not success and not self.stars:
+                        self.stars = 2.0
+                        self.grade = "2.0"
+                        self.grade_info = "Default failure rating"
+            
+            # Make sure grade is string format with one decimal place
+            if self.stars is not None and (self.grade is None or not isinstance(self.grade, str)):
+                self.grade = f"{self.stars:.1f}"
+            
+            logger.info(f"### FINAL VALUES - stars={self.stars}, grade={self.grade}, grade_info={self.grade_info}")
             
             if success:
                 return True, self.analysis_result, ""
