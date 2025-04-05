@@ -902,31 +902,37 @@
       display: flex;
       align-items: center;
       font-size: 12px;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 12px;
       white-space: nowrap;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
 
     .trusty-agent-status.passed {
-      background-color: #d4edda;
-      color: #155724;
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
     }
 
     .trusty-agent-status.failed {
-      background-color: #f8d7da;
-      color: #721c24;
+      background-color: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
     }
 
     .trusty-agent-status.pending {
-      background-color: #fff3cd;
-      color: #856404;
+      background-color: #fff8e1;
+      color: #f57f17;
+      border: 1px solid #ffe082;
     }
 
     .trusty-agent-stars {
       margin-left: 5px;
-      color: gold;
+      color: #FFD700; /* Gold color */
       font-weight: bold;
-      text-shadow: 1px 1px 1px rgba(0,0,0,0.5), -1px -1px 1px rgba(0,0,0,0.5), 1px -1px 1px rgba(0,0,0,0.5), -1px 1px 1px rgba(0,0,0,0.5);
+      text-shadow: 0px 1px 1px rgba(0,0,0,0.3);
+      letter-spacing: 1px;
     }
     
     /* Agent status styles */
@@ -1091,67 +1097,120 @@
       align-items: center;
       font-size: 16px;
       font-weight: bold;
-      padding: 10px;
-      border-radius: 8px;
+      padding: 12px 15px;
+      border-radius: 10px;
       color: #555;
       background-color: #f8f9fa;
       border: 1px solid #e9ecef;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
     }
     
     .star-value {
-      font-size: 22px;
-      margin-right: 6px;
+      font-size: 24px;
+      margin-right: 10px;
+      font-weight: bold;
     }
     
     .stars {
-      color: gold;
-      margin-left: 5px;
-      text-shadow: 1px 1px 1px rgba(0,0,0,0.8), -1px -1px 1px rgba(0,0,0,0.8), 1px -1px 1px rgba(0,0,0,0.8), -1px 1px 1px rgba(0,0,0,0.8), 
-                   2px 0px 1px rgba(0,0,0,0.5), -2px 0px 1px rgba(0,0,0,0.5), 0px 2px 1px rgba(0,0,0,0.5), 0px -2px 1px rgba(0,0,0,0.5);
-      font-size: 18px;
-      letter-spacing: 2px;
+      color: #FFD700; /* Gold color */
+      margin-left: 8px;
+      text-shadow: 0px 1px 1px rgba(0,0,0,0.3);
+      font-size: 20px;
+      letter-spacing: 3px;
     }
     
     /* Star colors based on rating */
     .star-rating[data-stars="5"],
     .star-rating[data-stars="4.5"] {
-      background-color: #d4edda;
-      color: #155724;
-      border-color: #c3e6cb;
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border-color: #a5d6a7;
+      box-shadow: 0 2px 8px rgba(46, 125, 50, 0.1);
     }
     
     .star-rating[data-stars="4"],
     .star-rating[data-stars="3.5"] {
-      background-color: #d1ecf1;
-      color: #0c5460;
-      border-color: #bee5eb;
+      background-color: #e3f2fd;
+      color: #1565c0;
+      border-color: #90caf9;
+      box-shadow: 0 2px 8px rgba(21, 101, 192, 0.1);
     }
     
     .star-rating[data-stars="3"],
     .star-rating[data-stars="2.5"] {
-      background-color: #fff3cd;
-      color: #856404;
-      border-color: #ffeeba;
+      background-color: #fff8e1;
+      color: #f57f17;
+      border-color: #ffe082;
+      box-shadow: 0 2px 8px rgba(245, 127, 23, 0.1);
     }
     
     .star-rating[data-stars="2"],
     .star-rating[data-stars="1.5"] {
-      background-color: #ffe5d0;
-      color: #7d5a00;
-      border-color: #ffdb9a;
+      background-color: #fff3e0;
+      color: #e65100;
+      border-color: #ffcc80;
+      box-shadow: 0 2px 8px rgba(230, 81, 0, 0.1);
     }
     
     .star-rating[data-stars="1"],
     .star-rating[data-stars="0.5"],
     .star-rating[data-stars="0"] {
-      background-color: #f8d7da;
-      color: #721c24;
-      border-color: #f5c6cb;
+      background-color: #ffebee;
+      color: #c62828;
+      border-color: #ef9a9a;
+      box-shadow: 0 2px 8px rgba(198, 40, 40, 0.1);
     }
     
     .grade-info {
       font-size: 14px;
       flex: 1;
+    }
+    
+    /* Trusty agent rating display styles */
+    .rating-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      background-color: #fafafa;
+      padding: 15px;
+      border-radius: 10px;
+      border-left: 4px solid #4285f4;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+    
+    .rating-grade-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 5px 0;
+    }
+    
+    .verification-info {
+      background-color: rgba(255,255,255,0.7);
+      padding: 12px 15px;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-top: 8px;
+      color: #555;
+      position: relative;
+    }
+    
+    .verification-info::before {
+      content: "How to Verify:";
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      color: #4285f4;
+    }
+    
+    .grade-info {
+      font-size: 15px;
+      flex: 1;
+      line-height: 1.5;
+      color: #555;
     }
   </style>
   <link rel="stylesheet" type="text/css" href="index.css">
@@ -2029,6 +2088,16 @@
         <button id="trustyAgentCloseBtn">×</button>
       </div>
       <div id="trustyAgentBody">
+        <div class="trusty-agent-section" id="trustyAgentRatingSection" style="display: none;">
+          <div class="trusty-agent-section-title">Trusty Agent Rating</div>
+          <div class="rating-container">
+            <div class="rating-grade-container">
+              <div id="trustyAgentGrade" class="grade"></div>
+              <div id="trustyAgentGradeInfo" class="grade-info"></div>
+            </div>
+            <div id="trustyAgentVerificationInfo" class="verification-info"></div>
+          </div>
+        </div>
         <div class="trusty-agent-section">
           <div class="trusty-agent-section-title">Prompt</div>
           <div id="trustyAgentPromptText" class="code-block"></div>
@@ -2038,16 +2107,6 @@
           <div id="trustyAgentResultStatus" class="agent-status"></div>
           <div id="trustyAgentAgentType" class="agent-type"></div>
           <div id="trustyAgentResultText" class="code-block"></div>
-        </div>
-        <div class="trusty-agent-section" id="trustyAgentPlausibilitySection" style="display: none;">
-          <div class="trusty-agent-section-title">Plausibility Evaluation</div>
-          <div class="plausibility-container">
-            <div class="plausibility-grade-container">
-              <div id="trustyAgentGrade" class="grade"></div>
-              <div id="trustyAgentGradeInfo" class="grade-info"></div>
-            </div>
-            <div id="trustyAgentVerificationInfo" class="verification-info"></div>
-          </div>
         </div>
         <div class="trusty-agent-section" id="trustyAgentImageSection" style="display: none;">
           <div class="trusty-agent-section-title">Screenshots</div>
@@ -2710,7 +2769,7 @@
       const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
       const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
       const trustyAgentSummary = document.getElementById('trustyAgentSummary');
-      const trustyAgentPlausibilitySection = document.getElementById('trustyAgentPlausibilitySection');
+      const trustyAgentRatingSection = document.getElementById('trustyAgentRatingSection');
       const trustyAgentGrade = document.getElementById('trustyAgentGrade');
       const trustyAgentGradeInfo = document.getElementById('trustyAgentGradeInfo');
       const trustyAgentVerificationInfo = document.getElementById('trustyAgentVerificationInfo');
@@ -2777,115 +2836,20 @@
       trustyAgentImageSection.style.display = 'none';
       trustyAgentTestResultsSection.style.display = 'none';
       trustyAgentSummarySection.style.display = 'none';
-      trustyAgentPlausibilitySection.style.display = 'none';
+      trustyAgentRatingSection.style.display = 'none';
 
       // Display or hide the result section based on whether there are results
       if (hasResults && resultObj) {
-        // Check if this is the plausibility agent
-        const isPlausibilityAgent = 
-          agentKey === 'plausibility' || 
-          agentName.toLowerCase().includes('plausibility') || 
-          (resultObj.agent_type && resultObj.agent_type.toLowerCase().includes('plausibility'));
+        // Check if the agent has a star rating or grade
+        const hasStarRating = resultObj.stars || (resultObj.grade && !isNaN(parseFloat(resultObj.grade)));
         
-        if (isPlausibilityAgent) {
-          // Handle special plausibility display
-          trustyAgentPlausibilitySection.style.display = 'block';
-          
-          // Display grade
-          if (resultObj.grade || resultObj.stars) {
-            // Debug log all properties to help diagnose issues
-            console.log(`Agent ${agentName} Properties:`, {
-              grade: resultObj.grade,
-              stars: resultObj.stars,
-              grade_info: resultObj.grade_info,
-              status: resultObj.status
-            });
-            
-            // First try to get numeric rating from stars property if available
-            let starRating = resultObj.stars ? parseFloat(resultObj.stars) : null;
-            
-            // If no stars property, try to parse from grade property
-            if (starRating === null && resultObj.grade) {
-              starRating = parseFloat(resultObj.grade);
-            }
-            
-            if (!isNaN(starRating)) {
-              // Star rating system - convert the old grade element to a star rating element
-              trustyAgentGrade.className = 'star-rating';
-              trustyAgentGrade.innerHTML = '';
-              
-              // Create rating value
-              const valueSpan = document.createElement('span');
-              valueSpan.className = 'star-value';
-              valueSpan.textContent = starRating.toFixed(1);
-              trustyAgentGrade.appendChild(valueSpan);
-              
-              // Create stars
-              const starsSpan = document.createElement('span');
-              starsSpan.className = 'stars';
-              
-              // Round to nearest half star
-              const roundedStars = Math.round(starRating * 2) / 2;
-              let starsHTML = '';
-              
-              // Add full stars
-              const fullStars = Math.floor(roundedStars);
-              for (let i = 0; i < fullStars; i++) {
-                starsHTML += '★';
-              }
-              
-              // Add half star if needed
-              if (roundedStars % 1 !== 0) {
-                starsHTML += '☆';
-              }
-              
-              // Add empty stars
-              const emptyStars = 5 - Math.ceil(roundedStars);
-              for (let i = 0; i < emptyStars; i++) {
-                starsHTML += '☆';
-              }
-              
-              starsSpan.innerHTML = starsHTML;
-              trustyAgentGrade.appendChild(starsSpan);
-              
-              // Use the rounded value for the data attribute for CSS styling
-              const roundedForCSS = Math.floor(starRating * 2) / 2; // Round to nearest 0.5
-              trustyAgentGrade.setAttribute('data-stars', roundedForCSS);
-            } else {
-              // Legacy letter grade system (for backward compatibility)
-              trustyAgentGrade.textContent = resultObj.grade || "N/A";
-              trustyAgentGrade.className = 'grade';
-              trustyAgentGrade.setAttribute('data-grade', resultObj.grade || "N/A");
-            }
-            trustyAgentGrade.style.display = 'flex';
-          } else {
-            trustyAgentGrade.style.display = 'none';
-          }
-          
-          // Display grade info
-          if (resultObj.grade_info) {
-            trustyAgentGradeInfo.textContent = resultObj.grade_info;
-            trustyAgentGradeInfo.style.display = 'block';
-          } else {
-            trustyAgentGradeInfo.style.display = 'none';
-          }
-          
-          // Display verification info
-          if (resultObj.verification_info) {
-            trustyAgentVerificationInfo.textContent = resultObj.verification_info;
-            trustyAgentVerificationInfo.style.display = 'block';
-          } else {
-            trustyAgentVerificationInfo.style.display = 'none';
-          }
-        }
-        // For any agent that has stars or grade, show the plausibility section
-        // This allows us to display star ratings for all agents, not just plausibility
-        else if (resultObj.stars || (resultObj.grade && !isNaN(parseFloat(resultObj.grade)))) {
-          // Show the plausibility section for star ratings
-          trustyAgentPlausibilitySection.style.display = 'block';
+        // If the agent has a star rating, display it at the top
+        if (hasStarRating) {
+          // Show the trusty agent rating section
+          trustyAgentRatingSection.style.display = 'block';
           
           // Debug log all properties to help diagnose issues
-          console.log(`Non-plausibility agent ${agentName} with rating:`, {
+          console.log(`Agent ${agentName} Rating Properties:`, {
             grade: resultObj.grade,
             stars: resultObj.stars,
             grade_info: resultObj.grade_info,
@@ -2960,8 +2924,21 @@
             trustyAgentGradeInfo.style.display = 'none';
           }
           
-          // Hide verification info for non-plausibility agents
-          trustyAgentVerificationInfo.style.display = 'none';
+          // Show verification info only for plausibility agent
+          const isPlausibilityAgent = 
+            agentKey === 'plausibility' || 
+            agentName.toLowerCase().includes('plausibility') || 
+            (resultObj.agent_type && resultObj.agent_type.toLowerCase().includes('plausibility'));
+          
+          if (isPlausibilityAgent && resultObj.verification_info) {
+            trustyAgentVerificationInfo.textContent = resultObj.verification_info;
+            trustyAgentVerificationInfo.style.display = 'block';
+          } else {
+            trustyAgentVerificationInfo.style.display = 'none';
+          }
+        } else {
+          // No star rating to display
+          trustyAgentRatingSection.style.display = 'none';
         }
 
         // Standard result section (text output)
@@ -3152,16 +3129,15 @@
             // Format to 1 decimal place
             const formattedRating = starRating.toFixed(1);
             
-            // Add the stars
-            const fullStars = Math.floor(starRating);
+            // Add the stars with better spacing and formatting
             let starsHTML = ` ${formattedRating} `;
             
-            // Add star icons
+            // Add star icons with more consistent display
             for (let i = 0; i < 5; i++) {
-              if (i < fullStars) {
+              if (i < Math.floor(starRating)) {
                 starsHTML += '★'; // Full star
-              } else if (i === fullStars && starRating % 1 >= 0.5) {
-                starsHTML += '★'; // Full star for half stars (simplified)
+              } else if (i === Math.floor(starRating) && starRating % 1 >= 0.5) {
+                starsHTML += '★'; // Full star for half stars
               } else {
                 starsHTML += '☆'; // Empty star
               }
