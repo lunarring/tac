@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Dict, Optional, Tuple, List, Any
 from playwright.sync_api import Page, sync_playwright, Browser, BrowserContext
 import os
@@ -454,7 +455,6 @@ def determine_vision_success(analysis_result: str, min_stars: float = 3.0) -> bo
             rating_line = rating_line.replace("*", "")
             
             # Try to extract a number from the line
-            import re
             numbers = re.findall(r'\d+\.?\d*', rating_line)
             if numbers:
                 try:

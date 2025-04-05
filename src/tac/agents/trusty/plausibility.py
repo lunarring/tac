@@ -1,4 +1,5 @@
- import json
+import json
+import re
 from typing import Dict, Optional, Tuple
 from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
@@ -188,7 +189,6 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                     line = line.strip()
                     if line:
                         # Try to extract a number from the line
-                        import re
                         numbers = re.findall(r'\d+\.?\d*', line)
                         if numbers:
                             rating_text = numbers[0]
