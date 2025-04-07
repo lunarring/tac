@@ -19,6 +19,13 @@ from tac.core.config import config, ConfigManager
 from tac.utils.git_manager import create_git_manager
 from tac.agents.trusty.pytest import PytestTestingAgent
 from tac.web.websocket_server import WebSocketServer  # Import the new WebSocketServer
+from tac.web.ui_components import (
+    ChatPanel, 
+    ProtoBlockView, 
+    FileDiffView, 
+    GitView, 
+    SpeechInput
+)
 
 class UIManager:
     def __init__(self, base_dir="."):
@@ -27,16 +34,44 @@ class UIManager:
         self.speech_to_text = Speech2Text()
         self.is_recording = False
         self.task_instructions = None
+        
         # Create a websocket server instance
         self.server = WebSocketServer(host='localhost', port=8765)
-        self.websocket = None  # Keep for compatibility
-        self._loop = None  # Keep for compatibility
-        # Add lock for thread safety - keep for compatibility
+        
+        # Create UI components
+        self.chat_panel = ChatPanel()
+        self.protoblock_view = ProtoBlockView(max_attempts=4)
+        self.file_diff_view = FileDiffView()
+        self.git_view = GitView()
+        self.speech_input = SpeechInput()
+        
+        # Register all components with the server
+        self.server.register_component(self.chat_panel)
+        self.server.register_component(self.protoblock_view)
+        self.server.register_component(self.file_diff_view)
+        self.server.register_component(self.git_view)
+        self.server.register_component(self.speech_input)
+        
+        # Register message types with components
+        self.server.register_message_type("user_message", self.chat_panel)
+        self.server.register_message_type("transcribed_message", self.chat_panel)
+        self.server.register_message_type("file_diff_request", self.file_diff_view)
+        self.server.register_message_type("file_status_request", self.file_diff_view)
+        self.server.register_message_type("git_branch_request", self.git_view)
+        self.server.register_message_type("git_commit_request", self.git_view)
+        self.server.register_message_type("git_discard_request", self.git_view)
+        self.server.register_message_type("git_merge_request", self.git_view)
+        self.server.register_message_type("mic_click", self.speech_input)
+        
+        # Keep websocket and loop references for backward compatibility
+        self.websocket = None
+        self._loop = None
         self._status_lock = asyncio.Lock()
         self.max_attempts = 4  # Maximum attempts
+        
         # Git manager for diffs
         self.git_manager = create_git_manager()
-        # Config is already initialized when imported
+        
         # Pre-check git status at initialization
         self.git_clean = None
         self.git_status_message = None
@@ -184,27 +219,8 @@ class UIManager:
         Args:
             protoblock: The ProtoBlock object containing all the details
         """
-        if protoblock:
-            # Get attempt number from processor's idx_attempt in run_loop
-            # Format attempt number using max_attempts from config
-            attempt_number = f"{protoblock.attempt_number}/{self.max_attempts}"
-            
-            # Convert protoblock to a suitable JSON format for display
-            protoblock_data = {
-                "type": "protoblock_data",
-                "attempt": attempt_number,
-                "block_id": protoblock.block_id,
-                "task_description": protoblock.task_description,
-                "context_files": protoblock.context_files,
-                "write_files": protoblock.write_files,
-                "trusty_agents": protoblock.trusty_agents,
-                "trusty_agent_prompts": protoblock.trusty_agent_prompts or {},
-                "trusty_agent_results": protoblock.trusty_agent_results or {}
-            }
-            
-            print(f"Sending protoblock data to client: {json.dumps(protoblock_data, indent=2)}")
-            await self.server.send_message(protoblock_data)
-            print("Protoblock data sent successfully")
+        # Delegate to the ProtoBlockView component
+        await self.protoblock_view.send_protoblock_data(protoblock)
 
     async def load_high_level_summaries(self):
         data = self.project_files.get_all_summaries()
@@ -285,10 +301,7 @@ class UIManager:
             print("Recording stopped. Transcript:", transcript)
             self.is_recording = False
             if transcript:
-                await self.server.send_message({
-                    "type": "transcribed_message",
-                    "message": transcript
-                })
+                await self.speech_input.send_transcription(transcript)
 
     def count_diff_lines(self, diff_text):
         """Count added and removed lines in a diff.
@@ -345,11 +358,10 @@ class UIManager:
             # In UI mode, we disabled auto_commit, so changes should be in working directory
             if not self.git_manager or not hasattr(self.git_manager, 'repo') or not self.git_manager.repo:
                 # No git, just return the file content
-                await self.server.send_message({
-                    "type": "file_diff_response",
-                    "filename": filename,
-                    "diff": f"Full file content (no git):\n{current_content}"
-                })
+                await self.file_diff_view.send_file_diff(
+                    filename,
+                    f"Full file content (no git):\n{current_content}"
+                )
                 return
                 
             # Get diff info from git
@@ -422,11 +434,7 @@ class UIManager:
                 diff = f"Current file content (git error: {str(git_err)}):\n{current_content}"
             
             # Send the result
-            await self.server.send_message({
-                "type": "file_diff_response",
-                "filename": filename,
-                "diff": diff
-            })
+            await self.file_diff_view.send_file_diff(filename, diff)
             
         except Exception as e:
             await self.send_error_response(filename, f"Unexpected error: {str(e)}")
@@ -435,11 +443,7 @@ class UIManager:
     async def send_error_response(self, filename, error_message):
         """Helper method to send error responses for file diff requests"""
         try:
-            await self.server.send_message({
-                "type": "file_diff_response",
-                "filename": filename,
-                "error": error_message
-            })
+            await self.file_diff_view.send_error(filename, error_message)
         except Exception as e:
             print(f"Error sending error response: {e}")
 
@@ -458,12 +462,11 @@ class UIManager:
             # Check if the file exists
             filepath = os.path.join(self.base_dir, filename)
             if not os.path.exists(filepath):
-                await self.server.send_message({
-                    "type": "file_status_response",
-                    "filename": filename,
-                    "is_modified": False,
-                    "error": "File does not exist"
-                })
+                await self.file_diff_view.send_file_status(
+                    filename=filename,
+                    is_modified=False,
+                    error="File does not exist"
+                )
                 return
             
             is_modified = False
@@ -554,28 +557,27 @@ class UIManager:
                 # Can't count lines without git, so just return is_modified
             
             # Send the response with line counts
-            await self.server.send_message({
-                "type": "file_status_response",
-                "filename": filename,
-                "is_modified": is_modified,
-                "added_lines": added_lines,
-                "removed_lines": removed_lines
-            })
+            await self.file_diff_view.send_file_status(
+                filename=filename,
+                is_modified=is_modified,
+                added_lines=added_lines,
+                removed_lines=removed_lines
+            )
             
         except Exception as e:
             print(f"Error handling file status request: {e}")
             traceback.print_exc()
-            await self.server.send_message({
-                "type": "file_status_response",
-                "filename": filename,
-                "is_modified": False,
-                "error": str(e)
-            })
+            await self.file_diff_view.send_file_status(
+                filename=filename,
+                is_modified=False,
+                error=str(e)
+            )
 
     async def _on_websocket_connect(self, websocket):
         """Handle a new WebSocket connection"""
-        self.websocket = websocket  # Keep for compatibility
-        self._loop = asyncio.get_running_loop()  # Keep for compatibility
+        # Keep references for backwards compatibility
+        self.websocket = websocket
+        self._loop = asyncio.get_running_loop()
         
         # Send initial status
         await self.send_status_message("Connected. Initializing...")
@@ -586,10 +588,7 @@ class UIManager:
         # Display pre-checked git status as a prominent message if there are issues
         if self.git_status_message and not self.git_clean:
             # Send as an error_message for more visibility in the UI
-            await self.server.send_message({
-                "type": "error_message",
-                "message": self.git_status_message
-            })
+            await self.chat_panel.send_error_message(self.git_status_message)
             await self.send_status_message("Warning: Git status check failed. You can chat but execution may be limited.")
         
         # Check git status again (will use cached result from init if available)
@@ -603,7 +602,7 @@ class UIManager:
         self.file_summaries = await self.load_high_level_summaries()
         
         await self.send_status_message("Ready. Waiting for instructions...")
-        
+
     async def _handle_user_message(self, websocket, data):
         """Handle a user message"""
         user_message = data.get("message", "").strip()
@@ -619,7 +618,7 @@ class UIManager:
         chat_agent = ChatAgent(system_prompt=formatted_system_content)
         assistant_reply = chat_agent.process_message(user_message)
         
-        # Send the response back to the client
+        # Send the response back to the client - use the old direct method for compatibility
         await websocket.send(assistant_reply)
         
     async def _handle_mic_click(self, websocket, data):
@@ -665,7 +664,19 @@ class UIManager:
         await self.handle_git_merge_request(target_branch)
 
     def _register_message_handlers(self):
-        """Register all message handlers with the WebSocketServer"""
+        """Register message handlers with the WebSocketServer and UI components"""
+        # Register component message handlers
+        self.chat_panel.register_message_handler("user_message", self._on_user_message_component)
+        self.chat_panel.register_message_handler("transcribed_message", self._on_transcribed_message_component)
+        self.file_diff_view.register_message_handler("file_diff_request", self._on_file_diff_request_component)
+        self.file_diff_view.register_message_handler("file_status_request", self._on_file_status_request_component)
+        self.git_view.register_message_handler("git_branch_request", self._on_git_branch_request_component)
+        self.git_view.register_message_handler("git_commit_request", self._on_git_commit_request_component)
+        self.git_view.register_message_handler("git_discard_request", self._on_git_discard_request_component)
+        self.git_view.register_message_handler("git_merge_request", self._on_git_merge_request_component)
+        self.speech_input.register_message_handler("mic_click", self._on_mic_click_component)
+        
+        # Also register legacy message handlers (for backwards compatibility)
         self.server.register_message_handler("mic_click", self._handle_mic_click)
         self.server.register_message_handler("block_click", self._handle_block_click)
         self.server.register_message_handler("file_diff_request", self._handle_file_diff_request)
@@ -676,7 +687,63 @@ class UIManager:
         self.server.register_message_handler("git_merge_request", self._handle_git_merge_request)
         self.server.register_message_handler("user_message", self._handle_user_message)
         self.server.register_message_handler("transcribed_message", self._handle_user_message)
+    
+    async def _on_user_message_component(self, data):
+        """Handle a user message from a component"""
+        user_message = data.get("message", "").strip()
+        if not user_message:
+            return
+            
+        # Get the system prompt
+        system_content = (
+            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
+        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
         
+        # Use the ChatAgent to process the message
+        chat_agent = ChatAgent(system_prompt=formatted_system_content)
+        assistant_reply = chat_agent.process_message(user_message)
+        
+        # Send the response back to the client directly for compatibility
+        # Don't use the component system for chat messages as they need a different format
+        if self.websocket:
+            await self.websocket.send(assistant_reply)
+        
+    async def _on_transcribed_message_component(self, data):
+        """Handle a transcribed message from speech input"""
+        await self._on_user_message_component(data)
+        
+    async def _on_file_diff_request_component(self, data):
+        """Handle a file diff request from a component"""
+        filename = data.get("filename", "")
+        await self.handle_file_diff_request(filename)
+        
+    async def _on_file_status_request_component(self, data):
+        """Handle a file status request from a component"""
+        filename = data.get("filename", "")
+        await self.handle_file_status_request(filename)
+        
+    async def _on_git_branch_request_component(self, data):
+        """Handle a git branch request from a component"""
+        await self.handle_git_branch_request()
+        
+    async def _on_git_commit_request_component(self, data):
+        """Handle a git commit request from a component"""
+        commit_message = data.get("commit_message", "")
+        await self.handle_git_commit_request(commit_message)
+        
+    async def _on_git_discard_request_component(self, data):
+        """Handle a git discard request from a component"""
+        await self.handle_git_discard_request()
+        
+    async def _on_git_merge_request_component(self, data):
+        """Handle a git merge request from a component"""
+        target_branch = data.get("target_branch", "")
+        await self.handle_git_merge_request(target_branch)
+        
+    async def _on_mic_click_component(self, data):
+        """Handle a mic click from a component"""
+        await self.dummy_mic_click(self.websocket)
+
     async def notify_tests_run(self):
         """
         Notify the background test runner that tests were recently executed.
@@ -697,10 +764,9 @@ class UIManager:
             git_clean = await self.check_git_status()
             if not git_clean:
                 await self.send_status_message("❌ Cannot proceed with block execution due to git status issues.")
-                await self.server.send_message({
-                    "type": "error_message",
-                    "message": "Git workspace is not clean. Please commit or stash your changes before proceeding."
-                })
+                await self.chat_panel.send_error_message(
+                    "Git workspace is not clean. Please commit or stash your changes before proceeding."
+                )
                 return
 
             # Load codebase information
@@ -760,10 +826,7 @@ class UIManager:
                 traceback.print_exc()
                 await self.send_status_message(f"❌ Error creating protoblock: {str(e)[:100]}...")
                 # Ensure we remove any previous protoblock display
-                await self.server.send_message({
-                    "type": "remove_protoblock",
-                    "message": "Failed to create protoblock"
-                })
+                await self.protoblock_view.remove_protoblock("Failed to create protoblock")
                 return
             
             # Execute the processor directly
@@ -787,28 +850,21 @@ class UIManager:
                 await self.send_protoblock_data(processor.protoblock)
                 
                 # Inform user that changes are uncommitted and can be viewed
-                await self.server.send_message({
-                    "type": "info_message",
-                    "message": "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
-                })
+                await self.chat_panel.send_info_message(
+                    "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
+                )
             else:
                 # If block execution failed, send explicit failure message
                 await self.send_status_message("❌ Block execution failed!")
                 # Force removal of protoblock display
-                await self.server.send_message({
-                    "type": "remove_protoblock",
-                    "message": "Block execution failed"
-                })
+                await self.protoblock_view.remove_protoblock("Block execution failed")
 
         except Exception as e:
             print(f"Error during block execution: {e}")
             traceback.print_exc()
             await self.send_status_message(f"❌ Error: {str(e)}")
             # Force removal of protoblock display on any exception
-            await self.server.send_message({
-                "type": "remove_protoblock",
-                "message": f"Error: {str(e)[:100]}"
-            })
+            await self.protoblock_view.remove_protoblock(f"Error: {str(e)[:100]}")
 
     async def handle_git_branch_request(self):
         """Handle request to get all available git branches"""
@@ -825,26 +881,15 @@ class UIManager:
                 # Sort branches alphabetically
                 branches.sort()
                 
-                await self.server.send_message({
-                    "type": "git_branch_response",
-                    "branches": branches
-                })
+                await self.git_view.send_branches(branches)
                 await self.send_status_message("Ready")
             else:
-                await self.server.send_message({
-                    "type": "git_branch_response",
-                    "branches": [],
-                    "error": "Git repository not available"
-                })
+                await self.git_view.send_branches([], error="Git repository not available")
                 await self.send_status_message("Git repository not available")
         except Exception as e:
             print(f"Error getting git branches: {e}")
             traceback.print_exc()
-            await self.server.send_message({
-                "type": "git_branch_response",
-                "branches": [],
-                "error": str(e)
-            })
+            await self.git_view.send_branches([], error=str(e))
             await self.send_status_message(f"Error: {str(e)}")
             
     async def handle_git_commit_request(self, commit_message):
@@ -862,38 +907,34 @@ class UIManager:
                 
                 if success:
                     response_message = "Changes committed successfully"
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "commit",
-                        "success": True,
-                        "message": response_message
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="commit",
+                        success=True,
+                        message=response_message
+                    )
                     await self.send_status_message(f"✅ {response_message}")
                 else:
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "commit",
-                        "success": False,
-                        "message": "Failed to commit changes"
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="commit",
+                        success=False,
+                        message="Failed to commit changes"
+                    )
                     await self.send_status_message("❌ Failed to commit changes")
             else:
-                await self.server.send_message({
-                    "type": "git_operation_response",
-                    "operation": "commit",
-                    "success": False,
-                    "message": "Git repository not available"
-                })
+                await self.git_view.send_operation_result(
+                    operation="commit",
+                    success=False,
+                    message="Git repository not available"
+                )
                 await self.send_status_message("❌ Git repository not available")
         except Exception as e:
             print(f"Error committing changes: {e}")
             traceback.print_exc()
-            await self.server.send_message({
-                "type": "git_operation_response",
-                "operation": "commit",
-                "success": False,
-                "message": f"Error: {str(e)}"
-            })
+            await self.git_view.send_operation_result(
+                operation="commit",
+                success=False,
+                message=f"Error: {str(e)}"
+            )
             await self.send_status_message(f"❌ Error committing changes: {str(e)}")
     
     async def handle_git_discard_request(self):
@@ -907,50 +948,45 @@ class UIManager:
                 
                 if success:
                     response_message = "Changes discarded successfully"
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "discard",
-                        "success": True,
-                        "message": response_message
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="discard",
+                        success=True,
+                        message=response_message
+                    )
                     await self.send_status_message(f"✅ {response_message}")
                 else:
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "discard",
-                        "success": False,
-                        "message": "Failed to discard changes"
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="discard",
+                        success=False,
+                        message="Failed to discard changes"
+                    )
                     await self.send_status_message("❌ Failed to discard changes")
             else:
-                await self.server.send_message({
-                    "type": "git_operation_response",
-                    "operation": "discard",
-                    "success": False,
-                    "message": "Git repository not available"
-                })
+                await self.git_view.send_operation_result(
+                    operation="discard",
+                    success=False,
+                    message="Git repository not available"
+                )
                 await self.send_status_message("❌ Git repository not available")
         except Exception as e:
             print(f"Error discarding changes: {e}")
             traceback.print_exc()
-            await self.server.send_message({
-                "type": "git_operation_response",
-                "operation": "discard",
-                "success": False,
-                "message": f"Error: {str(e)}"
-            })
+            await self.git_view.send_operation_result(
+                operation="discard",
+                success=False,
+                message=f"Error: {str(e)}"
+            )
             await self.send_status_message(f"❌ Error discarding changes: {str(e)}")
     
     async def handle_git_merge_request(self, target_branch):
         """Handle request to merge changes to a branch and delete current branch"""
         # Validate target branch
         if not target_branch:
-            await self.server.send_message({
-                "type": "git_operation_response",
-                "operation": "merge",
-                "success": False,
-                "message": "No target branch specified"
-            })
+            await self.git_view.send_operation_result(
+                operation="merge",
+                success=False,
+                message="No target branch specified"
+            )
             await self.send_status_message("❌ No target branch specified")
             return
             
@@ -962,12 +998,11 @@ class UIManager:
                 current_branch = self.git_manager.get_current_branch()
                 
                 if not current_branch:
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "merge",
-                        "success": False,
-                        "message": "Could not determine current branch"
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="merge",
+                        success=False,
+                        message="Could not determine current branch"
+                    )
                     await self.send_status_message("❌ Could not determine current branch")
                     return
                 
@@ -975,12 +1010,11 @@ class UIManager:
                 if not self.git_manager.is_clean():
                     commit_success = self.git_manager.commit(f"Changes before merging to {target_branch}")
                     if not commit_success:
-                        await self.server.send_message({
-                            "type": "git_operation_response",
-                            "operation": "merge",
-                            "success": False,
-                            "message": "Failed to commit pending changes before merge"
-                        })
+                        await self.git_view.send_operation_result(
+                            operation="merge",
+                            success=False,
+                            message="Failed to commit pending changes before merge"
+                        )
                         await self.send_status_message("❌ Failed to commit pending changes before merge")
                         return
                 
@@ -997,12 +1031,11 @@ class UIManager:
                         self.git_manager.repo.git.branch('-D', current_branch)
                     
                     response_message = f"Merged to {target_branch} and deleted {current_branch}"
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "merge",
-                        "success": True,
-                        "message": response_message
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="merge",
+                        success=True,
+                        message=response_message
+                    )
                     await self.send_status_message(f"✅ {response_message}")
                 except Exception as e:
                     # Try to abort any failed merge
@@ -1017,30 +1050,27 @@ class UIManager:
                     except:
                         pass
                         
-                    await self.server.send_message({
-                        "type": "git_operation_response",
-                        "operation": "merge",
-                        "success": False,
-                        "message": f"Merge failed: {str(e)}"
-                    })
+                    await self.git_view.send_operation_result(
+                        operation="merge",
+                        success=False,
+                        message=f"Merge failed: {str(e)}"
+                    )
                     await self.send_status_message(f"❌ Merge failed: {str(e)}")
             else:
-                await self.server.send_message({
-                    "type": "git_operation_response",
-                    "operation": "merge",
-                    "success": False,
-                    "message": "Git repository not available"
-                })
+                await self.git_view.send_operation_result(
+                    operation="merge",
+                    success=False,
+                    message="Git repository not available"
+                )
                 await self.send_status_message("❌ Git repository not available")
         except Exception as e:
             print(f"Error merging branches: {e}")
             traceback.print_exc()
-            await self.server.send_message({
-                "type": "git_operation_response",
-                "operation": "merge",
-                "success": False,
-                "message": f"Error: {str(e)}"
-            })
+            await self.git_view.send_operation_result(
+                operation="merge",
+                success=False,
+                message=f"Error: {str(e)}"
+            )
             await self.send_status_message(f"❌ Error merging branches: {str(e)}")
 
     def launch_ui(self):

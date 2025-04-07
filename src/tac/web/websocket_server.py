@@ -6,7 +6,8 @@ import os
 import signal
 import subprocess
 import traceback
-from typing import Callable, Dict, Optional, Any, List
+from typing import Callable, Dict, Optional, Any, List, Set
+from tac.web.ui_components import ComponentRegistry, StatusBar
 
 
 class WebSocketServer:
@@ -19,67 +20,46 @@ class WebSocketServer:
         self.port = port
         self.websocket = None
         self._loop = None
-        self._status_queue = asyncio.Queue()
-        self._status_lock = asyncio.Lock()
-        self._status_processor = None
+        
+        # Component registry for UI components
+        self.component_registry = ComponentRegistry()
+        
+        # Legacy message handlers for backwards compatibility
         self._message_handlers: Dict[str, Callable] = {}
         self._connection_handlers: List[Callable] = []
         self._disconnection_handlers: List[Callable] = []
         self._background_tasks = {}
+        
+        # Create and register core components
+        self.status_bar = StatusBar()
+        self.component_registry.register_component(self.status_bar)
+
+    def register_component(self, component):
+        """Register a UI component with the server"""
+        self.component_registry.register_component(component)
+        
+    def register_message_type(self, message_type: str, component):
+        """Register a component to handle a specific message type"""
+        self.component_registry.register_message_type(message_type, component)
 
     def register_message_handler(self, message_type: str, handler: Callable):
-        """Register a handler for a specific message type"""
+        """Register a handler for a specific message type (legacy method)"""
         self._message_handlers[message_type] = handler
 
     def register_connection_handler(self, handler: Callable):
-        """Register a handler to be called when a new connection is established"""
+        """Register a handler to be called when a new connection is established (legacy method)"""
         self._connection_handlers.append(handler)
 
     def register_disconnection_handler(self, handler: Callable):
-        """Register a handler to be called when a connection is closed"""
+        """Register a handler to be called when a connection is closed (legacy method)"""
         self._disconnection_handlers.append(handler)
-
-    async def _process_status_queue(self):
-        """Process status messages from the queue"""
-        while True:
-            try:
-                message = await self._status_queue.get()
-                # Use lock to prevent multiple concurrent status updates
-                async with self._status_lock:
-                    await self.send_status_message(message)
-                self._status_queue.task_done()
-            except Exception as e:
-                print(f"Error processing status queue: {e}")
-                # Don't break the loop on error
-                await asyncio.sleep(0.1)
 
     def send_status_bar(self, message: str):
         """
         Safe method to update the status bar from any context (sync or async).
         Can be called from both the main thread and background threads.
         """
-        print(f"Status update requested: {message}")
-        if self._loop and self._loop.is_running():
-            try:
-                # If we're in an async context with a running loop
-                asyncio.run_coroutine_threadsafe(self._status_queue.put(message), self._loop)
-                print(f"Status message queued: {message}")
-            except Exception as e:
-                print(f"Error queueing status message: {e}")
-                # Fallback - try to send directly if queueing fails
-                if self.websocket:
-                    try:
-                        asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._loop)
-                    except Exception as e2:
-                        print(f"Fallback status send failed: {e2}")
-        elif self.websocket:
-            # If we don't have a loop yet, try to get one and send directly
-            try:
-                loop = self._get_loop()
-                asyncio.run_coroutine_threadsafe(self.send_status_message(message), loop)
-                print(f"Status message sent via new loop: {message}")
-            except Exception as e:
-                print(f"Failed to send status via new loop: {e}")
+        self.status_bar.send_status_bar(message)
 
     def _get_loop(self):
         """Get the current event loop or create a new one"""
@@ -93,26 +73,7 @@ class WebSocketServer:
 
     async def send_status_message(self, message: str):
         """Direct async method to send status messages with awaiting"""
-        if self.websocket:
-            try:
-                # Check if this is an attempt update message from the processor
-                processor_attempt_match = None
-                if "Starting block creation and execution attempt" in message:
-                    # Extract the attempt info from the processor log message
-                    processor_attempt_match = message.split("Starting block creation and execution attempt ")[1].split(" of ")
-                    if len(processor_attempt_match) == 2:
-                        current = processor_attempt_match[0]
-                        max_attempts = processor_attempt_match[1]
-                        # Update message to match the format in the processor
-                        message = f"Starting attempt {current} of {max_attempts}..."
-                
-                await self.websocket.send(json.dumps({
-                    "type": "status_message",
-                    "message": message
-                }))
-                print(f"Status update sent: {message}")  # Log sent messages
-            except Exception as e:
-                print(f"Error sending status message: {e}")
+        await self.status_bar.send_status_message(message)
 
     async def send_message(self, data: dict):
         """Send a JSON message to the connected client"""
@@ -130,10 +91,13 @@ class WebSocketServer:
         self.websocket = websocket
         self._loop = asyncio.get_running_loop()
         
-        # Start the status queue processor right away
-        self._status_processor = asyncio.create_task(self._process_status_queue())
+        # Set the websocket for all components
+        self.component_registry.set_websocket_for_all(websocket)
         
-        # Call all registered connection handlers
+        # Start components that need initialization
+        await self.component_registry.start_components()
+        
+        # Call all registered connection handlers (legacy)
         for handler in self._connection_handlers:
             try:
                 if asyncio.iscoroutinefunction(handler):
@@ -151,24 +115,36 @@ class WebSocketServer:
                     
                     try:
                         data = json.loads(user_input_raw)
-                        if isinstance(data, dict) and "type" in data:
-                            message_type = data["type"]
+                        
+                        if isinstance(data, dict):
+                            # First try to route through component system
+                            if "type" in data:
+                                await self.component_registry.handle_message(data)
+                                
+                            # Also send to legacy handlers if registered
+                            message_type = data.get("type")
                             if message_type in self._message_handlers:
                                 handler = self._message_handlers[message_type]
                                 if asyncio.iscoroutinefunction(handler):
                                     await handler(websocket, data)
                                 else:
                                     handler(websocket, data)
-                            else:
-                                print(f"No handler registered for message type: {message_type}")
                         else:
-                            # Plain text message
+                            # Plain text message - send to user_message handler if exists
                             if "user_message" in self._message_handlers:
-                                await self._message_handlers["user_message"](websocket, {"type": "user_message", "message": user_input_raw.strip()})
+                                message_data = {"type": "user_message", "message": user_input_raw.strip()}
+                                await self._message_handlers["user_message"](websocket, message_data)
+                                
+                                # Also route through component system
+                                await self.component_registry.handle_message(message_data)
                     except json.JSONDecodeError:
                         # Plain text message
                         if "user_message" in self._message_handlers:
-                            await self._message_handlers["user_message"](websocket, {"type": "user_message", "message": user_input_raw.strip()})
+                            message_data = {"type": "user_message", "message": user_input_raw.strip()}
+                            await self._message_handlers["user_message"](websocket, message_data)
+                            
+                            # Also route through component system
+                            await self.component_registry.handle_message(message_data)
                         
                 except websockets.exceptions.ConnectionClosed:
                     break
@@ -177,7 +153,10 @@ class WebSocketServer:
                     traceback.print_exc()
                     
         finally:
-            # Call all registered disconnection handlers
+            # Stop all components that need cleanup
+            await self.component_registry.stop_components()
+            
+            # Call all registered disconnection handlers (legacy)
             for handler in self._disconnection_handlers:
                 try:
                     if asyncio.iscoroutinefunction(handler):
@@ -186,14 +165,6 @@ class WebSocketServer:
                         handler(websocket)
                 except Exception as e:
                     print(f"Error in disconnection handler: {e}")
-            
-            # Cancel the status processor when connection is closed
-            if self._status_processor:
-                self._status_processor.cancel()
-                try:
-                    await self._status_processor
-                except asyncio.CancelledError:
-                    pass
             
             # Cancel all background tasks
             for task_name, task in self._background_tasks.items():
