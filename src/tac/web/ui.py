@@ -27,6 +27,88 @@ from tac.web.ui_components import (
     SpeechInput
 )
 
+
+class MessageHandlerManager:
+    """
+    Centralized manager for handling UI messages from both component system and legacy system.
+    Eliminates duplicate handling code by providing a single implementation for each message type.
+    """
+    def __init__(self, ui_manager):
+        self.ui = ui_manager
+        
+    async def handle_user_message(self, data, websocket=None):
+        """Handle a user message"""
+        message = data.get("message", "").strip()
+        if not message:
+            return
+            
+        print(f"Received user message: {message[:50]}{'...' if len(message) > 50 else ''}")
+        
+        # Get the system prompt
+        system_content = (
+            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
+        formatted_system_content = system_content.format(file_summaries=self.ui.file_summaries)
+        
+        # Use the ChatAgent to process the message
+        chat_agent = ChatAgent(system_prompt=formatted_system_content)
+        assistant_reply = chat_agent.process_message(message)
+        
+        # Send the response back to the client
+        if websocket:
+            # Legacy mode: send directly to websocket
+            await websocket.send(assistant_reply)
+        elif self.ui.websocket:
+            # Component mode: use the stored websocket reference
+            await self.ui.websocket.send(assistant_reply)
+    
+    async def handle_transcribed_message(self, data, websocket=None):
+        """Handle a transcribed message from speech input"""
+        # Reuse the same user message handler for transcribed messages
+        await self.handle_user_message(data, websocket)
+    
+    async def handle_mic_click(self, data=None, websocket=None):
+        """Handle a microphone click"""
+        await self.ui.dummy_mic_click(websocket)
+    
+    async def handle_block_click(self, data=None, websocket=None):
+        """Handle a block click"""
+        # Create a new ChatAgent for getting task instructions
+        system_content = (
+            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
+        formatted_system_content = system_content.format(file_summaries=self.ui.file_summaries)
+        chat_agent = ChatAgent(system_prompt=formatted_system_content)
+        
+        await self.ui.handle_block_click(websocket, chat_agent)
+    
+    async def handle_file_diff_request(self, data, websocket=None):
+        """Handle a file diff request"""
+        filename = data.get("filename", "")
+        await self.ui.handle_file_diff_request(filename)
+    
+    async def handle_file_status_request(self, data, websocket=None):
+        """Handle a file status request"""
+        filename = data.get("filename", "")
+        await self.ui.handle_file_status_request(filename)
+    
+    async def handle_git_branch_request(self, data=None, websocket=None):
+        """Handle a git branch request"""
+        await self.ui.handle_git_branch_request()
+    
+    async def handle_git_commit_request(self, data, websocket=None):
+        """Handle a git commit request"""
+        commit_message = data.get("commit_message", "")
+        await self.ui.handle_git_commit_request(commit_message)
+    
+    async def handle_git_discard_request(self, data=None, websocket=None):
+        """Handle a git discard request"""
+        await self.ui.handle_git_discard_request()
+    
+    async def handle_git_merge_request(self, data, websocket=None):
+        """Handle a git merge request"""
+        target_branch = data.get("target_branch", "")
+        await self.ui.handle_git_merge_request(target_branch)
+
+
 class UIManager:
     def __init__(self, base_dir="."):
         self.base_dir = base_dir
@@ -44,6 +126,9 @@ class UIManager:
         self.file_diff_view = FileDiffView()
         self.git_view = GitView()
         self.speech_input = SpeechInput()
+        
+        # Create the message handler manager
+        self.message_handler = MessageHandlerManager(self)
         
         # Register all components with the server
         self.server.register_component(self.chat_panel)
@@ -692,75 +777,6 @@ class UIManager:
         
         await self.send_status_message("Ready. Waiting for instructions...")
 
-    async def _handle_user_message(self, websocket, data):
-        """
-        Handle a message from the user.
-        
-        Args:
-            websocket: The websocket connection
-            data: The message data
-        """
-        message = data.get("message", "").strip()
-        if not message:
-            return
-            
-        print(f"Received user message: {message[:50]}{'...' if len(message) > 50 else ''}")
-        
-        # Get the system prompt
-        system_content = (
-            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
-        
-        # Use the ChatAgent to process the message
-        chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        assistant_reply = chat_agent.process_message(message)
-        
-        # Send the response back to the client directly using the websocket
-        # Don't use the component system for chat messages as they need a different format
-        await websocket.send(assistant_reply)
-        
-    async def _handle_mic_click(self, websocket, data):
-        """Handle a microphone click"""
-        await self.dummy_mic_click(websocket)
-        
-    async def _handle_block_click(self, websocket, data):
-        """Handle a block click"""
-        # Create a new ChatAgent for getting task instructions
-        system_content = (
-            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
-        chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        
-        await self.handle_block_click(websocket, chat_agent)
-        
-    async def _handle_file_diff_request(self, websocket, data):
-        """Handle a file diff request"""
-        filename = data.get("filename", "")
-        await self.handle_file_diff_request(filename)
-        
-    async def _handle_file_status_request(self, websocket, data):
-        """Handle a file status request"""
-        filename = data.get("filename", "")
-        await self.handle_file_status_request(filename)
-        
-    async def _handle_git_branch_request(self, websocket, data):
-        """Handle a git branch request"""
-        await self.handle_git_branch_request()
-        
-    async def _handle_git_commit_request(self, websocket, data):
-        """Handle a git commit request"""
-        commit_message = data.get("commit_message", "")
-        await self.handle_git_commit_request(commit_message)
-        
-    async def _handle_git_discard_request(self, websocket, data):
-        """Handle a git discard request"""
-        await self.handle_git_discard_request()
-        
-    async def _handle_git_merge_request(self, websocket, data):
-        """Handle a git merge request"""
-        target_branch = data.get("target_branch", "")
-        await self.handle_git_merge_request(target_branch)
-
     async def _on_websocket_disconnect(self, websocket):
         """Handle WebSocket disconnection"""
         print(f"WebSocket connection closed")
@@ -775,107 +791,69 @@ class UIManager:
 
     def _register_message_handlers(self):
         """Register message handlers with the WebSocketServer and UI components"""
-        # Register component message handlers
-        self.chat_panel.register_message_handler("user_message", self._on_user_message_component)
-        self.chat_panel.register_message_handler("transcribed_message", self._on_transcribed_message_component)
-        self.file_diff_view.register_message_handler("file_diff_request", self._on_file_diff_request_component)
-        self.file_diff_view.register_message_handler("file_status_request", self._on_file_status_request_component)
-        self.git_view.register_message_handler("git_branch_request", self._on_git_branch_request_component)
-        self.git_view.register_message_handler("git_commit_request", self._on_git_commit_request_component)
-        self.git_view.register_message_handler("git_discard_request", self._on_git_discard_request_component)
-        self.git_view.register_message_handler("git_merge_request", self._on_git_merge_request_component)
-        self.speech_input.register_message_handler("mic_click", self._on_mic_click_component)
+        # Register component message handlers - use the centralized handler implementation
+        self.chat_panel.register_message_handler("user_message", 
+            lambda data: asyncio.create_task(self.message_handler.handle_user_message(data)))
         
-        # Also register legacy message handlers (for backwards compatibility)
-        self.server.register_message_handler("mic_click", self._handle_mic_click)
-        self.server.register_message_handler("block_click", self._handle_block_click)
-        self.server.register_message_handler("file_diff_request", self._handle_file_diff_request)
-        self.server.register_message_handler("file_status_request", self._handle_file_status_request)
-        self.server.register_message_handler("git_branch_request", self._handle_git_branch_request)
-        self.server.register_message_handler("git_commit_request", self._handle_git_commit_request)
-        self.server.register_message_handler("git_discard_request", self._handle_git_discard_request)
-        self.server.register_message_handler("git_merge_request", self._handle_git_merge_request)
-        self.server.register_message_handler("user_message", self._handle_user_message)
-        self.server.register_message_handler("transcribed_message", self._handle_user_message)
+        self.chat_panel.register_message_handler("transcribed_message", 
+            lambda data: asyncio.create_task(self.message_handler.handle_transcribed_message(data)))
+        
+        self.file_diff_view.register_message_handler("file_diff_request", 
+            lambda data: asyncio.create_task(self.message_handler.handle_file_diff_request(data)))
+        
+        self.file_diff_view.register_message_handler("file_status_request", 
+            lambda data: asyncio.create_task(self.message_handler.handle_file_status_request(data)))
+        
+        self.git_view.register_message_handler("git_branch_request", 
+            lambda data: asyncio.create_task(self.message_handler.handle_git_branch_request(data)))
+        
+        self.git_view.register_message_handler("git_commit_request", 
+            lambda data: asyncio.create_task(self.message_handler.handle_git_commit_request(data)))
+        
+        self.git_view.register_message_handler("git_discard_request", 
+            lambda data: asyncio.create_task(self.message_handler.handle_git_discard_request(data)))
+        
+        self.git_view.register_message_handler("git_merge_request", 
+            lambda data: asyncio.create_task(self.message_handler.handle_git_merge_request(data)))
+        
+        self.speech_input.register_message_handler("mic_click", 
+            lambda data: asyncio.create_task(self.message_handler.handle_mic_click(data)))
+        
+        # Also register legacy message handlers using the same implementation
+        self.server.register_message_handler("mic_click", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_mic_click(data, ws)))
+        
+        self.server.register_message_handler("block_click", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_block_click(data, ws)))
+        
+        self.server.register_message_handler("file_diff_request", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_file_diff_request(data, ws)))
+        
+        self.server.register_message_handler("file_status_request", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_file_status_request(data, ws)))
+        
+        self.server.register_message_handler("git_branch_request", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_git_branch_request(data, ws)))
+        
+        self.server.register_message_handler("git_commit_request", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_git_commit_request(data, ws)))
+        
+        self.server.register_message_handler("git_discard_request", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_git_discard_request(data, ws)))
+        
+        self.server.register_message_handler("git_merge_request", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_git_merge_request(data, ws)))
+        
+        self.server.register_message_handler("user_message", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_user_message(data, ws)))
+        
+        self.server.register_message_handler("transcribed_message", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_transcribed_message(data, ws)))
         
         # Register connection handlers
         self.server.register_connection_handler(self._on_websocket_connect)
         self.server.register_disconnection_handler(self._on_websocket_disconnect)
     
-    async def _on_user_message_component(self, data):
-        """Handle a user message from a component"""
-        user_message = data.get("message", "").strip()
-        if not user_message:
-            return
-            
-        # Get the system prompt
-        system_content = (
-            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
-        
-        # Use the ChatAgent to process the message
-        chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        assistant_reply = chat_agent.process_message(user_message)
-        
-        # Send the response back to the client directly for compatibility
-        # Don't use the component system for chat messages as they need a different format
-        if self.websocket:
-            await self.websocket.send(assistant_reply)
-        
-    async def _on_transcribed_message_component(self, data):
-        """Handle a transcribed message from speech input"""
-        transcribed_message = data.get("message", "").strip()
-        if not transcribed_message:
-            return
-            
-        await self.send_status_message(f"Processing transcribed message...")
-        
-        # Get the system prompt
-        system_content = (
-            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
-        
-        # Use the ChatAgent to process the message
-        chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        assistant_reply = chat_agent.process_message(transcribed_message)
-        
-        # Send the response back to the client directly for compatibility
-        if self.websocket:
-            await self.websocket.send(assistant_reply)
-        
-    async def _on_file_diff_request_component(self, data):
-        """Handle a file diff request from a component"""
-        filename = data.get("filename", "")
-        await self.handle_file_diff_request(filename)
-        
-    async def _on_file_status_request_component(self, data):
-        """Handle a file status request from a component"""
-        filename = data.get("filename", "")
-        await self.handle_file_status_request(filename)
-        
-    async def _on_git_branch_request_component(self, data):
-        """Handle a git branch request from a component"""
-        await self.handle_git_branch_request()
-        
-    async def _on_git_commit_request_component(self, data):
-        """Handle a git commit request from a component"""
-        commit_message = data.get("commit_message", "")
-        await self.handle_git_commit_request(commit_message)
-        
-    async def _on_git_discard_request_component(self, data):
-        """Handle a git discard request from a component"""
-        await self.handle_git_discard_request()
-        
-    async def _on_git_merge_request_component(self, data):
-        """Handle a git merge request from a component"""
-        target_branch = data.get("target_branch", "")
-        await self.handle_git_merge_request(target_branch)
-        
-    async def _on_mic_click_component(self, data):
-        """Handle a mic click from a component"""
-        # Don't pass websocket as it's now optional
-        await self.dummy_mic_click()
-
     async def notify_tests_run(self):
         """
         Notify the background test runner that tests were recently executed.
