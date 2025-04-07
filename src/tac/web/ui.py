@@ -44,14 +44,14 @@ class MessageHandlerManager:
             
         print(f"Received user message: {message[:50]}{'...' if len(message) > 50 else ''}")
         
-        # Get the system prompt
-        system_content = (
-            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=self.ui.file_summaries)
-        
-        # Use the ChatAgent to process the message
-        chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        assistant_reply = chat_agent.process_message(message)
+        # Use the persistent ChatAgent from the UIManager
+        if self.ui.chat_agent is None:
+            # Initialize ChatAgent if it doesn't exist yet (should be rare since it's initialized with file summaries)
+            system_content = self.ui.CHAT_SYSTEM_PROMPT.format(file_summaries=self.ui.file_summaries or "No file summaries available yet")
+            self.ui.chat_agent = ChatAgent(system_prompt=system_content)
+            
+        # Process the message using the persistent ChatAgent
+        assistant_reply = self.ui.chat_agent.process_message(message)
         
         # Send the response back to the client
         if websocket:
@@ -72,13 +72,13 @@ class MessageHandlerManager:
     
     async def handle_block_click(self, data=None, websocket=None):
         """Handle a block click"""
-        # Create a new ChatAgent for getting task instructions
-        system_content = (
-            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=self.ui.file_summaries)
-        chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        
-        await self.ui.handle_block_click(websocket, chat_agent)
+        # Use the persistent ChatAgent instead of creating a new one each time
+        if self.ui.chat_agent is None:
+            # This shouldn't happen normally, but handle it just in case
+            system_content = self.ui.CHAT_SYSTEM_PROMPT.format(file_summaries=self.ui.file_summaries or "No file summaries available yet")
+            self.ui.chat_agent = ChatAgent(system_prompt=system_content)
+            
+        await self.ui.handle_block_click(websocket, self.ui.chat_agent)
     
     async def handle_file_diff_request(self, data, websocket=None):
         """Handle a file diff request"""
@@ -110,12 +110,28 @@ class MessageHandlerManager:
 
 
 class UIManager:
+    # System prompt template for ChatAgent
+    CHAT_SYSTEM_PROMPT = (
+        "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. "
+        "Always reply concise and without formatting. Your task is to ask questions and clarify requests, "
+        "for this early phase of software design. Always try to be brief and concise and help the planning. "
+        "Remember, the user is not the one who is implementing the code, it is actually you and your team of "
+        "AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, "
+        "but rather try to gather information about what the user wants to build in the context of the codebase above. "
+        "Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. "
+        "Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. "
+        "Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that "
+        "they should hit the block button below to start the protoblock execution."
+    )
+    
     def __init__(self, base_dir="."):
         self.base_dir = base_dir
         self.project_files = ProjectFiles(self.base_dir)
         self.speech_to_text = Speech2Text()
         self.is_recording = False
         self.task_instructions = None
+        self.file_summaries = None
+        self.chat_agent = None  # Will be initialized when file_summaries are loaded
         
         # Create a websocket server instance
         self.server = WebSocketServer(host='localhost', port=8765)
@@ -385,7 +401,14 @@ class UIManager:
                     f"Loaded {total_files} file summaries with {error_count} errors"
                 )
                 
-            return "\n\n".join(formatted_strings)
+            summaries = "\n\n".join(formatted_strings)
+            
+            # Initialize or update the chat agent with the new summaries
+            if self.chat_agent is None:
+                system_content = self.CHAT_SYSTEM_PROMPT.format(file_summaries=summaries)
+                self.chat_agent = ChatAgent(system_prompt=system_content)
+            
+            return summaries
             
         except Exception as e:
             await self.handle_error(e, "load_high_level_summaries", notify_user=False)
@@ -774,6 +797,12 @@ class UIManager:
         # Load file summaries
         await self.send_status_message("Loading project file summaries...")
         self.file_summaries = await self.load_high_level_summaries()
+        
+        # Ensure we have a ChatAgent instance properly initialized
+        if self.chat_agent is None:
+            system_content = self.CHAT_SYSTEM_PROMPT.format(file_summaries=self.file_summaries)
+            self.chat_agent = ChatAgent(system_prompt=system_content)
+            await self.send_status_message("Chat agent initialized with codebase summaries")
         
         await self.send_status_message("Ready. Waiting for instructions...")
 
