@@ -99,105 +99,117 @@ class UIManager:
         # Register connection handlers
         self.server.register_connection_handler(self._on_websocket_connect)
 
+    async def create_or_restart_background_task(self, task_name, task_coroutine):
+        """
+        Create a new background task or restart it if it's done.
+        
+        Args:
+            task_name: Name of the task for tracking
+            task_coroutine: The coroutine to run as a background task
+            
+        Returns:
+            The created or existing task
+        """
+        if task_name not in self._background_tasks or self._background_tasks[task_name].done():
+            self._background_tasks[task_name] = asyncio.create_task(task_coroutine())
+            print(f"Started background task: {task_name}")
+        return self._background_tasks[task_name]
+    
     async def start_background_tasks(self):
         """Start essential background tasks when the UI starts"""
-        # Start file indexing task if not already running
-        if 'file_indexer' not in self._background_tasks or self._background_tasks['file_indexer'].done():
-            self._background_tasks['file_indexer'] = asyncio.create_task(self._background_file_indexer())
+        # Start file indexing task
+        await self.create_or_restart_background_task('file_indexer', self._background_file_indexer)
         
         # If test running is enabled in config, start the test runner
         if config.safe_get('general', 'run_tests_in_background', False):
-            if 'test_runner' not in self._background_tasks or self._background_tasks['test_runner'].done():
-                self._background_tasks['test_runner'] = asyncio.create_task(self._background_test_runner())
-
-    async def _background_file_indexer(self):
-        """Background task that periodically updates file summaries"""
-        try:
-            await self.send_status_message("Starting file indexing in background...")
-            first_run = True
+            await self.create_or_restart_background_task('test_runner', self._background_test_runner)
             
+    async def _background_file_indexer(self):
+        """Background task to index files periodically"""
+        try:
+            await self.send_status_message("Starting background file indexing...")
             while True:
                 try:
-                    # Run in executor to prevent blocking the event loop
-                    loop = asyncio.get_event_loop()
-                    stats = await loop.run_in_executor(None, self.project_files.update_summaries)
+                    # Perform file indexing
+                    self.project_files.refresh_index()
                     
-                    # Only send status message for the first run or if there were changes
-                    if first_run or sum([stats[key] for key in ['added', 'updated', 'removed']]) > 0:
-                        await self.send_status_message(
-                            f"File indexing: +{stats['added']}, ~{stats['updated']}, -{stats['removed']} files"
-                        )
-                        first_run = False
+                    # Update file summaries
+                    self.file_summaries = await self.load_high_level_summaries()
                     
-                    # Wait before next update - 5 minutes (300 seconds)
-                    await asyncio.sleep(300)
+                    # Delay before next indexing
+                    await asyncio.sleep(60)  # Index every minute
+                except asyncio.CancelledError:
+                    # Allow task to be cancelled
+                    raise
                 except Exception as e:
-                    print(f"Error in file indexer background task: {e}")
-                    # Don't exit the loop on error, just try again after waiting
-                    await asyncio.sleep(60)
+                    print(f"Error in background file indexer: {e}")
+                    await asyncio.sleep(5)  # Shorter delay after error
         except asyncio.CancelledError:
-            # Task was cancelled, clean exit
-            print("File indexer background task cancelled")
+            print("Background file indexer cancelled")
             raise
-        except Exception as e:
-            # Unexpected error
-            print(f"Unexpected error in file indexer background task: {e}")
-            traceback.print_exc()
 
     async def _background_test_runner(self):
-        """Background task that periodically runs tests"""
-        # Store as instance attribute to allow access from notify_tests_run
-        self.last_run_time = 0
-        
+        """Background task to run tests periodically"""
         try:
-            await self.send_status_message("Starting test runner in background...")
+            self.last_run_time = asyncio.get_event_loop().time()
+            await self.send_status_message("Starting background test runner...")
             
             while True:
                 try:
+                    # Wait time between test runs (10 minutes by default)
+                    wait_time = config.safe_get('general', 'background_test_interval', 600)
+                    
+                    # Get current time
                     current_time = asyncio.get_event_loop().time()
                     
-                    # If a block was recently executed, check if we need to wait
-                    # Skip test run if we've run tests in the last 5 minutes
-                    if current_time - self.last_run_time < 300:  # 5 minutes
-                        await self.send_status_message("Skipping background tests (recently run)")
-                        await asyncio.sleep(300)
+                    # Check if enough time has passed since last run
+                    if (current_time - self.last_run_time) < wait_time:
+                        # Not enough time has passed, wait some more
+                        await asyncio.sleep(30)  # Check again in 30 seconds
                         continue
                     
-                    # Run tests in executor to prevent blocking the event loop
-                    loop = asyncio.get_event_loop()
-                    test_path = config.general.test_path
-                    await self.send_status_message("Running background tests...")
-                    success = await loop.run_in_executor(None, lambda: self._test_runner.run_tests(test_path))
+                    # Check git status before running tests
+                    git_clean = await self.check_git_status()
+                    if not git_clean:
+                        # Git workspace not clean, skip tests
+                        await self.send_status_message("Background tests skipped: Git workspace not clean")
+                        await asyncio.sleep(wait_time)  # Wait before checking again
+                        continue
                     
                     # Update last run time
-                    self.last_run_time = asyncio.get_event_loop().time()
+                    self.last_run_time = current_time
                     
-                    test_stats = self._test_runner.get_test_stats()
-                    total = sum(test_stats.values())
+                    # Run tests in background
+                    await self.send_status_message("Running background tests...")
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, self._test_runner.run_tests)
                     
-                    if success:
-                        await self.send_status_message(
-                            f"Background tests: {test_stats['passed']}/{total} passed"
-                        )
+                    # Log test results
+                    if result.success:
+                        await self.send_status_message(f"✅ Background tests passed: {result.passed} tests")
                     else:
-                        await self.send_status_message(
-                            f"Background tests: {test_stats['failed']} failed, {test_stats['error']} errors"
-                        )
+                        failed = result.total - result.passed
+                        await self.send_status_message(f"❌ Background tests: {failed} of {result.total} failed")
+                        
+                        # Send message to chat panel if tests failed
+                        if result.failed > 0:
+                            await self.chat_panel.send_error_message(
+                                f"Background tests detected {result.failed} failing tests. Check the console output for details."
+                            )
                     
-                    # Wait before next test run - 5 minutes (300 seconds)
-                    await asyncio.sleep(300)
+                    # Wait before next test run
+                    await asyncio.sleep(wait_time)
+                    
+                except asyncio.CancelledError:
+                    # Allow task to be cancelled
+                    raise
                 except Exception as e:
-                    print(f"Error in test runner background task: {e}")
-                    # Don't exit the loop on error, just try again after waiting
-                    await asyncio.sleep(60)
+                    print(f"Error in background test runner: {e}")
+                    await asyncio.sleep(60)  # Wait a minute before trying again
+        
         except asyncio.CancelledError:
-            # Task was cancelled, clean exit
-            print("Test runner background task cancelled")
+            print("Background test runner cancelled")
             raise
-        except Exception as e:
-            # Unexpected error
-            print(f"Unexpected error in test runner background task: {e}")
-            traceback.print_exc()
 
     def send_status_bar(self, message):
         """
@@ -209,8 +221,21 @@ class UIManager:
 
     async def send_status_message(self, message):
         """Direct async method to send status messages with awaiting"""
-        # Delegate to the WebSocketServer
-        await self.server.send_status_message(message)
+        # Delegate to the WebSocketServer with error handling
+        try:
+            await self.server.send_status_message(message)
+        except Exception as e:
+            print(f"Error sending status message: {e}")
+            # If there's an error with the server method, try direct websocket send as fallback
+            if self.websocket:
+                try:
+                    status_data = {"type": "status_message", "message": message}
+                    await self.websocket.send(json.dumps(status_data))
+                    print(f"Status message sent directly: {message}")
+                except Exception as direct_err:
+                    print(f"Error sending status message directly: {direct_err}")
+            else:
+                print(f"Status message not sent (no websocket): {message}")
 
     async def send_protoblock_data(self, protoblock):
         """
@@ -234,62 +259,55 @@ class UIManager:
         return "\n\n".join(formatted_strings)
 
     async def check_git_status(self):
-        """Check git status early to prevent issues later. Returns True if git is clean or not enabled."""
-        # Use cached result if available
-        if self.git_clean is not None:
-            if self.git_status_message:
-                await self.send_status_message(self.git_status_message)
+        """
+        Check the git status of the workspace.
+        
+        Returns:
+            bool: True if git workspace is clean, False otherwise
+        """
+        try:
+            # Always report success if git is disabled in config
+            if not config.git.enabled:
+                self.git_clean = True
+                self.git_status_message = "Git operations are disabled in config."
+                return True
+                
+            # Skip check if git_manager is not available
+            if not self.git_manager:
+                self.git_clean = True
+                self.git_status_message = "Git manager not available."
+                return True
+                
+            # Perform actual git check
+            self.git_clean = self.git_manager.is_clean()
+            if not self.git_clean:
+                self.git_status_message = "⚠️ Git workspace is not clean. Please commit or stash your changes before proceeding."
+                
+                # Check if auto-stash is enabled
+                auto_stash = config.safe_get('general', 'auto_stash', False)
+                
+                if auto_stash:
+                    await self.send_status_message("Auto-stash is enabled. Stashing changes...")
+                    if self.git_manager.revert_changes():
+                        self.git_clean = True
+                        self.git_status_message = "✅ Changes successfully stashed."
+                        await self.send_status_message("✅ Changes successfully stashed.")
+                        return True
+                    else:
+                        self.git_status_message = "❌ Failed to stash changes. Please clean your git workspace manually."
+                        await self.send_status_message("❌ Failed to stash changes.")
+            else:
+                self.git_status_message = "✅ Git workspace is clean."
+                
             return self.git_clean
             
-        # If not cached, perform the check
-        if not config.git.enabled:
-            self.git_status_message = "Git operations are disabled in config."
-            await self.send_status_message(self.git_status_message)
-            self.git_clean = True
-            return True
-            
-        await self.send_status_message("Checking git status...")
-        git_manager = create_git_manager()
-        
-        if not git_manager.is_clean():
-            self.git_status_message = "❌ Git workspace is not clean. Please commit or stash your changes before proceeding."
-            await self.send_status_message(self.git_status_message)
-            
-            # Check if auto-stash is enabled - get the value manually since safe_get doesn't accept a default parameter
-            auto_stash = False
-            try:
-                # Check if the general section has auto_stash attribute
-                if hasattr(config.general, 'auto_stash'):
-                    auto_stash = config.general.auto_stash
-                # If not found, try to get it from config.safe_get without a default
-                else:
-                    auto_stash_value = config.safe_get('general', 'auto_stash')
-                    if auto_stash_value is not None:
-                        auto_stash = auto_stash_value
-            except:
-                # If any error occurs, default to False
-                auto_stash = False
-                
-            if auto_stash:
-                await self.send_status_message("Auto-stash is enabled. Stashing changes...")
-                if git_manager.revert_changes():
-                    await self.send_status_message("✅ Changes successfully stashed.")
-                    self.git_clean = True
-                    self.git_status_message = "✅ Git workspace is clean (auto-stashed)."
-                    return True
-                else:
-                    await self.send_status_message("❌ Failed to stash changes. Please clean your git workspace manually.")
-                    self.git_clean = False
-                    return False
-            else:
-                await self.send_status_message("Please commit or stash your changes before proceeding.")
-                self.git_clean = False
-                return False
-        
-        self.git_status_message = "✅ Git workspace is clean."
-        await self.send_status_message(self.git_status_message)
-        self.git_clean = True
-        return True
+        except Exception as e:
+            print(f"Error checking git status: {e}")
+            traceback.print_exc()
+            self.git_clean = False
+            self.git_status_message = f"⚠️ Git error: {str(e)}"
+            await self.send_status_message(f"⚠️ Git error: {str(e)}")
+            return False
 
     async def dummy_mic_click(self, websocket):
         if not self.is_recording:
@@ -604,11 +622,19 @@ class UIManager:
         await self.send_status_message("Ready. Waiting for instructions...")
 
     async def _handle_user_message(self, websocket, data):
-        """Handle a user message"""
-        user_message = data.get("message", "").strip()
-        if not user_message:
+        """
+        Handle a message from the user.
+        
+        Args:
+            websocket: The websocket connection
+            data: The message data
+        """
+        message = data.get("message", "").strip()
+        if not message:
             return
             
+        print(f"Received user message: {message[:50]}{'...' if len(message) > 50 else ''}")
+        
         # Get the system prompt
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
@@ -616,9 +642,10 @@ class UIManager:
         
         # Use the ChatAgent to process the message
         chat_agent = ChatAgent(system_prompt=formatted_system_content)
-        assistant_reply = chat_agent.process_message(user_message)
+        assistant_reply = chat_agent.process_message(message)
         
-        # Send the response back to the client - use the old direct method for compatibility
+        # Send the response back to the client directly using the websocket
+        # Don't use the component system for chat messages as they need a different format
         await websocket.send(assistant_reply)
         
     async def _handle_mic_click(self, websocket, data):
@@ -710,7 +737,24 @@ class UIManager:
         
     async def _on_transcribed_message_component(self, data):
         """Handle a transcribed message from speech input"""
-        await self._on_user_message_component(data)
+        transcribed_message = data.get("message", "").strip()
+        if not transcribed_message:
+            return
+            
+        await self.send_status_message(f"Processing transcribed message...")
+        
+        # Get the system prompt
+        system_content = (
+            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
+        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
+        
+        # Use the ChatAgent to process the message
+        chat_agent = ChatAgent(system_prompt=formatted_system_content)
+        assistant_reply = chat_agent.process_message(transcribed_message)
+        
+        # Send the response back to the client directly for compatibility
+        if self.websocket:
+            await self.websocket.send(assistant_reply)
         
     async def _on_file_diff_request_component(self, data):
         """Handle a file diff request from a component"""
@@ -818,7 +862,7 @@ class UIManager:
                 if processor.protoblock:
                     # Display protoblock as soon as it's created, before execution
                     await self.send_status_message("Generated protoblock. Preparing execution...")
-                    await self.send_protoblock_data(processor.protoblock)
+                    await self.protoblock_view.send_protoblock_data(processor.protoblock)
                     # Small delay to ensure UI updates
                     await asyncio.sleep(0.5)
             except Exception as e:
@@ -847,7 +891,7 @@ class UIManager:
             if success and processor.protoblock:
                 await self.send_status_message("✅ Block executed successfully! Displaying final results...")
                 # Send updated protoblock data after execution with the final attempt number
-                await self.send_protoblock_data(processor.protoblock)
+                await self.protoblock_view.send_protoblock_data(processor.protoblock)
                 
                 # Inform user that changes are uncommitted and can be viewed
                 await self.chat_panel.send_info_message(
