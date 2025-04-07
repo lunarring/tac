@@ -17,6 +17,7 @@ from tac.core.llm import LLMClient, Message
 from tac.core.config import config, ConfigManager
 from tac.utils.git_manager import create_git_manager
 from tac.agents.trusty.pytest import PytestTestingAgent
+from tac.web.websocket_server import WebSocketServer  # Import the new WebSocketServer
 
 class UIManager:
     def __init__(self, base_dir="."):
@@ -25,8 +26,10 @@ class UIManager:
         self.speech_to_text = Speech2Text()
         self.is_recording = False
         self.task_instructions = None
-        self.websocket = None
-        self._loop = None
+        # Create a websocket server instance
+        self.server = WebSocketServer(host='localhost', port=8765)
+        self.websocket = None  # Keep for compatibility
+        self._loop = None  # Keep for compatibility
         self._status_queue = asyncio.Queue()
         self.max_attempts = 4  # Maximum attempts
         # Add lock for thread safety
@@ -55,6 +58,11 @@ class UIManager:
             self.git_clean = True
             if not config.git.enabled:
                 self.git_status_message = "Git operations are disabled in config."
+                
+        # Register message handlers with the WebSocketServer
+        self._register_message_handlers()
+        # Register connection handlers
+        self.server.register_connection_handler(self._on_websocket_connect)
 
     async def start_background_tasks(self):
         """Start essential background tasks when the UI starts"""
@@ -161,29 +169,8 @@ class UIManager:
         Safe method to update the status bar from any context (sync or async).
         Can be called from both the main thread and background threads.
         """
-        print(f"Status update requested: {message}")
-        if self._loop and self._loop.is_running():
-            try:
-                # If we're in an async context with a running loop
-                future = asyncio.run_coroutine_threadsafe(self._status_queue.put(message), self._loop)
-                # Don't wait for the result to avoid blocking
-                print(f"Status message queued: {message}")
-            except Exception as e:
-                print(f"Error queueing status message: {e}")
-                # Fallback - try to send directly if queueing fails
-                if self.websocket:
-                    try:
-                        asyncio.run_coroutine_threadsafe(self.send_status_message(message), self._loop)
-                    except Exception as e2:
-                        print(f"Fallback status send failed: {e2}")
-        elif self.websocket:
-            # If we don't have a loop yet, try to get one and send directly
-            try:
-                loop = self._get_loop()
-                asyncio.run_coroutine_threadsafe(self.send_status_message(message), loop)
-                print(f"Status message sent via new loop: {message}")
-            except Exception as e:
-                print(f"Failed to send status via new loop: {e}")
+        # Delegate to the WebSocketServer
+        self.server.send_status_bar(message)
 
     async def _process_status_queue(self):
         """Process status messages from the queue"""
@@ -210,26 +197,8 @@ class UIManager:
 
     async def send_status_message(self, message):
         """Direct async method to send status messages with awaiting"""
-        if self.websocket:
-            try:
-                # Check if this is an attempt update message from the processor
-                processor_attempt_match = None
-                if "Starting block creation and execution attempt" in message:
-                    # Extract the attempt info from the processor log message
-                    processor_attempt_match = message.split("Starting block creation and execution attempt ")[1].split(" of ")
-                    if len(processor_attempt_match) == 2:
-                        current = processor_attempt_match[0]
-                        max_attempts = processor_attempt_match[1]
-                        # Update message to match the format in the processor
-                        message = f"Starting attempt {current} of {max_attempts}..."
-                
-                await self.websocket.send(json.dumps({
-                    "type": "status_message",
-                    "message": message
-                }))
-                print(f"Status update sent: {message}")  # Log sent messages
-            except Exception as e:
-                print(f"Error sending status message: {e}")
+        # Delegate to the WebSocketServer
+        await self.server.send_status_message(message)
 
     async def send_protoblock_data(self, protoblock):
         """
@@ -238,7 +207,7 @@ class UIManager:
         Args:
             protoblock: The ProtoBlock object containing all the details
         """
-        if self.websocket and protoblock:
+        if protoblock:
             # Get attempt number from processor's idx_attempt in run_loop
             # Format attempt number using max_attempts from config
             attempt_number = f"{protoblock.attempt_number}/{self.max_attempts}"
@@ -257,7 +226,7 @@ class UIManager:
             }
             
             print(f"Sending protoblock data to client: {json.dumps(protoblock_data, indent=2)}")
-            await self.websocket.send(json.dumps(protoblock_data))
+            await self.server.send_message(protoblock_data)
             print("Protoblock data sent successfully")
 
     async def load_high_level_summaries(self):
@@ -339,11 +308,10 @@ class UIManager:
             print("Recording stopped. Transcript:", transcript)
             self.is_recording = False
             if transcript:
-                payload = {
+                await self.server.send_message({
                     "type": "transcribed_message",
                     "message": transcript
-                }
-                await self.websocket.send(json.dumps(payload))
+                })
 
     def count_diff_lines(self, diff_text):
         """Count added and removed lines in a diff.
@@ -489,15 +457,14 @@ class UIManager:
 
     async def send_error_response(self, filename, error_message):
         """Helper method to send error responses for file diff requests"""
-        if self.websocket:
-            try:
-                await self.websocket.send(json.dumps({
-                    "type": "file_diff_response",
-                    "filename": filename,
-                    "error": error_message
-                }))
-            except Exception as e:
-                print(f"Error sending error response: {e}")
+        try:
+            await self.server.send_message({
+                "type": "file_diff_response",
+                "filename": filename,
+                "error": error_message
+            })
+        except Exception as e:
+            print(f"Error sending error response: {e}")
 
     async def handle_file_status_request(self, filename):
         """
@@ -628,12 +595,10 @@ class UIManager:
                 "error": str(e)
             }))
             
-    async def handle_connection(self, websocket):
-        self.websocket = websocket
-        self._loop = asyncio.get_running_loop()
-        
-        # Start the status queue processor right away and save it as instance variable
-        self._status_processor = asyncio.create_task(self._process_status_queue())
+    async def _on_websocket_connect(self, websocket):
+        """Handle a new WebSocket connection"""
+        self.websocket = websocket  # Keep for compatibility
+        self._loop = asyncio.get_running_loop()  # Keep for compatibility
         
         # Send initial status
         await self.send_status_message("Connected. Initializing...")
@@ -644,10 +609,10 @@ class UIManager:
         # Display pre-checked git status as a prominent message if there are issues
         if self.git_status_message and not self.git_clean:
             # Send as an error_message for more visibility in the UI
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "error_message",
                 "message": self.git_status_message
-            }))
+            })
             await self.send_status_message("Warning: Git status check failed. You can chat but execution may be limited.")
         
         # Check git status again (will use cached result from init if available)
@@ -658,91 +623,83 @@ class UIManager:
         
         # Load file summaries
         await self.send_status_message("Loading project file summaries...")
-        file_summaries = await self.load_high_level_summaries()
+        self.file_summaries = await self.load_high_level_summaries()
         
         await self.send_status_message("Ready. Waiting for instructions...")
-
+        
+    async def _handle_user_message(self, websocket, data):
+        """Handle a user message"""
+        user_message = data.get("message", "").strip()
+        if not user_message:
+            return
+            
+        # Get the system prompt
         system_content = (
             "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
-        formatted_system_content = system_content.format(file_summaries=file_summaries)
+        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
+        
+        # Use the ChatAgent to process the message
         chat_agent = ChatAgent(system_prompt=formatted_system_content)
+        assistant_reply = chat_agent.process_message(user_message)
+        
+        # Send the response back to the client
+        await websocket.send(assistant_reply)
+        
+    async def _handle_mic_click(self, websocket, data):
+        """Handle a microphone click"""
+        await self.dummy_mic_click(websocket)
+        
+    async def _handle_block_click(self, websocket, data):
+        """Handle a block click"""
+        # Create a new ChatAgent for getting task instructions
+        system_content = (
+            "A high level summary of the codebase which the user wants to modify is here: {file_summaries}. Always reply concise and without formatting. Your task is to ask questions and clarify requests, for this early phase of software design. Always try to be brief and concise and help the planning. Remember, the user is not the one who is implementing the code, it is actually you and your team of AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, but rather try to gather information about what the user wants to build in the context of the codebase above. Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that they should hit the block button below to start the protoblock execution.")
+        formatted_system_content = system_content.format(file_summaries=self.file_summaries)
+        chat_agent = ChatAgent(system_prompt=formatted_system_content)
+        
+        await self.handle_block_click(websocket, chat_agent)
+        
+    async def _handle_file_diff_request(self, websocket, data):
+        """Handle a file diff request"""
+        filename = data.get("filename", "")
+        await self.handle_file_diff_request(filename)
+        
+    async def _handle_file_status_request(self, websocket, data):
+        """Handle a file status request"""
+        filename = data.get("filename", "")
+        await self.handle_file_status_request(filename)
+        
+    async def _handle_git_branch_request(self, websocket, data):
+        """Handle a git branch request"""
+        await self.handle_git_branch_request()
+        
+    async def _handle_git_commit_request(self, websocket, data):
+        """Handle a git commit request"""
+        commit_message = data.get("commit_message", "")
+        await self.handle_git_commit_request(commit_message)
+        
+    async def _handle_git_discard_request(self, websocket, data):
+        """Handle a git discard request"""
+        await self.handle_git_discard_request()
+        
+    async def _handle_git_merge_request(self, websocket, data):
+        """Handle a git merge request"""
+        target_branch = data.get("target_branch", "")
+        await self.handle_git_merge_request(target_branch)
 
-        try:
-            while True:
-                try:
-                    user_input_raw = await websocket.recv()
-                    print("Received message from client:", user_input_raw)
-                    user_message = None
-
-                    try:
-                        data = json.loads(user_input_raw)
-                        if isinstance(data, dict) and "type" in data:
-                            message_type = data["type"]
-                            if message_type == "mic_click":
-                                await self.dummy_mic_click(websocket)
-                                continue
-                            elif message_type == "block_click":
-                                await self.handle_block_click(websocket, chat_agent)
-                                continue
-                            elif message_type == "file_diff_request":
-                                await self.handle_file_diff_request(data.get("filename", ""))
-                                continue
-                            elif message_type == "file_status_request":
-                                await self.handle_file_status_request(data.get("filename", ""))
-                                continue
-                            elif message_type == "git_branch_request":
-                                await self.handle_git_branch_request()
-                                continue
-                            elif message_type == "git_commit_request":
-                                await self.handle_git_commit_request(data.get("commit_message", ""))
-                                continue
-                            elif message_type == "git_discard_request":
-                                await self.handle_git_discard_request()
-                                continue
-                            elif message_type == "git_merge_request":
-                                await self.handle_git_merge_request(data.get("target_branch", ""))
-                                continue
-                            elif message_type in ["user_message", "transcribed_message"]:
-                                user_message = data.get("message", "").strip()
-                        else:
-                            user_message = user_input_raw.strip()
-                    except json.JSONDecodeError:
-                        if user_input_raw.strip() == "mic_click":
-                            await self.dummy_mic_click(websocket)
-                            continue
-                        user_message = user_input_raw.strip()
-
-                    if user_message:
-                        assistant_reply = chat_agent.process_message(user_message)
-                        print(f"Sending message to client: {assistant_reply}")
-                        await websocket.send(assistant_reply)
-                except websockets.exceptions.ConnectionClosed:
-                    break
-                except Exception as e:
-                    print(f"Error in processing message: {e}")
-                    break
-        finally:
-            # Cancel the status processor when connection is closed
-            if hasattr(self, '_status_processor'):
-                self._status_processor.cancel()
-                try:
-                    await self._status_processor
-                except asyncio.CancelledError:
-                    pass
-            
-            # Cancel all background tasks
-            for task_name, task in self._background_tasks.items():
-                if not task.done():
-                    print(f"Cancelling background task: {task_name}")
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-            
-            # Clear websocket reference
-            self.websocket = None
-
+    def _register_message_handlers(self):
+        """Register all message handlers with the WebSocketServer"""
+        self.server.register_message_handler("mic_click", self._handle_mic_click)
+        self.server.register_message_handler("block_click", self._handle_block_click)
+        self.server.register_message_handler("file_diff_request", self._handle_file_diff_request)
+        self.server.register_message_handler("file_status_request", self._handle_file_status_request)
+        self.server.register_message_handler("git_branch_request", self._handle_git_branch_request)
+        self.server.register_message_handler("git_commit_request", self._handle_git_commit_request)
+        self.server.register_message_handler("git_discard_request", self._handle_git_discard_request)
+        self.server.register_message_handler("git_merge_request", self._handle_git_merge_request)
+        self.server.register_message_handler("user_message", self._handle_user_message)
+        self.server.register_message_handler("transcribed_message", self._handle_user_message)
+        
     async def notify_tests_run(self):
         """
         Notify the background test runner that tests were recently executed.
@@ -763,10 +720,10 @@ class UIManager:
             git_clean = await self.check_git_status()
             if not git_clean:
                 await self.send_status_message("❌ Cannot proceed with block execution due to git status issues.")
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "error_message",
                     "message": "Git workspace is not clean. Please commit or stash your changes before proceeding."
-                }))
+                })
                 return
 
             # Load codebase information
@@ -826,10 +783,10 @@ class UIManager:
                 traceback.print_exc()
                 await self.send_status_message(f"❌ Error creating protoblock: {str(e)[:100]}...")
                 # Ensure we remove any previous protoblock display
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "remove_protoblock",
                     "message": "Failed to create protoblock"
-                }))
+                })
                 return
             
             # Execute the processor directly
@@ -853,28 +810,28 @@ class UIManager:
                 await self.send_protoblock_data(processor.protoblock)
                 
                 # Inform user that changes are uncommitted and can be viewed
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "info_message",
                     "message": "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
-                }))
+                })
             else:
                 # If block execution failed, send explicit failure message
                 await self.send_status_message("❌ Block execution failed!")
                 # Force removal of protoblock display
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "remove_protoblock",
                     "message": "Block execution failed"
-                }))
+                })
 
         except Exception as e:
             print(f"Error during block execution: {e}")
             traceback.print_exc()
             await self.send_status_message(f"❌ Error: {str(e)}")
             # Force removal of protoblock display on any exception
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "remove_protoblock",
                 "message": f"Error: {str(e)[:100]}"
-            }))
+            })
 
     async def handle_git_branch_request(self):
         """Handle request to get all available git branches"""
@@ -1196,7 +1153,7 @@ class UIManager:
             
             print("Background file indexer is always enabled")
             
-            # Run the server
-            asyncio.run(self.run_server())
+            # Launch the server
+            self.server.launch()
         except KeyboardInterrupt:
             print("WebSocket server stopped by user.")
