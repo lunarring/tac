@@ -26,6 +26,7 @@ from tac.web.ui_components import (
     GitView, 
     SpeechInput
 )
+from tac.blocks.generator import ProtoBlockGenerator  # Add this import
 
 
 class MessageHandlerManager:
@@ -910,17 +911,31 @@ class UIManager:
             await self.send_status_message("Creating block from conversation...")
             
             try:
-                genesis_prompt = chat_agent.generate_task_instructions()
+                # Get conversation history from chat agent
+                conversation = chat_agent.get_messages()
+                # Format the conversation for the prompt
+                conversation_text = "\n".join([f"{msg.role}: {msg.content}" for msg in conversation])
+                
+                # Send status about extracting task from conversation
+                await self.send_status_message("Converting conversation to task instructions...")
+                
+                # Create a protoblock generator and get the genesis prompt
+                protoblock_generator = ProtoBlockGenerator(ui_manager=self)
+                task_instructions = f"Based on the following conversation between a user and an AI assistant, determine what task the user wants to implement:\n\n{conversation_text}\n\nFocus on the most recent request from the user and create clear, actionable instructions."
+                
+                # Note: The codebase parameter is required but immediately replaced within the method
+                genesis_prompt = protoblock_generator.get_protoblock_genesis_prompt(codebase="", task_instructions=task_instructions)
+                
                 if not genesis_prompt:
-                    await self.send_status_message("❌ Failed to generate task instructions.")
+                    await self.send_status_message("❌ Failed to generate protoblock prompt.")
                     await self.chat_panel.send_error_message(
-                        "Failed to generate task instructions. Please provide more detailed information about what you want to accomplish."
+                        "Failed to generate protoblock prompt. Please provide more detailed information about what you want to accomplish."
                     )
                     return
             except Exception as prompt_err:
-                await self.send_status_message(f"❌ Error generating task instructions: {str(prompt_err)}")
+                await self.send_status_message(f"❌ Error generating protoblock prompt: {str(prompt_err)}")
                 await self.chat_panel.send_error_message(
-                    f"Error generating task instructions: {str(prompt_err)}. Please try again with more specific instructions."
+                    f"Error generating protoblock prompt: {str(prompt_err)}. Please try again with more specific instructions."
                 )
                 return
 

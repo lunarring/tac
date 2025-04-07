@@ -30,7 +30,7 @@ class ChatAgent:
         """
         return self.conversation
     
-    def generate_task_instructions(self) -> str:
+    def generate_task_instructions_llm(self) -> str:
         """
         Summarizes the conversation history into a clear, concise set of task instructions.
         
@@ -59,7 +59,26 @@ class ChatAgent:
         
         # Get the summary from the LLM
         summary = summarizer.chat_completion(summary_messages)
-        return summary
+        return summary    
+    
+    def generate_task_instructions(self) -> str:
+        """
+        Summarizes the conversation history into a clear, concise set of task instructions.
+        
+        Returns:
+            str: Compressed conversation as task instructions
+        """
+        # Use a stronger LLM for summarization
+        # Format the conversation for the summary prompt
+        conversation_text = "\n".join([f"{msg.role}: {msg.content}" for msg in self.conversation])
+        
+        task_instructions = f"""We have the following conversation between a user and an AI assistant: 
+{conversation_text}
+
+Your task is now to find out what the user wants and rephrase it given the codebase. Pay special attention to what the user says, particularly towards the end. Ignore the AI messages, they are here just for context."""
+        
+        # Get the summary from the LLM
+        return task_instructions
         
 # For manual testing if needed.
 if __name__ == "__main__":
