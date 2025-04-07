@@ -211,16 +211,33 @@ class WebSocketServer:
         print(f"WebSocket server started on ws://{self.host}:{self.port}")
         print("Please open 'src/tac/web/index.html' in your browser to view the UI.")
         
+        # Use a different approach that allows for proper cancellation
+        stop_event = asyncio.Event()
+        
+        def signal_handler():
+            stop_event.set()
+            
+        # Add signal handlers for graceful shutdown
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, signal_handler)
+            
         try:
-            await asyncio.Future()  # Run forever
-        except asyncio.CancelledError:
+            # Wait until stopped
+            await stop_event.wait()
+        finally:
+            # Clean up
             server.close()
             await server.wait_closed()
-            raise
 
     def launch(self):
         """Start the WebSocket server"""
         try:
             asyncio.run(self.run_server())
         except KeyboardInterrupt:
-            print("WebSocket server stopped by user.") 
+            print("WebSocket server stopped by user.")
+        except Exception as e:
+            print(f"Error in WebSocket server: {e}")
+            traceback.print_exc()
+        finally:
+            print("WebSocket server has shut down.") 

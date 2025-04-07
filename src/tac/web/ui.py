@@ -96,8 +96,6 @@ class UIManager:
                 
         # Register message handlers with the WebSocketServer
         self._register_message_handlers()
-        # Register connection handlers
-        self.server.register_connection_handler(self._on_websocket_connect)
 
     async def create_or_restart_background_task(self, task_name, task_coroutine):
         """
@@ -270,15 +268,44 @@ class UIManager:
         await self.protoblock_view.send_protoblock_data(protoblock)
 
     async def load_high_level_summaries(self):
-        data = self.project_files.get_all_summaries()
-        formatted_strings = []
-        for rel_path, file_info in data.get("files", {}).items():
-            if "error" in file_info:
-                summary = f"Error analyzing file: {file_info['error']}"
-            else:
-                summary = file_info.get("summary_high_level", "No summary available")
-            formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
-        return "\n\n".join(formatted_strings)
+        """
+        Load high-level summaries of all files in the project.
+        
+        Returns:
+            str: Formatted summary text for all files
+        """
+        try:
+            # Get all summaries from the project files
+            data = self.project_files.get_all_summaries()
+            formatted_strings = []
+            
+            # Get total file count for logging
+            total_files = len(data.get("files", {}))
+            error_count = 0
+            
+            # Process each file
+            for rel_path, file_info in data.get("files", {}).items():
+                if "error" in file_info:
+                    summary = f"Error analyzing file: {file_info['error']}"
+                    error_count += 1
+                else:
+                    summary = file_info.get("summary_high_level", "No summary available")
+                
+                # Format the summary with file path
+                formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
+            
+            # Log summary statistics
+            if error_count > 0:
+                await self.send_status_message(
+                    f"Loaded {total_files} file summaries with {error_count} errors"
+                )
+                
+            return "\n\n".join(formatted_strings)
+            
+        except Exception as e:
+            await self.handle_error(e, "load_high_level_summaries", notify_user=False)
+            # Return a minimal summary as fallback
+            return "Error loading file summaries. Please check the console for details."
 
     async def check_git_status(self):
         """
@@ -406,7 +433,7 @@ class UIManager:
             # Check if the file exists
             filepath = os.path.join(self.base_dir, filename)
             if not os.path.exists(filepath):
-                await self.send_error_response(filename, f"File {filename} does not exist")
+                await self.file_diff_view.send_error(filename, f"File {filename} does not exist")
                 return
             
             # Always read the current file content for comparison
@@ -414,7 +441,8 @@ class UIManager:
                 with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                     current_content = f.read()
             except Exception as read_err:
-                await self.send_error_response(filename, f"Could not read file: {str(read_err)}")
+                await self.file_diff_view.send_error(filename, f"Could not read file: {str(read_err)}")
+                await self.handle_error(read_err, "handle_file_diff_request", "FileDiffView", False)
                 return
                 
             # In UI mode, we disabled auto_commit, so changes should be in working directory
@@ -433,8 +461,8 @@ class UIManager:
                 try:
                     tracked_files = self.git_manager.repo.git.ls_files().split('\n')
                     is_tracked = filename in tracked_files
-                except Exception:
-                    pass
+                except Exception as track_err:
+                    await self.handle_error(track_err, "handle_file_diff_request (track check)", "FileDiffView", False)
                     
                 # Is this an untracked file?
                 is_untracked = filename in self.git_manager.repo.untracked_files
@@ -443,15 +471,15 @@ class UIManager:
                 unstaged_diff = ""
                 try:
                     unstaged_diff = self.git_manager.repo.git.diff('--', filename)
-                except Exception:
-                    pass
+                except Exception as unstaged_err:
+                    await self.handle_error(unstaged_err, "handle_file_diff_request (unstaged diff)", "FileDiffView", False)
                     
                 # Then check for staged changes
                 staged_diff = ""
                 try:
                     staged_diff = self.git_manager.repo.git.diff('--staged', '--', filename)
-                except Exception:
-                    pass
+                except Exception as staged_err:
+                    await self.handle_error(staged_err, "handle_file_diff_request (staged diff)", "FileDiffView", False)
                 
                 # Format appropriate diff output
                 if unstaged_diff:
@@ -490,8 +518,7 @@ class UIManager:
                     diff = f"File status unknown. Current content:\n{current_content}"
                     
             except Exception as git_err:
-                print(f"Git error getting diff: {git_err}")
-                traceback.print_exc()
+                await self.handle_error(git_err, "handle_file_diff_request (git diff)", "FileDiffView", False)
                 # Fall back to showing current content
                 diff = f"Current file content (git error: {str(git_err)}):\n{current_content}"
             
@@ -499,15 +526,15 @@ class UIManager:
             await self.file_diff_view.send_file_diff(filename, diff)
             
         except Exception as e:
-            await self.send_error_response(filename, f"Unexpected error: {str(e)}")
-            traceback.print_exc()
+            await self.handle_error(e, "handle_file_diff_request", "FileDiffView")
+            await self.file_diff_view.send_error(filename, f"Unexpected error: {str(e)}")
 
     async def send_error_response(self, filename, error_message):
         """Helper method to send error responses for file diff requests"""
         try:
             await self.file_diff_view.send_error(filename, error_message)
         except Exception as e:
-            print(f"Error sending error response: {e}")
+            await self.handle_error(e, "send_error_response", "FileDiffView", False)
 
     async def handle_file_status_request(self, filename):
         """
@@ -734,6 +761,18 @@ class UIManager:
         target_branch = data.get("target_branch", "")
         await self.handle_git_merge_request(target_branch)
 
+    async def _on_websocket_disconnect(self, websocket):
+        """Handle WebSocket disconnection"""
+        print(f"WebSocket connection closed")
+        
+        # If this is our current websocket, remove the reference
+        if self.websocket == websocket:
+            self.websocket = None
+            
+        # No need to clean up everything on disconnect - the client might reconnect
+        # Just mark that we're no longer connected
+        await self.send_status_message("Client disconnected")
+
     def _register_message_handlers(self):
         """Register message handlers with the WebSocketServer and UI components"""
         # Register component message handlers
@@ -758,6 +797,10 @@ class UIManager:
         self.server.register_message_handler("git_merge_request", self._handle_git_merge_request)
         self.server.register_message_handler("user_message", self._handle_user_message)
         self.server.register_message_handler("transcribed_message", self._handle_user_message)
+        
+        # Register connection handlers
+        self.server.register_connection_handler(self._on_websocket_connect)
+        self.server.register_disconnection_handler(self._on_websocket_disconnect)
     
     async def _on_user_message_component(self, data):
         """Handle a user message from a component"""
@@ -972,38 +1015,68 @@ class UIManager:
             # For the first attempt, make sure we use the same format as in processor.py
             await self.send_status_message("Starting block creation and execution attempt 1 of 4")
             
-            # Execute in executor to prevent blocking the event loop
-            loop = asyncio.get_event_loop()
+            # Create a cancellable task for the block execution instead of using an executor
+            # This ensures we can interrupt execution with CTRL+C
+            block_task = None
+            
             try:
-                success = await loop.run_in_executor(None, processor.run_loop)
+                # Define a coroutine that wraps the processor.run_loop() method
+                async def run_processor():
+                    loop = asyncio.get_event_loop()
+                    return await loop.run_in_executor(None, processor.run_loop)
+                
+                # Create and store the task
+                block_task = asyncio.create_task(run_processor())
+                self._background_tasks['current_block'] = block_task
+                
+                # Wait for the task to complete
+                success = await block_task
+                
+                # If tests were run during block execution and background tests are enabled,
+                # notify the background test runner
+                if run_tests_first and config.safe_get('general', 'run_tests_in_background', False):
+                    await self.notify_tests_run()
+
+                # Check if execution was successful and we have a protoblock
+                if success and processor.protoblock:
+                    await self.send_status_message("✅ Block executed successfully! Displaying final results...")
+                    # Send updated protoblock data after execution with the final attempt number
+                    await self.protoblock_view.send_protoblock_data(processor.protoblock)
+                    
+                    # Inform user that changes are uncommitted and can be viewed
+                    await self.chat_panel.send_info_message(
+                        "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
+                    )
+                else:
+                    # If block execution failed, send explicit failure message
+                    await self.send_status_message("❌ Block execution failed!")
+                    # Force removal of protoblock display
+                    await self.protoblock_view.remove_protoblock("Block execution failed")
+                    
+            except asyncio.CancelledError:
+                # Task was cancelled (e.g., by CTRL+C)
+                await self.send_status_message("❌ Block execution cancelled by user.")
+                await self.protoblock_view.remove_protoblock("Execution cancelled by user")
+                # Re-raise the exception to propagate the cancellation
+                raise
+                
             except Exception as exec_err:
                 print(f"Error during block execution: {exec_err}")
                 traceback.print_exc()
                 await self.send_status_message(f"❌ Block execution failed: {str(exec_err)}")
                 await self.protoblock_view.remove_protoblock(f"Execution error: {str(exec_err)[:100]}")
-                return
-            
-            # If tests were run during block execution and background tests are enabled,
-            # notify the background test runner
-            if run_tests_first and config.safe_get('general', 'run_tests_in_background', False):
-                await self.notify_tests_run()
-
-            # Check if execution was successful and we have a protoblock
-            if success and processor.protoblock:
-                await self.send_status_message("✅ Block executed successfully! Displaying final results...")
-                # Send updated protoblock data after execution with the final attempt number
-                await self.protoblock_view.send_protoblock_data(processor.protoblock)
                 
-                # Inform user that changes are uncommitted and can be viewed
-                await self.chat_panel.send_info_message(
-                    "Changes have been made but not committed. Click on any file in the 'Files to Modify' section to view the changes."
-                )
-            else:
-                # If block execution failed, send explicit failure message
-                await self.send_status_message("❌ Block execution failed!")
-                # Force removal of protoblock display
-                await self.protoblock_view.remove_protoblock("Block execution failed")
+            finally:
+                # Clean up the task reference
+                if 'current_block' in self._background_tasks:
+                    del self._background_tasks['current_block']
 
+        except asyncio.CancelledError:
+            # Propagate cancellation
+            print("Block execution cancelled by user (CTRL+C)")
+            await self.send_status_message("Block execution cancelled by user (CTRL+C)")
+            raise
+            
         except Exception as e:
             print(f"Error during block execution: {e}")
             traceback.print_exc()
@@ -1222,6 +1295,21 @@ class UIManager:
         """
         Launch the WebSocket UI server with proper startup sequence and error handling.
         """
+        loop = asyncio.get_event_loop()
+        
+        # Set up signal handlers for graceful shutdown
+        try:
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(self._handle_exit_signal(s))
+                )
+            print("Signal handlers registered for graceful shutdown (CTRL+C)")
+        except NotImplementedError:
+            # Windows doesn't support SIGINT/SIGTERM signal handlers
+            print("Warning: Signal handlers not supported on this platform")
+            pass
+            
         try:
             print("\n=== TAC Web UI Startup ===")
             print(f"Base directory: {self.base_dir}")
@@ -1236,11 +1324,46 @@ class UIManager:
             
         except KeyboardInterrupt:
             print("\nWebSocket server stopped by user")
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.shutdown())
+                else:
+                    asyncio.run(self.shutdown())
+            except Exception as shutdown_err:
+                print(f"Error during shutdown: {shutdown_err}")
+                
         except Exception as e:
             print(f"\nError starting WebSocket server: {e}")
             traceback.print_exc()
             print("\nServer failed to start. Please check the error message above.")
-            
+            try:
+                asyncio.run(self.shutdown())
+            except Exception as shutdown_err:
+                print(f"Error during shutdown: {shutdown_err}")
+                
+    async def _handle_exit_signal(self, signal):
+        """Handle exit signal gracefully"""
+        print(f"\nReceived exit signal {signal.name}, shutting down...")
+        
+        # Force cancel any running block execution
+        if 'current_block' in self._background_tasks and not self._background_tasks['current_block'].done():
+            print("Forcefully cancelling running block execution...")
+            self._background_tasks['current_block'].cancel()
+            try:
+                # Give it a short timeout to clean up
+                await asyncio.wait_for(self._background_tasks['current_block'], timeout=2.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                # Expected when cancelling
+                pass
+                
+        await self.shutdown()
+        
+        # Stop the event loop
+        loop = asyncio.get_running_loop()
+        if loop.is_running():
+            loop.stop()
+
     def _pre_launch_checks(self):
         """Perform pre-launch checks to identify potential issues"""
         # Check git status
@@ -1316,3 +1439,92 @@ class UIManager:
                         "git_commit_request", "git_discard_request", 
                         "git_merge_request", "user_message", "transcribed_message"])
         return handlers
+
+    async def handle_error(self, error, source_method=None, component=None, notify_user=True):
+        """
+        Centralized error handler for UI operations.
+        
+        Args:
+            error: The exception that occurred
+            source_method: Optional name of the method where the error occurred
+            component: Optional name of the component where the error occurred
+            notify_user: Whether to notify the user about the error
+        """
+        # Generate error message
+        error_text = str(error)
+        source = f" in {source_method}" if source_method else ""
+        component_text = f" ({component})" if component else ""
+        
+        # Log error to console
+        print(f"Error{source}{component_text}: {error_text}")
+        if config.safe_get('debug', 'show_traceback', True):
+            traceback.print_exc()
+        
+        # Send status message
+        await self.send_status_message(f"❌ Error{component_text}: {error_text[:100]}{'...' if len(error_text) > 100 else ''}")
+        
+        # Notify user via chat panel if requested
+        if notify_user and self.chat_panel:
+            try:
+                await self.chat_panel.send_error_message(
+                    f"An error occurred{component_text}: {error_text}"
+                )
+            except Exception as notify_err:
+                print(f"Failed to send error notification: {notify_err}")
+                
+        return False
+
+    async def cancel_background_tasks(self):
+        """Cancel all running background tasks"""
+        for task_name, task in list(self._background_tasks.items()):
+            if not task.done():
+                print(f"Cancelling background task: {task_name}")
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    print(f"Task {task_name} cancelled successfully")
+                except Exception as e:
+                    print(f"Error cancelling task {task_name}: {e}")
+        self._background_tasks.clear()
+    
+    async def cleanup_components(self):
+        """Clean up all UI components before shutdown"""
+        components = [
+            self.chat_panel, 
+            self.protoblock_view, 
+            self.file_diff_view, 
+            self.git_view, 
+            self.speech_input
+        ]
+        
+        for component in components:
+            try:
+                if hasattr(component, 'cleanup') and callable(component.cleanup):
+                    await component.cleanup()
+            except Exception as e:
+                print(f"Error cleaning up component {component.__class__.__name__}: {e}")
+                
+        # Make sure recording is stopped
+        if self.is_recording:
+            try:
+                self.speech_to_text.stop_recording()
+                self.is_recording = False
+            except Exception as e:
+                print(f"Error stopping recording during cleanup: {e}")
+                
+    async def shutdown(self):
+        """Perform graceful shutdown of the UI manager"""
+        print("Shutting down UI Manager...")
+        
+        # Cancel background tasks
+        await self.cancel_background_tasks()
+        
+        # Clean up components
+        await self.cleanup_components()
+        
+        # Close websocket if open
+        if self.websocket and not self.websocket.closed:
+            await self.websocket.close()
+            
+        print("UI Manager shutdown complete")
