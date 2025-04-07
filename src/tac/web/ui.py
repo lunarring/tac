@@ -8,6 +8,7 @@ import subprocess
 import argparse
 import traceback
 import difflib
+import git
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
 from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
@@ -30,10 +31,9 @@ class UIManager:
         self.server = WebSocketServer(host='localhost', port=8765)
         self.websocket = None  # Keep for compatibility
         self._loop = None  # Keep for compatibility
-        self._status_queue = asyncio.Queue()
-        self.max_attempts = 4  # Maximum attempts
-        # Add lock for thread safety
+        # Add lock for thread safety - keep for compatibility
         self._status_lock = asyncio.Lock()
+        self.max_attempts = 4  # Maximum attempts
         # Git manager for diffs
         self.git_manager = create_git_manager()
         # Config is already initialized when imported
@@ -171,29 +171,6 @@ class UIManager:
         """
         # Delegate to the WebSocketServer
         self.server.send_status_bar(message)
-
-    async def _process_status_queue(self):
-        """Process status messages from the queue"""
-        while True:
-            try:
-                message = await self._status_queue.get()
-                # Use lock to prevent multiple concurrent status updates
-                async with self._status_lock:
-                    await self.send_status_message(message)
-                self._status_queue.task_done()
-            except Exception as e:
-                print(f"Error processing status queue: {e}")
-                # Don't break the loop on error
-                await asyncio.sleep(0.1)
-
-    def _get_loop(self):
-        if self._loop is None:
-            try:
-                self._loop = asyncio.get_event_loop()
-            except RuntimeError:
-                self._loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(self._loop)
-        return self._loop
 
     async def send_status_message(self, message):
         """Direct async method to send status messages with awaiting"""
@@ -368,11 +345,11 @@ class UIManager:
             # In UI mode, we disabled auto_commit, so changes should be in working directory
             if not self.git_manager or not hasattr(self.git_manager, 'repo') or not self.git_manager.repo:
                 # No git, just return the file content
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "file_diff_response",
                     "filename": filename,
                     "diff": f"Full file content (no git):\n{current_content}"
-                }))
+                })
                 return
                 
             # Get diff info from git
@@ -445,11 +422,11 @@ class UIManager:
                 diff = f"Current file content (git error: {str(git_err)}):\n{current_content}"
             
             # Send the result
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "file_diff_response",
                 "filename": filename,
                 "diff": diff
-            }))
+            })
             
         except Exception as e:
             await self.send_error_response(filename, f"Unexpected error: {str(e)}")
@@ -481,12 +458,12 @@ class UIManager:
             # Check if the file exists
             filepath = os.path.join(self.base_dir, filename)
             if not os.path.exists(filepath):
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "file_status_response",
                     "filename": filename,
                     "is_modified": False,
                     "error": "File does not exist"
-                }))
+                })
                 return
             
             is_modified = False
@@ -577,24 +554,24 @@ class UIManager:
                 # Can't count lines without git, so just return is_modified
             
             # Send the response with line counts
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "file_status_response",
                 "filename": filename,
                 "is_modified": is_modified,
                 "added_lines": added_lines,
                 "removed_lines": removed_lines
-            }))
+            })
             
         except Exception as e:
             print(f"Error handling file status request: {e}")
             traceback.print_exc()
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "file_status_response",
                 "filename": filename,
                 "is_modified": False,
                 "error": str(e)
-            }))
-            
+            })
+
     async def _on_websocket_connect(self, websocket):
         """Handle a new WebSocket connection"""
         self.websocket = websocket  # Keep for compatibility
@@ -835,9 +812,6 @@ class UIManager:
 
     async def handle_git_branch_request(self):
         """Handle request to get all available git branches"""
-        if not self.websocket:
-            return
-            
         await self.send_status_message("Fetching git branches...")
         
         branches = []
@@ -851,33 +825,30 @@ class UIManager:
                 # Sort branches alphabetically
                 branches.sort()
                 
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "git_branch_response",
                     "branches": branches
-                }))
+                })
                 await self.send_status_message("Ready")
             else:
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "git_branch_response",
                     "branches": [],
                     "error": "Git repository not available"
-                }))
+                })
                 await self.send_status_message("Git repository not available")
         except Exception as e:
             print(f"Error getting git branches: {e}")
             traceback.print_exc()
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "git_branch_response",
                 "branches": [],
                 "error": str(e)
-            }))
+            })
             await self.send_status_message(f"Error: {str(e)}")
             
     async def handle_git_commit_request(self, commit_message):
         """Handle request to commit changes"""
-        if not self.websocket:
-            return
-            
         # Validate commit message
         if not commit_message:
             commit_message = "Changes from TAC block execution"
@@ -891,45 +862,42 @@ class UIManager:
                 
                 if success:
                     response_message = "Changes committed successfully"
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "commit",
                         "success": True,
                         "message": response_message
-                    }))
+                    })
                     await self.send_status_message(f"✅ {response_message}")
                 else:
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "commit",
                         "success": False,
                         "message": "Failed to commit changes"
-                    }))
+                    })
                     await self.send_status_message("❌ Failed to commit changes")
             else:
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "git_operation_response",
                     "operation": "commit",
                     "success": False,
                     "message": "Git repository not available"
-                }))
+                })
                 await self.send_status_message("❌ Git repository not available")
         except Exception as e:
             print(f"Error committing changes: {e}")
             traceback.print_exc()
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "git_operation_response",
                 "operation": "commit",
                 "success": False,
                 "message": f"Error: {str(e)}"
-            }))
+            })
             await self.send_status_message(f"❌ Error committing changes: {str(e)}")
     
     async def handle_git_discard_request(self):
         """Handle request to discard changes"""
-        if not self.websocket:
-            return
-            
         await self.send_status_message("Discarding changes...")
         
         try:
@@ -939,53 +907,50 @@ class UIManager:
                 
                 if success:
                     response_message = "Changes discarded successfully"
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "discard",
                         "success": True,
                         "message": response_message
-                    }))
+                    })
                     await self.send_status_message(f"✅ {response_message}")
                 else:
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "discard",
                         "success": False,
                         "message": "Failed to discard changes"
-                    }))
+                    })
                     await self.send_status_message("❌ Failed to discard changes")
             else:
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "git_operation_response",
                     "operation": "discard",
                     "success": False,
                     "message": "Git repository not available"
-                }))
+                })
                 await self.send_status_message("❌ Git repository not available")
         except Exception as e:
             print(f"Error discarding changes: {e}")
             traceback.print_exc()
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "git_operation_response",
                 "operation": "discard",
                 "success": False,
                 "message": f"Error: {str(e)}"
-            }))
+            })
             await self.send_status_message(f"❌ Error discarding changes: {str(e)}")
     
     async def handle_git_merge_request(self, target_branch):
         """Handle request to merge changes to a branch and delete current branch"""
-        if not self.websocket:
-            return
-            
         # Validate target branch
         if not target_branch:
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "git_operation_response",
                 "operation": "merge",
                 "success": False,
                 "message": "No target branch specified"
-            }))
+            })
             await self.send_status_message("❌ No target branch specified")
             return
             
@@ -997,12 +962,12 @@ class UIManager:
                 current_branch = self.git_manager.get_current_branch()
                 
                 if not current_branch:
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "merge",
                         "success": False,
                         "message": "Could not determine current branch"
-                    }))
+                    })
                     await self.send_status_message("❌ Could not determine current branch")
                     return
                 
@@ -1010,12 +975,12 @@ class UIManager:
                 if not self.git_manager.is_clean():
                     commit_success = self.git_manager.commit(f"Changes before merging to {target_branch}")
                     if not commit_success:
-                        await self.websocket.send(json.dumps({
+                        await self.server.send_message({
                             "type": "git_operation_response",
                             "operation": "merge",
                             "success": False,
                             "message": "Failed to commit pending changes before merge"
-                        }))
+                        })
                         await self.send_status_message("❌ Failed to commit pending changes before merge")
                         return
                 
@@ -1032,14 +997,14 @@ class UIManager:
                         self.git_manager.repo.git.branch('-D', current_branch)
                     
                     response_message = f"Merged to {target_branch} and deleted {current_branch}"
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "merge",
                         "success": True,
                         "message": response_message
-                    }))
+                    })
                     await self.send_status_message(f"✅ {response_message}")
-                except git.GitCommandError as e:
+                except Exception as e:
                     # Try to abort any failed merge
                     try:
                         self.git_manager.repo.git.merge('--abort')
@@ -1052,65 +1017,31 @@ class UIManager:
                     except:
                         pass
                         
-                    await self.websocket.send(json.dumps({
+                    await self.server.send_message({
                         "type": "git_operation_response",
                         "operation": "merge",
                         "success": False,
                         "message": f"Merge failed: {str(e)}"
-                    }))
+                    })
                     await self.send_status_message(f"❌ Merge failed: {str(e)}")
             else:
-                await self.websocket.send(json.dumps({
+                await self.server.send_message({
                     "type": "git_operation_response",
                     "operation": "merge",
                     "success": False,
                     "message": "Git repository not available"
-                }))
+                })
                 await self.send_status_message("❌ Git repository not available")
         except Exception as e:
             print(f"Error merging branches: {e}")
             traceback.print_exc()
-            await self.websocket.send(json.dumps({
+            await self.server.send_message({
                 "type": "git_operation_response",
                 "operation": "merge",
                 "success": False,
                 "message": f"Error: {str(e)}"
-            }))
+            })
             await self.send_status_message(f"❌ Error merging branches: {str(e)}")
-
-    async def run_server(self):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', 8765))
-                s.close()
-        except OSError:
-            try:
-                result = subprocess.run(['pgrep', '-f', 'python.*tac'], capture_output=True, text=True)
-                if result.stdout.strip():
-                    pids = result.stdout.strip().split('\n')
-                    for pid_str in pids:
-                        try:
-                            pid = int(pid_str)
-                            print(f"Killing existing Python process (PID: {pid}) using port 8765")
-                            os.kill(pid, signal.SIGTERM)
-                        except Exception as e:
-                            print(f"Failed to kill process {pid_str}: {e}")
-                    await asyncio.sleep(1)
-                else:
-                    print("Port 8765 is in use but no Python TAC processes found. Please free the port manually.")
-                    raise OSError("Port 8765 is in use by non-Python process")
-            except Exception as e:
-                print(f"Failed to kill existing processes: {e}")
-
-        server = await websockets.serve(self.handle_connection, 'localhost', 8765)
-        print("WebSocket server started on ws://localhost:8765")
-        print("Please open 'src/tac/web/index.html' in your browser to view the UI.")
-        try:
-            await asyncio.Future()  # Run forever
-        except asyncio.CancelledError:
-            server.close()
-            await server.wait_closed()
-            raise
 
     def launch_ui(self):
         try:
