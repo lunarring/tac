@@ -112,7 +112,7 @@ class UIManager:
             self._background_tasks[task_name] = asyncio.create_task(task_coroutine())
             print(f"Started background task: {task_name}")
         return self._background_tasks[task_name]
-    
+
     async def start_background_tasks(self):
         """Start essential background tasks when the UI starts"""
         # Start file indexing task
@@ -121,7 +121,7 @@ class UIManager:
         # If test running is enabled in config, start the test runner
         if config.safe_get('general', 'run_tests_in_background', False):
             await self.create_or_restart_background_task('test_runner', self._background_test_runner)
-            
+
     async def _background_file_indexer(self):
         """Background task to index files periodically"""
         try:
@@ -290,9 +290,9 @@ class UIManager:
                     error_count += 1
                 else:
                     summary = file_info.get("summary_high_level", "No summary available")
-                
-                # Format the summary with file path
-                formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
+                    
+                    # Format the summary with file path
+                    formatted_strings.append(f"###FILE: {rel_path}\n{summary}\n###END_FILE")
             
             # Log summary statistics
             if error_count > 0:
@@ -326,7 +326,7 @@ class UIManager:
                 self.git_clean = True
                 self.git_status_message = "Git manager not available."
                 return True
-                
+            
             # Perform actual git check
             self.git_clean = self.git_manager.is_clean()
             if not self.git_clean:
@@ -341,10 +341,10 @@ class UIManager:
                         self.git_clean = True
                         self.git_status_message = "✅ Changes successfully stashed."
                         await self.send_status_message("✅ Changes successfully stashed.")
-                        return True
-                    else:
-                        self.git_status_message = "❌ Failed to stash changes. Please clean your git workspace manually."
-                        await self.send_status_message("❌ Failed to stash changes.")
+                    return True
+                else:
+                    self.git_status_message = "❌ Failed to stash changes. Please clean your git workspace manually."
+                    await self.send_status_message("❌ Failed to stash changes.")
             else:
                 self.git_status_message = "✅ Git workspace is clean."
                 
@@ -357,7 +357,7 @@ class UIManager:
             self.git_status_message = f"⚠️ Git error: {str(e)}"
             await self.send_status_message(f"⚠️ Git error: {str(e)}")
             return False
-
+        
     async def dummy_mic_click(self, websocket=None):
         """
         Handle microphone recording toggle and transcription.
@@ -1379,7 +1379,7 @@ class UIManager:
                         
                         # Check if auto-stash is enabled
                         auto_stash = config.safe_get('general', 'auto_stash', False)
-                        
+                            
                         if auto_stash:
                             print("Auto-stash is enabled. Stashing changes...")
                             if self.git_manager.revert_changes():
@@ -1392,8 +1392,8 @@ class UIManager:
                     print(f"⚠️ Git status check failed: {e}")
         else:
             print("ℹ️ Git support not available")
-        
-        # Check background tasks configuration
+            
+            # Check background tasks configuration
         print("\nBackground Tasks:")
         if config.safe_get('general', 'run_tests_in_background', False):
             print("✅ Background test runner is enabled")
