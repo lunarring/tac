@@ -4,7 +4,7 @@ import re
 import time
 import json
 import tempfile
-from typing import Dict, Tuple, List, Optional, Any
+from typing import Dict, Tuple, List, Optional, Any, Union
 from dataclasses import dataclass, field
 # Now we can import pexpect normally since we renamed the file
 import pexpect
@@ -13,6 +13,7 @@ import traceback
 
 from tac.blocks import ProtoBlock
 from tac.agents.trusty.base import TrustyAgent, trusty_agent
+from tac.agents.trusty.results import TrustyAgentResult
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 
@@ -35,7 +36,7 @@ class PexpectTestingAgent(TrustyAgent):
         self.test_results = []
         self.report = ""
         
-    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Implementation of the check method for Pexpect testing.
         
@@ -45,10 +46,24 @@ class PexpectTestingAgent(TrustyAgent):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            Tuple containing:
-            - bool: Success status (always True as we rely on pytest)
-            - str: Error analysis (empty string)
-            - str: Failure type description (empty string)
+            TrustyAgentResult: Result object indicating we rely on pytest for checking
         """
         logger.info("PexpectTestingAgent relies on pytest for checking pexpect-based tests")
-        return True, "", ""
+        
+        # Create a result object with appropriate information
+        result = TrustyAgentResult(
+            success=True,
+            agent_type="pexpect_agent",
+            summary="PexpectTestingAgent relies on pytest for checking pexpect-based tests"
+        )
+        
+        # Add a report explaining how pexpect tests are executed
+        result.add_report(
+            """Pexpect tests are executed through pytest, so this agent doesn't perform active checking itself.
+Instead, it provides the framework for writing end-to-end testing using pexpect.
+These tests will be executed by the pytest agent during the regular test run.""",
+            "Pexpect Testing Information"
+        )
+        
+        # Return the result
+        return result

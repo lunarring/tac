@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Optional, Dict, Any, TypeVar, cast, ClassVar, Type, Callable
+from typing import Tuple, Optional, Dict, Any, TypeVar, cast, ClassVar, Type, Callable, Union
 from functools import wraps
 
 from tac.blocks import ProtoBlock
 from tac.core.log_config import setup_logging
 from tac.agents.trusty.registry import TrustyAgentRegistry
+from tac.agents.trusty.results import TrustyAgentResult
 
 logger = setup_logging('tac.trusty_agents.base')
 
@@ -43,8 +44,7 @@ class TrustyAgent(ABC):
     Abstract base class for all trusty agents.
     
     All trusty agents must implement the _check_impl method which evaluates
-    a protoblock implementation and returns success status, error analysis,
-    and failure type.A trusty agent for verification
+    a protoblock implementation and returns a TrustyAgentResult.
     
     Class attributes:
         agent_name: Name of the agent for registration (defaults to class name)
@@ -91,10 +91,10 @@ class TrustyAgent(ABC):
             import traceback
             logger.debug(traceback.format_exc())
     
-    def check(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+    def check(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Check the implementation against specified criteria.
-        This is a wrapper method that enforces the correct return format.
+        This is a wrapper method that handles result formatting and error handling.
         
         Args:
             protoblock: The ProtoBlock containing task specifications
@@ -102,58 +102,79 @@ class TrustyAgent(ABC):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            Tuple containing:
-            - bool: Success status (True if check passed, False otherwise)
-            - str: Error analysis (empty string if success is True)
-            - str: Failure type description (empty string if success is True)
+            Either a legacy tuple or a TrustyAgentResult object:
+            - If using the new system: TrustyAgentResult object
+            - If using legacy: Tuple containing:
+              * bool: Success status (True if check passed, False otherwise)
+              * str: Error analysis (empty string if success is True)
+              * str: Failure type description (empty string if success is True)
         """
         try:
+            # Get agent name for result
+            agent_type = self.agent_name or self.__class__.__name__.lower()
+            if not agent_type and agent_type.endswith('agent'):
+                agent_type = agent_type[:-5]
+            
             # Call the implementation method
             result = self._check_impl(protoblock, codebase, code_diff)
             
-            # Validate the result
+            # Handle different return types
+            if isinstance(result, TrustyAgentResult):
+                # Already a TrustyAgentResult, return as is
+                return result
+            
+            # Legacy tuple format
             if not isinstance(result, tuple) or len(result) != 3:
                 logger.error(f"Invalid return format from {self.__class__.__name__}._check_impl: expected tuple of length 3, got {type(result)}")
-                return False, f"Internal error: Invalid return format from {self.__class__.__name__}", "Format error"
+                error_msg = f"Internal error: Invalid return format from {self.__class__.__name__}"
+                
+                # Create error result
+                error_result = TrustyAgentResult(
+                    success=False,
+                    agent_type=agent_type,
+                    summary=f"Check failed: Format error"
+                )
+                error_result.add_error(error_msg, "Format error")
+                return error_result
             
             success, error_analysis, failure_type = result
             
             # Validate success is a boolean
             if not isinstance(success, bool):
                 logger.error(f"Invalid success value from {self.__class__.__name__}._check_impl: expected bool, got {type(success)}")
-                return False, f"Internal error: Invalid success value from {self.__class__.__name__}", "Format error"
-            
-            # Validate error_analysis is a string
-            if not isinstance(error_analysis, str):
-                logger.error(f"Invalid error_analysis from {self.__class__.__name__}._check_impl: expected str, got {type(error_analysis)}")
-                error_analysis = str(error_analysis)
-            
-            # Validate failure_type is a string
-            if not isinstance(failure_type, str):
-                logger.error(f"Invalid failure_type from {self.__class__.__name__}._check_impl: expected str, got {type(failure_type)}")
-                failure_type = str(failure_type)
-            
-            # Enforce empty strings for error_analysis and failure_type when success is True
-            if success:
-                if error_analysis:
-                    logger.warning(f"{self.__class__.__name__} returned non-empty error_analysis with success=True, forcing to empty string")
-                if failure_type:
-                    logger.warning(f"{self.__class__.__name__} returned non-empty failure_type with success=True, forcing to empty string")
-                return True, "", ""
-            
-            # Ensure non-empty failure_type when success is False
-            if not failure_type:
-                logger.warning(f"{self.__class__.__name__} returned empty failure_type with success=False, using default")
-                failure_type = f"{self.__class__.__name__} check failed"
-            
-            return success, error_analysis, failure_type
+                error_msg = f"Internal error: Invalid success value from {self.__class__.__name__}"
+                
+                # Create error result
+                error_result = TrustyAgentResult(
+                    success=False,
+                    agent_type=agent_type,
+                    summary=f"Check failed: Format error"
+                )
+                error_result.add_error(error_msg, "Format error")
+                return error_result
+                
+            # Convert legacy result to TrustyAgentResult
+            return TrustyAgentResult.from_legacy_result(success, agent_type, error_analysis, failure_type)
             
         except Exception as e:
             logger.exception(f"Exception in {self.__class__.__name__}.check: {str(e)}")
-            return False, f"Internal error in {self.__class__.__name__}: {str(e)}", f"{self.__class__.__name__} exception"
+            
+            # Create error result
+            agent_type = self.agent_name or self.__class__.__name__.lower()
+            error_result = TrustyAgentResult(
+                success=False,
+                agent_type=agent_type,
+                summary=f"Check failed: {self.__class__.__name__} exception"
+            )
+            error_result.add_error(
+                message=f"Internal error in {self.__class__.__name__}: {str(e)}",
+                error_type=f"{self.__class__.__name__} exception",
+                stacktrace=logger.format_exc() if hasattr(logger, 'format_exc') else None
+            )
+            return error_result
     
     @abstractmethod
-    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Implementation of the check method. This should be overridden by subclasses.
         
@@ -163,10 +184,12 @@ class TrustyAgent(ABC):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            Tuple containing:
-            - bool: Success status (True if check passed, False otherwise)
-            - str: Error analysis (empty string if success is True)
-            - str: Failure type description (empty string if success is True)
+            Either a legacy tuple or a TrustyAgentResult object:
+            - If using the new system: TrustyAgentResult object
+            - If using legacy: Tuple containing:
+              * bool: Success status (True if check passed, False otherwise)
+              * str: Error analysis (empty string if success is True)
+              * str: Failure type description (empty string if success is True)
         """
         pass 
 
@@ -208,29 +231,60 @@ class ComparativeTrustyAgent(TrustyAgent):
         """Capture the initial state before any changes."""
         self.before_state = self._capture_state()
     
-    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """Implementation of the comparative check."""
         try:
+            # Get agent name for the result
+            agent_type = self.agent_name or self.__class__.__name__.lower()
+            if agent_type.endswith('agent'):
+                agent_type = agent_type[:-5]
+                
             # Verify we have the before state
             if self.before_state is None:
-                return False, "No initial state captured", "Missing before state"
+                result = TrustyAgentResult(
+                    success=False,
+                    agent_type=agent_type,
+                    summary="Check failed: Missing before state"
+                )
+                result.add_error("No initial state captured", "Missing before state")
+                return result
             
             # Capture after state
             after_state = self._capture_state()
             
             # Get comparison criteria from protoblock
-            criteria = protoblock.trusty_agent_prompts.get(self.name, "")
+            criteria = protoblock.trusty_agent_prompts.get(self.agent_name or agent_type, "")
             
             # Compare states
             success, analysis = self._compare_states(self.before_state, after_state, criteria)
             
             if success:
-                return True, "", ""
+                result = TrustyAgentResult(
+                    success=True,
+                    agent_type=agent_type,
+                    summary="Check passed successfully"
+                )
+                result.add_report(analysis, "Comparison Analysis")
+                return result
             else:
-                return False, analysis, "Comparison failed"
+                result = TrustyAgentResult(
+                    success=False,
+                    agent_type=agent_type,
+                    summary="Check failed: Comparison failed"
+                )
+                result.add_report(analysis, "Comparison Analysis")
+                return result
                 
         except Exception as e:
-            return False, str(e), "Comparison error"
+            logger.exception(f"Exception in {self.__class__.__name__}._check_impl: {str(e)}")
+            agent_type = self.agent_name or self.__class__.__name__.lower()
+            result = TrustyAgentResult(
+                success=False,
+                agent_type=agent_type,
+                summary=f"Check failed: {str(e)}"
+            )
+            result.add_error(str(e), "Comparison error")
+            return result
     
     def _capture_state(self) -> Any:
         """Override this to capture the state for comparison."""

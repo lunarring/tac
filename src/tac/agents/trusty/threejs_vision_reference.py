@@ -5,7 +5,7 @@ import time
 import tempfile
 import subprocess
 import logging
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional, Any, Union
 import platform
 import uuid
 
@@ -27,6 +27,7 @@ from tac.utils.web_utils import (
 )
 from tac.utils.image_stitcher import stitch_images
 from tac.core.config import config
+from tac.agents.trusty.results import TrustyAgentResult
 from PIL import Image
 
 logger = setup_logging('tac.trusty_agents.threejs_vision_reference')
@@ -198,7 +199,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             logger.error(f"Error determining grade: {e}")
             return False
 
-    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Compare the before and after states with the provided reference image.
         
@@ -208,11 +209,15 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            Tuple containing:
-            - bool: Success status
-            - str: Analysis from vision LLM
-            - str: Failure type or empty string if successful
+            TrustyAgentResult: The result with comparison details
         """
+        # Create a result object for this agent
+        result = TrustyAgentResult(
+            success=False,  # Default to False, will set to True if successful
+            agent_type="threejs_vision_reference",
+            summary="Checking visual output against reference image"
+        )
+        
         try:
             # Store the protoblock for use in _capture_state
             self.protoblock = protoblock
@@ -224,15 +229,41 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
                 if image_url:
                     self.set_reference_image(image_url)
                 if not self.reference_image or not self.reference_image_path:
-                    logger.error("Reference image not provided")
-                    return False, "Reference image not provided", "Missing reference image"
+                    error_msg = "Reference image not provided"
+                    result.summary = error_msg
+                    result.add_error(error_msg, "Missing reference image")
+                    return result
+            
+            # Add reference image to result
+            result.details["reference_image_path"] = self.reference_image_path
             
             # Verify we have the before state
             if not self.before_screenshot_path:
-                return False, "No initial state captured", "Missing before state"
+                error_msg = "No initial state captured"
+                result.summary = error_msg
+                result.add_error(error_msg, "Missing before state")
+                return result
+            
+            # Add before screenshot to result
+            result.add_screenshot(
+                path=self.before_screenshot_path,
+                description="Before state screenshot"
+            )
             
             # Capture after state
-            self.after_screenshot_path = self._capture_state()
+            try:
+                self.after_screenshot_path = self._capture_state()
+                
+                # Add after screenshot to result
+                result.add_screenshot(
+                    path=self.after_screenshot_path,
+                    description="After state screenshot"
+                )
+            except Exception as e:
+                error_msg = f"Failed to capture after state: {str(e)}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Screenshot failed")
+                return result
             
             # Create comparison image by stitching before, after, and reference images side by side.
             self.comparison_path = os.path.join(
@@ -250,10 +281,22 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
             comparison_img.save(self.comparison_path)
             logger.info(f"Comparison image saved: {self.comparison_path}")
             
+            # Add comparison to result
+            result.add_comparison(
+                before_path=self.before_screenshot_path,
+                after_path=self.after_screenshot_path,
+                reference_path=self.reference_image_path,
+                description="Before, after, and reference comparison"
+            )
+            result.details["comparison_path"] = self.comparison_path
+            
             # Get expected changes from protoblock; if not provided use a default prompt.
             expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_reference", "")
             if not expected_changes:
                 expected_changes = "Compare the current implementation against the provided reference image."
+            
+            # Add expected changes to result details
+            result.details["expected_changes"] = expected_changes
             
             # Create a detailed prompt for analysis using a grading system.
             prompt = f"""Analyze this side-by-side comparison of a Three.js application:
@@ -289,15 +332,38 @@ RECOMMENDATIONS:
             self.analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
             logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
             
+            # Add analysis to result
+            result.add_report(self.analysis_result, "Visual Analysis")
+            
+            # Extract grade from analysis if available
+            grade = None
+            grade_scale = "A-F"
+            if "GRADE:" in self.analysis_result:
+                grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                if grade_line:
+                    grade = grade_line[0].upper()  # Take first character as grade
+                    result.add_grade(grade, grade_scale, "Comparison grade (only A is considered passing)")
+            
             success = self._determine_success(self.analysis_result)
             if success:
-                return True, self.analysis_result, ""
+                result.success = True
+                result.summary = "Visual comparison successful - matches reference"
+                if grade:
+                    result.summary += f" with grade {grade}"
+                return result
             else:
-                return False, self.analysis_result, "Visual comparison failed"
+                result.success = False
+                result.summary = "Visual comparison failed - does not match reference"
+                if grade:
+                    result.summary += f" with grade {grade}"
+                return result
             
         except Exception as e:
             logger.exception(f"Error in visual comparison: {str(e)}")
-            return False, str(e), "Visual comparison error"
+            result.success = False
+            result.summary = "Visual comparison error"
+            result.add_error(str(e), "Visual comparison error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            return result
             
         finally:
             # Clean up browser resources

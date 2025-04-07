@@ -17,6 +17,7 @@ from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.agents.trusty.base import TrustyAgent, trusty_agent
 from tac.agents.trusty.pytest import ErrorAnalyzer
+from tac.agents.trusty.results import TrustyAgentResult
 from tac.utils.web_utils import (
     verify_page_load, 
     take_page_screenshot,
@@ -50,14 +51,24 @@ class ThreeJSVisionAgent(TrustyAgent):
         self.error_analyzer = ErrorAnalyzer()
         self.collected_errors = []  # Initialize collected_errors list
 
-    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Launch a browser with Playwright, navigate to the Three.js app, take a screenshot, and analyze it.
+        
+        Returns:
+            TrustyAgentResult: The result of the visual check with screenshot and analysis
         """
         playwright = None
         browser = None
         context = None
         page = None
+        
+        # Create a result object for this agent
+        result = TrustyAgentResult(
+            success=False,  # Default to False, will set to True if successful
+            agent_type="threejs_vision",
+            summary="Checking visual output of Three.js application"
+        )
         
         try:
             logger.info("========== STARTING NEW THREEJS VISUAL TEST ==========")
@@ -65,10 +76,17 @@ class ThreeJSVisionAgent(TrustyAgent):
             # Get the HTML file path
             app_file_path = self._get_app_file_path(protoblock)
             if not app_file_path:
-                return False, "Could not determine which HTML file to run", "No HTML file found"
+                result.summary = "Could not determine which HTML file to run"
+                result.add_error("No HTML file found", "Missing file")
+                return result
             
             if not os.path.exists(app_file_path):
-                return False, f"HTML file not found: {app_file_path}", "HTML file not found"
+                result.summary = f"HTML file not found: {app_file_path}"
+                result.add_error(f"HTML file not found: {app_file_path}", "Missing file")
+                return result
+            
+            # Add file info to result details
+            result.details["app_file_path"] = app_file_path
             
             # Launch browser and navigate
             playwright = sync_playwright().start()
@@ -81,40 +99,81 @@ class ThreeJSVisionAgent(TrustyAgent):
             logger.info(f"Navigating to: {file_url}")
             response = page.goto(file_url, wait_until="networkidle", timeout=30000)
             if not response or not response.ok:
-                return False, f"Failed to load page: {response.status if response else 'No response'}", "Browser errors detected"
+                error_msg = f"Failed to load page: {response.status if response else 'No response'}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Browser error")
+                return result
             
             # Verify page load
             success, errors, _ = verify_page_load(page, timeout=30000)
             if not success:
-                return False, "\n".join(errors), "Browser errors detected"
+                error_msg = "\n".join(errors)
+                result.summary = "Browser errors detected"
+                result.add_error(error_msg, "Browser errors")
+                return result
             
             # Take screenshot
             try:
                 self.screenshot_path = take_page_screenshot(page)
                 logger.info(f"Screenshot saved: {self.screenshot_path}")
+                result.add_screenshot(
+                    path=self.screenshot_path,
+                    description="Three.js application output"
+                )
+                result.details["screenshot_path"] = self.screenshot_path
             except Exception as e:
-                return False, f"Failed to take screenshot: {str(e)}", "Screenshot failed"
+                error_msg = f"Failed to take screenshot: {str(e)}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Screenshot failed")
+                return result
             
             # Get expected visual elements
             expected_visual = protoblock.trusty_agent_prompts.get("threejs_vision", "")
             if not expected_visual:
                 expected_visual = "Analyze what you see in the 3D scene and describe the Three.js visualization in detail."
             
+            # Add expected visual to result details
+            result.details["expected_visual"] = expected_visual
+            
             # Analyze screenshot
             prompt = f"Analyze this screenshot of a Three.js application's output. Expected: {expected_visual}"
             self.analysis_result = analyze_screenshot(self.screenshot_path, prompt, self.llm_client)
             
-            # Determine success
+            # Add analysis to result
+            result.add_report(self.analysis_result, "Visual Analysis")
+            
+            # Extract grade from analysis if available
+            grade = None
+            grade_scale = "A-F"
+            if "GRADE:" in self.analysis_result:
+                grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                if grade_line:
+                    grade = grade_line[0].upper()  # Take first character as grade
+                    result.add_grade(grade, grade_scale, f"Graded on scale from A (best) to F (worst)")
+            
+            # Determine success based on grade or content analysis
             success = determine_vision_success(self.analysis_result, config.general.trusty_agents.minimum_vision_score.upper())
             
             if success:
-                return True, "", ""
+                result.success = True
+                result.summary = "Visual verification successful"
+                return result
             else:
-                return False, self.analysis_result, "Three.js visual verification failed"
+                result.success = False
+                result.summary = "Three.js visual verification failed"
+                
+                # If we have a grade, add it to the failure message
+                if grade:
+                    result.summary += f" with grade {grade}"
+                    
+                return result
             
         except Exception as e:
             logger.exception(f"Error in Three.js vision testing: {str(e)}")
-            return False, str(e), "Three.js vision testing exception"
+            result.success = False
+            result.summary = "Three.js vision testing exception"
+            result.add_error(str(e), "Exception", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            return result
             
         finally:
             # Clean up resources in reverse order
@@ -346,16 +405,16 @@ def main():
     try:
         # Run the actual check
         print("Starting browser and taking screenshot...")
-        success, error_analysis, failure_type = agent._check_impl(protoblock, "", "")
+        result = agent._check_impl(protoblock, "", "")
         
         # Display results
         print("\nTest Results:")
-        print(f"Success: {success}")
+        print(f"Success: {result.success}")
         
-        if not success:
-            print(f"Failure Type: {failure_type}")
+        if not result.success:
+            print(f"Failure Type: {result.summary}")
             print("\nError Analysis:")
-            print(error_analysis)
+            print(result.analysis_result)
         else:
             # Get a more specific success message from the protoblock prompt
             prompt_text = protoblock.trusty_agent_prompts.get('threejs_vision', '').strip()
@@ -372,10 +431,10 @@ def main():
             print(f"Screenshot size: {file_size} bytes")
             
             # Show more details if available
-            if agent.analysis_result:
+            if result.analysis_result:
                 print("\nDetailed analysis:")
                 print("-" * 50)
-                print(agent.analysis_result)
+                print(result.analysis_result)
                 print("-" * 50)
                 
     except Exception as e:

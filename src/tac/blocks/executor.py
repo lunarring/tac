@@ -149,78 +149,128 @@ class BlockExecutor:
                 
             try:
                 # Run the agent check
-                success, error_analysis, failure_type = agent.check(
+                result = agent.check(
                     self.protoblock, self.codebase, code_diff
                 )
+                
+                # Handle both legacy tuple format and new TrustyAgentResult format
+                if isinstance(result, tuple) and len(result) == 3:
+                    success, error_analysis, failure_type = result
+                    
+                    # Convert legacy result to TrustyAgentResult for uniform handling
+                    from tac.agents.trusty.results import TrustyAgentResult
+                    agent_result = TrustyAgentResult.from_legacy_result(
+                        success, registry_name, error_analysis, failure_type
+                    )
+                else:
+                    # Already a TrustyAgentResult
+                    agent_result = result
+                    success = agent_result.success
+                    error_analysis = ""
+                    failure_type = ""
+                    
+                    # Extract error analysis and failure type from the result if needed
+                    if not success:
+                        failure_type = agent_result.summary
+                        # Get error analysis from reports or error components
+                        for component in agent_result.components:
+                            if component.component_type == "report":
+                                error_analysis = component.content
+                                break
+                        if not error_analysis:
+                            for component in agent_result.components:
+                                if component.component_type == "error":
+                                    error_analysis = component.message
+                                    break
                 
                 # Store the agent result in the protoblock
                 if hasattr(self, 'protoblock') and self.protoblock:
                     if not self.protoblock.trusty_agent_results:
                         self.protoblock.trusty_agent_results = {}
                     
-                    # Determine the primary output text
-                    if not success:
-                        output_text = error_analysis
-                    else:
-                        # Try to use the best available detailed output:
-                        # 1. analysis_result from vision agents
-                        # 2. detailed_output attribute if it exists
-                        # 3. output attribute if it exists
-                        # 4. Fall back to a generic "success" message
-                        if hasattr(agent, 'analysis_result') and agent.analysis_result:
-                            output_text = agent.analysis_result
-                        elif hasattr(agent, 'detailed_output') and agent.detailed_output:
-                            output_text = agent.detailed_output
-                        elif hasattr(agent, 'output') and agent.output:
-                            output_text = agent.output
-                        else:
-                            output_text = 'Verification successful'
+                    # Convert TrustyAgentResult to dictionary for storage
+                    result_dict = agent_result.to_dict()
                     
-                    # Create the base result dictionary
-                    result_dict = {
-                        'output': output_text,
-                        'status': 'passed' if success else 'failed',
-                        'agent_type': agent_name
+                    # Extract important information for UI display
+                    # Build a more UI-friendly representation
+                    ui_friendly_result = {
+                        'status': 'passed' if agent_result.success else 'failed',
+                        'agent_type': agent_result.agent_type,
+                        'summary': agent_result.summary
                     }
                     
-                    # Add image URLs if they exist
-                    if hasattr(agent, 'image_url') and agent.image_url:
-                        result_dict['image_url'] = agent.image_url
+                    # Add output content from reports
+                    report_texts = []
+                    for component in agent_result.components:
+                        if component.component_type == "report":
+                            report_texts.append(component.content)
                     
-                    # Add screenshot path if it exists
-                    if hasattr(agent, 'screenshot_path') and agent.screenshot_path:
-                        result_dict['screenshot_path'] = agent.screenshot_path
-                        
-                    # Add comparison image if it exists (for vision comparison agents)
-                    if hasattr(agent, 'comparison_path') and agent.comparison_path:
-                        result_dict['comparison_path'] = agent.comparison_path
-                        
-                    # Add test results if it's a test runner
-                    if hasattr(agent, 'test_results') and agent.test_results:
-                        result_dict['test_results'] = agent.test_results
-                        
-                    # Add summary if it exists
-                    if hasattr(agent, 'summary') and agent.summary:
-                        result_dict['summary'] = agent.summary
-                        
-                    # Add plausibility-specific fields if they exist
-                    if agent_name.lower() == 'plausibilitytestingagent' or registry_name == 'plausibility':
-                        if hasattr(agent, 'grade') and agent.grade:
-                            result_dict['grade'] = agent.grade
-                        if hasattr(agent, 'grade_info') and agent.grade_info:
-                            result_dict['grade_info'] = agent.grade_info
-                        if hasattr(agent, 'verification_info') and agent.verification_info:
-                            result_dict['verification_info'] = agent.verification_info
+                    if report_texts:
+                        ui_friendly_result['output'] = "\n\n".join(report_texts)
+                    elif error_analysis:
+                        ui_friendly_result['output'] = error_analysis
+                    else:
+                        ui_friendly_result['output'] = agent_result.summary
                     
-                    # Store all available results
-                    self.protoblock.trusty_agent_results[registry_name] = result_dict
+                    # Add screenshots if present
+                    screenshot_paths = []
+                    for component in agent_result.components:
+                        if component.component_type == "screenshot":
+                            screenshot_paths.append(component.path)
+                    
+                    if screenshot_paths:
+                        ui_friendly_result['screenshot_paths'] = screenshot_paths
+                        ui_friendly_result['screenshot_path'] = screenshot_paths[0]  # For backward compatibility
+                    
+                    # Add comparison images if present
+                    comparison_paths = []
+                    for component in agent_result.components:
+                        if component.component_type == "comparison":
+                            if hasattr(component, 'before_path') and component.before_path:
+                                comparison_paths.append(component.before_path)
+                            if hasattr(component, 'after_path') and component.after_path:
+                                comparison_paths.append(component.after_path)
+                            if hasattr(component, 'reference_path') and component.reference_path:
+                                comparison_paths.append(component.reference_path)
+                    
+                    if comparison_paths:
+                        ui_friendly_result['comparison_paths'] = comparison_paths
+                    
+                    # Add grade information if present
+                    for component in agent_result.components:
+                        if component.component_type == "grade":
+                            ui_friendly_result['grade'] = component.grade
+                            ui_friendly_result['grade_scale'] = component.scale
+                            ui_friendly_result['grade_description'] = component.description
+                    
+                    # Add metrics if present
+                    metrics = []
+                    for component in agent_result.components:
+                        if component.component_type == "metric":
+                            metrics.append({
+                                'name': component.name,
+                                'value': component.value,
+                                'unit': component.unit,
+                                'threshold': component.threshold if hasattr(component, 'threshold') else None,
+                                'passes': component.passes_threshold if hasattr(component, 'passes_threshold') else None
+                            })
+                    
+                    if metrics:
+                        ui_friendly_result['metrics'] = metrics
+                    
+                    # Add any details from the result
+                    ui_friendly_result.update(agent_result.details)
+                    
+                    # Store both the full result and the UI-friendly version
+                    self.protoblock.trusty_agent_results[registry_name] = {
+                        'full_result': result_dict,
+                        **ui_friendly_result  # Merge in the UI-friendly fields
+                    }
                     
                     # Log the result we're storing
-                    logger.info(f"Stored result for agent {registry_name}: status={result_dict['status']}")
-                    logger.info(f"  Output length: {len(output_text)}")
-                    for key in result_dict:
-                        if key != 'output':  # Skip output as we logged its length above
-                            logger.info(f"  {key}: {result_dict[key]}")
+                    logger.info(f"Stored result for agent {registry_name}: status={'passed' if success else 'failed'}")
+                    logger.info(f"  Components: {len(agent_result.components)} components")
+                    logger.info(f"  Summary: {agent_result.summary}")
                 
                 # Send immediate status update after the agent completes
                 if not success:
@@ -241,18 +291,36 @@ class BlockExecutor:
                     if not self.protoblock.trusty_agent_results:
                         self.protoblock.trusty_agent_results = {}
                     
-                    # Store error data
-                    self.protoblock.trusty_agent_results[registry_name] = {
-                        'output': error_msg,
+                    # Create an error result
+                    from tac.agents.trusty.results import TrustyAgentResult
+                    error_result = TrustyAgentResult(
+                        success=False,
+                        agent_type=registry_name,
+                        summary=f"Error in {agent_name}: {type(e).__name__}"
+                    )
+                    error_result.add_error(
+                        message=error_msg,
+                        error_type=f"{agent_name} exception",
+                        stacktrace=logger.format_exc() if hasattr(logger, 'format_exc') else None
+                    )
+                    
+                    # Create UI-friendly representation
+                    ui_friendly_result = {
                         'status': 'error',
-                        'agent_type': agent_name
+                        'agent_type': agent_name,
+                        'output': error_msg,
+                        'summary': f"Error in {agent_name}: {type(e).__name__}"
                     }
                     
-                    # Log the error result we're storing
-                    logger.info(f"Stored error result for agent {registry_name}: status=error")
+                    # Store both the full result and the UI-friendly version
+                    self.protoblock.trusty_agent_results[registry_name] = {
+                        'full_result': error_result.to_dict(),
+                        **ui_friendly_result
+                    }
+                    
+                return False, error_msg, f"{agent_name} execution error"
                 
-                return False, error_msg, f"Exception in {agent_name} check"
-        
+        # All trusty agents passed
         return True, "", ""
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:

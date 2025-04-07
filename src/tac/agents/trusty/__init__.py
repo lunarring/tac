@@ -52,3 +52,32 @@ try:
     load_all_agents()
 except Exception as e:
     logger.error(f"Error loading trusty agents: {e}")
+
+from tac.agents.trusty.base import TrustyAgent, ComparativeTrustyAgent
+from tac.agents.trusty.registry import TrustyAgentRegistry
+from tac.agents.trusty.results import TrustyAgentResult
+from tac.agents.trusty.ui import ConsoleResultRenderer, HTMLResultRenderer
+
+# Import all agents to ensure they register
+import tac.agents.trusty.pytest
+import tac.agents.trusty.threejs_vision
+import tac.agents.trusty.threejs_vision_before_after
+import tac.agents.trusty.threejs_vision_reference
+import tac.agents.trusty.pexpect_agent
+import tac.agents.trusty.plausibility
+
+# Import performance agent (optional)
+try:
+    import tac.agents.trusty.performance
+except ImportError:
+    pass  # Performance agent is optional
+
+# Export publicly useful classes
+__all__ = [
+    'TrustyAgent', 
+    'ComparativeTrustyAgent', 
+    'TrustyAgentRegistry',
+    'TrustyAgentResult',
+    'ConsoleResultRenderer',
+    'HTMLResultRenderer'
+]

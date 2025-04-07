@@ -16,6 +16,7 @@ from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.agents.trusty.base import TrustyAgent, ComparativeTrustyAgent, trusty_agent
+from tac.agents.trusty.results import TrustyAgentResult
 from tac.utils.web_utils import (
     verify_page_load, 
     take_page_screenshot,
@@ -140,7 +141,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             raise ValueError("Protoblock not set. Call set_protoblock first.")
         self.before_screenshot_path = self._capture_state()
 
-    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: str, code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Compare the before and after states.
         
@@ -150,30 +151,60 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            Tuple containing:
-            - bool: Success status
-            - str: Error analysis
-            - str: Failure type
+            TrustyAgentResult: The result with comparison details
         """
+        # Create a result object for this agent
+        result = TrustyAgentResult(
+            success=False,  # Default to False, will set to True if successful
+            agent_type="threejs_vision_before_after",
+            summary="Checking visual changes between before and after states"
+        )
+        
         try:
             # Store the protoblock for use in _capture_state
             self.protoblock = protoblock
             
             # Verify we have the before state
             if not self.before_screenshot_path:
-                return False, "No initial state captured", "Missing before state"
+                result.summary = "No initial state captured"
+                result.add_error("Before screenshot not found", "Missing before state")
+                return result
+            
+            # Add before screenshot to result
+            result.add_screenshot(
+                path=self.before_screenshot_path,
+                description="Before state screenshot"
+            )
             
             # Capture after state
-            self.after_screenshot_path = self._capture_state()
+            try:
+                self.after_screenshot_path = self._capture_state()
+                
+                # Add after screenshot to result
+                result.add_screenshot(
+                    path=self.after_screenshot_path,
+                    description="After state screenshot"
+                )
+            except Exception as e:
+                error_msg = f"Failed to capture after state: {str(e)}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Screenshot failed")
+                return result
             
             # Verify that screenshots exist and have content
             for img_path, img_name in [(self.before_screenshot_path, "Before"), (self.after_screenshot_path, "After")]:
                 if not os.path.exists(img_path):
-                    return False, f"{img_name} screenshot file not found: {img_path}", f"Missing {img_name.lower()} screenshot"
+                    error_msg = f"{img_name} screenshot file not found: {img_path}"
+                    result.summary = error_msg
+                    result.add_error(error_msg, f"Missing {img_name.lower()} screenshot")
+                    return result
                     
                 file_size = os.path.getsize(img_path)
                 if file_size == 0:
-                    return False, f"{img_name} screenshot file is empty: {img_path}", f"Empty {img_name.lower()} screenshot"
+                    error_msg = f"{img_name} screenshot file is empty: {img_path}"
+                    result.summary = error_msg
+                    result.add_error(error_msg, f"Empty {img_name.lower()} screenshot")
+                    return result
                 
                 logger.info(f"{img_name} screenshot verified: {img_path} ({file_size} bytes)")
             
@@ -205,13 +236,27 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             comparison_img.save(self.comparison_path)
             logger.info(f"Comparison image saved: {self.comparison_path}")
             
+            # Add comparison to result
+            result.add_comparison(
+                before_path=self.before_screenshot_path,
+                after_path=self.after_screenshot_path,
+                description="Before and after comparison"
+            )
+            result.details["comparison_path"] = self.comparison_path
+            
             # Verify the comparison image was created properly
             if not os.path.exists(self.comparison_path):
-                return False, "Failed to create comparison image", "Image stitching failed"
+                error_msg = "Failed to create comparison image"
+                result.summary = error_msg
+                result.add_error(error_msg, "Image stitching failed")
+                return result
                 
             comparison_file_size = os.path.getsize(self.comparison_path)
             if comparison_file_size == 0:
-                return False, "Comparison image file is empty", "Empty comparison image"
+                error_msg = "Comparison image file is empty"
+                result.summary = error_msg 
+                result.add_error(error_msg, "Empty comparison image")
+                return result
                 
             logger.info(f"Comparison image verified: {self.comparison_path} ({comparison_file_size} bytes)")
             
@@ -222,6 +267,9 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_before_after", "")
             if not expected_changes:
                 expected_changes = "Analyze the visual differences between the before and after states."
+            
+            # Add expected changes to result details
+            result.details["expected_changes"] = expected_changes
             
             # Create a detailed prompt for analysis
             prompt = f"""Analyze this side-by-side comparison of a Three.js application:
@@ -274,20 +322,44 @@ Focus on:
             logger.info(f"Sending comparison image to vision model: {self.comparison_path}")
             self.analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
             
+            # Add analysis to result
+            result.add_report(self.analysis_result, "Visual Analysis")
+            
+            # Extract grade from analysis if available
+            grade = None
+            grade_scale = "A-F"
+            if "GRADE:" in self.analysis_result:
+                grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                if grade_line:
+                    grade = grade_line[0].upper()  # Take first character as grade
+                    result.add_grade(grade, grade_scale, f"Graded on scale from A (best) to F (worst)")
+            
             # Log the detailed analysis
             logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
             
-            # Determine success with minimum grade B
-            success = determine_vision_success(self.analysis_result, "B")
+            # Determine success based on grade or content analysis
+            minimum_grade = config.general.trusty_agents.minimum_vision_score.upper()
+            success = determine_vision_success(self.analysis_result, minimum_grade) 
             
             if success:
-                return True, self.analysis_result, ""
+                result.success = True
+                result.summary = "Visual comparison successful"
+                if grade:
+                    result.summary += f" with grade {grade}"
+                return result
             else:
-                return False, self.analysis_result, "Visual comparison failed"
+                result.success = False
+                result.summary = "Visual comparison failed"
+                if grade:
+                    result.summary += f" with grade {grade}"
+                return result
             
         except Exception as e:
             logger.exception(f"Error in visual comparison: {str(e)}")
-            return False, str(e), "Visual comparison error"
+            result.success = False
+            result.summary = "Visual comparison error"
+            result.add_error(str(e), "Visual comparison error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            return result
             
         finally:
             # Clean up browser resources

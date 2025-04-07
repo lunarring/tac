@@ -6,13 +6,14 @@ from _pytest.reports import TestReport
 import sys
 import re
 import shutil
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Union
 from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.agents.trusty.base import TrustyAgent, trusty_agent
+from tac.agents.trusty.results import TrustyAgentResult
 
 logger = setup_logging('tac.trusty_agents.pytest')
 
@@ -36,7 +37,7 @@ class PytestTestingAgent(TrustyAgent):
         self.error_analyzer = ErrorAnalyzer()  # Initialize error analyzer
         
 
-    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Run tests and check if they pass.
         
@@ -46,11 +47,15 @@ class PytestTestingAgent(TrustyAgent):
             code_diff: The git diff showing implemented changes (not used in this agent)
             
         Returns:
-            Tuple containing:
-            - bool: Success status (True if tests passed, False otherwise)
-            - str: Error analysis (empty string if success is True)
-            - str: Failure type description (empty string if success is True)
+            TrustyAgentResult: Result object with test information
         """
+        # Create a result object for this agent
+        result = TrustyAgentResult(
+            success=False,  # Default to False, will set to True if successful
+            agent_type="pytest",
+            summary="Running pytest tests"
+        )
+        
         try:
             test_path = config.general.test_path
             logger.info("Test Execution Details:")
@@ -58,51 +63,69 @@ class PytestTestingAgent(TrustyAgent):
             logger.info(f"Working directory: {os.getcwd()}")
             logger.info(f"Python path: {sys.path}")
             
+            # Add details to result
+            result.details["test_path"] = test_path
+            result.details["working_directory"] = os.getcwd()
+            
             # Reload modules to ensure we're using the latest code
             self._reload_modules()
             
             test_success = self.run_tests(test_path)
             test_results = self.get_test_results()
+            
+            # Add test results to result object
+            result.add_report(test_results, "Test Results")
+            
+            # Extract test statistics
+            test_stats = self.get_test_stats()
+            total_tests = sum(test_stats.values()) if test_stats else 0
+            passed_tests = test_stats.get('passed', 0) if test_stats else 0
+            failed_tests = test_stats.get('failed', 0) if test_stats else 0
+            error_tests = test_stats.get('error', 0) if test_stats else 0
+            skipped_tests = test_stats.get('skipped', 0) if test_stats else 0
+            
+            # Add metrics for test stats
+            result.add_metric("Total Tests", total_tests, "tests")
+            result.add_metric("Passed Tests", passed_tests, "tests", is_better="higher")
+            if failed_tests > 0:
+                result.add_metric("Failed Tests", failed_tests, "tests", threshold=0, is_better="lower")
+            if error_tests > 0:
+                result.add_metric("Error Tests", error_tests, "tests", threshold=0, is_better="lower")
+            if skipped_tests > 0:
+                result.add_metric("Skipped Tests", skipped_tests, "tests")
+            
+            # Log test results
+            if failed_tests > 0:
+                logger.warning(f"{failed_tests} out of {total_tests} tests failed")
+                logger.warning("This indicates potential issues but won't stop execution")
+                result.summary = f"Tests failed: {failed_tests} out of {total_tests} tests failed"
+            else:
+                logger.info(f"All {total_tests} tests passed successfully")
+                result.summary = f"Tests passed: {total_tests} tests executed successfully"
+        
         except Exception as e:
             error_msg = f"Error during test execution: {type(e).__name__}: {str(e)}"
             logger.error(error_msg)
-            test_results = error_msg
-            test_success = False
+            result.summary = "Test execution failed with error"
+            result.add_error(error_msg, "Test Execution Error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            return result
 
-        
-        # Extract test statistics
-        test_stats = self.get_test_stats()
-        total_tests = sum(test_stats.values()) if test_stats else 0
-        failed_tests = test_stats.get('failed', 0) if test_stats else 0
-        
-        # Log test results
-        if failed_tests > 0:
-            logger.warning(f"{failed_tests} out of {total_tests} tests failed")
-            logger.warning("This indicates potential issues but won't stop execution")
-        else:
-            logger.info(f"All {total_tests} tests passed successfully")
-
-        # Only return early if tests failed
+        # If tests failed or had errors, perform error analysis
         if not test_success:
-            failure_type = "Pytest failed"
-            execution_success = False
-            error_analysis = ""  # Initialize as empty string instead of "None"
-            logger.debug(f"Software test result: NO SUCCESS. Test results: {test_results}")
-
             if config.general.trusty_agents.run_error_analysis:
                 error_analysis = self.error_analyzer.analyze_failure(
                     protoblock, 
                     test_results,
                     codebase
                 )
-                logger.debug(f"Error Analysis: {error_analysis}")
-            else:
-                logger.debug("Software test result: FAILURE!")
-
-            logger.info("Returning early due to test failure, skipping any remaining trusty agents")
-            return execution_success, error_analysis, failure_type
+                result.add_report(error_analysis, "Error Analysis")
+            
+            # Final result
+            return result
         else:
-            return True, "", ""
+            # Tests passed successfully
+            result.success = True
+            return result
 
     def get_test_stats(self) -> dict:
         """Get the current test statistics"""

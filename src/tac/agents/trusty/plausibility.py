@@ -1,10 +1,11 @@
 import json
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 from tac.core.llm import LLMClient, Message
 from tac.blocks import ProtoBlock
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.agents.trusty.base import TrustyAgent, trusty_agent
+from tac.agents.trusty.results import TrustyAgentResult
 from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
 logger = setup_logging('tac.trusty_agents.plausibility')
@@ -42,7 +43,7 @@ class PlausibilityTestingAgent(TrustyAgent):
         min_score_value = self._score_values.get(config.general.trusty_agents.minimum_plausibility_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
-    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Tuple[bool, str, str]:
+    def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """
         Analyzes the implementation against the promised changes.
         
@@ -52,11 +53,15 @@ class PlausibilityTestingAgent(TrustyAgent):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            Tuple containing:
-            - bool: Success status (True if check passed, False otherwise)
-            - str: Error analysis (empty string if success is True)
-            - str: Failure type description (empty string if success is True)
+            TrustyAgentResult: Result object with plausibility analysis and grade
         """
+        # Create a result object for this agent
+        result = TrustyAgentResult(
+            success=False,  # Default to False, will set to True if passing
+            agent_type="plausibility",
+            summary="Checking plausibility of implementation"
+        )
+        
         logger.info("Starting LLM-based plausibility check")
         logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
         logger.debug(f"Git diff length: {len(code_diff) if code_diff else 'None'}")
@@ -144,11 +149,16 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             
             if not analysis or not analysis.strip():
                 logger.error("Received empty response from LLM")
-                return False, "Error: Unable to generate plausibility analysis", "Plausibility check failed"
+                result.summary = "Error: Unable to generate plausibility analysis"
+                result.add_error("Received empty response from LLM", "Analysis failed")
+                return result
             
             logger.info("Successfully received LLM analysis")
 
-            # Extract sections for UI display
+            # Add full analysis to result
+            result.add_report(analysis, "Full Analysis")
+
+            # Extract sections for result sections
             summary = ""
             if "BRIEF SUMMARY OF THE APPROACH" in analysis:
                 summary_parts = analysis.split("BRIEF SUMMARY OF THE APPROACH")
@@ -166,8 +176,8 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                     
                     logger.info(f"Brief Summary: {summary[:100]}...")
                     
-            # Store summary for UI display
-            self.summary = summary
+                    # Add summary to result details
+                    result.details["summary"] = summary
 
             # Extract HUMAN VERIFICATION section if present
             human_verification = ""
@@ -176,10 +186,30 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                 if len(human_verification_parts) > 1:
                     human_verification = human_verification_parts[1].strip()
                     logger.info(f"Human Verification: {human_verification}", heading=True)
-            
-            # Store verification info for UI display
-            self.verification_info = human_verification
+                    
+                    # Add verification info to result details
+                    result.details["verification_info"] = human_verification
 
+            # Extract missing files section if present
+            missing_files = ""
+            if "MISSING FILES:" in analysis:
+                missing_files_parts = analysis.split("MISSING FILES:")
+                if len(missing_files_parts) > 1:
+                    end_marker = None
+                    for marker in ["RECOMMENDATIONS:", "PLAUSIBILITY SCORE RATING:", "HUMAN VERIFICATION:"]:
+                        if marker in missing_files_parts[1]:
+                            end_marker = marker
+                            break
+                    
+                    if end_marker:
+                        missing_files = missing_files_parts[1].split(end_marker)[0].strip()
+                    else:
+                        missing_files = missing_files_parts[1].strip()
+                    
+                    # Add missing files to result details
+                    result.details["missing_files"] = missing_files
+
+            # Extract plausibility score
             final_plausibility_score = ""
             if "PLAUSIBILITY SCORE RATING:" in analysis:
                 score_section = analysis.split("PLAUSIBILITY SCORE RATING:")[1].strip()
@@ -192,28 +222,46 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             # Strip any whitespace and ensure uppercase
             final_plausibility_score = final_plausibility_score.strip().upper()
             
-            # Store grade for UI display
-            self.grade = final_plausibility_score
-            
-            # Add a field indicating the grading scale for UI display
-            self.grade_info = {
-                "A": "Excellent - Perfect match with requirements",
-                "B": "Good - Minor improvements possible",
-                "C": "Acceptable - Some issues exist",
-                "D": "Minimum Pass - Not ideal but functional",
-                "F": "Failed - Significant issues or non-functional"
-            }.get(final_plausibility_score, "Unknown grade")
-
-            # Check if score meets minimum requirement
-            is_plausible = self._is_score_passing(final_plausibility_score)
-
-            logger.info(f"Plausibility score: {final_plausibility_score}")
-            
-            if is_plausible:
-                return True, "", ""
+            # Add grade to result
+            if final_plausibility_score in ["A", "B", "C", "D", "F"]:
+                grade_descriptions = {
+                    "A": "Excellent - Perfect match with requirements",
+                    "B": "Good - Minor issues but overall solid implementation",
+                    "C": "Acceptable - Has issues but generally meets requirements",
+                    "D": "Minimum Pass - Barely meets requirements",
+                    "F": "Failed - Does not meet requirements"
+                }
+                
+                result.add_grade(
+                    final_plausibility_score, 
+                    "A-F", 
+                    grade_descriptions.get(final_plausibility_score, "")
+                )
+                
+                # Store grade in details for backward compatibility
+                result.details["grade"] = final_plausibility_score
+                result.details["grade_info"] = grade_descriptions
             else:
-                return False, analysis, "Plausibility check failed"
+                logger.warning("Invalid grade extracted, no letter grade found")
+                result.add_error("Invalid grade extracted", "Grade parsing failed")
+                return result
+            
+            # Check if the score passes the minimum requirement
+            is_passing = self._is_score_passing(final_plausibility_score)
+            
+            # Update result success status and summary
+            if is_passing:
+                result.success = True
+                result.summary = f"Plausibility check passed with grade {final_plausibility_score}"
+            else:
+                result.success = False
+                result.summary = f"Plausibility check failed with grade {final_plausibility_score} (minimum: {self._min_score})"
+            
+            return result
             
         except Exception as e:
-            logger.error(f"Error during plausibility check: {str(e)}", exc_info=True)
-            return False, f"Error during plausibility check: {str(e)}", "Plausibility check exception" 
+            logger.exception(f"Error in plausibility check: {str(e)}")
+            result.success = False
+            result.summary = "Plausibility check failed with error"
+            result.add_error(str(e), "Plausibility check error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            return result 
