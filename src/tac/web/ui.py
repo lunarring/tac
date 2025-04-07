@@ -873,9 +873,6 @@ class UIManager:
         self.server.register_message_handler("git_merge_request", 
             lambda ws, data: asyncio.create_task(self.message_handler.handle_git_merge_request(data, ws)))
         
-        self.server.register_message_handler("user_message", 
-            lambda ws, data: asyncio.create_task(self.message_handler.handle_user_message(data, ws)))
-        
         self.server.register_message_handler("transcribed_message", 
             lambda ws, data: asyncio.create_task(self.message_handler.handle_transcribed_message(data, ws)))
         
@@ -1444,7 +1441,7 @@ class UIManager:
         handlers.extend(["mic_click", "block_click", "file_diff_request", 
                         "file_status_request", "git_branch_request", 
                         "git_commit_request", "git_discard_request", 
-                        "git_merge_request", "user_message", "transcribed_message"])
+                        "git_merge_request"])
         return handlers
 
     async def handle_error(self, error, source_method=None, component=None, notify_user=True):
