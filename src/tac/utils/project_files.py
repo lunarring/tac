@@ -247,6 +247,15 @@ class ProjectFiles:
         
         return "\n\n".join(formatted_strings)
         
+    def refresh_index(self) -> Dict:
+        """
+        Wrapper for update_summaries to maintain compatibility with UI code.
+        
+        Returns:
+            Dict: Statistics about the update
+        """
+        return self.update_summaries()
+        
     def get_function_location(self, function_name: str) -> Union[str, bool]:
         """
         Check if a function with the given name exists in the codebase.
