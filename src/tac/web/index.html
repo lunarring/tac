@@ -19,6 +19,7 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
+      flex-wrap: nowrap; /* Prevent wrapping on smaller screens */
     }
     /* Left panel for chat interface with a clean, modern aesthetic */
     #leftPanel {
@@ -29,6 +30,9 @@
       display: flex;
       flex-direction: column;
       box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+      width: 50%; /* Make it exactly 50% */
+      min-width: unset; /* Remove min-width */
+      max-width: unset; /* Remove max-width */
     }
     /* Header for chat with refined padding and subtle shadow effect */
     #chatHeader {
@@ -209,19 +213,112 @@
       border-color: #007bff;
       color: #007bff;
     }
-    /* Right panel for Three.js canvas with a modern dark gradient */
+    /* Right panel for block view and protoblock display */
     #rightPanel {
       flex: 1;
       position: relative;
       background: linear-gradient(135deg, #e0eafc, #cfdef3);
       box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);
       overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      width: 50%; /* Make it exactly 50% */
     }
+    
     /* Ensure Three.js canvas fills its container */
     #rightPanel canvas {
       width: 100% !important;
       height: 100% !important;
       display: block;
+      transition: opacity 0.3s ease-in-out;
+    }
+    
+    /* Protoblock container styling */
+    #protoblockContainer {
+      display: none;
+      width: 95%; /* Increase width to use more space */
+      margin: 60px auto 20px;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      color: #333;
+      font-size: 14px;
+      transition: opacity 0.3s ease-in-out;
+    }
+    
+    #protoblockHeader {
+      margin-bottom: 20px;
+      border-bottom: 1px solid #e1e4e8;
+      padding-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    #protoblockHeader h2 {
+      margin: 0;
+      color: #333;
+      font-size: 24px;
+    }
+    
+    #protoblockAttempt {
+      background-color: #f1f8ff;
+      border: 1px solid #c8e1ff;
+      border-radius: 20px;
+      padding: 5px 15px;
+      color: #0366d6;
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    .section {
+      margin-bottom: 25px;
+      background: #f6f8fa;
+      border-radius: 6px;
+      padding: 15px;
+    }
+    
+    .section-title {
+      font-weight: 500;
+      font-size: 18px;
+      color: #24292e;
+      margin-bottom: 10px;
+    }
+    
+    .file-list {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .file-list li {
+      padding: 10px;
+      background-color: white;
+      border: 1px solid #e1e4e8;
+      border-radius: 4px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .file-list li:hover {
+      background-color: #f1f8ff;
+    }
+    
+    .file-list li.modified {
+      border-left: 4px solid #28a745;
+    }
+    
+    .code-block {
+      background-color: white;
+      border: 1px solid #e1e4e8;
+      border-radius: 4px;
+      padding: 15px;
+      overflow-x: auto;
+      font-family: monospace;
+      white-space: pre-wrap;
+      line-height: 1.5;
     }
     /* Styling for the new runtime status text field in the right panel */
     #runtimeStatus {
@@ -229,15 +326,33 @@
       top: 16px;
       left: 0;
       right: 0;
-      width: 75%;
+      width: 90%; /* Wider to use more space */
       margin: 0 auto;
       color: #333;
-      font-size: 18px;
+      font-size: 16px; /* Slightly smaller font */
       background-color: rgba(255, 255, 255, 0.7);
-      padding: 8px 12px;
-      border-radius: 4px;
+      padding: 12px 16px;
+      border-radius: 8px;
       text-align: center;
       z-index: 10;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+    
+    /* Runtime status variations for different states */
+    #runtimeStatus.processing {
+      background-color: rgba(255, 236, 179, 0.9);
+      box-shadow: 0 2px 10px rgba(255, 193, 7, 0.2);
+    }
+    
+    #runtimeStatus.success {
+      background-color: rgba(212, 237, 218, 0.9);
+      box-shadow: 0 2px 10px rgba(40, 167, 69, 0.2);
+    }
+    
+    #runtimeStatus.error {
+      background-color: rgba(248, 215, 218, 0.9);
+      box-shadow: 0 2px 10px rgba(220, 53, 69, 0.2);
     }
     /* Info message styling */
     #infoMessage {
@@ -245,7 +360,7 @@
       bottom: 16px;
       left: 0;
       right: 0;
-      width: 75%;
+      width: 90%; /* Match runtimeStatus width */
       margin: 0 auto;
       color: #0366d6;
       font-size: 16px;
@@ -269,7 +384,7 @@
       top: 60px;
       left: 0;
       right: 0;
-      width: 75%;
+      width: 90%; /* Match runtimeStatus width */
       margin: 0 auto;
       color: #721c24;
       font-size: 16px;
@@ -294,14 +409,15 @@
     /* Protoblock display container styling */
     #protoblockContainer {
       display: none;
-      width: 90%;
-      margin: 70px auto 20px;
+      width: 95%; /* Increase width to use more space */
+      margin: 60px auto 20px;
       background-color: rgba(255, 255, 255, 0.9);
       border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
       padding: 20px;
       color: #333;
       font-size: 14px;
+      transition: opacity 0.3s ease-in-out;
     }
     #protoblockHeader {
       text-align: center;
@@ -671,52 +787,46 @@
     
     /* Git Operations Panel */
     #gitOperationsPanel {
-      background-color: #f8f9fa;
+      margin: 0 10px 10px;
       padding: 15px;
-      border-top: 1px solid #e1e4e8;
-      margin-top: 5px;
-      margin-bottom: 10px;
+      background-color: #f6f8fa;
+      border-radius: 8px;
+      border: 1px solid #e1e4e8;
+      display: none;
     }
     
     .git-buttons {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      margin-top: 10px;
     }
     
     .git-button {
       padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #d0d0d0;
-      background-color: #f0f0f0;
+      background-color: #ffffff;
+      border: 1px solid #c3c3c3;
+      border-radius: 4px;
       cursor: pointer;
       font-size: 14px;
       transition: background-color 0.2s;
-      width: 100%;
-      text-align: center;
     }
     
     .git-button:hover {
-      background-color: #e0e0e0;
-    }
-    
-    .git-button:active {
-      background-color: #d0d0d0;
+      background-color: #f1f8ff;
+      border-color: #0366d6;
     }
     
     .merge-container {
       display: flex;
-      flex-direction: column;
-      gap: 5px;
+      gap: 8px;
     }
     
     .branch-select {
-      padding: 6px;
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #c3c3c3;
       border-radius: 4px;
-      border: 1px solid #d0d0d0;
       font-size: 14px;
-      width: 100%;
     }
     
     #commitChangesBtn {
@@ -1143,16 +1253,50 @@
     function toggleProtoblockDisplay(show) {
       const protoblockContainer = document.getElementById('protoblockContainer');
       const canvas = renderer.domElement;
+      const runtimeStatus = document.getElementById('runtimeStatus');
       
       if (show) {
-        canvas.style.display = 'none';
+        // First show the protoblock container
         protoblockContainer.style.display = 'block';
+        
+        // Use a smooth transition for the canvas
+        canvas.style.opacity = '0';
+        setTimeout(() => {
+          canvas.style.display = 'none';
+          // Ensure the status is properly visible over the protoblock
+          runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+        }, 300);
       } else {
+        // Show the canvas first
         canvas.style.display = 'block';
-        protoblockContainer.style.display = 'none';
+        setTimeout(() => {
+          canvas.style.opacity = '1';
+          // Hide the protoblock container
+          protoblockContainer.style.display = 'none';
+          // Reset status background for cube view
+          runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+        }, 50);
       }
     }
 
+    // Function to update the runtime status with appropriate styling
+    function updateRuntimeStatus(message, status = "default") {
+      const statusElement = document.getElementById("runtimeStatus");
+      statusElement.textContent = message;
+      
+      // Remove all status classes
+      statusElement.classList.remove("processing", "success", "error");
+      
+      // Add appropriate class based on status
+      if (status === "processing") {
+        statusElement.classList.add("processing");
+      } else if (status === "success") {
+        statusElement.classList.add("success");
+      } else if (status === "error") {
+        statusElement.classList.add("error");
+      }
+    }
+    
     // Function to handle block execution failure
     function handleBlockFailure() {
       // Hide the protoblock display completely
@@ -1165,12 +1309,15 @@
       rebuildProtoblockContainer();
       
       // Update the runtime status to show error
-      document.getElementById("runtimeStatus").textContent = "Block execution failed";
+      updateRuntimeStatus("Block execution failed", "error");
     }
     
     // Function to rebuild the empty protoblock container structure
     function rebuildProtoblockContainer() {
       const container = document.getElementById('protoblockContainer');
+      
+      // Clear the container first
+      container.innerHTML = '';
       
       // Header
       const header = document.createElement('div');
@@ -1393,8 +1540,23 @@
         const data = JSON.parse(event.data);
         
         if (data.type === "status_message") {
-          // Update the right-side status text bar.
-          document.getElementById("runtimeStatus").textContent = data.message;
+          // Update the right-side status text bar using the new function
+          updateRuntimeStatus(data.message);
+          
+          // Detect status type from the message content for proper styling
+          if (data.message.includes("Starting") || 
+             data.message.includes("Processing") || 
+             data.message.includes("Analyzing") ||
+             data.message.includes("Executing")) {
+            updateRuntimeStatus(data.message, "processing");
+          } else if (data.message.includes("✅") || 
+                    data.message.includes("success")) {
+            updateRuntimeStatus(data.message, "success");
+          } else if (data.message.includes("❌") || 
+                    data.message.includes("Error") || 
+                    data.message.includes("failed")) {
+            updateRuntimeStatus(data.message, "error");
+          }
           
           // Check for attempt number updates in status messages - support both formats
           const attemptMatch = data.message.match(/Starting (?:block creation and execution )?attempt (\d+) of (\d+)/);
@@ -1555,8 +1717,8 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Immediately update the runtime status to reflect the protoblock execution process.
-      document.getElementById("runtimeStatus").textContent = "Executing protoblock";
+      // Immediately update the runtime status to reflect the protoblock execution process
+      updateRuntimeStatus("Executing protoblock...", "processing");
       
       // Hide the protoblock display when starting a new block generation
       toggleProtoblockDisplay(false);
