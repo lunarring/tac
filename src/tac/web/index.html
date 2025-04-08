@@ -60,10 +60,6 @@
           <div id="taskDescription" class="code-block"></div>
         </div>
         <div class="section">
-          <div class="section-title">Context Files</div>
-          <ul id="contextFilesList" class="file-list"></ul>
-        </div>
-        <div class="section">
           <div class="section-title">Files to Modify</div>
           <ul id="writeFilesList" class="file-list"></ul>
         </div>
@@ -248,22 +244,16 @@
       // Header
       const header = document.createElement('div');
       header.id = 'protoblockHeader';
-      header.innerHTML = '<h2>Protoblock</h2><p id="protoblockAttempt">Attempt 1/4</p>';
+      header.innerHTML = '<h2>Protoblock</h2>' +
+                         '<p id="protoblockAttempt">Attempt 1/4</p>';
       container.appendChild(header);
       
       // Task Description
       const taskSection = document.createElement('div');
       taskSection.className = 'section';
       taskSection.innerHTML = '<div class="section-title">Task Description</div>' +
-                              '<div id="taskDescription" class="code-block"></div>';
+                             '<div id="taskDescription" class="code-block"></div>';
       container.appendChild(taskSection);
-      
-      // Context Files
-      const contextFilesSection = document.createElement('div');
-      contextFilesSection.className = 'section';
-      contextFilesSection.innerHTML = '<div class="section-title">Context Files</div>' +
-                                     '<ul id="contextFilesList" class="file-list"></ul>';
-      container.appendChild(contextFilesSection);
       
       // Files to Modify
       const writeFilesSection = document.createElement('div');
@@ -303,16 +293,6 @@
         // Create text node to ensure we can reference just the filename later
         li.appendChild(document.createTextNode(file));
         writeFilesList.appendChild(li);
-      });
-      
-      // Update context files
-      const contextFilesList = document.getElementById('contextFilesList');
-      contextFilesList.innerHTML = '';
-      data.context_files.forEach(file => {
-        const li = document.createElement('li');
-        // Create text node to ensure we can reference just the filename later
-        li.appendChild(document.createTextNode(file));
-        contextFilesList.appendChild(li);
       });
       
       // Update trusty agents
@@ -932,296 +912,10 @@
         }
       });
     });
-  </script>
-  
-  <!-- File diff overlay -->
-  <div id="fileDiffOverlay">
-    <div id="fileDiffContent">
-      <div id="fileDiffHeader">
-        <h3 id="fileDiffTitle">File Changes</h3>
-        <div>
-          <button id="fileDiffViewToggle" title="Toggle between unified and split view">Split View</button>
-          <button id="fileDiffCloseBtn">×</button>
-        </div>
-      </div>
-      <div id="fileDiffBody"></div>
-      <div id="fileDiffSplitView" class="initially-hidden">
-        <div id="fileDiffLeft"></div>
-        <div id="fileDiffRight"></div>
-        <div id="fileDiffScrollContainer">
-          <div id="fileDiffScrollContent"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-  <!-- Trusty Agent Prompt overlay -->
-  <div id="trustyAgentOverlay">
-    <div id="trustyAgentContent">
-      <div id="trustyAgentHeader">
-        <h3 id="trustyAgentTitle">Trusty Agent</h3>
-        <button id="trustyAgentCloseBtn">×</button>
-      </div>
-      <div id="trustyAgentBody">
-        <div class="trusty-agent-section">
-          <div class="trusty-agent-section-title">Prompt</div>
-          <div id="trustyAgentPromptText" class="code-block"></div>
-        </div>
-        <div class="trusty-agent-section initially-hidden" id="trustyAgentResultSection">
-          <div class="trusty-agent-section-title">Result</div>
-          <div id="trustyAgentResultStatus" class="agent-status"></div>
-          <div id="trustyAgentAgentType" class="agent-type"></div>
-          <div id="trustyAgentResultText" class="code-block"></div>
-        </div>
-        <div class="trusty-agent-section initially-hidden" id="trustyAgentPlausibilitySection">
-          <div class="trusty-agent-section-title">Plausibility Evaluation</div>
-          <div class="plausibility-container">
-            <div class="plausibility-grade-container">
-              <div id="trustyAgentGrade" class="grade"></div>
-              <div id="trustyAgentGradeInfo" class="grade-info"></div>
-            </div>
-            <div id="trustyAgentVerificationInfo" class="verification-info"></div>
-          </div>
-        </div>
-        <div class="trusty-agent-section initially-hidden" id="trustyAgentImageSection">
-          <div class="trusty-agent-section-title">Screenshots</div>
-          <div id="trustyAgentImageContainer">
-            <div id="mainImageContainer">
-              <h4>Main Screenshot</h4>
-              <img id="trustyAgentImage" alt="Trusty Agent Output Image" class="constrained-image">
-            </div>
-            <div id="comparisonImageContainer" class="initially-hidden">
-              <h4>Comparison Screenshot</h4>
-              <img id="trustyAgentComparisonImage" alt="Comparison Screenshot" class="constrained-image">
-            </div>
-          </div>
-        </div>
-        <div class="trusty-agent-section initially-hidden" id="trustyAgentTestResultsSection">
-          <div class="trusty-agent-section-title">Test Results</div>
-          <div id="trustyAgentTestResults" class="code-block"></div>
-        </div>
-        <div class="trusty-agent-section initially-hidden" id="trustyAgentSummarySection">
-          <div class="trusty-agent-section-title">Summary</div>
-          <div id="trustyAgentSummary" class="summary-block"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  
-  <script>
-    // File diff handling
-    const fileDiffOverlay = document.getElementById('fileDiffOverlay');
-    const fileDiffCloseBtn = document.getElementById('fileDiffCloseBtn');
-    const fileDiffBody = document.getElementById('fileDiffBody');
-    const fileDiffTitle = document.getElementById('fileDiffTitle');
-    const fileDiffSplitView = document.getElementById('fileDiffSplitView');
-    const fileDiffLeft = document.getElementById('fileDiffLeft');
-    const fileDiffRight = document.getElementById('fileDiffRight');
-    const fileDiffViewToggle = document.getElementById('fileDiffViewToggle');
-
-    let diffViewMode = 'unified'; // 'unified' or 'split'
-
-    // Toggle between unified and split view
-    fileDiffViewToggle.addEventListener('click', () => {
-      if (diffViewMode === 'unified') {
-        diffViewMode = 'split';
-        fileDiffBody.style.display = 'none';
-        fileDiffSplitView.style.display = 'flex';
-        fileDiffViewToggle.textContent = 'Unified View';
-        
-        // Set proper height for scroll container after switching to split view
-        setupSplitViewScrolling();
-      } else {
-        diffViewMode = 'unified';
-        fileDiffBody.style.display = 'block';
-        fileDiffSplitView.style.display = 'none';
-        fileDiffViewToggle.textContent = 'Split View';
-      }
-    });
-    
-    // Function to set up synchronized scrolling
-    function setupSplitViewScrolling() {
-      const scrollContainer = document.getElementById('fileDiffScrollContainer');
-      const scrollContent = document.getElementById('fileDiffScrollContent');
-      const leftPane = document.getElementById('fileDiffLeft');
-      const rightPane = document.getElementById('fileDiffRight');
-      
-      // Set height of scroll content based on line count
-      if (window.currentDiffLineCount) {
-        // Approximate line height of 22px
-        scrollContent.style.height = (window.currentDiffLineCount * 22) + 'px';
-      }
-      
-      // Synchronize panes with scroll container
-      scrollContainer.onscroll = function() {
-        leftPane.scrollTop = scrollContainer.scrollTop;
-        rightPane.scrollTop = scrollContainer.scrollTop;
-      };
-    }
-
-    // Function to parse a git diff and create the split view content
-    function parseDiffForSplitView(diff) {
-      const leftContent = [];
-      const rightContent = [];
-      
-      // Regular expressions for parsing diff parts
-      const fileHeaderRegex = /^diff --git a\/(.*) b\/(.*)$/;
-      const hunkHeaderRegex = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)$/;
-      
-      let leftLineNumber = 1;
-      let rightLineNumber = 1;
-      let currentFile = '';
-      let inHunk = false;
-      let diffLineCount = 0;
-      
-      // Split the diff into lines
-      const lines = diff.split('\n');
-      
-      // Add file header
-      leftContent.push('<div class="diff-file-header">Original</div>');
-      rightContent.push('<div class="diff-file-header">Modified</div>');
-      diffLineCount++;
-      
-      // Process each line of the diff
-      lines.forEach(line => {
-        // Check for file header
-        const fileHeaderMatch = line.match(fileHeaderRegex);
-        if (fileHeaderMatch) {
-          currentFile = fileHeaderMatch[1];
-          leftContent.push(`<div class="diff-section-header">${currentFile}</div>`);
-          rightContent.push(`<div class="diff-section-header">${currentFile}</div>`);
-          diffLineCount++;
-          return;
-        }
-        
-        // Check for hunk header
-        const hunkHeaderMatch = line.match(hunkHeaderRegex);
-        if (hunkHeaderMatch) {
-          const leftStart = parseInt(hunkHeaderMatch[1]);
-          const rightStart = parseInt(hunkHeaderMatch[3]);
-          
-          inHunk = true;
-          leftLineNumber = leftStart;
-          rightLineNumber = rightStart;
-          
-          leftContent.push(`<div class="diff-section-header">${line}</div>`);
-          rightContent.push(`<div class="diff-section-header">${line}</div>`);
-          diffLineCount++;
-          return;
-        }
-        
-        // Skip other headers or non-content lines
-        if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('index ')) {
-          return;
-        }
-        
-        // Process content lines
-        if (inHunk) {
-          if (line.startsWith('-')) {
-            // Line removed - show in left only
-            leftContent.push(`
-              <div class="diff-line diff-removed-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightContent.push(`<div class="diff-line diff-filler"></div>`);
-            leftLineNumber++;
-            diffLineCount++;
-          } else if (line.startsWith('+')) {
-            // Line added - show in right only
-            leftContent.push(`<div class="diff-line diff-filler"></div>`);
-            rightContent.push(`
-              <div class="diff-line diff-added-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightLineNumber++;
-            diffLineCount++;
-          } else if (line.startsWith(' ')) {
-            // Common line - show in both
-            leftContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            leftLineNumber++;
-            rightLineNumber++;
-            diffLineCount++;
-          } else if (line.trim() === '') {
-            // Empty line - show in both
-            leftContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content"></span>
-              </div>
-            `);
-            rightContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content"></span>
-              </div>
-            `);
-            leftLineNumber++;
-            rightLineNumber++;
-            diffLineCount++;
-          }
-        }
-      });
-      
-      return {
-        left: leftContent.join(''),
-        right: rightContent.join(''),
-        lineCount: diffLineCount
-      };
-    }
-
-    // Helper function to escape HTML special characters
-    function escapeHtml(unsafe) {
-      return unsafe
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-    }
-
-    // Close overlay when clicking the close button
-    fileDiffCloseBtn.addEventListener('click', () => {
-      fileDiffOverlay.style.display = 'none';
-    });
-
-    // Close overlay when clicking outside the content
-    fileDiffOverlay.addEventListener('click', (event) => {
-      if (event.target === fileDiffOverlay) {
-        fileDiffOverlay.style.display = 'none';
-      }
-    });
-
-    // Function to fetch and show file diff
-    async function showFileDiff(filename) {
-      fileDiffTitle.textContent = `Changes in ${filename}`;
-      fileDiffBody.innerHTML = 'Loading diff...';
-      fileDiffLeft.innerHTML = 'Loading...';
-      fileDiffRight.innerHTML = 'Loading...';
-      fileDiffOverlay.style.display = 'flex';
-      
-      // Send WebSocket request for file diff
-      requestFileDiff(filename);
-    }
 
     // Function to make file list items clickable
     function makeFilesClickable() {
       const writeFilesList = document.getElementById('writeFilesList');
-      const contextFilesList = document.getElementById('contextFilesList');
       
       console.log("Making files clickable");
       
@@ -1256,24 +950,6 @@
           });
           
           // Request file status to highlight modified files
-          checkFileStatus(filename);
-        });
-        
-        // Context files should NOT be clickable in the same way write files are
-        const contextFileItems = contextFilesList.querySelectorAll('li');
-        console.log(`Found ${contextFileItems.length} context files`);
-        
-        contextFileItems.forEach(item => {
-          // Remove any clickable styling or event listeners
-          const newItem = item.cloneNode(true);
-          item.parentNode.replaceChild(newItem, item);
-          
-          // Make them non-clickable by default
-          newItem.classList.remove('clickable-file');
-          newItem.classList.remove('modified-file');
-          
-          // Still check file status, but don't make them clickable for diffs
-          const filename = newItem.childNodes[0].textContent.trim();
           checkFileStatus(filename);
         });
       } else {
@@ -1334,73 +1010,61 @@
             return;
           }
           
-          // Find the file item in both lists
-          const allFileLists = [
-            document.getElementById('writeFilesList'),
-            document.getElementById('contextFilesList')
-          ];
+          // Find the file item in the write files list
+          const writeFilesList = document.getElementById('writeFilesList');
+          if (!writeFilesList) return;
           
-          allFileLists.forEach(list => {
-            if (!list) return;
+          const items = writeFilesList.querySelectorAll('li');
+          items.forEach(item => {
+            // Extract the actual filename from the first text node
+            let itemFilename = '';
+            if (item.childNodes.length > 0 && item.childNodes[0].nodeType === Node.TEXT_NODE) {
+              itemFilename = item.childNodes[0].textContent.trim();
+            } else {
+              itemFilename = item.textContent.trim();
+            }
             
-            const items = list.querySelectorAll('li');
-            items.forEach(item => {
-              // Extract the actual filename from the first text node
-              let itemFilename = '';
-              if (item.childNodes.length > 0 && item.childNodes[0].nodeType === Node.TEXT_NODE) {
-                itemFilename = item.childNodes[0].textContent.trim();
-              } else {
-                itemFilename = item.textContent.trim();
-              }
-              
-              if (itemFilename === filename.trim()) {
-                // For context files, we don't want to highlight them as modified
-                if (list.id === 'contextFilesList') {
-                  // Don't add modification styling to context files
-                  return;
-                }
+            if (itemFilename === filename.trim()) {
+              // Update class based on modification status
+              if (is_modified) {
+                item.classList.add('modified-file');
                 
-                // Update class based on modification status
-                if (is_modified) {
-                  item.classList.add('modified-file');
+                // Add line counts if available
+                if (added_lines > 0 || removed_lines > 0) {
+                  // Create line count display
+                  let lineCountHTML = '';
                   
-                  // Add line counts if available
-                  if (added_lines > 0 || removed_lines > 0) {
-                    // Create line count display
-                    let lineCountHTML = '';
-                    
-                    if (added_lines > 0) {
-                      lineCountHTML += `<span class="line-count-added">+${added_lines}</span>`;
-                    }
-                    
-                    if (removed_lines > 0) {
-                      lineCountHTML += `<span class="line-count-removed">-${removed_lines}</span>`;
-                    }
-                    
-                    // Add the line count badge
-                    const badge = document.createElement('span');
-                    badge.className = 'line-count-badge';
-                    badge.innerHTML = lineCountHTML;
-                    
-                    // Remove any existing badge first
-                    const existingBadge = item.querySelector('.line-count-badge');
-                    if (existingBadge) {
-                      item.removeChild(existingBadge);
-                    }
-                    
-                    // Add new badge
-                    item.appendChild(badge);
+                  if (added_lines > 0) {
+                    lineCountHTML += `<span class="line-count-added">+${added_lines}</span>`;
                   }
-                } else {
-                  item.classList.remove('modified-file');
-                  // Remove any existing line count badge
+                  
+                  if (removed_lines > 0) {
+                    lineCountHTML += `<span class="line-count-removed">-${removed_lines}</span>`;
+                  }
+                  
+                  // Add the line count badge
+                  const badge = document.createElement('span');
+                  badge.className = 'line-count-badge';
+                  badge.innerHTML = lineCountHTML;
+                  
+                  // Remove any existing badge first
                   const existingBadge = item.querySelector('.line-count-badge');
                   if (existingBadge) {
                     item.removeChild(existingBadge);
                   }
+                  
+                  // Add new badge
+                  item.appendChild(badge);
+                }
+              } else {
+                item.classList.remove('modified-file');
+                // Remove any existing line count badge
+                const existingBadge = item.querySelector('.line-count-badge');
+                if (existingBadge) {
+                  item.removeChild(existingBadge);
                 }
               }
-            });
+            }
           });
         }
       } catch (e) {
@@ -1824,6 +1488,291 @@
       trustyAgentCloseBtn.onclick = function() {
         trustyAgentOverlay.style.display = 'none';
       };
+    }
+  </script>
+  
+  <!-- File diff overlay -->
+  <div id="fileDiffOverlay">
+    <div id="fileDiffContent">
+      <div id="fileDiffHeader">
+        <h3 id="fileDiffTitle">File Changes</h3>
+        <div>
+          <button id="fileDiffViewToggle" title="Toggle between unified and split view">Split View</button>
+          <button id="fileDiffCloseBtn">×</button>
+        </div>
+      </div>
+      <div id="fileDiffBody"></div>
+      <div id="fileDiffSplitView" class="initially-hidden">
+        <div id="fileDiffLeft"></div>
+        <div id="fileDiffRight"></div>
+        <div id="fileDiffScrollContainer">
+          <div id="fileDiffScrollContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Trusty Agent Prompt overlay -->
+  <div id="trustyAgentOverlay">
+    <div id="trustyAgentContent">
+      <div id="trustyAgentHeader">
+        <h3 id="trustyAgentTitle">Trusty Agent</h3>
+        <button id="trustyAgentCloseBtn">×</button>
+      </div>
+      <div id="trustyAgentBody">
+        <div class="trusty-agent-section">
+          <div class="trusty-agent-section-title">Prompt</div>
+          <div id="trustyAgentPromptText" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentResultSection">
+          <div class="trusty-agent-section-title">Result</div>
+          <div id="trustyAgentResultStatus" class="agent-status"></div>
+          <div id="trustyAgentAgentType" class="agent-type"></div>
+          <div id="trustyAgentResultText" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentPlausibilitySection">
+          <div class="trusty-agent-section-title">Plausibility Evaluation</div>
+          <div class="plausibility-container">
+            <div class="plausibility-grade-container">
+              <div id="trustyAgentGrade" class="grade"></div>
+              <div id="trustyAgentGradeInfo" class="grade-info"></div>
+            </div>
+            <div id="trustyAgentVerificationInfo" class="verification-info"></div>
+          </div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentImageSection">
+          <div class="trusty-agent-section-title">Screenshots</div>
+          <div id="trustyAgentImageContainer">
+            <div id="mainImageContainer">
+              <h4>Main Screenshot</h4>
+              <img id="trustyAgentImage" alt="Trusty Agent Output Image" class="constrained-image">
+            </div>
+            <div id="comparisonImageContainer" class="initially-hidden">
+              <h4>Comparison Screenshot</h4>
+              <img id="trustyAgentComparisonImage" alt="Comparison Screenshot" class="constrained-image">
+            </div>
+          </div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentTestResultsSection">
+          <div class="trusty-agent-section-title">Test Results</div>
+          <div id="trustyAgentTestResults" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentSummarySection">
+          <div class="trusty-agent-section-title">Summary</div>
+          <div id="trustyAgentSummary" class="summary-block"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // File diff handling
+    const fileDiffOverlay = document.getElementById('fileDiffOverlay');
+    const fileDiffCloseBtn = document.getElementById('fileDiffCloseBtn');
+    const fileDiffBody = document.getElementById('fileDiffBody');
+    const fileDiffTitle = document.getElementById('fileDiffTitle');
+    const fileDiffSplitView = document.getElementById('fileDiffSplitView');
+    const fileDiffLeft = document.getElementById('fileDiffLeft');
+    const fileDiffRight = document.getElementById('fileDiffRight');
+    const fileDiffViewToggle = document.getElementById('fileDiffViewToggle');
+
+    let diffViewMode = 'unified'; // 'unified' or 'split'
+
+    // Toggle between unified and split view
+    fileDiffViewToggle.addEventListener('click', () => {
+      if (diffViewMode === 'unified') {
+        diffViewMode = 'split';
+        fileDiffBody.style.display = 'none';
+        fileDiffSplitView.style.display = 'flex';
+        fileDiffViewToggle.textContent = 'Unified View';
+        
+        // Set proper height for scroll container after switching to split view
+        setupSplitViewScrolling();
+      } else {
+        diffViewMode = 'unified';
+        fileDiffBody.style.display = 'block';
+        fileDiffSplitView.style.display = 'none';
+        fileDiffViewToggle.textContent = 'Split View';
+      }
+    });
+    
+    // Function to set up synchronized scrolling
+    function setupSplitViewScrolling() {
+      const scrollContainer = document.getElementById('fileDiffScrollContainer');
+      const scrollContent = document.getElementById('fileDiffScrollContent');
+      const leftPane = document.getElementById('fileDiffLeft');
+      const rightPane = document.getElementById('fileDiffRight');
+      
+      // Set height of scroll content based on line count
+      if (window.currentDiffLineCount) {
+        // Approximate line height of 22px
+        scrollContent.style.height = (window.currentDiffLineCount * 22) + 'px';
+      }
+      
+      // Synchronize panes with scroll container
+      scrollContainer.onscroll = function() {
+        leftPane.scrollTop = scrollContainer.scrollTop;
+        rightPane.scrollTop = scrollContainer.scrollTop;
+      };
+    }
+
+    // Function to parse a git diff and create the split view content
+    function parseDiffForSplitView(diff) {
+      const leftContent = [];
+      const rightContent = [];
+      
+      // Regular expressions for parsing diff parts
+      const fileHeaderRegex = /^diff --git a\/(.*) b\/(.*)$/;
+      const hunkHeaderRegex = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)$/;
+      
+      let leftLineNumber = 1;
+      let rightLineNumber = 1;
+      let currentFile = '';
+      let inHunk = false;
+      let diffLineCount = 0;
+      
+      // Split the diff into lines
+      const lines = diff.split('\n');
+      
+      // Add file header
+      leftContent.push('<div class="diff-file-header">Original</div>');
+      rightContent.push('<div class="diff-file-header">Modified</div>');
+      diffLineCount++;
+      
+      // Process each line of the diff
+      lines.forEach(line => {
+        // Check for file header
+        const fileHeaderMatch = line.match(fileHeaderRegex);
+        if (fileHeaderMatch) {
+          currentFile = fileHeaderMatch[1];
+          leftContent.push(`<div class="diff-section-header">${currentFile}</div>`);
+          rightContent.push(`<div class="diff-section-header">${currentFile}</div>`);
+          diffLineCount++;
+          return;
+        }
+        
+        // Check for hunk header
+        const hunkHeaderMatch = line.match(hunkHeaderRegex);
+        if (hunkHeaderMatch) {
+          const leftStart = parseInt(hunkHeaderMatch[1]);
+          const rightStart = parseInt(hunkHeaderMatch[3]);
+          
+          inHunk = true;
+          leftLineNumber = leftStart;
+          rightLineNumber = rightStart;
+          
+          leftContent.push(`<div class="diff-section-header">${line}</div>`);
+          rightContent.push(`<div class="diff-section-header">${line}</div>`);
+          diffLineCount++;
+          return;
+        }
+        
+        // Skip other headers or non-content lines
+        if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('index ')) {
+          return;
+        }
+        
+        // Process content lines
+        if (inHunk) {
+          if (line.startsWith('-')) {
+            // Line removed - show in left only
+            leftContent.push(`
+              <div class="diff-line diff-removed-line">
+                <span class="diff-line-number">${leftLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            rightContent.push(`<div class="diff-line diff-filler"></div>`);
+            leftLineNumber++;
+            diffLineCount++;
+          } else if (line.startsWith('+')) {
+            // Line added - show in right only
+            leftContent.push(`<div class="diff-line diff-filler"></div>`);
+            rightContent.push(`
+              <div class="diff-line diff-added-line">
+                <span class="diff-line-number">${rightLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            rightLineNumber++;
+            diffLineCount++;
+          } else if (line.startsWith(' ')) {
+            // Common line - show in both
+            leftContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${leftLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            rightContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${rightLineNumber}</span>
+                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
+              </div>
+            `);
+            leftLineNumber++;
+            rightLineNumber++;
+            diffLineCount++;
+          } else if (line.trim() === '') {
+            // Empty line - show in both
+            leftContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${leftLineNumber}</span>
+                <span class="diff-line-content"></span>
+              </div>
+            `);
+            rightContent.push(`
+              <div class="diff-line">
+                <span class="diff-line-number">${rightLineNumber}</span>
+                <span class="diff-line-content"></span>
+              </div>
+            `);
+            leftLineNumber++;
+            rightLineNumber++;
+            diffLineCount++;
+          }
+        }
+      });
+      
+      return {
+        left: leftContent.join(''),
+        right: rightContent.join(''),
+        lineCount: diffLineCount
+      };
+    }
+
+    // Helper function to escape HTML special characters
+    function escapeHtml(unsafe) {
+      return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+    }
+
+    // Close overlay when clicking the close button
+    fileDiffCloseBtn.addEventListener('click', () => {
+      fileDiffOverlay.style.display = 'none';
+    });
+
+    // Close overlay when clicking outside the content
+    fileDiffOverlay.addEventListener('click', (event) => {
+      if (event.target === fileDiffOverlay) {
+        fileDiffOverlay.style.display = 'none';
+      }
+    });
+
+    // Function to fetch and show file diff
+    async function showFileDiff(filename) {
+      fileDiffTitle.textContent = `Changes in ${filename}`;
+      fileDiffBody.innerHTML = 'Loading diff...';
+      fileDiffLeft.innerHTML = 'Loading...';
+      fileDiffRight.innerHTML = 'Loading...';
+      fileDiffOverlay.style.display = 'flex';
+      
+      // Send WebSocket request for file diff
+      requestFileDiff(filename);
     }
   </script>
 </body>

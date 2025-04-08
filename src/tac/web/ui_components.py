@@ -187,7 +187,6 @@ class ProtoBlockView(Component):
             "attempt": attempt_number,
             "block_id": protoblock.block_id,
             "task_description": protoblock.task_description,
-            "context_files": protoblock.context_files,
             "write_files": protoblock.write_files,
             "trusty_agents": protoblock.trusty_agents,
             "trusty_agent_prompts": protoblock.trusty_agent_prompts or {},
