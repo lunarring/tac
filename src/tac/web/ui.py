@@ -11,7 +11,7 @@ import difflib
 import git
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
-from tac.utils.audio import Speech2Text  # Keep the import but it now uses the dummy class
+from tac.utils.audio import Speech2Text
 from tac.blocks.processor import BlockProcessor
 from tac.cli.main import execute_command
 from tac.core.llm import LLMClient, Message
@@ -27,6 +27,7 @@ from tac.web.ui_components import (
     SpeechInput
 )
 from tac.blocks.generator import ProtoBlockGenerator  # Add this import
+import time
 
 
 class MessageHandlerManager:
@@ -75,8 +76,123 @@ class MessageHandlerManager:
         return
     
     async def handle_mic_click(self, data=None, websocket=None):
-        """Handle a microphone click"""
-        await self.ui.dummy_mic_click(websocket)
+        """
+        Handle a microphone click by implementing the logic directly.
+        This method is called whenever the microphone button is clicked.
+        """
+        print(f"MessageHandlerManager.handle_mic_click called with data: {data}")
+        
+        try:
+            # Import necessary modules
+            import os
+            import tempfile
+            import subprocess
+            import time
+            
+            # Extract the client's desired recording state
+            client_recording = True  # Default
+            if data and isinstance(data, dict) and 'recording' in data:
+                client_recording = bool(data.get('recording'))
+            
+            # Debounce logic to prevent multiple rapid clicks of the same type
+            current_time = time.time()
+            last_click_time = getattr(self, '_last_mic_click_time', 0)
+            last_click_state = getattr(self, '_last_click_state', None)
+            
+            # Save current click info for next time
+            self._last_mic_click_time = current_time
+            self._last_click_state = client_recording
+            
+            # Only debounce if this is a repeat click with the same state
+            if (current_time - last_click_time < self.ui.CLICK_DEBOUNCE_TIME and 
+                last_click_state == client_recording):
+                print(f"Ignoring duplicate mic click - same state ({client_recording}) too soon ({current_time - last_click_time:.2f}s)")
+                return
+                
+            # Log what triggered this function
+            print(f"Processing mic click with data: {data}, client wants recording={client_recording}")
+            
+            # Handle the click based on our current state and client's desired state
+            if not self.ui.is_recording and client_recording:
+                # START RECORDING
+                print(f"Starting recording (current state={self.ui.is_recording})")
+                await self.ui.send_status_message("Recording audio...")
+                
+                # If the recorder is in a bad state, recreate it
+                if hasattr(self.ui.speech_to_text, 'audio_recorder') and self.ui.speech_to_text.audio_recorder is not None:
+                    # Try to clean up the existing recorder
+                    try:
+                        if hasattr(self.ui.speech_to_text.audio_recorder, 'cleanup'):
+                            self.ui.speech_to_text.audio_recorder.cleanup()
+                    except Exception as e:
+                        print(f"Error cleaning up audio recorder: {e}")
+                    
+                    # Replace with a fresh recorder if recording previously failed
+                    if getattr(self.ui.speech_to_text.audio_recorder, 'is_recording', False):
+                        print("Detected stale recorder - replacing with a fresh instance")
+                        from tac.utils.audio import AudioRecorder
+                        self.ui.speech_to_text.audio_recorder = AudioRecorder()
+                
+                # Check if we can access PyAudio
+                import pyaudio
+                p = pyaudio.PyAudio()
+                device_count = p.get_device_count()
+                print(f"Pre-recording check: {device_count} audio devices available")
+                p.terminate()
+                
+                # Update UI state BEFORE starting the recording
+                self.ui.is_recording = True
+                await self.ui.speech_input.send_recording_status(True)
+                
+                # Start the speech recording (not in a thread)
+                print("Calling speech_to_text.start_recording()...")
+                self.ui.speech_to_text.start_recording()
+                print("Recording started successfully")
+                
+            elif self.ui.is_recording and not client_recording:
+                # STOP RECORDING
+                print(f"Stopping recording (current state={self.ui.is_recording})")
+                
+                # Update UI state BEFORE stopping the recording
+                self.ui.is_recording = False
+                await self.ui.speech_input.send_recording_status(False)
+                
+                print("Calling speech_to_text.stop_recording()...")
+                
+                # Direct approach - the modified stop_recording method now handles everything
+                try:
+                    result = self.ui.speech_to_text.stop_recording()
+                    
+                    if result:
+                        print(f"Speech transcription result: {result}")
+                        await self.ui.send_status_message(f"Transcription: {result}")
+                    else:
+                        print("No transcription result, recording may have been too short")
+                        await self.ui.send_status_message("No transcription result, recording may have been too short")
+                        
+                except Exception as inner_err:
+                    print(f"Error during stop_recording: {inner_err}")
+                    print(f"Error type: {type(inner_err)}")
+                    import traceback
+                    traceback.print_exc()
+                    
+                    # Try to clean up any files or resources
+                    try:
+                        if hasattr(self.ui.speech_to_text, 'audio_recorder'):
+                            self.ui.speech_to_text.audio_recorder.cleanup()
+                    except Exception as cleanup_err:
+                        print(f"Error cleaning up: {cleanup_err}")
+                    
+                    raise  # Re-raise to handle in outer exception handler
+            else:
+                print(f"Ignoring mic click - current state ({self.ui.is_recording}) already matches client's desired state ({client_recording})")
+        except Exception as e:
+            print(f"Error in microphone handling: {e}")
+            traceback.print_exc()
+            self.ui.is_recording = False
+            await self.ui.speech_input.send_recording_status(False)
+            await self.ui.send_status_message(f"Microphone error: {str(e)}")
+            await self.ui.chat_panel.send_error_message(f"Microphone error: {str(e)}")
     
     async def handle_block_click(self, data=None, websocket=None):
         """Handle a block click"""
@@ -132,10 +248,24 @@ class UIManager:
         "they should hit the block button below to start the protoblock execution."
     )
     
+    # Add a new class variable to track the last mic click time
+    CLICK_DEBOUNCE_TIME = 1.0  # Seconds to ignore additional clicks
+    
     def __init__(self, base_dir="."):
         self.base_dir = base_dir
         self.project_files = ProjectFiles(self.base_dir)
-        self.speech_to_text = Speech2Text()  # Using dummy version without audio functionality
+        
+        # Check audio devices availability before creating Speech2Text
+        self._test_audio_devices()
+        
+        # Use the real Speech2Text implementation
+        self.speech_to_text = Speech2Text()
+        
+        # Debug: Check if speech_to_text initialized properly
+        import inspect
+        print(f"Speech2Text instance: {self.speech_to_text}")
+        print(f"Speech2Text methods: {[m for m in dir(self.speech_to_text) if not m.startswith('_')]}")
+        
         self.is_recording = False
         self.task_instructions = None
         self.file_summaries = None
@@ -205,6 +335,41 @@ class UIManager:
                 
         # Register message handlers with the WebSocketServer
         self._register_message_handlers()
+
+    def _test_audio_devices(self):
+        """Test if audio devices are accessible in the current context"""
+        try:
+            import pyaudio
+            p = pyaudio.PyAudio()
+            
+            # Get device count
+            device_count = p.get_device_count()
+            print(f"Audio devices found: {device_count}")
+            
+            # Print device info
+            for i in range(device_count):
+                device_info = p.get_device_info_by_index(i)
+                print(f"Device {i}: {device_info['name']}")
+                print(f"  Input channels: {device_info['maxInputChannels']}")
+                print(f"  Output channels: {device_info['maxOutputChannels']}")
+                print(f"  Default sample rate: {device_info['defaultSampleRate']}")
+            
+            # Get default input device
+            try:
+                default_input = p.get_default_input_device_info()
+                print(f"Default input device: {default_input['name']} (index {default_input['index']})")
+            except IOError:
+                print("No default input device available")
+            
+            # Clean up
+            p.terminate()
+            print("Audio device test completed successfully")
+            
+        except Exception as e:
+            print(f"Error testing audio devices: {e}")
+            import traceback
+            traceback.print_exc()
+            print("Audio functionality may not work properly")
 
     async def create_or_restart_background_task(self, task_name, task_coroutine):
         """
@@ -474,59 +639,6 @@ class UIManager:
             await self.send_status_message(f"⚠️ Git error: {str(e)}")
             return False
         
-    async def dummy_mic_click(self, websocket=None):
-        """
-        Handle microphone button click but inform user that audio is disabled.
-        
-        Args:
-            websocket: Optional websocket connection (for backward compatibility)
-        """
-        try:
-            if not self.is_recording:
-                # Inform user audio is disabled
-                await self.send_status_message("Audio functionality has been disabled.")
-                self.is_recording = True
-                await self.speech_input.send_recording_status(True)
-            else:
-                # Reset state
-                self.is_recording = False
-                await self.speech_input.send_recording_status(False)
-                await self.send_status_message("Audio functionality has been disabled.")
-                await self.chat_panel.send_info_message(
-                    "The audio functionality has been disabled in this version. Please type your message instead."
-                )
-        except Exception as e:
-            print(f"Error in microphone handling: {e}")
-            traceback.print_exc()
-            self.is_recording = False
-            await self.speech_input.send_recording_status(False)
-            await self.send_status_message(f"Microphone error: {str(e)}")
-            await self.chat_panel.send_error_message(f"Microphone error: {str(e)}")
-
-    def count_diff_lines(self, diff_text):
-        """Count added and removed lines in a diff.
-        
-        Args:
-            diff_text: The diff text to analyze
-            
-        Returns:
-            tuple: (added_lines, removed_lines)
-        """
-        if not diff_text or not isinstance(diff_text, str):
-            return 0, 0
-            
-        added = 0
-        removed = 0
-        
-        # Count lines that start with + or - but not ++ or --
-        for line in diff_text.splitlines():
-            if line.startswith('+') and not line.startswith('+++'):
-                added += 1
-            elif line.startswith('-') and not line.startswith('---'):
-                removed += 1
-                
-        return added, removed
-
     async def handle_file_diff_request(self, filename):
         """
         Handles a request for a diff of a specific file.
