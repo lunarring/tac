@@ -9,3 +9,969 @@
   display: flex;
   gap: 10px;
 }
+
+/* Main styles */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #e0eafc, #cfdef3);
+}
+
+/* Container split into two equal halves */
+#splitContainer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  flex-wrap: nowrap; /* Prevent wrapping on smaller screens */
+}
+
+/* Left panel for chat interface with a clean, modern aesthetic */
+#leftPanel {
+  flex: 1;
+  position: relative;
+  border-right: 1px solid #d0d0d0;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
+  width: 50%; /* Make it exactly 50% */
+  min-width: unset; /* Remove min-width */
+  max-width: unset; /* Remove max-width */
+}
+
+/* Header for chat with refined padding and subtle shadow effect */
+#chatHeader {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+}
+
+#chatHeader #recipientName {
+  font-weight: 500;
+  font-size: 18px;
+  color: #333;
+}
+
+/* Typing animation indicator styles moved inside header and enlarged */
+#typingAnimation {
+  display: none;
+  margin-left: 10px;
+  font-style: italic;
+  color: #888;
+  align-items: center;
+}
+
+/* Base style for animated dots; animation speed increased to 0.5s */
+#typingAnimation .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin: 0 3px;
+  border-radius: 50%;
+  animation: typing 0.5s ease-in-out infinite;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Unique dot colors and adjusted delays */
+#typingAnimation .dot:nth-child(1) {
+  animation-delay: 0s;
+  background: radial-gradient(circle, red, darkred);
+}
+
+#typingAnimation .dot:nth-child(2) {
+  animation-delay: 0.1s;
+  background: radial-gradient(circle, green, darkgreen);
+}
+
+#typingAnimation .dot:nth-child(3) {
+  animation-delay: 0.2s;
+  background: radial-gradient(circle, blue, darkblue);
+}
+
+/* Keyframes for smooth, sinusoidal vertical movement */
+@keyframes typing {
+  0%   { transform: translateY(0); }
+  50%  { transform: translateY(-5px); }
+  100% { transform: translateY(0); }
+}
+
+#chatHeader #recipientStatus {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #4caf50;
+}
+
+/* New CSS rule to update the offline status text color to red */
+#chatHeader.offline #recipientStatus {
+  color: #f44336;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  background-color: #4caf50;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* Chat message container within left panel */
+#messageContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  color: #555;
+  background-color: #fafafa;
+}
+
+/* When offline, change chat bubble text to red */
+#messageContainer.offline .chat-bubble {
+  color: red;
+}
+
+/* Input container now uses flex layout to allocate dedicated space to the text field and buttons */
+#inputContainer {
+  margin: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Chat input area with modern styling; allow dynamic resizing within available space */
+#userInput {
+  flex: 1;
+  min-width: 300px;
+  min-height: 40px;
+  height: 60px;
+  font-size: 16px;
+  padding: 12px;
+  background-color: #ffffff;
+  color: #333;
+  border: 1px solid #c3c3c3;
+  border-radius: 12px;
+  resize: none;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  box-sizing: border-box;
+}
+
+#userInput:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+}
+
+/* Common styling for both action buttons with a rounded rectangle border */
+.action-button {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #c3c3c3;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.3s;
+  border-radius: 12px;
+}
+
+/* CSS rule to display a red indicator when recording */
+.action-button.recording {
+  background-color: red;
+}
+
+/* Subtle hover effect for action buttons with a gentle brightness increase */
+.action-button:hover {
+  filter: brightness(1.1);
+}
+
+/* Additional smoother animation for block button when active */
+#blockButton.active {
+  transform: scale(1.1);
+  transition: transform 0.3s ease-in-out;
+}
+
+/* Keyframes for pulsating effect */
+@keyframes pulsate {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.1);
+    filter: brightness(1.5);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+/* Animation keyframes for rotating effect */
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* CSS rule for rotating mic button to indicate ongoing transcription */
+#micButton.rotating {
+  animation: rotate 1s linear infinite;
+}
+
+/* Git related styles */
+.git-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.git-button {
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border: 1px solid #c3c3c3;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.git-button:hover {
+  background-color: #f1f8ff;
+  border-color: #0366d6;
+}
+
+.merge-container {
+  display: flex;
+  gap: 8px;
+}
+
+.branch-select {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #c3c3c3;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+#commitChangesBtn {
+  background-color: #dff0d8;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+/* Hidden elements */
+.hidden {
+  display: none;
+}
+
+/* Hidden but will be shown when needed */
+.initially-hidden {
+  display: none;
+}
+
+/* Max-width and max-height constraints for images */
+.constrained-image {
+  max-width: 100%;
+  max-height: 400px;
+}
+
+#comparisonImageContainer {
+  margin-top: 20px;
+}
+
+/* Visibility classes */
+.visible {
+  display: block;
+}
+
+.display-flex {
+  display: flex;
+}
+
+/* Right panel for block view and protoblock display */
+#rightPanel {
+  flex: 1;
+  position: relative;
+  background: linear-gradient(135deg, #e0eafc, #cfdef3);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  width: 50%; /* Make it exactly 50% */
+}
+
+/* Ensure Three.js canvas fills its container */
+#rightPanel canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Protoblock container styling */
+#protoblockContainer {
+  width: 95%; /* Increase width to use more space */
+  margin: 60px auto 20px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  color: #333;
+  font-size: 14px;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Protoblock header styles */
+#protoblockHeader {
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e1e4e8;
+  padding-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#protoblockHeader h2 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+}
+
+#protoblockAttempt {
+  background-color: #f1f8ff;
+  border: 1px solid #c8e1ff;
+  border-radius: 20px;
+  padding: 5px 15px;
+  color: #0366d6;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Runtime status styling */
+#runtimeStatus {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  width: 90%;
+  margin: 0 auto;
+  color: #333;
+  font-size: 16px;
+  background-color: rgba(255, 255, 255, 0.7);
+  padding: 12px 16px;
+  border-radius: 8px;
+  text-align: center;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+/* Chat bubble styles */
+.chat-bubble {
+  margin: 10px 0;
+  padding: 12px 16px;
+  border-radius: 20px;
+  max-width: 80%;
+  clear: both;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  font-size: 14px;
+  line-height: 1.5;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+
+.chat-user {
+  background-color: #007bff;
+  color: #ffffff;
+  float: right;
+  border-top-right-radius: 4px;
+}
+
+.chat-ai {
+  background-color: #e9ecef;
+  color: #333;
+  float: left;
+  border-top-left-radius: 4px;
+}
+
+.chat-clear {
+  clear: both;
+}
+
+/* Error and info message styling */
+#errorMessage {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  right: 0;
+  width: 90%;
+  margin: 0 auto;
+  color: #721c24;
+  font-size: 16px;
+  background-color: rgba(248, 215, 218, 0.95);
+  padding: 15px;
+  border-radius: 4px;
+  text-align: center;
+  z-index: 20;
+  border-left: 4px solid #dc3545;
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+  display: none;
+}
+
+#infoMessage {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  width: 90%;
+  margin: 0 auto;
+  color: #0366d6;
+  font-size: 16px;
+  background-color: rgba(230, 247, 255, 0.9);
+  padding: 12px;
+  border-radius: 4px;
+  text-align: center;
+  z-index: 10;
+  border-left: 4px solid #0366d6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  display: none;
+}
+
+/* File diff overlay styles */
+#fileDiffOverlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+#fileDiffContent {
+  width: 90%;
+  max-width: 1200px;
+  height: 80%;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#fileDiffHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background-color: #f6f8fa;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+#fileDiffHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #24292e;
+}
+
+#fileDiffCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  color: #586069;
+}
+
+#fileDiffCloseBtn:hover {
+  color: #24292e;
+}
+
+#fileDiffBody {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  background-color: #f8f8f8;
+}
+
+#fileDiffSplitView {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+#fileDiffLeft, #fileDiffRight {
+  flex: 1;
+  padding: 10px 20px;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-y: hidden;
+}
+
+#fileDiffLeft {
+  background-color: #fffbf6;
+  border-right: 1px solid #e1e4e8;
+}
+
+#fileDiffRight {
+  background-color: #f6fffe;
+}
+
+/* Styles for the protoblock sections */
+.section {
+  margin-bottom: 25px;
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.section-title {
+  font-weight: 500;
+  font-size: 18px;
+  color: #24292e;
+  margin-bottom: 10px;
+}
+
+.file-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-list li {
+  padding: 10px;
+  background-color: white;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.file-list li:hover {
+  background-color: #f1f8ff;
+}
+
+.file-list li.modified {
+  border-left: 4px solid #28a745;
+}
+
+.code-block {
+  background-color: white;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 15px;
+  overflow-x: auto;
+  font-family: monospace;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Trusty Agent overlay styles */
+#trustyAgentOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+#trustyAgentContent {
+  background-color: white;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+#trustyAgentHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+#trustyAgentTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+#trustyAgentCloseBtn {
+  font-size: 24px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #666;
+  transition: color 0.2s;
+}
+
+#trustyAgentCloseBtn:hover {
+  color: #333;
+}
+
+#trustyAgentBody {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(90vh - 60px);
+}
+
+.trusty-agent-section {
+  margin-bottom: 24px;
+}
+
+.trusty-agent-section-title {
+  font-weight: 600;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #444;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+/* Agent status styles */
+.agent-status {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.agent-status.passed {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.agent-status.failed {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.agent-status.error {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+/* Agent type style */
+.agent-type {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 12px;
+  background-color: #e2e3e5;
+  color: #383d41;
+  border: 1px solid #d6d8db;
+  margin-left: 10px;
+}
+
+/* Summary block style */
+.summary-block {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Plausibility display styles */
+.plausibility-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.plausibility-grade-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.grade {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.grade[data-grade="A"] {
+  background-color: #d4edda;
+  color: #155724;
+  border: 2px solid #c3e6cb;
+}
+
+.grade[data-grade="B"] {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border: 2px solid #bee5eb;
+}
+
+.grade[data-grade="C"] {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 2px solid #ffeeba;
+}
+
+.grade[data-grade="D"] {
+  background-color: #ffe5d0;
+  color: #7d5a00;
+  border: 2px solid #ffdb9a;
+}
+
+.grade[data-grade="F"] {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 2px solid #f5c6cb;
+}
+
+.grade-info {
+  font-size: 14px;
+  flex: 1;
+}
+
+.verification-info {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+/* Diff styles */
+.diff-line {
+  display: flex;
+  padding: 0 5px;
+  border-radius: 3px;
+  margin: 2px 0;
+}
+
+.diff-line-number {
+  color: #999;
+  text-align: right;
+  user-select: none;
+  padding-right: 10px;
+  min-width: 40px;
+  border-right: 1px solid #eee;
+  margin-right: 10px;
+  font-size: 12px;
+}
+
+.diff-line-content {
+  flex: 1;
+}
+
+.diff-added-line {
+  background-color: #e6ffed;
+}
+
+.diff-removed-line {
+  background-color: #ffeef0;
+}
+
+.diff-section-header {
+  background-color: #f1f8ff;
+  padding: 5px;
+  margin: 10px 0;
+  color: #0366d6;
+  font-weight: 500;
+  border-bottom: 1px solid #c8e1ff;
+}
+
+.diff-file-header {
+  background-color: #f1f8ff;
+  padding: 8px 5px;
+  margin: 15px 0 10px 0;
+  color: #0366d6;
+  font-weight: 500;
+  border-bottom: 1px solid #c8e1ff;
+  border-top: 1px solid #c8e1ff;
+}
+
+.diff-added {
+  background-color: #e6ffed;
+  color: #22863a;
+  display: block;
+  white-space: pre-wrap;
+}
+
+.diff-removed {
+  background-color: #ffeef0;
+  color: #cb2431;
+  display: block;
+  white-space: pre-wrap;
+}
+
+.diff-header {
+  background-color: #f1f8ff;
+  color: #0366d6;
+  padding: 5px 0;
+  margin: 10px 0;
+  border-bottom: 1px solid #c8e1ff;
+  display: block;
+  white-space: pre-wrap;
+}
+
+.diff-unchanged {
+  color: #24292e;
+  display: block;
+  white-space: pre-wrap;
+}
+
+.diff-section {
+  margin-top: 20px;
+  border-top: 1px solid #e1e4e8;
+  padding-top: 10px;
+  display: block;
+}
+
+.diff-error, .diff-empty {
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  display: block;
+}
+
+.diff-error {
+  background-color: #ffeef0;
+  border: 1px solid #fdb8c0;
+  color: #cb2431;
+}
+
+.diff-empty {
+  background-color: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  color: #586069;
+}
+
+/* Line count badge styles */
+.line-count-badge {
+  display: inline-flex;
+  margin-left: 8px;
+  font-size: 0.8em;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.line-count-added {
+  background-color: #c8e6c9;
+  color: #2e7d32;
+  padding: 2px 4px;
+}
+
+.line-count-removed {
+  background-color: #ffcdd2;
+  color: #c62828;
+  padding: 2px 4px;
+}
+
+.clickable-file .line-count-badge {
+  float: right;
+  margin-right: 4px;
+}
+
+/* Clickable file styles */
+.clickable-file {
+  position: relative;
+}
+
+.clickable-file::after {
+  content: "🔍";
+  margin-left: 5px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.modified-file {
+  font-weight: bold;
+  color: #28a745;
+  position: relative;
+}
+
+.modified-file::after {
+  content: "";
+  background-color: #f9a825;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 8px;
+}
+
+/* Style for trusty agent item in file list to show it's clickable */
+.trusty-agent-item {
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+  position: relative;
+}
+
+.trusty-agent-item::after {
+  content: "👁️";
+  margin-left: 5px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.trusty-agent-item.has-results {
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+.trusty-agent-item.has-results::after {
+  content: "👁️";
+  color: #155724;
+}
+
+.trusty-agent-item:hover {
+  background-color: #e6f7ff;
+  border-color: #91d5ff;
+  transform: translateY(-2px);
+}
+
+.trusty-agent-item.has-results:hover {
+  background-color: #c3e6cb;
+  border-color: #a3d9a5;
+}
