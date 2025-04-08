@@ -121,8 +121,16 @@ class WebSocketServer:
                             if "type" in data:
                                 # Filter out recording_status messages from chat
                                 if data.get("type") == "recording_status":
-                                    # Only route these to the component registry
-                                    await self.component_registry.handle_message(data)
+                                    # Make sure component_id is set to speech_input
+                                    if "component_id" not in data:
+                                        data["component_id"] = "speech_input"
+                                    # Only route these to the specific component, not to all handlers
+                                    speech_input = self.component_registry.get_component("speech_input")
+                                    if speech_input:
+                                        await speech_input.handle_message(data)
+                                    else:
+                                        # Fallback to registry if component not found
+                                        await self.component_registry.handle_message(data)
                                 else:
                                     # For other message types, route to both systems
                                     await self.component_registry.handle_message(data)

@@ -43,6 +43,17 @@ class Component:
             if "component_id" not in data:
                 data["component_id"] = self.component_id
                 
+            # Prevent recording_status messages from being sent to chat
+            # Only speech_input component should send recording_status messages
+            if data.get("type") == "recording_status" and data.get("component_id") != "speech_input":
+                print(f"Blocked recording_status message from being sent by non-speech_input component: {self.component_id}")
+                return False
+                
+            # If this is speech_input component sending recording_status message
+            # ensure it has the correct component_id to prevent chat display
+            if self.component_id == "speech_input" and data.get("type") == "recording_status":
+                data["component_id"] = "speech_input"
+                
             try:
                 await self.websocket.send(json.dumps(data))
                 return True
@@ -142,7 +153,6 @@ class ChatPanel(Component):
         
         # Ignore recording_status messages
         if message_type == "recording_status":
-            print(f"Ignoring recording_status message in ChatPanel")
             return
             
         # Process other message types normally
@@ -352,6 +362,13 @@ class ComponentRegistry:
         """Route a message to the appropriate component(s)"""
         message_type = message_data.get("type")
         component_id = message_data.get("component_id")
+        
+        # Special case for recording_status messages - only send to speech_input
+        if message_type == "recording_status":
+            speech_input = self.get_component("speech_input")
+            if speech_input:
+                await speech_input.handle_message(message_data)
+            return
         
         # Special case for chat messages - ensure they go to chat panel regardless of component_id
         if message_type == "chat_message":

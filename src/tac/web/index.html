@@ -470,6 +470,12 @@
         // Try to parse as JSON first
         const data = JSON.parse(event.data);
         
+        // EXPLICITLY FILTER OUT RECORDING STATUS MESSAGES
+        if (data.type === "recording_status") {
+          console.log("Received recording_status message - not displaying in chat");
+          return;
+        }
+        
         if (data.type === "status_message") {
           // Update the right-side status text bar using the new function
           updateRuntimeStatus(data.message);
