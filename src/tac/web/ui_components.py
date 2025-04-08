@@ -36,10 +36,11 @@ class Component:
     async def send_message(self, message_data: Dict[str, Any]):
         """Send a message to the client"""
         if self.websocket:
-            # Don't include component_id for chat_message types
-            # as they need to be compatible with the existing frontend
+            # Always include component_id to ensure proper routing to the right component
             data = message_data.copy()
-            if data.get("type") != "chat_message":
+            
+            # Only skip component_id for chat messages as they need special handling
+            if "component_id" not in data:
                 data["component_id"] = self.component_id
                 
             try:
@@ -134,6 +135,25 @@ class ChatPanel(Component):
     """
     def __init__(self):
         super().__init__("chat_panel")
+        
+    async def handle_message(self, message_data: Dict[str, Any]):
+        """Handle a message sent to this component"""
+        message_type = message_data.get("type")
+        
+        # Ignore recording_status messages
+        if message_type == "recording_status":
+            print(f"Ignoring recording_status message in ChatPanel")
+            return
+            
+        # Process other message types normally
+        if message_type in self._message_handlers:
+            handler = self._message_handlers[message_type]
+            if asyncio.iscoroutinefunction(handler):
+                await handler(message_data)
+            else:
+                handler(message_data)
+        else:
+            print(f"No handler registered for message type: {message_type} in component {self.component_id}")
         
     async def send_chat_message(self, message: str):
         """Send a chat message to the client"""
@@ -277,24 +297,31 @@ class GitView(Component):
 
 class SpeechInput(Component):
     """
-    Component for handling speech input button UI (functionality disabled).
+    Component for handling speech input button UI.
     """
     def __init__(self):
         super().__init__("speech_input")
+        self._debug_mode = False  # Set to True to enable debug messages
         
     async def send_transcription(self, transcript: str):
-        """Send a speech transcription to the client (disabled)"""
-        # Instead of sending transcript, we'll send a message about disabled functionality
+        """Send a speech transcription to the client"""
         await self.send_message({
             "type": "transcribed_message",
-            "message": "Audio functionality has been disabled."
+            "message": transcript
         })
         
     async def send_recording_status(self, is_recording: bool):
-        """Send recording status update to update the microphone button UI"""
+        """
+        Send recording status update to update the microphone button UI.
+        When not in debug mode, this only updates the UI state without sending
+        debug messages.
+        """
+        # This message should only go to the speech_input component, not the chat panel
+        # Make sure component_id is explicitly set to ensure proper routing
         await self.send_message({
             "type": "recording_status",
-            "is_recording": is_recording
+            "is_recording": is_recording,
+            "component_id": "speech_input"  # Explicitly set component_id
         })
 
 
@@ -324,7 +351,21 @@ class ComponentRegistry:
     async def handle_message(self, message_data: Dict[str, Any]):
         """Route a message to the appropriate component(s)"""
         message_type = message_data.get("type")
+        component_id = message_data.get("component_id")
         
+        # Special case for chat messages - ensure they go to chat panel regardless of component_id
+        if message_type == "chat_message":
+            chat_panel = self.get_component("chat_panel")
+            if chat_panel:
+                await chat_panel.handle_message(message_data)
+                return
+        
+        # If component_id is specified, route to that component directly
+        if component_id and component_id in self.components:
+            await self.components[component_id].handle_message(message_data)
+            return
+            
+        # Otherwise use the message_type routing table
         if message_type in self.message_type_handlers:
             for component in self.message_type_handlers[message_type]:
                 await component.handle_message(message_data)

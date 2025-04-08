@@ -65,10 +65,7 @@ class AudioRecorder:
                 data, overflowed = self.stream.read(self.chunk)
                 self.frames.append(data.flatten())
                 
-                # Print diagnostics
-                if len(self.frames) % 10 == 0:
-                    elapsed = time.time() - start_time
-                    logger.debug(f"Recording frames: {len(self.frames)}, elapsed: {elapsed:.2f}s")
+
 
         logger.info(f"Finished recording. Captured {len(self.frames)} frames in {time.time() - start_time:.2f} seconds")
         

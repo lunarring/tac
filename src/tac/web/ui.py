@@ -65,23 +65,37 @@ class MessageHandlerManager:
     
     async def handle_transcribed_message(self, data, websocket=None):
         """Handle a transcribed message from speech input"""
-        # Instead of processing the message, just inform the user that audio is disabled
-        websocket_to_use = websocket if websocket else self.ui.websocket
+        transcription = data.get("message", "").strip()
+        if not transcription:
+            return
+            
+        # First send the transcription to the chat panel as a user message
+        await self.ui.chat_panel.send_message({
+            "type": "chat_message",
+            "role": "user",
+            "message": transcription
+        })
         
-        if websocket_to_use:
-            await self.ui.chat_panel.send_info_message(
-                "The audio functionality has been disabled in this version. Please type your message instead."
-            )
-            await self.ui.send_status_message("Audio functionality has been disabled.")
-        return
+        # Process the message using the chat agent
+        if self.ui.chat_agent is None:
+            system_content = self.ui.CHAT_SYSTEM_PROMPT.format(file_summaries=self.ui.file_summaries or "No file summaries available yet")
+            self.ui.chat_agent = ChatAgent(system_prompt=system_content)
+            
+        # Process the message using the persistent ChatAgent
+        assistant_reply = self.ui.chat_agent.process_message(transcription)
+        
+        # Send the assistant's response to the chat panel
+        await self.ui.chat_panel.send_message({
+            "type": "chat_message",
+            "role": "assistant",
+            "message": assistant_reply
+        })
     
     async def handle_mic_click(self, data=None, websocket=None):
         """
         Handle a microphone click by implementing the logic directly.
         This method is called whenever the microphone button is clicked.
         """
-        print(f"MessageHandlerManager.handle_mic_click called with data: {data}")
-        
         try:
             # Import necessary modules
             import os
@@ -106,16 +120,13 @@ class MessageHandlerManager:
             # Only debounce if this is a repeat click with the same state
             if (current_time - last_click_time < self.ui.CLICK_DEBOUNCE_TIME and 
                 last_click_state == client_recording):
-                print(f"Ignoring duplicate mic click - same state ({client_recording}) too soon ({current_time - last_click_time:.2f}s)")
+                print(f"Ignoring duplicate mic click - too soon ({current_time - last_click_time:.2f}s)")
                 return
-                
-            # Log what triggered this function
-            print(f"Processing mic click with data: {data}, client wants recording={client_recording}")
             
             # Handle the click based on our current state and client's desired state
             if not self.ui.is_recording and client_recording:
                 # START RECORDING
-                print(f"Starting recording (current state={self.ui.is_recording})")
+                print("Starting recording...")
                 await self.ui.send_status_message("Recording audio...")
                 
                 # If the recorder is in a bad state, recreate it
@@ -124,12 +135,11 @@ class MessageHandlerManager:
                     try:
                         if hasattr(self.ui.speech_to_text.audio_recorder, 'cleanup'):
                             self.ui.speech_to_text.audio_recorder.cleanup()
-                    except Exception as e:
-                        print(f"Error cleaning up audio recorder: {e}")
+                    except Exception:
+                        pass
                     
                     # Replace with a fresh recorder if recording previously failed
                     if getattr(self.ui.speech_to_text.audio_recorder, 'is_recording', False):
-                        print("Detected stale recorder - replacing with a fresh instance")
                         from tac.utils.audio import AudioRecorder
                         self.ui.speech_to_text.audio_recorder = AudioRecorder()
                 
@@ -144,35 +154,32 @@ class MessageHandlerManager:
                 self.ui.is_recording = True
                 await self.ui.speech_input.send_recording_status(True)
                 
-                # Start the speech recording (not in a thread)
-                print("Calling speech_to_text.start_recording()...")
+                # Start the speech recording
                 self.ui.speech_to_text.start_recording()
-                print("Recording started successfully")
                 
             elif self.ui.is_recording and not client_recording:
                 # STOP RECORDING
-                print(f"Stopping recording (current state={self.ui.is_recording})")
+                print("Stopping recording...")
                 
                 # Update UI state BEFORE stopping the recording
                 self.ui.is_recording = False
                 await self.ui.speech_input.send_recording_status(False)
-                
-                print("Calling speech_to_text.stop_recording()...")
                 
                 # Direct approach - the modified stop_recording method now handles everything
                 try:
                     result = self.ui.speech_to_text.stop_recording()
                     
                     if result:
-                        print(f"Speech transcription result: {result}")
-                        await self.ui.send_status_message(f"Transcription: {result}")
+                        print(f"Speech transcription: {result}")
+                        
+                        # Send transcription to chat as a user message
+                        await self.handle_transcribed_message({"message": result}, websocket)
                     else:
                         print("No transcription result, recording may have been too short")
                         await self.ui.send_status_message("No transcription result, recording may have been too short")
                         
                 except Exception as inner_err:
                     print(f"Error during stop_recording: {inner_err}")
-                    print(f"Error type: {type(inner_err)}")
                     import traceback
                     traceback.print_exc()
                     
@@ -180,19 +187,38 @@ class MessageHandlerManager:
                     try:
                         if hasattr(self.ui.speech_to_text, 'audio_recorder'):
                             self.ui.speech_to_text.audio_recorder.cleanup()
-                    except Exception as cleanup_err:
-                        print(f"Error cleaning up: {cleanup_err}")
+                    except Exception:
+                        pass
                     
                     raise  # Re-raise to handle in outer exception handler
             else:
-                print(f"Ignoring mic click - current state ({self.ui.is_recording}) already matches client's desired state ({client_recording})")
+                print(f"Ignoring mic click - state already matches ({self.ui.is_recording}={client_recording})")
         except Exception as e:
             print(f"Error in microphone handling: {e}")
             traceback.print_exc()
             self.ui.is_recording = False
             await self.ui.speech_input.send_recording_status(False)
             await self.ui.send_status_message(f"Microphone error: {str(e)}")
-            await self.ui.chat_panel.send_error_message(f"Microphone error: {str(e)}")
+            
+    async def handle_transcribed_text(self, transcription, websocket=None):
+        """
+        Handle transcribed text as a user message.
+        
+        Args:
+            transcription: The transcribed text from speech recognition
+            websocket: Optional websocket connection
+        """
+        if not transcription:
+            return
+            
+        # Create a user message with the transcription
+        user_message = {"type": "user_message", "message": transcription}
+        
+        # Process the message
+        await self.handle_user_message(user_message, websocket)
+        
+        # Update the status bar
+        await self.ui.send_status_message(f"Transcription: {transcription}")
     
     async def handle_block_click(self, data=None, websocket=None):
         """Handle a block click"""

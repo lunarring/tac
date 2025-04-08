@@ -119,16 +119,25 @@ class WebSocketServer:
                         if isinstance(data, dict):
                             # First try to route through component system
                             if "type" in data:
-                                await self.component_registry.handle_message(data)
-                                
-                            # Also send to legacy handlers if registered
-                            message_type = data.get("type")
-                            if message_type in self._message_handlers:
-                                handler = self._message_handlers[message_type]
-                                if asyncio.iscoroutinefunction(handler):
-                                    await handler(websocket, data)
+                                # Filter out recording_status messages from chat
+                                if data.get("type") == "recording_status":
+                                    # Only route these to the component registry
+                                    await self.component_registry.handle_message(data)
                                 else:
-                                    handler(websocket, data)
+                                    # For other message types, route to both systems
+                                    await self.component_registry.handle_message(data)
+                                    
+                                    # Also send to legacy handlers if registered
+                                    message_type = data.get("type")
+                                    if message_type in self._message_handlers:
+                                        handler = self._message_handlers[message_type]
+                                        if asyncio.iscoroutinefunction(handler):
+                                            await handler(websocket, data)
+                                        else:
+                                            handler(websocket, data)
+                            else:
+                                # No message type - handle as legacy
+                                print("Message with no type received:", data)
                         else:
                             # Plain text message - send to user_message handler if exists
                             if "user_message" in self._message_handlers:
