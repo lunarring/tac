@@ -11,7 +11,7 @@ import difflib
 import git
 from tac.agents.misc.chat import ChatAgent
 from tac.utils.project_files import ProjectFiles
-from tac.utils.audio import Speech2Text  # Newly imported for speech-to-text functionality
+from tac.utils.audio import Speech2Text  # Keep the import but it now uses the dummy class
 from tac.blocks.processor import BlockProcessor
 from tac.cli.main import execute_command
 from tac.core.llm import LLMClient, Message
@@ -64,8 +64,15 @@ class MessageHandlerManager:
     
     async def handle_transcribed_message(self, data, websocket=None):
         """Handle a transcribed message from speech input"""
-        # Reuse the same user message handler for transcribed messages
-        await self.handle_user_message(data, websocket)
+        # Instead of processing the message, just inform the user that audio is disabled
+        websocket_to_use = websocket if websocket else self.ui.websocket
+        
+        if websocket_to_use:
+            await self.ui.chat_panel.send_info_message(
+                "The audio functionality has been disabled in this version. Please type your message instead."
+            )
+            await self.ui.send_status_message("Audio functionality has been disabled.")
+        return
     
     async def handle_mic_click(self, data=None, websocket=None):
         """Handle a microphone click"""
@@ -128,7 +135,7 @@ class UIManager:
     def __init__(self, base_dir="."):
         self.base_dir = base_dir
         self.project_files = ProjectFiles(self.base_dir)
-        self.speech_to_text = Speech2Text()
+        self.speech_to_text = Speech2Text()  # Using dummy version without audio functionality
         self.is_recording = False
         self.task_instructions = None
         self.file_summaries = None
@@ -469,30 +476,25 @@ class UIManager:
         
     async def dummy_mic_click(self, websocket=None):
         """
-        Handle microphone recording toggle and transcription.
+        Handle microphone button click but inform user that audio is disabled.
         
         Args:
             websocket: Optional websocket connection (for backward compatibility)
         """
         try:
             if not self.is_recording:
-                # Start recording
-                await self.send_status_message("Starting voice recording...")
-                self.speech_to_text.start_recording()
+                # Inform user audio is disabled
+                await self.send_status_message("Audio functionality has been disabled.")
                 self.is_recording = True
                 await self.speech_input.send_recording_status(True)
             else:
-                # Stop recording and process
-                await self.send_status_message("Processing voice recording...")
-                transcript = self.speech_to_text.stop_recording()
+                # Reset state
                 self.is_recording = False
                 await self.speech_input.send_recording_status(False)
-                
-                if transcript:
-                    await self.send_status_message(f"Transcript received: {transcript[:30]}...")
-                    await self.speech_input.send_transcription(transcript)
-                else:
-                    await self.send_status_message("No speech detected.")
+                await self.send_status_message("Audio functionality has been disabled.")
+                await self.chat_panel.send_info_message(
+                    "The audio functionality has been disabled in this version. Please type your message instead."
+                )
         except Exception as e:
             print(f"Error in microphone handling: {e}")
             traceback.print_exc()
@@ -1524,13 +1526,9 @@ class UIManager:
             except Exception as e:
                 print(f"Error cleaning up component {component.__class__.__name__}: {e}")
                 
-        # Make sure recording is stopped
+        # Reset recording state if active
         if self.is_recording:
-            try:
-                self.speech_to_text.stop_recording()
-                self.is_recording = False
-            except Exception as e:
-                print(f"Error stopping recording during cleanup: {e}")
+            self.is_recording = False
                 
     async def shutdown(self):
         """Perform graceful shutdown of the UI manager"""

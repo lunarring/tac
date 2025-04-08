@@ -277,16 +277,24 @@ class GitView(Component):
 
 class SpeechInput(Component):
     """
-    Component for handling speech input.
+    Component for handling speech input button UI (functionality disabled).
     """
     def __init__(self):
         super().__init__("speech_input")
         
     async def send_transcription(self, transcript: str):
-        """Send a speech transcription to the client"""
+        """Send a speech transcription to the client (disabled)"""
+        # Instead of sending transcript, we'll send a message about disabled functionality
         await self.send_message({
             "type": "transcribed_message",
-            "message": transcript
+            "message": "Audio functionality has been disabled."
+        })
+        
+    async def send_recording_status(self, is_recording: bool):
+        """Send recording status update to update the microphone button UI"""
+        await self.send_message({
+            "type": "recording_status",
+            "is_recording": is_recording
         })
 
 
