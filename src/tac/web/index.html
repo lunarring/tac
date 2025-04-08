@@ -46,7 +46,13 @@
       </div>
     </div>
     <div id="blockPanel">
-      <div id="runtimeStatus">Ready...</div>
+      <div id="blockHeader">
+        <div id="blockTitle">Block Status</div>
+        <div id="blockStatus">
+          <span class="statusDot blockStatusDot"></span>
+          <span id="blockStatusText">Ready...</span>
+        </div>
+      </div>
       <div id="errorMessage"></div>
       <div id="infoMessage"></div>
       <div id="protoblockContainer">
@@ -187,6 +193,7 @@
           hideElement(canvas);
           // Ensure the status is properly visible over the protoblock
           runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+          document.getElementById('blockHeader').style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
         }, 300);
       } else {
         // Show the canvas first
@@ -197,25 +204,38 @@
           hideElement(protoblockContainer);
           // Reset status background for cube view
           runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+          document.getElementById('blockHeader').style.backgroundColor = 'transparent';
+          document.getElementById('blockHeader').style.boxShadow = 'none';
         }, 50);
       }
     }
 
     // Function to update the runtime status with appropriate styling
     function updateRuntimeStatus(message, status = "default") {
-      const statusElement = document.getElementById("runtimeStatus");
-      statusElement.textContent = message;
+      const statusTextElement = document.getElementById("blockStatusText");
+      const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
       
-      // Remove all status classes
-      statusElement.classList.remove("processing", "success", "error");
+      if (!statusTextElement || !statusDotElement) return;
+      
+      statusTextElement.textContent = message;
+      
+      // Remove all status classes from text and dot
+      statusTextElement.classList.remove("processing", "success", "error", "default");
+      statusDotElement.classList.remove("processing", "success", "error", "default", "online", "offline");
       
       // Add appropriate class based on status
       if (status === "processing") {
-        statusElement.classList.add("processing");
+        statusTextElement.classList.add("processing");
+        statusDotElement.classList.add("processing"); // Yellow dot for processing
       } else if (status === "success") {
-        statusElement.classList.add("success");
+        statusTextElement.classList.add("success");
+        statusDotElement.classList.add("success"); // Green dot for success
       } else if (status === "error") {
-        statusElement.classList.add("error");
+        statusTextElement.classList.add("error");
+        statusDotElement.classList.add("error"); // Red dot for error
+      } else {
+        statusTextElement.classList.add("default");
+        statusDotElement.classList.add("online"); // Default to green/online dot
       }
     }
     
@@ -359,7 +379,12 @@
       
       // Check if we should attempt to make files clickable (only after success)
       const runtimeStatus = document.getElementById('runtimeStatus');
-      if (runtimeStatus.textContent.includes("✅")) {
+      const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
+      const isSuccess = blockStatusTextContent.includes("✅") || 
+                       blockStatusTextContent.includes("successful") ||
+                       blockStatusTextContent.includes("Ready");
+      
+      if (isSuccess) {
         // Make files clickable after a delay to ensure the DOM is ready
         setTimeout(makeFilesClickable, 300);
       }
@@ -780,6 +805,7 @@
           
         // Show operation in progress
         document.getElementById("runtimeStatus").textContent = "Committing changes...";
+        updateRuntimeStatus("Committing changes...", "processing");
         
         const request = {
           type: "git_commit_request",
@@ -795,6 +821,7 @@
         if (socket && socket.readyState === WebSocket.OPEN) {
           // Show operation in progress
           document.getElementById("runtimeStatus").textContent = "Discarding changes...";
+          updateRuntimeStatus("Discarding changes...", "processing");
           
           const request = {
             type: "git_discard_request"
@@ -818,6 +845,7 @@
         if (socket && socket.readyState === WebSocket.OPEN) {
           // Show operation in progress
           document.getElementById("runtimeStatus").textContent = `Merging to ${selectedBranch}...`;
+          updateRuntimeStatus(`Merging to ${selectedBranch}...`, "processing");
           
           const request = {
             type: "git_merge_request",
@@ -877,6 +905,7 @@
             if (data.success) {
               // Display success message
               document.getElementById("runtimeStatus").textContent = `✅ ${data.message}`;
+              updateRuntimeStatus(`✅ ${data.message}`, "success");
               
               // Update UI based on operation
               if (data.operation === "commit") {
@@ -905,6 +934,7 @@
             } else {
               // Display error message
               document.getElementById("runtimeStatus").textContent = `❌ ${data.message}`;
+              updateRuntimeStatus(`❌ ${data.message}`, "error");
             }
           }
         } catch (e) {
@@ -921,9 +951,10 @@
       
       // Only apply click handlers if block execution was successful
       const runtimeStatus = document.getElementById('runtimeStatus');
-      const isSuccess = runtimeStatus.textContent.includes("✅") || 
-                       runtimeStatus.textContent.includes("successful") ||
-                       runtimeStatus.textContent.includes("Ready");
+      const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
+      const isSuccess = blockStatusTextContent.includes("✅") || 
+                       blockStatusTextContent.includes("successful") ||
+                       blockStatusTextContent.includes("Ready");
       
       if (isSuccess) {
         // Make write files clickable
@@ -987,8 +1018,10 @@
       
       // Check if this is a successful block execution
       const runtimeStatus = document.getElementById('runtimeStatus');
-      const isSuccess = runtimeStatus.textContent.includes("✅") || 
-                       runtimeStatus.textContent.includes("successful");
+      const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
+      const isSuccess = blockStatusTextContent.includes("✅") || 
+                       blockStatusTextContent.includes("successful") ||
+                       blockStatusTextContent.includes("Ready");
                        
       if (isSuccess) {
         // Make files clickable after a delay to ensure the DOM is ready

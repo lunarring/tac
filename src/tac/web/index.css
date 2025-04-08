@@ -312,6 +312,7 @@ html, body {
   display: flex;
   flex-direction: column;
   width: 50%; /* Make it exactly 50% */
+  max-width: unset; /* Remove max-width */
   border-radius: 12px 0 0 12px;
 }
 
@@ -326,7 +327,7 @@ html, body {
 /* Protoblock container styling */
 #protoblockContainer {
   width: 95%; /* Increase width to use more space */
-  margin: 60px auto 20px;
+  margin: 20px auto; /* Remove top margin, let header handle it */
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -987,4 +988,70 @@ html, body {
 .trusty-agent-item.has-results:hover {
   background-color: #c3e6cb;
   border-color: #a3d9a5;
+}
+
+/* New Block Panel Header Styles */
+#blockHeader {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  background-color: #ffffff; /* Same as chat header */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08); /* Same as chat header */
+  z-index: 10;
+  border-radius: 12px 0 0 0;
+  position: sticky; /* Make header sticky */
+  top: 0;
+}
+
+#blockTitle {
+  font-weight: 500;
+  font-size: 18px;
+  color: #333;
+}
+
+#blockStatus {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #4caf50; /* Default online color */
+}
+
+.blockStatusDot {
+  width: 8px;
+  height: 8px;
+  background-color: #4caf50; /* Default online color */
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  transition: background-color 0.3s ease;
+}
+
+/* Specific status colors for block status */
+#blockStatusText.processing {
+  color: #f57c00; /* Orange for processing */
+}
+.blockStatusDot.processing {
+  background-color: #f57c00;
+}
+
+#blockStatusText.success {
+  color: #4caf50; /* Green for success */
+}
+.blockStatusDot.success {
+  background-color: #4caf50;
+}
+
+#blockStatusText.error {
+  color: #f44336; /* Red for error */
+}
+.blockStatusDot.error {
+  background-color: #f44336;
+}
+
+#blockStatusText.default {
+  color: #4caf50; /* Default to online color */
+}
+.blockStatusDot.online {
+  background-color: #4caf50; /* Green for online/ready */
 }
