@@ -152,7 +152,7 @@ class ChatPanel(Component):
         message_type = message_data.get("type")
         
         # Ignore recording_status messages
-        if message_type == "recording_status":
+        if message_type == "recording_status" or message_data.get("ui_only") is True:
             return
             
         # Process other message types normally
@@ -331,7 +331,8 @@ class SpeechInput(Component):
         await self.send_message({
             "type": "recording_status",
             "is_recording": is_recording,
-            "component_id": "speech_input"  # Explicitly set component_id
+            "component_id": "speech_input",  # Explicitly set component_id
+            "ui_only": True  # Mark as UI-only message to prevent it from being treated as chat
         })
 
 
@@ -364,7 +365,7 @@ class ComponentRegistry:
         component_id = message_data.get("component_id")
         
         # Special case for recording_status messages - only send to speech_input
-        if message_type == "recording_status":
+        if message_type == "recording_status" or message_data.get("ui_only") is True:
             speech_input = self.get_component("speech_input")
             if speech_input:
                 await speech_input.handle_message(message_data)

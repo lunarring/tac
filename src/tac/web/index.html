@@ -471,7 +471,8 @@
         const data = JSON.parse(event.data);
         
         // EXPLICITLY FILTER OUT RECORDING STATUS MESSAGES
-        if (data.type === "recording_status") {
+        if (data.type === "recording_status" || 
+            (data.component_id === "speech_input" && data.type === "recording_status")) {
           console.log("Received recording_status message - not displaying in chat");
           return;
         }
@@ -615,14 +616,40 @@
           console.log(`Received ${data.type}`);
           return;
         }
+        else if (data.type === "chat_message") {
+          // Handle properly formatted chat messages
+          const role = data.role || "AI";
+          const message = data.message || "";
+          
+          // Add to chat as appropriate role
+          if (role === "user") {
+            addChatMessage("User", message);
+          } else if (role === "assistant") {
+            addChatMessage("AI", message);
+            hideTypingIndicator();
+          } else {
+            addChatMessage(role, message);
+          }
+          
+          return;
+        }
         else {
-          // Regular AI response
-          addChatMessage("AI", event.data);
-          // Immediately hide typing indicator after full display of AI message
+          // Check for unknown message types that might need special handling
+          console.log("Received message with unrecognized type:", data.type);
+          
+          // Check if this is a complete message object that we can parse
+          if (typeof data === 'object' && data.message) {
+            addChatMessage("AI", data.message);
+          } else {
+            // Last resort - display the raw data as a message
+            console.warn("Displaying raw message data:", data);
+            addChatMessage("AI", JSON.stringify(data));
+          }
           hideTypingIndicator();
         }
       } catch (e) {
         // If not JSON or parsing fails, treat as a regular message
+        console.log("Parsing JSON failed, treating as plain text:", e);
         addChatMessage("AI", event.data);
         hideTypingIndicator();
       }

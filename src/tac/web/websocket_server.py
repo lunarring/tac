@@ -128,9 +128,8 @@ class WebSocketServer:
                                     speech_input = self.component_registry.get_component("speech_input")
                                     if speech_input:
                                         await speech_input.handle_message(data)
-                                    else:
-                                        # Fallback to registry if component not found
-                                        await self.component_registry.handle_message(data)
+                                    # Explicitly NEVER route recording_status messages to legacy handlers
+                                    # which would cause them to show up in chat
                                 else:
                                     # For other message types, route to both systems
                                     await self.component_registry.handle_message(data)
