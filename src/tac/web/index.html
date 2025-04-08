@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="splitContainer">
-    <div id="leftPanel">
+    <div id="chatPanel">
       <div id="chatHeader">
         <div id="recipientName">tac.vibe</div>
         <div id="typingAnimation">
@@ -45,7 +45,7 @@
         </div>
       </div>
     </div>
-    <div id="rightPanel">
+    <div id="blockPanel">
       <div id="runtimeStatus">Ready...</div>
       <div id="errorMessage"></div>
       <div id="infoMessage"></div>
@@ -126,8 +126,8 @@
       }
     }
 
-    // Initialize Three.js scene in the right panel
-    const threeContainer = document.getElementById('rightPanel');
+    // Initialize Three.js scene in the block panel
+    const threeContainer = document.getElementById('blockPanel');
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -385,7 +385,7 @@
       }
     }
 
-    // Update renderer and camera on resize for rightPanel
+    // Update renderer and camera on resize for block panel
     window.addEventListener('resize', () => {
       const width = threeContainer.clientWidth;
       const height = threeContainer.clientHeight;
@@ -394,7 +394,7 @@
       camera.updateProjectionMatrix();
     });
 
-    // Chat functionality in the left panel
+    // Chat functionality in the chat panel
     const messageContainer = document.getElementById("messageContainer");
     const statusText = document.getElementById("statusText");
     const statusDot = document.querySelector("#recipientStatus .statusDot");
@@ -504,7 +504,7 @@
             console.log("Removing protoblock display due to failure message");
             // Force the canvas to be shown and protoblock to be hidden
             document.getElementById('protoblockContainer').style.display = 'none';
-            document.querySelector('#rightPanel canvas').style.display = 'block';
+            document.querySelector('#blockPanel canvas').style.display = 'block';
             // Don't clear the data - just hide it
           }
           
@@ -553,7 +553,7 @@
           
           // Force the canvas to be shown and protoblock to be hidden
           document.getElementById('protoblockContainer').style.display = 'none';
-          document.querySelector('#rightPanel canvas').style.display = 'block';
+          document.querySelector('#blockPanel canvas').style.display = 'block';
           
           // Clear any existing protoblock data and rebuild the container
           document.getElementById('protoblockContainer').innerHTML = '';
@@ -569,7 +569,7 @@
           
           // Ensure the protoblock container is visible
           document.getElementById('protoblockContainer').style.display = 'block';
-          document.querySelector('#rightPanel canvas').style.display = 'none';
+          document.querySelector('#blockPanel canvas').style.display = 'none';
           
           // Display the data
           displayProtoblockData(data);

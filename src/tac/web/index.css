@@ -30,7 +30,7 @@ html, body {
 }
 
 /* Left panel for chat interface with a clean, modern aesthetic */
-#leftPanel {
+#chatPanel {
   flex: 1;
   position: relative;
   border-right: 1px solid #d0d0d0;
@@ -297,7 +297,7 @@ html, body {
 }
 
 /* Right panel for block view and protoblock display */
-#rightPanel {
+#blockPanel {
   flex: 1;
   position: relative;
   background: linear-gradient(135deg, #e0eafc, #cfdef3);
@@ -309,7 +309,7 @@ html, body {
 }
 
 /* Ensure Three.js canvas fills its container */
-#rightPanel canvas {
+#blockPanel canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
