@@ -267,7 +267,7 @@ class UIManager:
         "for this early phase of software design. Always try to be brief and concise and help the planning. "
         "Remember, the user is not the one who is implementing the code, it is actually you and your team of "
         "AI agents and they use trusty agents to verify the code. So don't tell the user how to do it themselves, "
-        "but rather try to gather information about what the user wants to build in the context of the codebase above. "
+        "but rather try to gather information about what the user really wants to build in the context of the codebase above. "
         "Don't be too verbose about the code itself, but rather gather an understanding of what the user really wants. "
         "Always be brief and to the point! However the goal is to end up with ONE clear task and do them one at a time. "
         "Ideally just answer in ONE sentence and not more! Also if you feel we have enough information, tell the user that "
@@ -295,7 +295,7 @@ class UIManager:
         self.is_recording = False
         self.task_instructions = None
         self.file_summaries = None
-        self.chat_agent = None  # Will be initialized when file_summaries are loaded
+        self.chat_agent = None  # Will be initialized when file summaries are loaded
         
         # Create a websocket server instance
         self.server = WebSocketServer(host='localhost', port=8765)
@@ -415,7 +415,7 @@ class UIManager:
 
     async def start_background_tasks(self):
         """Start essential background tasks when the UI starts"""
-        # Start file indexing task
+        # Start file indexing task (now performed only once)
         await self.create_or_restart_background_task('file_indexer', self._background_file_indexer)
         
         # If test running is enabled in config, start the test runner
@@ -423,27 +423,14 @@ class UIManager:
             await self.create_or_restart_background_task('test_runner', self._background_test_runner)
 
     async def _background_file_indexer(self):
-        """Background task to index files periodically"""
+        """Background task to index files once during UI initialization"""
         try:
-            await self.send_status_message("Starting background file indexing...")
-            while True:
-                try:
-                    # Perform file indexing
-                    self.project_files.refresh_index()
-                    
-                    # Update file summaries
-                    self.file_summaries = await self.load_high_level_summaries()
-                    
-                    # Delay before next indexing
-                    await asyncio.sleep(60)  # Index every minute
-                except asyncio.CancelledError:
-                    # Allow task to be cancelled
-                    raise
-                except Exception as e:
-                    print(f"Error in background file indexer: {e}")
-                    await asyncio.sleep(5)  # Shorter delay after error
-        except asyncio.CancelledError:
-            print("Background file indexer cancelled")
+            await self.send_status_message("Starting file indexing...")
+            # Perform file indexing only once.
+            self.project_files.refresh_index()
+            self.file_summaries = await self.load_high_level_summaries()
+        except Exception as e:
+            print(f"Error in background file indexer: {e}")
             raise
 
     async def _background_test_runner(self):
@@ -1683,3 +1670,7 @@ class UIManager:
             await self.websocket.close()
             
         print("UI Manager shutdown complete")
+        
+if __name__ == "__main__":
+    ui_manager = UIManager(base_dir=".")
+    ui_manager.launch_ui()
