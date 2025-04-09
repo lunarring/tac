@@ -90,6 +90,9 @@ class MessageHandlerManager:
             "role": "assistant",
             "message": assistant_reply
         })
+        
+        # Update the status bar after processing transcription to indicate readiness for new input.
+        await self.ui.send_status_message("Waiting for input")
     
     async def handle_mic_click(self, data=None, websocket=None):
         """
@@ -221,7 +224,7 @@ class MessageHandlerManager:
         await self.handle_user_message(user_message, websocket)
         
         # Update the status bar
-        await self.ui.send_status_message(f"Transcription: {transcription}")
+        await self.ui.send_status_message("Waiting for input")
     
     async def handle_block_click(self, data=None, websocket=None):
         """Handle a block click"""

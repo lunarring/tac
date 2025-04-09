@@ -30,5 +30,5 @@ async def test_mic_release_updates_status():
     # Simulate mic release event by sending {'recording': False}
     await ui_manager.message_handler.handle_mic_click({'recording': False})
     
-    # Check that the latest status message is updated to "Transcribing audio..."
-    assert ui_manager.latest_status == "Transcribing audio..."
+    # Check that the latest status message is updated to "Waiting for input" after transcription completes.
+    assert ui_manager.latest_status == "Waiting for input"
