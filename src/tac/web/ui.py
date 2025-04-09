@@ -165,6 +165,9 @@ class MessageHandlerManager:
                 self.ui.is_recording = False
                 await self.ui.speech_input.send_recording_status(False)
                 
+                # NEW: Update status indicating that transcription is beginning
+                await self.ui.send_status_message("Transcribing audio...")
+                
                 # Direct approach - the modified stop_recording method now handles everything
                 try:
                     result = self.ui.speech_to_text.stop_recording()
@@ -296,6 +299,7 @@ class UIManager:
         self.task_instructions = None
         self.file_summaries = None
         self.chat_agent = None  # Will be initialized when file summaries are loaded
+        self.latest_status = ""  # Added for testing status updates
         
         # Create a websocket server instance
         self.server = WebSocketServer(host='localhost', port=8765)
@@ -531,6 +535,7 @@ class UIManager:
         # Delegate to the WebSocketServer with error handling
         try:
             await self.server.send_status_message(message)
+            self.latest_status = message
         except Exception as e:
             print(f"Error sending status message: {e}")
             # If there's an error with the server method, try direct websocket send as fallback
@@ -539,6 +544,7 @@ class UIManager:
                     status_data = {"type": "status_message", "message": message}
                     await self.websocket.send(json.dumps(status_data))
                     print(f"Status message sent directly: {message}")
+                    self.latest_status = message
                 except Exception as direct_err:
                     print(f"Error sending status message directly: {direct_err}")
             else:
