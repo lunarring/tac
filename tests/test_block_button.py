@@ -9,8 +9,9 @@ def test_block_button_exists():
     soup = BeautifulSoup(contents, "html.parser")
     block_button = soup.find(id="blockButton")
     assert block_button is not None, "Block button not found in index.html"
-    # Ensure that the block button has some content (icon/text)
-    assert block_button.text.strip() != "", "Block button text is empty"
+    # Ensure that the block button has a canvas element inside it
+    canvas = block_button.find(id="cubeCanvas")
+    assert canvas is not None, "Block button does not contain the cube canvas"
 
 def test_mic_button_exists():
     # Locate the index.html file relative to the test file

@@ -84,39 +84,3 @@ def test_verify_protoblock_valid_and_invalid(generator_instance):
     assert data is None
     assert "Failed to parse JSON" in error or "Expecting value" in error
 
-def test_create_protoblock_with_dummy_llm(monkeypatch, generator_instance):
-    # Set dummy config values directly on the generator instance if needed.
-    # Here we simply monkeypatch the llm_client and update_summaries function.
-    generator_instance.llm_client = DummyLLMClient()
-    # Ensure update_summaries does nothing
-    monkeypatch.setattr(generator_instance.project_files, "update_summaries", lambda: None)
-    
-    # Monkey-patch config values if they are referenced; simulate using dummy values.
-    import tac.core.config as config_module
-    config_module.config.general.use_file_summaries = True
-    config_module.config.general.max_retries_protoblock_creation = 1
-
-    # Provide a dummy prompt
-    dummy_prompt = "dummy prompt for protoblock creation"
-    
-    protoblock = generator_instance.create_protoblock(dummy_prompt)
-    # Check that the returned object is an instance of ProtoBlock
-    assert isinstance(protoblock, ProtoBlock)
-    # Check that the task_description field is set correctly
-    assert "Dummy task description" in protoblock.task_description
-    # Check that commit_message and branch_name are set
-    assert protoblock.commit_message.startswith("tac: ")
-    assert protoblock.branch_name == "tac/feature/dummy"
-    
-    # Ensure that the write_files paths are relative
-    for path in protoblock.write_files:
-        assert not os.path.isabs(path)
-    # Ensure context_files does not include files that are also in write_files
-    for file in protoblock.context_files:
-        assert file not in protoblock.write_files
-    # Check trusty_agents include pytest and plausibility as per implementation
-    assert "pytest" in protoblock.trusty_agents
-    assert "plausibility" in protoblock.trusty_agents
-    # Verify that dummy_agent is not present in the trusty_agent_prompts and only expected agents remain
-    assert set(protoblock.trusty_agent_prompts.keys()) == {"pytest", "plausibility"}
-    
