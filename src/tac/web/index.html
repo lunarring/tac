@@ -20,6 +20,7 @@
           <span class="statusDot"></span>
           <span id="statusText">connecting...</span>
         </div>
+        <div id="settingsButton" class="action-button">⚙️</div>
       </div>
       <div id="messageContainer"></div>
       <div id="gitOperationsPanel" class="initially-hidden">
@@ -1515,30 +1516,6 @@
           console.log(`Setting comparison image src to: ${usablePath}`);
         } else {
           comparisonImageContainer.style.display = 'none';
-        }
-        
-        // Check for screenshot path (which might be different from image_url)
-        if (!resultObj.image_url && resultObj.screenshot_path) {
-          trustyAgentImageSection.style.display = 'block';
-          const usablePath = makePathUsable(resultObj.screenshot_path);
-          trustyAgentImage.src = usablePath;
-          console.log(`Setting image from screenshot_path: ${usablePath}`);
-        }
-        
-        // Check for test results
-        if (resultObj.test_results) {
-          trustyAgentTestResultsSection.style.display = 'block';
-          trustyAgentTestResults.textContent = resultObj.test_results;
-        } else {
-          trustyAgentTestResultsSection.style.display = 'none';
-        }
-        
-        // Check for summary
-        if (resultObj.summary) {
-          trustyAgentSummarySection.style.display = 'block';
-          trustyAgentSummary.textContent = resultObj.summary;
-        } else {
-          trustyAgentSummarySection.style.display = 'none';
         }
       } else {
         // No results found, show a message
