@@ -1314,7 +1314,6 @@
         // Show message based on execution status
         resultSection.style.display = 'block';
         resultStatusElement.style.display = 'none';
-        
         if (executionSuccessful) {
           // Execution was successful but no results for this agent
           resultTextElement.innerHTML = '<div class="diff-empty">This agent was executed but did not produce any output.</div>';
@@ -1322,7 +1321,6 @@
           // Execution may still be in progress or failed
           resultTextElement.innerHTML = '<div class="diff-empty">No results available yet for this agent.</div>';
         }
-        
         imageSection.style.display = 'none';
       }
       
@@ -1389,10 +1387,7 @@
       
       if (protoblock.trusty_agent_results) {
         console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
-        
-        // Try both the full agent name and lowercase version to match backend storage
         const possibleKeys = [agentName, agentKey, agentName.toLowerCase(), agentKey.replace('agent', '')];
-        
         for (const key of possibleKeys) {
           if (protoblock.trusty_agent_results[key]) {
             resultObj = protoblock.trusty_agent_results[key];
@@ -1406,13 +1401,9 @@
       // Helper function to make file paths usable in the browser
       function makePathUsable(path) {
         if (!path) return null;
-        
-        // If it's already a URL or a relative path, return as is
         if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('./') || path.startsWith('/')) {
           return path;
         }
-        
-        // Convert absolute path to a file URL
         try {
           return 'file://' + path;
         } catch (e) {
@@ -1430,47 +1421,8 @@
 
       // Display or hide the result section based on whether there are results
       if (hasResults && resultObj) {
-        // Check if this is the plausibility agent
-        const isPlausibilityAgent = 
-          agentKey === 'plausibility' || 
-          agentName.toLowerCase().includes('plausibility') || 
-          (resultObj.agent_type && resultObj.agent_type.toLowerCase().includes('plausibility'));
-        
-        if (isPlausibilityAgent) {
-          // Handle special plausibility display
-          trustyAgentPlausibilitySection.style.display = 'block';
-          
-          // Display grade
-          if (resultObj.grade) {
-            trustyAgentGrade.textContent = resultObj.grade;
-            trustyAgentGrade.setAttribute('data-grade', resultObj.grade);
-            trustyAgentGrade.style.display = 'flex';
-          } else {
-            trustyAgentGrade.style.display = 'none';
-          }
-          
-          // Display grade info
-          if (resultObj.grade_info) {
-            trustyAgentGradeInfo.textContent = resultObj.grade_info;
-            trustyAgentGradeInfo.style.display = 'block';
-          } else {
-            trustyAgentGradeInfo.style.display = 'none';
-          }
-          
-          // Display verification info
-          if (resultObj.verification_info) {
-            trustyAgentVerificationInfo.textContent = resultObj.verification_info;
-            trustyAgentVerificationInfo.style.display = 'block';
-          } else {
-            trustyAgentVerificationInfo.style.display = 'none';
-          }
-        }
-
-        // Standard result section (text output)
         if (resultObj.output) {
           trustyAgentResultSection.style.display = 'block';
-          
-          // Set status badge
           if (resultObj.status) {
             trustyAgentResultStatus.textContent = resultObj.status;
             trustyAgentResultStatus.className = 'agent-status';
@@ -1485,20 +1437,8 @@
             trustyAgentResultStatus.textContent = '';
             trustyAgentResultStatus.className = 'agent-status';
           }
-          
-          // Set agent type if available
-          if (resultObj.agent_type) {
-            trustyAgentAgentType.textContent = resultObj.agent_type;
-            trustyAgentAgentType.style.display = 'inline-block';
-          } else {
-            trustyAgentAgentType.style.display = 'none';
-          }
-          
-          // Set result text content
           trustyAgentResultText.textContent = resultObj.output || "No text output available";
         }
-
-        // Check if there's an image URL and display it
         if (resultObj.image_url) {
           trustyAgentImageSection.style.display = 'block';
           const usablePath = makePathUsable(resultObj.image_url);
@@ -1507,8 +1447,6 @@
         } else {
           trustyAgentImageSection.style.display = 'none';
         }
-        
-        // Check for comparison image
         if (resultObj.comparison_path) {
           comparisonImageContainer.style.display = 'block';
           const usablePath = makePathUsable(resultObj.comparison_path);
@@ -1518,7 +1456,6 @@
           comparisonImageContainer.style.display = 'none';
         }
       } else {
-        // No results found, show a message
         trustyAgentResultSection.style.display = 'block';
         trustyAgentResultStatus.style.display = 'none';
         trustyAgentAgentType.style.display = 'none';
@@ -1526,7 +1463,6 @@
         console.log(`No results found for agent: ${agentKey}`);
       }
 
-      // Set up the close button event listener
       const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
       trustyAgentCloseBtn.onclick = function() {
         trustyAgentOverlay.style.display = 'none';
@@ -1646,13 +1582,10 @@
       const leftPane = document.getElementById('fileDiffLeft');
       const rightPane = document.getElementById('fileDiffRight');
       
-      // Set height of scroll content based on line count
       if (window.currentDiffLineCount) {
-        // Approximate line height of 22px
         scrollContent.style.height = (window.currentDiffLineCount * 22) + 'px';
       }
       
-      // Synchronize panes with scroll container
       scrollContainer.onscroll = function() {
         leftPane.scrollTop = scrollContainer.scrollTop;
         rightPane.scrollTop = scrollContainer.scrollTop;
@@ -1664,7 +1597,6 @@
       const leftContent = [];
       const rightContent = [];
       
-      // Regular expressions for parsing diff parts
       const fileHeaderRegex = /^diff --git a\/(.*) b\/(.*)$/;
       const hunkHeaderRegex = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)$/;
       
@@ -1674,17 +1606,12 @@
       let inHunk = false;
       let diffLineCount = 0;
       
-      // Split the diff into lines
-      const lines = diff.split('\n');
-      
-      // Add file header
       leftContent.push('<div class="diff-file-header">Original</div>');
       rightContent.push('<div class="diff-file-header">Modified</div>');
       diffLineCount++;
       
-      // Process each line of the diff
+      const lines = diff.split('\n');
       lines.forEach(line => {
-        // Check for file header
         const fileHeaderMatch = line.match(fileHeaderRegex);
         if (fileHeaderMatch) {
           currentFile = fileHeaderMatch[1];
@@ -1694,7 +1621,6 @@
           return;
         }
         
-        // Check for hunk header
         const hunkHeaderMatch = line.match(hunkHeaderRegex);
         if (hunkHeaderMatch) {
           const leftStart = parseInt(hunkHeaderMatch[1]);
@@ -1710,15 +1636,12 @@
           return;
         }
         
-        // Skip other headers or non-content lines
         if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('index ')) {
           return;
         }
         
-        // Process content lines
         if (inHunk) {
           if (line.startsWith('-')) {
-            // Line removed - show in left only
             leftContent.push(`
               <div class="diff-line diff-removed-line">
                 <span class="diff-line-number">${leftLineNumber}</span>
@@ -1729,7 +1652,6 @@
             leftLineNumber++;
             diffLineCount++;
           } else if (line.startsWith('+')) {
-            // Line added - show in right only
             leftContent.push(`<div class="diff-line diff-filler"></div>`);
             rightContent.push(`
               <div class="diff-line diff-added-line">
@@ -1740,7 +1662,6 @@
             rightLineNumber++;
             diffLineCount++;
           } else if (line.startsWith(' ')) {
-            // Common line - show in both
             leftContent.push(`
               <div class="diff-line">
                 <span class="diff-line-number">${leftLineNumber}</span>
@@ -1757,7 +1678,6 @@
             rightLineNumber++;
             diffLineCount++;
           } else if (line.trim() === '') {
-            // Empty line - show in both
             leftContent.push(`
               <div class="diff-line">
                 <span class="diff-line-number">${leftLineNumber}</span>
@@ -1817,6 +1737,32 @@
       // Send WebSocket request for file diff
       requestFileDiff(filename);
     }
+  </script>
+  
+  <!-- New settings page functionality -->
+  <script>
+    // Bind click event on the settings button to replace the right panel with a settings page
+    const settingsButton = document.getElementById('settingsButton');
+    settingsButton.addEventListener('click', function () {
+      const blockPanel = document.getElementById('blockPanel');
+      // Clear the current content of the blockPanel
+      blockPanel.innerHTML = '';
+      // Create a settings page container with placeholder content
+      const settingsPage = document.createElement('div');
+      settingsPage.id = 'settingsPage';
+      settingsPage.style.padding = '20px';
+      settingsPage.innerHTML = `
+        <h2>Settings Page</h2>
+        <p>This is a placeholder for settings. Adjust controls as needed.</p>
+        <div>
+          <label for="dummyInput">Dummy Input:</label>
+          <input type="text" id="dummyInput" placeholder="Enter value">
+        </div>
+        <br>
+        <button id="dummyButton">Dummy Action</button>
+      `;
+      blockPanel.appendChild(settingsPage);
+    });
   </script>
 </body>
 </html>
