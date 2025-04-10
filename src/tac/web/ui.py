@@ -406,8 +406,8 @@ class UIManager:
 
     async def start_background_tasks(self):
         """Start essential background tasks when the UI starts"""
-        # Immediately perform file indexing instead of scheduling it as a background task.
-        await self._background_file_indexer()
+        # Schedule file indexing as a background task so it doesn't block chat functionality.
+        asyncio.create_task(self._background_file_indexer())
         
         # If test running is enabled in config, start the test runner in the background.
         if config.safe_get('general', 'run_tests_in_background', False):
@@ -917,7 +917,7 @@ class UIManager:
         # Send initial status
         await self.send_status_message("Connected. Initializing...")
         
-        # Start background tasks (file indexing now happens immediately)
+        # Start background tasks (file indexing now happens asynchronously)
         await self.start_background_tasks()
         
         # Display pre-checked git status as a prominent message if there are issues
