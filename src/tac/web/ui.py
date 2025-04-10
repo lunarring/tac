@@ -29,7 +29,6 @@ from tac.web.ui_components import (
 from tac.blocks.generator import ProtoBlockGenerator  # Add this import
 import time
 
-
 class MessageHandlerManager:
     """
     Centralized manager for handling UI messages from both component system and legacy system.
@@ -263,7 +262,6 @@ class MessageHandlerManager:
         """Handle a git merge request"""
         target_branch = data.get("target_branch", "")
         await self.ui.handle_git_merge_request(target_branch)
-
 
 class UIManager:
     # System prompt template for ChatAgent
@@ -1014,10 +1012,24 @@ class UIManager:
         self.server.register_message_handler("transcribed_message", 
             lambda ws, data: asyncio.create_task(self.message_handler.handle_transcribed_message(data, ws)))
         
+        # Register the settings button click handler
+        self.server.register_message_handler("settings_click", 
+            lambda ws, data: asyncio.create_task(self.handle_settings_click(ws, data)))
+        
         # Register connection handlers
         self.server.register_connection_handler(self._on_websocket_connect)
         self.server.register_disconnection_handler(self._on_websocket_disconnect)
     
+    async def handle_settings_click(self, websocket, data=None):
+        """
+        Handle the settings button click event by invoking get_config_html from the settings module
+        and sending the formatted HTML back to the client.
+        """
+        from tac.web import settings as settings_module
+        html = settings_module.get_config_html()
+        response = json.dumps({"type": "settings_page", "html": html})
+        await websocket.send(response)
+
     async def notify_tests_run(self):
         """
         Notify the background test runner that tests were recently executed.
