@@ -77,30 +77,23 @@ class PlausibilityTestingAgent(TrustyAgent):
 You are a senior software engineer reviewing code changes. Your task is to determine if the implemented changes match the promised functionality and requirements. Critically, you need to determine if the implemented changes are also actively used in the codebase and integrated properly, especially when existing functionality is replaced with new one. However keep in mind, the implementation was done by a junior developer and we don't want to scare them off. Furthermore, the codebase passed all tests already, but here we are interested if the changes are making sense in what we want to achieve.
 </purpose>
 
-Here are the files that were modified:
-<modified_files>
-{write_files_prompt}
-</modified_files>
+We want to achieve the following task description: {protoblock.task_description}
 
-And here specifically what was changed:
+Here are all the changes that were made by the junior developer. This is the most important place for your evaluation, do these changes in code_diff make sense? Do they fulfill the task description? Are they aligned with the task description?
 <code_diff>
 {code_diff}
 </code_diff>
 
-And here the description of the task:
-<protoblock>
-Task Description: {protoblock.task_description}
-Write Files: {protoblock.write_files}
-Context Files: {protoblock.context_files}
-Plausibility Prompt: {protoblock.trusty_agent_prompts.get("plausibility", "Use common sense.")}
-</protoblock>
-
+For context, here are the full files that the junior developer had access to.
+<modified_files>
+{write_files_prompt}
+</modified_files>
 
 
 <analysis_rules>
-1. Compare the implemented changes against the task description
-2. Verify that the changes fulfill the promised functionality
-3. Check if any changes seem unrelated or potentially harmful
+1. Compare the implemented changes against the task description, looking at the <code_diff> section, because these are the changes.
+2. Verify that the changes in <code_diff> fulfill the promised functionality in the task description.
+3. Check if any changes in <code_diff> seem unrelated, unwanted or potentially harmful
 4. Consider if the implementation is complete and sufficient, particularly that the new code is integrated properly into the program flow and not just isolated dead code.
 5. Look for any missing requirements or incomplete implementations
 6. Look if there are any external dependencies that may have been hallucinated by the junior developer.
@@ -117,11 +110,8 @@ BRIEF SUMMARY OF THE APPROACH
 DETAILED ANALYSIS:
 (Provide in-depth analysis of what matches or mismatches with requirements)
 
-ROOT CAUSE:
+ISSUES:
 (If implausible, explain the fundamental issues)
-
-MISSING FILES:
-(List all files that should have been included into the protoblock either for context or for writing)
 
 RECOMMENDATIONS:
 (List specific suggestions for improvement if needed)
