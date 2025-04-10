@@ -433,8 +433,9 @@ class UIManager:
         """Background task to index files once during UI initialization"""
         try:
             await self.send_status_message("Starting file indexing...")
-            # Perform file indexing immediately.
-            self.project_files.refresh_index()
+            # Run file indexing asynchronously using an executor to avoid blocking the event loop.
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self.project_files.refresh_index)
             self.file_summaries = await self.load_high_level_summaries()
         except Exception as e:
             print(f"Error in background file indexer: {e}")
