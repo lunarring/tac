@@ -404,6 +404,15 @@ class UIManager:
             traceback.print_exc()
             print("Audio functionality may not work properly")
 
+    async def start_background_tasks(self):
+        """Start essential background tasks when the UI starts"""
+        # Immediately perform file indexing instead of scheduling it as a background task.
+        await self._background_file_indexer()
+        
+        # If test running is enabled in config, start the test runner in the background.
+        if config.safe_get('general', 'run_tests_in_background', False):
+            await self.create_or_restart_background_task('test_runner', self._background_test_runner)
+
     async def create_or_restart_background_task(self, task_name, task_coroutine):
         """
         Create a new background task or restart it if it's done.
@@ -420,20 +429,11 @@ class UIManager:
             print(f"Started background task: {task_name}")
         return self._background_tasks[task_name]
 
-    async def start_background_tasks(self):
-        """Start essential background tasks when the UI starts"""
-        # Start file indexing task (now performed only once)
-        await self.create_or_restart_background_task('file_indexer', self._background_file_indexer)
-        
-        # If test running is enabled in config, start the test runner
-        if config.safe_get('general', 'run_tests_in_background', False):
-            await self.create_or_restart_background_task('test_runner', self._background_test_runner)
-
     async def _background_file_indexer(self):
         """Background task to index files once during UI initialization"""
         try:
             await self.send_status_message("Starting file indexing...")
-            # Perform file indexing only once.
+            # Perform file indexing immediately.
             self.project_files.refresh_index()
             self.file_summaries = await self.load_high_level_summaries()
         except Exception as e:
@@ -916,7 +916,7 @@ class UIManager:
         # Send initial status
         await self.send_status_message("Connected. Initializing...")
         
-        # Start background tasks
+        # Start background tasks (file indexing now happens immediately)
         await self.start_background_tasks()
         
         # Display pre-checked git status as a prominent message if there are issues
