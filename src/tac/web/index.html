@@ -468,13 +468,11 @@
     // Listen for messages from the server
     socket.addEventListener('message', (event) => {
       try {
-        // Try to parse as JSON first
         const data = JSON.parse(event.data);
-        
-        // EXPLICITLY FILTER OUT RECORDING STATUS MESSAGES
-        if (data.type === "recording_status" || 
-            (data.component_id === "speech_input" && data.type === "recording_status")) {
-          console.log("Received recording_status message - not displaying in chat");
+        // Handle settings page response first
+        if (data.type === "settings_page") {
+          const blockPanel = document.getElementById('blockPanel');
+          blockPanel.innerHTML = data.html;
           return;
         }
         
@@ -505,8 +503,6 @@
             // Update the attempt number display in protoblock header
             document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
             console.log(`Updated attempt number to ${current}/${max}`);
-            
-            // Don't hide the protoblock here - it will be replaced when the new one is created
           }
           
           // Check for block execution failure message
@@ -518,7 +514,6 @@
             // Force the canvas to be shown and protoblock to be hidden
             document.getElementById('protoblockContainer').style.display = 'none';
             document.querySelector('#blockPanel canvas').style.display = 'block';
-            // Don't clear the data - just hide it
           }
           
           // Show git operations panel after successful block execution
@@ -535,12 +530,10 @@
           errorMessage.textContent = data.message;
           errorMessage.style.display = "block";
           
-          // Apply a slight shake animation by removing and re-adding the class
           errorMessage.classList.remove("animated");
-          void errorMessage.offsetWidth; // Force reflow to restart animation
+          void errorMessage.offsetWidth;
           errorMessage.classList.add("animated");
           
-          // Hide the error message after 30 seconds to allow plenty of time to read
           setTimeout(() => {
             errorMessage.style.display = "none";
           }, 30000);
@@ -548,12 +541,10 @@
           return;
         }
         else if (data.type === "info_message") {
-          // Display info message at the bottom of the right panel
           const infoMessage = document.getElementById("infoMessage");
           infoMessage.textContent = data.message;
           infoMessage.style.display = "block";
           
-          // Automatically hide after 15 seconds
           setTimeout(() => {
             infoMessage.style.display = "none";
           }, 15000);
@@ -561,48 +552,36 @@
           return;
         }
         else if (data.type === "remove_protoblock") {
-          // This is an explicit message to remove the protoblock display
           console.log("Received explicit remove_protoblock message");
-          
-          // Force the canvas to be shown and protoblock to be hidden
           document.getElementById('protoblockContainer').style.display = 'none';
           document.querySelector('#blockPanel canvas').style.display = 'block';
           
-          // Clear any existing protoblock data and rebuild the container
           document.getElementById('protoblockContainer').innerHTML = '';
           rebuildProtoblockContainer();
           
-          // Update runtime status 
           document.getElementById("runtimeStatus").textContent = data.message || "Block processing complete";
           return;
         }
         else if (data.type === "protoblock_data") {
-          // Display protoblock data in the right panel
           console.log("Received protoblock data:", data);
           
-          // Ensure the protoblock container is visible
           document.getElementById('protoblockContainer').style.display = 'block';
           document.querySelector('#blockPanel canvas').style.display = 'none';
           
-          // Display the data
           displayProtoblockData(data);
           
           console.log("Protoblock is now visible");
           return;
         }
         else if (data.type === "transcribed_message") {
-          // Display as a user message
           addChatMessage("User", data.message);
           
-          // Send it back to server for processing
           const payload = {
             type: "user_message",
             message: data.message
           };
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
-
-          // Remove any indication (waiting, recording, transcribing) from micButton once transcription is received
           micButton.classList.remove('waiting');
           micButton.classList.remove('recording');
           micButton.classList.remove('rotating');
@@ -613,16 +592,13 @@
                 data.type === "file_diff_response" || 
                 data.type === "git_branch_response" || 
                 data.type === "git_operation_response") {
-          // Ignore these types of messages - don't display in chat
           console.log(`Received ${data.type}`);
           return;
         }
         else if (data.type === "chat_message") {
-          // Handle properly formatted chat messages
           const role = data.role || "AI";
           const message = data.message || "";
           
-          // Add to chat as appropriate role
           if (role === "user") {
             addChatMessage("User", message);
           } else if (role === "assistant") {
@@ -635,21 +611,16 @@
           return;
         }
         else {
-          // Check for unknown message types that might need special handling
           console.log("Received message with unrecognized type:", data.type);
-          
-          // Check if this is a complete message object that we can parse
           if (typeof data === 'object' && data.message) {
             addChatMessage("AI", data.message);
           } else {
-            // Last resort - display the raw data as a message
             console.warn("Displaying raw message data:", data);
             addChatMessage("AI", JSON.stringify(data));
           }
           hideTypingIndicator();
         }
       } catch (e) {
-        // If not JSON or parsing fails, treat as a regular message
         console.log("Parsing JSON failed, treating as plain text:", e);
         addChatMessage("AI", event.data);
         hideTypingIndicator();
@@ -662,16 +633,13 @@
         event.preventDefault();
         const text = userInput.value.trim();
         if (text !== "") {
-          // Display user's message in the chat history
           addChatMessage("User", text);
           
-          // Format the message as JSON
           const payload = {
             type: "user_message",
             message: text
           };
           
-          // Send the message to the server via WebSocket and show typing animation
           socket.send(JSON.stringify(payload));
           showTypingIndicator();
           userInput.value = "";
@@ -682,24 +650,16 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Immediately update the runtime status to reflect the protoblock execution process
       updateRuntimeStatus("Executing protoblock...", "processing");
-      
-      // Hide the protoblock display when starting a new block generation
       toggleProtoblockDisplay(false);
-      
-      // Clear any existing protoblock data
       document.getElementById('protoblockContainer').innerHTML = '';
       rebuildProtoblockContainer();
       
-      // Add active class to trigger animation
       blockButton.classList.add('active');
-      // Remove active class after a short delay to revert to original state
       setTimeout(() => {
         blockButton.classList.remove('active');
       }, 300);
       
-      // If there is a message typed in, send it first to the chat system
       const text = userInput.value.trim();
       if (text !== "") {
         addChatMessage("User", text);
@@ -712,7 +672,6 @@
         userInput.value = "";
       }
       
-      // Initiate block processing by sending the block_click payload
       const payload = {
         type: "block_click"
       };
@@ -723,15 +682,12 @@
     let isRecording = false; // flag to track recording state
 
     micButton.addEventListener('click', function() {
-      // Toggle the recording state
       isRecording = !isRecording;
       if (isRecording) {
-        // Start recording: add 'recording' class to display red indicator and remove rotating if set
         micButton.classList.add('recording');
         micButton.classList.remove('rotating');
         micButton.classList.remove('transcribing');
       } else {
-        // Stop recording: remove 'recording' class and add 'transcribing' class to indicate ongoing transcription
         micButton.classList.remove('recording');
         micButton.classList.remove('rotating');
         micButton.classList.add('transcribing');
@@ -754,7 +710,6 @@
     const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
     btnCamera.position.z = 2;
 
-    // Updated cube geometry dimensions for a visibly larger cube
     const btnGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
     const btnMaterial = new THREE.MeshPhongMaterial({ 
       color: 0x0078d7, 
@@ -781,693 +736,13 @@
 
     // Initially hide the protoblock display
     toggleProtoblockDisplay(false);
-
-    // Initialize the protoblock container structure
     rebuildProtoblockContainer();
 
-    // Expose socket and cube for testing purposes
-    window.socket = socket;
-    window.cube = cube;
-    
-    // Git Operations Functionality
-    let hasPendingChanges = false;
-    let availableBranches = [];
-    
-    // Function to show git operations panel after successful block execution
-    function showGitOperationsPanel(show) {
-      const gitPanel = document.getElementById('gitOperationsPanel');
-      const inputContainer = document.getElementById('inputContainer');
-      
-      if (!gitPanel) return;
-      
-      if (show) {
-        // Show git panel and hide input
-        gitPanel.style.display = 'block';
-        inputContainer.style.display = 'none';
-        
-        // Request available branches
-        requestBranchList();
-        
-        console.log("Git operations panel shown, chat input hidden");
-      } else {
-        // Hide git panel and show input
-        gitPanel.style.display = 'none';
-        inputContainer.style.display = 'flex';
-        
-        console.log("Git operations panel hidden, chat input shown");
-      }
-    }
-    
-    // Function to request list of available branches
-    function requestBranchList() {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const request = {
-          type: "git_branch_request"
-        };
-        socket.send(JSON.stringify(request));
-      }
-    }
-    
-    // Function to handle commit changes button click
-    function handleCommitChanges() {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        // Get the task description to use as commit message
-        const taskDescription = document.getElementById('taskDescription').textContent.trim();
-        const commitMsg = taskDescription.length > 50 
-          ? taskDescription.substring(0, 47) + '...' 
-          : taskDescription;
-          
-        // Show operation in progress
-        document.getElementById("runtimeStatus").textContent = "Committing changes...";
-        updateRuntimeStatus("Committing changes...", "processing");
-        
-        const request = {
-          type: "git_commit_request",
-          commit_message: commitMsg
-        };
-        socket.send(JSON.stringify(request));
-      }
-    }
-    
-    // Function to handle discard changes button click
-    function handleDiscardChanges() {
-      if (confirm("Are you sure you want to discard all changes?")) {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          // Show operation in progress
-          document.getElementById("runtimeStatus").textContent = "Discarding changes...";
-          updateRuntimeStatus("Discarding changes...", "processing");
-          
-          const request = {
-            type: "git_discard_request"
-          };
-          socket.send(JSON.stringify(request));
-        }
-      }
-    }
-    
-    // Function to handle merge with branch button click
-    function handleMergeBranch() {
-      const branchSelect = document.getElementById('branchSelect');
-      const selectedBranch = branchSelect.value;
-      
-      if (!selectedBranch) {
-        alert("Please select a branch to merge with");
-        return;
-      }
-      
-      if (confirm(`Are you sure you want to merge changes into ${selectedBranch} and delete the current branch?`)) {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          // Show operation in progress
-          document.getElementById("runtimeStatus").textContent = `Merging to ${selectedBranch}...`;
-          updateRuntimeStatus(`Merging to ${selectedBranch}...`, "processing");
-          
-          const request = {
-            type: "git_merge_request",
-            target_branch: selectedBranch
-          };
-          socket.send(JSON.stringify(request));
-        }
-      }
-    }
-    
-    // Wait for DOMContentLoaded to ensure all elements are available
-    document.addEventListener('DOMContentLoaded', function() {
-      // Set up git operation button event listeners
-      const commitBtn = document.getElementById('commitChangesBtn');
-      const discardBtn = document.getElementById('discardChangesBtn');
-      const mergeBtn = document.getElementById('mergeBtn');
-      
-      if (commitBtn) {
-        commitBtn.addEventListener('click', handleCommitChanges);
-      }
-      
-      if (discardBtn) {
-        discardBtn.addEventListener('click', handleDiscardChanges);
-      }
-      
-      if (mergeBtn) {
-        mergeBtn.addEventListener('click', handleMergeBranch);
-      }
-      
-      // Listen for git-related responses
-      socket.addEventListener('message', function(event) {
-        try {
-          const data = JSON.parse(event.data);
-          
-          // Handle git branch response
-          if (data.type === "git_branch_response") {
-            // Populate branch dropdown
-            const branchSelect = document.getElementById('branchSelect');
-            availableBranches = data.branches || [];
-            
-            // Clear existing options
-            while (branchSelect.options.length > 1) {
-              branchSelect.remove(1);
-            }
-            
-            // Add new options
-            availableBranches.forEach(branch => {
-              const option = document.createElement('option');
-              option.value = branch;
-              option.textContent = branch;
-              branchSelect.appendChild(option);
-            });
-          }
-          
-          // Handle git operation response
-          else if (data.type === "git_operation_response") {
-            if (data.success) {
-              // Display success message
-              document.getElementById("runtimeStatus").textContent = `✅ ${data.message}`;
-              updateRuntimeStatus(`✅ ${data.message}`, "success");
-              
-              // Update UI based on operation
-              if (data.operation === "commit") {
-                // Hide git panel after commit
-                document.getElementById('gitOperationsPanel').style.display = 'none';
-                
-                // Wait a bit and disable entirely
-                setTimeout(() => {
-                  showGitOperationsPanel(false);
-                }, 100);
-              }
-              else if (data.operation === "discard") {
-                // Hide git panel and refresh the page to show original state
-                document.getElementById('gitOperationsPanel').style.display = 'none';
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
-              }
-              else if (data.operation === "merge") {
-                // Hide git panel and refresh the page
-                document.getElementById('gitOperationsPanel').style.display = 'none';
-                setTimeout(() => {
-                  window.location.reload();
-                }, 1000);
-              }
-            } else {
-              // Display error message
-              document.getElementById("runtimeStatus").textContent = `❌ ${data.message}`;
-              updateRuntimeStatus(`❌ ${data.message}`, "error");
-            }
-          }
-        } catch (e) {
-          // Not JSON
-        }
-      });
+    // Bind click event for settings: send settings_click message over websocket
+    const settingsButton = document.getElementById('settingsButton');
+    settingsButton.addEventListener('click', function () {
+      socket.send(JSON.stringify({ type: "settings_click" }));
     });
-
-    // Function to make file list items clickable
-    function makeFilesClickable() {
-      const writeFilesList = document.getElementById('writeFilesList');
-      
-      console.log("Making files clickable");
-      
-      // Only apply click handlers if block execution was successful
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
-      const isSuccess = blockStatusTextContent.includes("✅") || 
-                       blockStatusTextContent.includes("successful") ||
-                       blockStatusTextContent.includes("Ready");
-      
-      if (isSuccess) {
-        // Make write files clickable
-        const writeFileItems = writeFilesList.querySelectorAll('li');
-        console.log(`Found ${writeFileItems.length} write files to make clickable`);
-        
-        writeFileItems.forEach(item => {
-          // Remove existing event listeners by cloning the node
-          const newItem = item.cloneNode(true);
-          item.parentNode.replaceChild(newItem, item);
-          
-          // Extract just the filename without any badges or added elements
-          const filename = newItem.childNodes[0].textContent.trim();
-          
-          newItem.classList.add('clickable-file');
-          newItem.addEventListener('click', (event) => {
-            // Prevent clicks on badges from triggering the diff view
-            if (event.target.closest('.line-count-badge')) {
-              return;
-            }
-            
-            console.log(`Clicked on file: ${filename}`);
-            showFileDiff(filename);
-          });
-          
-          // Request file status to highlight modified files
-          checkFileStatus(filename);
-        });
-      } else {
-        console.log("Block execution not successful, not making files clickable");
-      }
-    }
-
-    // Function to check if a file has been modified
-    function checkFileStatus(filename) {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const request = {
-          type: "file_status_request",
-          filename: filename
-        };
-        socket.send(JSON.stringify(request));
-      }
-    }
-
-    // Function to send message to server to request file diff
-    function requestFileDiff(filename) {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        const request = {
-          type: "file_diff_request",
-          filename: filename
-        };
-        socket.send(JSON.stringify(request));
-      }
-    }
-
-    // Update the displayProtoblockData function to make files clickable
-    const originalDisplayProtoblockData = displayProtoblockData;
-    displayProtoblockData = function(data) {
-      // Call the original function
-      originalDisplayProtoblockData(data);
-      
-      // Check if this is a successful block execution
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
-      const isSuccess = blockStatusTextContent.includes("✅") || 
-                       blockStatusTextContent.includes("successful") ||
-                       blockStatusTextContent.includes("Ready");
-                       
-      if (isSuccess) {
-        // Make files clickable after a delay to ensure the DOM is ready
-        setTimeout(makeFilesClickable, 300);
-      }
-    };
-
-    // Add handling for file_status_response messages
-    socket.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === "file_status_response") {
-          // Handle file status update
-          const { filename, is_modified, error, added_lines, removed_lines } = data;
-          
-          if (error) {
-            console.log(`Error checking status for ${filename}: ${error}`);
-            return;
-          }
-          
-          // Find the file item in the write files list
-          const writeFilesList = document.getElementById('writeFilesList');
-          if (!writeFilesList) return;
-          
-          const items = writeFilesList.querySelectorAll('li');
-          items.forEach(item => {
-            // Extract the actual filename from the first text node
-            let itemFilename = '';
-            if (item.childNodes.length > 0 && item.childNodes[0].nodeType === Node.TEXT_NODE) {
-              itemFilename = item.childNodes[0].textContent.trim();
-            } else {
-              itemFilename = item.textContent.trim();
-            }
-            
-            if (itemFilename === filename.trim()) {
-              // Update class based on modification status
-              if (is_modified) {
-                item.classList.add('modified-file');
-                
-                // Add line counts if available
-                if (added_lines > 0 || removed_lines > 0) {
-                  // Create line count display
-                  let lineCountHTML = '';
-                  
-                  if (added_lines > 0) {
-                    lineCountHTML += `<span class="line-count-added">+${added_lines}</span>`;
-                  }
-                  
-                  if (removed_lines > 0) {
-                    lineCountHTML += `<span class="line-count-removed">-${removed_lines}</span>`;
-                  }
-                  
-                  // Add the line count badge
-                  const badge = document.createElement('span');
-                  badge.className = 'line-count-badge';
-                  badge.innerHTML = lineCountHTML;
-                  
-                  // Remove any existing badge first
-                  const existingBadge = item.querySelector('.line-count-badge');
-                  if (existingBadge) {
-                    item.removeChild(existingBadge);
-                  }
-                  
-                  // Add new badge
-                  item.appendChild(badge);
-                }
-              } else {
-                item.classList.remove('modified-file');
-                // Remove any existing line count badge
-                const existingBadge = item.querySelector('.line-count-badge');
-                if (existingBadge) {
-                  item.removeChild(existingBadge);
-                }
-              }
-            }
-          });
-        }
-      } catch (e) {
-        // Not JSON or not a file_status_response
-      }
-    });
-
-    // When we get a file_diff_response, handle both unified and split views
-    socket.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === "file_diff_response") {
-          // Display the diff in the overlay
-          fileDiffTitle.textContent = `Changes in ${data.filename}`;
-          
-          // Format and display the diff with syntax highlighting
-          let formattedDiff = '';
-          
-          if (data.error) {
-            formattedDiff = `<div class="diff-error">Error: ${data.error}</div>`;
-            fileDiffBody.innerHTML = formattedDiff;
-            fileDiffLeft.innerHTML = formattedDiff;
-            fileDiffRight.innerHTML = formattedDiff;
-          } else if (!data.diff || data.diff.trim() === '') {
-            formattedDiff = '<div class="diff-empty">No changes detected for this file.</div>';
-            fileDiffBody.innerHTML = formattedDiff;
-            fileDiffLeft.innerHTML = formattedDiff;
-            fileDiffRight.innerHTML = formattedDiff;
-          } else {
-            // Handle the case where diff is just file content
-            if (data.diff.startsWith("Full file content") || data.diff.startsWith("File is tracked")) {
-              // Simple content display
-              const content = data.diff.replace(/^Full file content.*?\n/g, '');
-              formattedDiff = `<div class="diff-section">${data.diff.split('\n')[0]}</div>`;
-              formattedDiff += `<pre class="diff-unchanged">${escapeHtml(content)}</pre>`;
-              
-              // For split view, show the same content on both sides
-              fileDiffLeft.innerHTML = `<div class="diff-file-header">Original</div><pre>${escapeHtml(content)}</pre>`;
-              fileDiffRight.innerHTML = `<div class="diff-file-header">Modified</div><pre>${escapeHtml(content)}</pre>`;
-              window.currentDiffLineCount = content.split('\n').length + 5; // +5 for headers
-            } else {
-              // Process the diff for unified view
-              const diffLines = data.diff.split('\n');
-              let inSection = false;
-              
-              diffLines.forEach(line => {
-                if (line.startsWith("=== ") && line.endsWith(" ===")) {
-                  // Section header (staged/unstaged)
-                  formattedDiff += `<div class="diff-section">${line}</div>`;
-                  inSection = true;
-                } else if (line.startsWith('+') && !line.startsWith('+++')) {
-                  formattedDiff += `<div class="diff-added">${escapeHtml(line)}</div>`;
-                } else if (line.startsWith('-') && !line.startsWith('---')) {
-                  formattedDiff += `<div class="diff-removed">${escapeHtml(line)}</div>`;
-                } else if (line.startsWith('@@')) {
-                  formattedDiff += `<div class="diff-header">${escapeHtml(line)}</div>`;
-                } else if (line.startsWith('diff') || line.startsWith('---') || line.startsWith('+++')) {
-                  formattedDiff += `<div class="diff-header">${escapeHtml(line)}</div>`;
-                } else {
-                  formattedDiff += `<div class="diff-unchanged">${escapeHtml(line)}</div>`;
-                }
-              });
-              
-              // Create split view
-              const splitViewContent = parseDiffForSplitView(data.diff);
-              fileDiffLeft.innerHTML = splitViewContent.left;
-              fileDiffRight.innerHTML = splitViewContent.right;
-              window.currentDiffLineCount = splitViewContent.lineCount;
-            }
-            
-            fileDiffBody.innerHTML = formattedDiff;
-          }
-          
-          fileDiffOverlay.style.display = 'flex';
-          
-          // Set the view mode according to current setting
-          if (diffViewMode === 'unified') {
-            fileDiffBody.style.display = 'block';
-            fileDiffSplitView.style.display = 'none';
-            fileDiffViewToggle.textContent = 'Split View';
-          } else {
-            fileDiffBody.style.display = 'none';
-            fileDiffSplitView.style.display = 'flex';
-            fileDiffViewToggle.textContent = 'Unified View';
-            // Setup synchronized scrolling
-            setupSplitViewScrolling();
-          }
-        }
-      } catch (e) {
-        // Not JSON or not a file diff response
-        console.log("Error parsing message:", e);
-      }
-    });
-
-    // Trusty Agent Prompt Overlay functionality
-    const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
-    const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
-    const trustyAgentBody = document.getElementById('trustyAgentBody');
-    const trustyAgentTitle = document.getElementById('trustyAgentTitle');
-
-    // Function to show a specific trusty agent prompt
-    function showTrustyAgentPrompt(agentName, agentKey) {
-      console.log(`Showing prompt for agent: ${agentName} (key: ${agentKey})`);
-      
-      // Set the title
-      trustyAgentTitle.textContent = `${agentName}`;
-      
-      // Get the prompt
-      const prompt = window.trustyAgentPrompts[agentName] || '';
-      console.log(`Prompt for ${agentName}:`, prompt ? 'exists' : 'not found');
-      
-      // Get the results (if any)
-      // Try both the full name and the key name to match backend storage
-      const results = window.trustyAgentResults && 
-                     (window.trustyAgentResults[agentName] || window.trustyAgentResults[agentKey] || null);
-      
-      console.log(`Results for ${agentName}:`, results || 'not found');
-      
-      // Set the prompt text
-      const promptTextElement = document.getElementById('trustyAgentPromptText');
-      promptTextElement.textContent = prompt || 'No prompt available for this agent.';
-      
-      // Process results if available
-      const resultSection = document.getElementById('trustyAgentResultSection');
-      const resultTextElement = document.getElementById('trustyAgentResultText');
-      const resultStatusElement = document.getElementById('trustyAgentResultStatus');
-      const imageSection = document.getElementById('trustyAgentImageSection');
-      const imageElement = document.getElementById('trustyAgentImage');
-      
-      // Get the runtime status to check if execution was successful
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const executionSuccessful = runtimeStatus.textContent.includes("✅");
-      
-      if (results && (results.output || results.image_url)) {
-        console.log(`${agentName} has results to display`);
-        
-        // Show result section if there's output text
-        if (results.output) {
-          console.log(`${agentName} output:`, results.output);
-          resultSection.style.display = 'block';
-          resultTextElement.textContent = results.output;
-          
-          // Set status indicator
-          if (results.status) {
-            resultStatusElement.className = 'agent-status ' + results.status;
-            let statusText = '';
-            switch (results.status) {
-              case 'passed':
-                statusText = 'Verification Passed ✅';
-                break;
-              case 'failed':
-                statusText = 'Verification Failed ❌';
-                break;
-              case 'error':
-                statusText = 'Execution Error ⚠️';
-                break;
-              default:
-                statusText = results.status;
-            }
-            resultStatusElement.textContent = statusText;
-            resultStatusElement.style.display = 'inline-block';
-          } else {
-            resultStatusElement.style.display = 'none';
-          }
-        } else {
-          resultSection.style.display = 'none';
-        }
-        
-        // Show image section if there's an image URL
-        if (results.image_url) {
-          console.log(`${agentName} image URL:`, results.image_url);
-          imageSection.style.display = 'block';
-          imageElement.src = results.image_url;
-        } else {
-          imageSection.style.display = 'none';
-        }
-      } else {
-        console.log(`${agentName} has no results to display`);
-        
-        // Show message based on execution status
-        resultSection.style.display = 'block';
-        resultStatusElement.style.display = 'none';
-        if (executionSuccessful) {
-          // Execution was successful but no results for this agent
-          resultTextElement.innerHTML = '<div class="diff-empty">This agent was executed but did not produce any output.</div>';
-        } else {
-          // Execution may still be in progress or failed
-          resultTextElement.innerHTML = '<div class="diff-empty">No results available yet for this agent.</div>';
-        }
-        imageSection.style.display = 'none';
-      }
-      
-      // Show the overlay
-      trustyAgentOverlay.style.display = 'flex';
-    }
-
-    // Close overlay when clicking the close button
-    trustyAgentCloseBtn.addEventListener('click', () => {
-      trustyAgentOverlay.style.display = 'none';
-    });
-
-    // Close overlay when clicking outside the content
-    trustyAgentOverlay.addEventListener('click', (event) => {
-      if (event.target === trustyAgentOverlay) {
-        trustyAgentOverlay.style.display = 'none';
-      }
-    });
-
-    function displayTrustyAgentPrompt(agentName, protoblock) {
-      console.log("Displaying prompt for agent:", agentName);
-      const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
-      const trustyAgentTitle = document.getElementById('trustyAgentTitle');
-      const trustyAgentPromptText = document.getElementById('trustyAgentPromptText');
-      const trustyAgentResultSection = document.getElementById('trustyAgentResultSection');
-      const trustyAgentResultText = document.getElementById('trustyAgentResultText');
-      const trustyAgentImageSection = document.getElementById('trustyAgentImageSection');
-      const trustyAgentImage = document.getElementById('trustyAgentImage');
-      const trustyAgentAgentType = document.getElementById('trustyAgentAgentType');
-      const trustyAgentResultStatus = document.getElementById('trustyAgentResultStatus');
-      const trustyAgentComparisonImage = document.getElementById('trustyAgentComparisonImage');
-      const comparisonImageContainer = document.getElementById('comparisonImageContainer');
-      const trustyAgentTestResultsSection = document.getElementById('trustyAgentTestResultsSection');
-      const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
-      const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
-      const trustyAgentSummary = document.getElementById('trustyAgentSummary');
-      const trustyAgentPlausibilitySection = document.getElementById('trustyAgentPlausibilitySection');
-      const trustyAgentGrade = document.getElementById('trustyAgentGrade');
-      const trustyAgentGradeInfo = document.getElementById('trustyAgentGradeInfo');
-      const trustyAgentVerificationInfo = document.getElementById('trustyAgentVerificationInfo');
-
-      // Display the overlay
-      trustyAgentOverlay.style.display = 'flex';
-
-      // Set the title
-      trustyAgentTitle.textContent = `Trusty Agent: ${agentName}`;
-
-      // Set the prompt text
-      const agentKey = agentName.toLowerCase();
-      let agentPrompt = "";
-
-      // Check if the prompt exists for the agent
-      let hasPrompt = false;
-      if (protoblock.trusty_agent_prompts && protoblock.trusty_agent_prompts[agentKey]) {
-        hasPrompt = true;
-        agentPrompt = protoblock.trusty_agent_prompts[agentKey];
-      }
-
-      trustyAgentPromptText.textContent = hasPrompt ? agentPrompt : "No prompt found for this agent.";
-
-      // Check if there are results for this agent
-      let resultObj = null;
-      let hasResults = false;
-      
-      if (protoblock.trusty_agent_results) {
-        console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
-        const possibleKeys = [agentName, agentKey, agentName.toLowerCase(), agentKey.replace('agent', '')];
-        for (const key of possibleKeys) {
-          if (protoblock.trusty_agent_results[key]) {
-            resultObj = protoblock.trusty_agent_results[key];
-            hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
-            console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
-            break;
-          }
-        }
-      }
-      
-      // Helper function to make file paths usable in the browser
-      function makePathUsable(path) {
-        if (!path) return null;
-        if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('./') || path.startsWith('/')) {
-          return path;
-        }
-        try {
-          return 'file://' + path;
-        } catch (e) {
-          console.error('Error processing path:', e);
-          return path;
-        }
-      }
-
-      // Clear previous display state
-      trustyAgentResultSection.style.display = 'none';
-      trustyAgentImageSection.style.display = 'none';
-      trustyAgentTestResultsSection.style.display = 'none';
-      trustyAgentSummarySection.style.display = 'none';
-      trustyAgentPlausibilitySection.style.display = 'none';
-
-      // Display or hide the result section based on whether there are results
-      if (hasResults && resultObj) {
-        if (resultObj.output) {
-          trustyAgentResultSection.style.display = 'block';
-          if (resultObj.status) {
-            trustyAgentResultStatus.textContent = resultObj.status;
-            trustyAgentResultStatus.className = 'agent-status';
-            if (resultObj.status.toLowerCase() === 'passed') {
-              trustyAgentResultStatus.classList.add('passed');
-            } else if (resultObj.status.toLowerCase() === 'failed') {
-              trustyAgentResultStatus.classList.add('failed');
-            } else {
-              trustyAgentResultStatus.classList.add('error');
-            }
-          } else {
-            trustyAgentResultStatus.textContent = '';
-            trustyAgentResultStatus.className = 'agent-status';
-          }
-          trustyAgentResultText.textContent = resultObj.output || "No text output available";
-        }
-        if (resultObj.image_url) {
-          trustyAgentImageSection.style.display = 'block';
-          const usablePath = makePathUsable(resultObj.image_url);
-          trustyAgentImage.src = usablePath;
-          console.log(`Setting main image src to: ${usablePath}`);
-        } else {
-          trustyAgentImageSection.style.display = 'none';
-        }
-        if (resultObj.comparison_path) {
-          comparisonImageContainer.style.display = 'block';
-          const usablePath = makePathUsable(resultObj.comparison_path);
-          trustyAgentComparisonImage.src = usablePath;
-          console.log(`Setting comparison image src to: ${usablePath}`);
-        } else {
-          comparisonImageContainer.style.display = 'none';
-        }
-      } else {
-        trustyAgentResultSection.style.display = 'block';
-        trustyAgentResultStatus.style.display = 'none';
-        trustyAgentAgentType.style.display = 'none';
-        trustyAgentResultText.textContent = "No results found for this agent.";
-        console.log(`No results found for agent: ${agentKey}`);
-      }
-
-      const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
-      trustyAgentCloseBtn.onclick = function() {
-        trustyAgentOverlay.style.display = 'none';
-      };
-    }
   </script>
   
   <!-- File diff overlay -->
@@ -1564,8 +839,6 @@
         fileDiffBody.style.display = 'none';
         fileDiffSplitView.style.display = 'flex';
         fileDiffViewToggle.textContent = 'Unified View';
-        
-        // Set proper height for scroll container after switching to split view
         setupSplitViewScrolling();
       } else {
         diffViewMode = 'unified';
@@ -1575,7 +848,6 @@
       }
     });
     
-    // Function to set up synchronized scrolling
     function setupSplitViewScrolling() {
       const scrollContainer = document.getElementById('fileDiffScrollContainer');
       const scrollContent = document.getElementById('fileDiffScrollContent');
@@ -1592,7 +864,6 @@
       };
     }
 
-    // Function to parse a git diff and create the split view content
     function parseDiffForSplitView(diff) {
       const leftContent = [];
       const rightContent = [];
@@ -1704,7 +975,6 @@
       };
     }
 
-    // Helper function to escape HTML special characters
     function escapeHtml(unsafe) {
       return unsafe
           .replace(/&/g, "&amp;")
@@ -1714,19 +984,16 @@
           .replace(/'/g, "&#039;");
     }
 
-    // Close overlay when clicking the close button
     fileDiffCloseBtn.addEventListener('click', () => {
       fileDiffOverlay.style.display = 'none';
     });
 
-    // Close overlay when clicking outside the content
     fileDiffOverlay.addEventListener('click', (event) => {
       if (event.target === fileDiffOverlay) {
         fileDiffOverlay.style.display = 'none';
       }
     });
 
-    // Function to fetch and show file diff
     async function showFileDiff(filename) {
       fileDiffTitle.textContent = `Changes in ${filename}`;
       fileDiffBody.innerHTML = 'Loading diff...';
@@ -1734,35 +1001,239 @@
       fileDiffRight.innerHTML = 'Loading...';
       fileDiffOverlay.style.display = 'flex';
       
-      // Send WebSocket request for file diff
       requestFileDiff(filename);
     }
   </script>
   
+  <!-- Trusty Agent Prompt overlay functionality -->
+  <script>
+    const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
+    const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
+    const trustyAgentBody = document.getElementById('trustyAgentBody');
+    const trustyAgentTitle = document.getElementById('trustyAgentTitle');
+
+    function showTrustyAgentPrompt(agentName, agentKey) {
+      console.log(`Showing prompt for agent: ${agentName} (key: ${agentKey})`);
+      
+      trustyAgentTitle.textContent = `${agentName}`;
+      
+      const prompt = window.trustyAgentPrompts[agentName] || '';
+      console.log(`Prompt for ${agentName}:`, prompt ? 'exists' : 'not found');
+      
+      const results = window.trustyAgentResults && 
+                     (window.trustyAgentResults[agentName] || window.trustyAgentResults[agentKey] || null);
+      
+      console.log(`Results for ${agentName}:`, results || 'not found');
+      
+      const promptTextElement = document.getElementById('trustyAgentPromptText');
+      promptTextElement.textContent = prompt || 'No prompt available for this agent.';
+      
+      const resultSection = document.getElementById('trustyAgentResultSection');
+      const resultTextElement = document.getElementById('trustyAgentResultText');
+      const resultStatusElement = document.getElementById('trustyAgentResultStatus');
+      const imageSection = document.getElementById('trustyAgentImageSection');
+      const imageElement = document.getElementById('trustyAgentImage');
+      
+      const runtimeStatus = document.getElementById('runtimeStatus');
+      const executionSuccessful = runtimeStatus.textContent.includes("✅");
+      
+      if (results && (results.output || results.image_url)) {
+        console.log(`${agentName} has results to display`);
+        
+        if (results.output) {
+          console.log(`${agentName} output:`, results.output);
+          resultSection.style.display = 'block';
+          resultTextElement.textContent = results.output;
+          
+          if (results.status) {
+            resultStatusElement.className = 'agent-status ' + results.status;
+            let statusText = '';
+            switch (results.status) {
+              case 'passed':
+                statusText = 'Verification Passed ✅';
+                break;
+              case 'failed':
+                statusText = 'Verification Failed ❌';
+                break;
+              case 'error':
+                statusText = 'Execution Error ⚠️';
+                break;
+              default:
+                statusText = results.status;
+            }
+            resultStatusElement.textContent = statusText;
+            resultStatusElement.style.display = 'inline-block';
+          } else {
+            resultStatusElement.style.display = 'none';
+          }
+        } else {
+          resultSection.style.display = 'none';
+        }
+        
+        if (results.image_url) {
+          console.log(`${agentName} image URL:`, results.image_url);
+          imageSection.style.display = 'block';
+          imageElement.src = results.image_url;
+        } else {
+          imageSection.style.display = 'none';
+        }
+      } else {
+        console.log(`${agentName} has no results to display`);
+        
+        resultSection.style.display = 'block';
+        resultStatusElement.style.display = 'none';
+        if (executionSuccessful) {
+          resultTextElement.innerHTML = '<div class="diff-empty">This agent was executed but did not produce any output.</div>';
+        } else {
+          resultTextElement.innerHTML = '<div class="diff-empty">No results available yet for this agent.</div>';
+        }
+        imageSection.style.display = 'none';
+      }
+      
+      trustyAgentOverlay.style.display = 'flex';
+    }
+
+    trustyAgentCloseBtn.addEventListener('click', () => {
+      trustyAgentOverlay.style.display = 'none';
+    });
+
+    trustyAgentOverlay.addEventListener('click', (event) => {
+      if (event.target === trustyAgentOverlay) {
+        trustyAgentOverlay.style.display = 'none';
+      }
+    });
+
+    function displayTrustyAgentPrompt(agentName, protoblock) {
+      console.log("Displaying prompt for agent:", agentName);
+      const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
+      const trustyAgentTitle = document.getElementById('trustyAgentTitle');
+      const trustyAgentPromptText = document.getElementById('trustyAgentPromptText');
+      const trustyAgentResultSection = document.getElementById('trustyAgentResultSection');
+      const trustyAgentResultText = document.getElementById('trustyAgentResultText');
+      const trustyAgentImageSection = document.getElementById('trustyAgentImageSection');
+      const trustyAgentImage = document.getElementById('trustyAgentImage');
+      const trustyAgentAgentType = document.getElementById('trustyAgentAgentType');
+      const trustyAgentResultStatus = document.getElementById('trustyAgentResultStatus');
+      const trustyAgentComparisonImage = document.getElementById('trustyAgentComparisonImage');
+      const comparisonImageContainer = document.getElementById('comparisonImageContainer');
+      const trustyAgentTestResultsSection = document.getElementById('trustyAgentTestResultsSection');
+      const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
+      const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
+      const trustyAgentSummary = document.getElementById('trustyAgentSummary');
+      const trustyAgentPlausibilitySection = document.getElementById('trustyAgentPlausibilitySection');
+      const trustyAgentGrade = document.getElementById('trustyAgentGrade');
+      const trustyAgentGradeInfo = document.getElementById('trustyAgentGradeInfo');
+      const trustyAgentVerificationInfo = document.getElementById('trustyAgentVerificationInfo');
+
+      trustyAgentOverlay.style.display = 'flex';
+
+      trustyAgentTitle.textContent = `Trusty Agent: ${agentName}`;
+
+      const agentKey = agentName.toLowerCase();
+      let agentPrompt = "";
+
+      let hasPrompt = false;
+      if (protoblock.trusty_agent_prompts && protoblock.trusty_agent_prompts[agentKey]) {
+        hasPrompt = true;
+        agentPrompt = protoblock.trusty_agent_prompts[agentKey];
+      }
+
+      trustyAgentPromptText.textContent = hasPrompt ? agentPrompt : "No prompt found for this agent.";
+
+      let resultObj = null;
+      let hasResults = false;
+      
+      if (protoblock.trusty_agent_results) {
+        console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
+        const possibleKeys = [agentName, agentKey, agentName.toLowerCase(), agentKey.replace('agent', '')];
+        for (const key of possibleKeys) {
+          if (protoblock.trusty_agent_results[key]) {
+            resultObj = protoblock.trusty_agent_results[key];
+            hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
+            console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
+            break;
+          }
+        }
+      }
+      
+      function makePathUsable(path) {
+        if (!path) return null;
+        if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('./') || path.startsWith('/')) {
+          return path;
+        }
+        try {
+          return 'file://' + path;
+        } catch (e) {
+          console.error('Error processing path:', e);
+          return path;
+        }
+      }
+
+      trustyAgentResultSection.style.display = 'none';
+      trustyAgentImageSection.style.display = 'none';
+      trustyAgentTestResultsSection.style.display = 'none';
+      trustyAgentSummarySection.style.display = 'none';
+      trustyAgentPlausibilitySection.style.display = 'none';
+
+      if (hasResults && resultObj) {
+        if (resultObj.output) {
+          trustyAgentResultSection.style.display = 'block';
+          if (resultObj.status) {
+            trustyAgentResultStatus.textContent = resultObj.status;
+            trustyAgentResultStatus.className = 'agent-status';
+            if (resultObj.status.toLowerCase() === 'passed') {
+              trustyAgentResultStatus.classList.add('passed');
+            } else if (resultObj.status.toLowerCase() === 'failed') {
+              trustyAgentResultStatus.classList.add('failed');
+            } else {
+              trustyAgentResultStatus.classList.add('error');
+            }
+          } else {
+            trustyAgentResultStatus.textContent = '';
+            trustyAgentResultStatus.className = 'agent-status';
+          }
+          trustyAgentResultText.textContent = resultObj.output || "No text output available";
+        }
+        if (resultObj.image_url) {
+          trustyAgentImageSection.style.display = 'block';
+          const usablePath = makePathUsable(resultObj.image_url);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting main image src to: ${usablePath}`);
+        } else {
+          trustyAgentImageSection.style.display = 'none';
+        }
+        if (resultObj.comparison_path) {
+          comparisonImageContainer.style.display = 'block';
+          const usablePath = makePathUsable(resultObj.comparison_path);
+          trustyAgentComparisonImage.src = usablePath;
+          console.log(`Setting comparison image src to: ${usablePath}`);
+        } else {
+          comparisonImageContainer.style.display = 'none';
+        }
+      } else {
+        trustyAgentResultSection.style.display = 'block';
+        trustyAgentResultStatus.style.display = 'none';
+        trustyAgentAgentType.style.display = 'none';
+        trustyAgentResultText.textContent = "No results found for this agent.";
+        console.log(`No results found for agent: ${agentKey}`);
+      }
+
+      const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
+      trustyAgentCloseBtn.onclick = function() {
+        trustyAgentOverlay.style.display = 'none';
+      };
+    }
+  </script>
+  
+  <script>
+    // File diff view toggle and helper functions already defined above
+  </script>
+  
   <!-- New settings page functionality -->
   <script>
-    // Bind click event on the settings button to replace the right panel with a settings page
-    const settingsButton = document.getElementById('settingsButton');
-    settingsButton.addEventListener('click', function () {
-      const blockPanel = document.getElementById('blockPanel');
-      // Clear the current content of the blockPanel
-      blockPanel.innerHTML = '';
-      // Create a settings page container with placeholder content
-      const settingsPage = document.createElement('div');
-      settingsPage.id = 'settingsPage';
-      settingsPage.style.padding = '20px';
-      settingsPage.innerHTML = `
-        <h2>Settings Page</h2>
-        <p>This is a placeholder for settings. Adjust controls as needed.</p>
-        <div>
-          <label for="dummyInput">Dummy Input:</label>
-          <input type="text" id="dummyInput" placeholder="Enter value">
-        </div>
-        <br>
-        <button id="dummyButton">Dummy Action</button>
-      `;
-      blockPanel.appendChild(settingsPage);
-    });
+    // Removed previous placeholder implementation.
+    // The settings button now sends a WebSocket message ("settings_click")
+    // which is handled by the UIManager on the backend to generate settings HTML via get_config_html.
   </script>
 </body>
 </html>
