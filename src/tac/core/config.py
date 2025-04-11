@@ -73,7 +73,7 @@ class LLMSettings:
     temperature: float = 0.7
     max_tokens: Optional[int] = None
     verify_ssl: bool = True
-    timeout: int = 120
+    timeout: int = 240
     max_image_dimension: int = 1200  # Maximum dimension for image downscaling
     reasoning_effort: str = "medium"  # Added reasoning_effort
 
