@@ -20,6 +20,7 @@ class LLMProvider(Enum):
     """Supported LLM providers."""
     DEEPSEEK = "deepseek"
     OPENAI = "openai"
+    GEMINI = "gemini"
 
 @dataclass
 class Message:
@@ -48,8 +49,22 @@ class LLMClient:
         self.config = llm_config
         self.client = self._initialize_client()
     
-    def _initialize_client(self) -> OpenAI:
-        """Initialize the OpenAI client with appropriate configuration."""
+    def _initialize_client(self) -> Union[OpenAI, Any]:
+        """Initialize the client with appropriate configuration."""
+        # Handle Gemini client initialization
+        if self.config.provider == LLMProvider.GEMINI.value:
+            try:
+                import google.generativeai as genai
+                api_key = self.config.api_key or os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    raise ValueError("Gemini API key is required. Set it in the config or as GEMINI_API_KEY environment variable.")
+                genai.configure(api_key=api_key)
+                return genai
+            except ImportError:
+                logger.error("To use Gemini, please install the google-generativeai package: pip install google-generativeai")
+                raise
+        
+        # Handle OpenAI client initialization (default)
         kwargs = {
             "api_key": self.config.api_key or os.getenv(f"{self.config.provider.upper()}_API_KEY"),
             "timeout": self.config.settings.timeout,
@@ -66,9 +81,10 @@ class LLMClient:
         For reasoning models, incorporate the reasoning strength into the system prompt messages.
         For non-reasoning (e.g., vision model 'gpt-4o'), do nothing.
         """
-        # Assuming vision model is identified by 'gpt-4o'
-        if self.config.model == "gpt-4o":
+        # Skip for Gemini or vision models
+        if self.config.provider == LLMProvider.GEMINI.value or self.config.model == "gpt-4o":
             return messages
+        
         for msg in messages:
             if msg.role == "system":
                 msg.content = f"{msg.content}\n(Reasoning Effort: {self.config.settings.reasoning_effort})"
@@ -97,6 +113,10 @@ class LLMClient:
         if self.config.model.lower() == "weak":
             combined_response = " ".join(message.content for message in messages)
             return combined_response
+        
+        # Handle Gemini API
+        if self.config.provider == LLMProvider.GEMINI.value:
+            return self._gemini_chat_completion(messages, temperature, max_tokens, stream)
         
         # Inject reasoning effort into system prompts for reasoning models.
         messages = self._inject_reasoning_into_system(messages)
@@ -166,6 +186,99 @@ class LLMClient:
                     error_msg += f"\nResponse body: {e.response.text}"
                 except:
                     pass
+            logger.error(error_msg)
+            return f"LLM failure: {error_msg}"
+    
+    def _gemini_chat_completion(
+        self,
+        messages: List[Message],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False,
+    ) -> str:
+        """
+        Send a chat completion request to the Gemini API.
+        
+        Args:
+            messages: List of messages in the conversation
+            temperature: Controls randomness (0.0 to 1.0)
+            max_tokens: Maximum number of tokens to generate
+            stream: Whether to stream the response
+            
+        Returns:
+            str: The content of the model's response message
+        """
+        try:
+            # Convert to Gemini message format
+            gemini_messages = []
+            
+            # Gemini uses "user" and "model" roles instead of "user" and "assistant"
+            role_mapping = {
+                "user": "user",
+                "assistant": "model",
+                "system": "user"  # Gemini doesn't have system messages, prepend to first user message
+            }
+            
+            system_content = ""
+            for msg in messages:
+                if msg.role == "system":
+                    system_content += msg.content + "\n"
+                else:
+                    gemini_role = role_mapping.get(msg.role, "user")
+                    content = msg.content
+                    
+                    # If this is the first user message and we have system content, prepend it
+                    if gemini_role == "user" and system_content and not any(m.get("role") == "user" for m in gemini_messages):
+                        content = system_content + "\n" + content
+                        system_content = ""  # Clear after using
+                    
+                    gemini_messages.append({"role": gemini_role, "parts": [{"text": content}]})
+            
+            # If we have system content but no user messages to attach it to, add it as a user message
+            if system_content:
+                gemini_messages.append({"role": "user", "parts": [{"text": system_content}]})
+                # Add a model response to maintain the conversation flow
+                gemini_messages.append({"role": "model", "parts": [{"text": "I understand."}]})
+            
+            # Configure generation parameters
+            generation_config = {}
+            
+            if temperature is None:
+                temperature = self.config.settings.temperature
+            generation_config["temperature"] = temperature
+            
+            if max_tokens is None:
+                max_tokens = self.config.settings.max_tokens
+            if max_tokens:
+                generation_config["max_output_tokens"] = max_tokens
+            
+            # Get the model
+            model = self.client.GenerativeModel(self.config.model)
+            
+            # Create the chat session
+            chat = model.start_chat(history=gemini_messages[:-1] if gemini_messages else [])
+            
+            # Generate the response
+            logger.debug(f"Gemini pre: Messages: {gemini_messages}, Config: {generation_config}")
+            response = chat.send_message(
+                gemini_messages[-1]["parts"][0]["text"] if gemini_messages else "",
+                generation_config=generation_config,
+                stream=stream
+            )
+            logger.debug(f"Gemini post: Response received")
+            
+            if stream:
+                # Collect streamed response
+                full_response = ""
+                for chunk in response:
+                    if chunk.text:
+                        full_response += chunk.text
+                return full_response
+            else:
+                return response.text
+                
+        except Exception as e:
+            error_msg = f"Gemini API call failed: {str(e)}"
             logger.error(error_msg)
             return f"LLM failure: {error_msg}"
         
@@ -254,60 +367,57 @@ class LLMClient:
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
-        # Process image with downscaling if needed and encode to base64
-        try:
-            with Image.open(image_path) as img:
-                width, height = img.size
-                max_dimension = self.config.settings.max_image_dimension
-                if width > max_dimension or height > max_dimension:
-                    scale = max_dimension / max(width, height)
-                    new_width = int(width * scale)
-                    new_height = int(height * scale)
-                    img = img.resize((new_width, new_height))
-                    logger.info(f"Image downscaled from ({width}x{height}) to ({new_width}x{new_height}).")
-                else:
-                    logger.info(f"Image size ({width}x{height}) within limits, no downscaling applied.")
-                
-                # Determine image format from file extension
-                image_ext = os.path.splitext(image_path)[1].lower()
-                if image_ext in ['.jpg', '.jpeg']:
-                    mime_type = 'image/jpeg'
-                    image_format = 'JPEG'
-                elif image_ext == '.png':
-                    mime_type = 'image/png'
-                    image_format = 'PNG'
-                else:
-                    # Default to JPEG if unknown
-                    mime_type = 'image/jpeg'
-                    image_format = 'JPEG'
-                
-                buffer = BytesIO()
-                img.save(buffer, format=image_format)
-                image_bytes = buffer.getvalue()
-                
-            # Encode to base64
-            base64_image = base64.b64encode(image_bytes).decode('utf-8')
-            logger.info(f"Image encoded successfully: {image_path} as {mime_type}")
+        # Handle Gemini vision
+        if self.config.provider == LLMProvider.GEMINI.value:
+            return self._gemini_vision_chat_completion(messages, image_path, temperature)
             
+        # Prepare the image for the API call
+        try:
+            # Open and potentially resize the image
+            with Image.open(image_path) as img:
+                # Ensure image is in a supported format
+                if img.format not in ['JPEG', 'PNG', 'GIF', 'WEBP']:
+                    logger.warning(f"Converting image from {img.format} to PNG")
+                    img = img.convert('RGB')
+                    temp_path = f"{os.path.splitext(image_path)[0]}_converted.png"
+                    img.save(temp_path, format='PNG')
+                    image_path = temp_path
+                
+                # Check if we need to resize the image
+                max_dim = self.config.settings.max_image_dimension
+                if max(img.width, img.height) > max_dim:
+                    logger.info(f"Resizing image to fit within {max_dim}x{max_dim}")
+                    img = self.downscale_image(img, max_dim, max_dim)
+                    temp_path = f"{os.path.splitext(image_path)[0]}_resized.png"
+                    img.save(temp_path, format='PNG')
+                    image_path = temp_path
         except Exception as e:
-            error_msg = f"Failed to process and encode image: {str(e)}"
+            error_msg = f"Error processing image: {str(e)}"
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
-        # Convert messages to the format expected by the API
+        # Encode the image to base64
+        try:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+        except Exception as e:
+            error_msg = f"Error encoding image: {str(e)}"
+            logger.error(error_msg)
+            return f"Vision LLM failure: {error_msg}"
+            
+        # Prepare the messages
         formatted_messages = []
-        
-        for i, msg in enumerate(messages):
-            # For the last user message, add the image
-            if i == len(messages) - 1 and msg.role == "user":
+        for msg in messages:
+            if msg.role == "user" and msg is messages[-1]:
+                # For the last user message, include the image
                 formatted_messages.append({
-                    "role": msg.role,
+                    "role": "user",
                     "content": [
                         {"type": "text", "text": msg.content},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:{mime_type};base64,{base64_image}"
+                                "url": f"data:image/jpeg;base64,{base64_image}"
                             }
                         }
                     ]
@@ -318,118 +428,244 @@ class LLMClient:
                     "content": msg.content
                 })
         
-        # Prepare completion parameters without passing 'reasoning_effort'
+        # Prepare API parameters
+        if temperature is None:
+            temperature = self.config.settings.temperature
+            
         params = {
             "model": self.config.model,
             "messages": formatted_messages,
-            "stream": False,
-            "timeout": self.config.settings.timeout,
+            "temperature": temperature,
         }
-        
-        # Use settings from config if not overridden
-        if temperature is None:
-            temperature = self.config.settings.temperature
-        params["temperature"] = temperature
         
         max_tokens = self.config.settings.max_tokens
         if max_tokens:
             params["max_tokens"] = max_tokens
             
+        # Make the API call
         try:
-            # Create a sanitized copy of params for logging (without the image data)
+            # Create a version of params suitable for logging (without the full image data)
             log_params = params.copy()
-            if "messages" in log_params:
-                log_params["messages"] = [
-                    m if isinstance(m.get("content", ""), str) else 
-                    {**m, "content": [
-                        c if c.get("type") != "image_url" else {"type": "image_url", "image_url": {"url": "[BASE64_IMAGE_DATA_REMOVED]"}}
-                        for c in m.get("content", [])
-                    ]}
-                    for m in log_params["messages"]
-                ]
+            for msg in log_params["messages"]:
+                if isinstance(msg["content"], list):
+                    for content_item in msg["content"]:
+                        if content_item.get("type") == "image_url":
+                            content_item["image_url"]["url"] = "[BASE64_IMAGE_DATA]"
             
             logger.debug(f"Vision LLM pre: Params: {log_params}")
             response = self.client.chat.completions.create(**params)
-            # Don't log the full response object which might contain image data
             logger.debug(f"Vision LLM post: Response received: {response}")
+            
             if not response or not response.choices:
                 raise ValueError("Empty response received from API")
+                
             return response.choices[0].message.content
         except Exception as e:
             provider_name = self.config.provider.capitalize()
-            # Add more detailed error information
-            error_msg = f"{provider_name} Vision API call failed: {str(e)}"
-            if hasattr(e, 'response'):
-                error_msg += f"\nResponse status: {e.response.status_code}"
-                try:
-                    error_msg += f"\nResponse body: {e.response.text}"
-                except:
-                    pass
+            error_msg = f"{provider_name} vision API call failed: {str(e)}"
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
     
-    def downscale_image(self, image: Image, target_width: int, target_height: int) -> Image:
+    def _gemini_vision_chat_completion(
+        self,
+        messages: List[Message],
+        image_path: str,
+        temperature: Optional[float] = None,
+    ) -> str:
         """
-        Downscale the given image to fit within target dimensions while preserving aspect ratio.
-        Only downscales if the image is larger than the target dimensions.
+        Send a vision chat completion request to the Gemini API with an image.
         
         Args:
-            image: PIL Image object to be resized.
-            target_width: Maximum allowed width.
-            target_height: Maximum allowed height.
-        
-        Returns:
-            PIL Image object resized to fit within the target dimensions.
+            messages: List of messages in the conversation
+            image_path: Path to the image file
+            temperature: Controls randomness (0.0 to 1.0)
             
-        Raises:
-            ValueError: If target dimensions are not positive.
+        Returns:
+            str: The content of the model's response message
         """
-        if target_width <= 0 or target_height <= 0:
-            raise ValueError("Target dimensions must be positive")
+        try:
+            # Process system messages
+            system_content = ""
+            for msg in messages:
+                if msg.role == "system":
+                    system_content += msg.content + "\n"
+            
+            # Get the last user message
+            user_message = ""
+            for msg in reversed(messages):
+                if msg.role == "user":
+                    user_message = msg.content
+                    break
+            
+            # Prepend system content if available
+            if system_content:
+                user_message = system_content + "\n" + user_message
+            
+            # Configure generation parameters
+            generation_config = {}
+            
+            if temperature is None:
+                temperature = self.config.settings.temperature
+            generation_config["temperature"] = temperature
+            
+            max_tokens = self.config.settings.max_tokens
+            if max_tokens:
+                generation_config["max_output_tokens"] = max_tokens
+            
+            # Load the image
+            img = Image.open(image_path)
+            
+            # Prepare content parts with text and image
+            contents = [
+                {"text": user_message},
+                {"image": img}
+            ]
+            
+            # Get the model
+            model = self.client.GenerativeModel(self.config.model)
+            
+            # Generate the response
+            logger.debug(f"Gemini Vision pre: Text: {user_message}, Config: {generation_config}")
+            response = model.generate_content(
+                contents,
+                generation_config=generation_config
+            )
+            logger.debug(f"Gemini Vision post: Response received")
+            
+            return response.text
+                
+        except Exception as e:
+            error_msg = f"Gemini Vision API call failed: {str(e)}"
+            logger.error(error_msg)
+            return f"Vision LLM failure: {error_msg}"
         
-        orig_width, orig_height = image.size
-        # If image is smaller or equal to the target dimensions, return the original image.
-        if orig_width <= target_width and orig_height <= target_height:
+    def downscale_image(self, image: Image, target_width: int, target_height: int) -> Image:
+        """
+        Downscale an image to fit within target dimensions while preserving aspect ratio.
+        
+        Args:
+            image: PIL Image object
+            target_width: Maximum width
+            target_height: Maximum height
+            
+        Returns:
+            PIL Image: Resized image
+        """
+        original_width, original_height = image.size
+        
+        # Calculate the scaling factor
+        width_ratio = target_width / original_width
+        height_ratio = target_height / original_height
+        ratio = min(width_ratio, height_ratio)
+        
+        # Only downscale, never upscale
+        if ratio >= 1:
             return image
+            
+        # Calculate new dimensions
+        new_width = int(original_width * ratio)
+        new_height = int(original_height * ratio)
         
-        scale = min(target_width / orig_width, target_height / orig_height)
-        new_width = int(orig_width * scale)
-        new_height = int(orig_height * scale)
-        return image.resize((new_width, new_height))
+        # Resize the image
+        return image.resize((new_width, new_height), Image.LANCZOS)
 
-# Example usage:
+
+# Simple test/example code
 if __name__ == "__main__":
-    # Example messages
-    messages = [
-        Message(role="system", content="You are a helpful assistant"),
-        Message(role="user", content="Hello!")
-    ]
+    # Example usage with component-based configuration
+    client_default = LLMClient(component="chat")
+    default_response = client_default.chat_completion([
+        Message(role="user", content="What is the capital of France?")
+    ])
+    print(f"Default response: {default_response}")
     
-    # Example with weak model (default)
-    print("Using weak model:")
-    client_weak = LLMClient(llm_type="weak")
-    response_weak = client_weak.chat_completion(messages)
-    print(response_weak)
+    # Example usage with specific template (component-based)
+    client_component = LLMClient(component="native_agent")  # Will use o3-mini
+    component_response = client_component.chat_completion([
+        Message(role="system", content="You are a helpful assistant."),
+        Message(role="user", content="What are three interesting Python features?")
+    ])
+    print(f"\nComponent-based template (native_agent) response:")
+    print(component_response)
     
-    # Example with strong model
-    # print("\nUsing strong model:")
-    # client_strong = LLMClient(llm_type="strong")
-    # response_strong = client_strong.chat_completion(messages)
-    # print(response_strong)
-    
-    # Example with vision model
-    print("\nUsing vision model:")
-    # image_path = os.path.expanduser("~/Downloads/tmpip7ugsgv.png")
-    image_path = os.path.expanduser("~/Downloads/tmpig4ajga7.png")
-    # Check if the image exists
-    if os.path.exists(image_path):
-        client_vision = LLMClient(llm_type="vision")
-        vision_messages = [
-            Message(role="system", content="You are a helpful assistant that can analyze images"),
-            Message(role="user", content="Do you see a white background and a blue dot in the middle?")
-        ]
-        print(f"Analyzing image at: {image_path}")
-        response_vision = client_vision.vision_chat_completion(vision_messages, image_path)
-        print(response_vision)
+    # Example usage with Gemini model (component-based)
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    if gemini_api_key:
+        print("\nGemini API key found, running Gemini example...")
+        try:
+            # Component-based approach - using the "gemini" component
+            client_gemini = LLMClient(component="gemini")
+            
+            gemini_response = client_gemini.chat_completion([
+                Message(role="system", content="You are a helpful assistant who provides concise answers."),
+                Message(role="user", content="What are three key benefits of AI in healthcare?")
+            ])
+            
+            print("\nResponse from Gemini (component='gemini'):")
+            print("-" * 50)
+            print(gemini_response)
+            print("-" * 50)
+            
+            # List available Gemini models (if needed)
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_api_key)
+            models = genai.list_models()
+            available_models = [model.name for model in models if "generateContent" in model.supported_generation_methods]
+            print(f"Available Gemini models: {available_models}")
+            
+            # Try to find Gemini 2.5 Pro if available
+            gemini_25_pro = [m for m in available_models if "gemini-2.5-pro" in m]
+            if gemini_25_pro:
+                model_name = gemini_25_pro[0]
+                print(f"\nFound Gemini 2.5 Pro! Using model: {model_name}")
+                
+                # Demonstrate direct override approach
+                client_gemini_25 = LLMClient(config_override={
+                    "provider": "gemini",
+                    "model": model_name,
+                    "api_key": gemini_api_key
+                })
+                
+                gemini_25_response = client_gemini_25.chat_completion([
+                    Message(role="system", content="You are a helpful assistant who provides concise answers."),
+                    Message(role="user", content="Explain three key concepts of quantum computing.")
+                ])
+                
+                print("\nResponse from Gemini 2.5 Pro (direct override):")
+                print("-" * 50)
+                print(gemini_25_response)
+                print("-" * 50)
+            
+            # Example with Gemini Vision (if available)
+            image_path = os.path.expanduser("~/Downloads/example.jpg")
+            if os.path.exists(image_path):
+                print(f"\nFound image at {image_path}, testing Gemini Vision...")
+                
+                client_gemini_vision = LLMClient(component="gemini_vision")
+                
+                vision_response = client_gemini_vision.vision_chat_completion([
+                    Message(role="system", content="Describe what you see in this image in detail."),
+                    Message(role="user", content="What's in this image?")
+                ], image_path)
+                
+                print("\nGemini Vision response:")
+                print("-" * 50)
+                print(vision_response)
+                print("-" * 50)
+        except Exception as e:
+            print(f"\nError running Gemini example: {str(e)}")
+            print("If this is an ImportError, make sure to install the required package:")
+            print("pip install google-generativeai>=0.3.1")
     else:
-        print(f"Image not found at {image_path}. Vision example skipped.") 
+        print("\nGemini example skipped: GEMINI_API_KEY environment variable not set")
+        print("To run the Gemini example, set your API key with:")
+        print("export GEMINI_API_KEY='your-api-key-here'")
+        
+    print("\nSummary of component-to-model mappings:")
+    print("-" * 50)
+    for component, template in config._config.component_llm_mappings.items():
+        model = config._config.llm_templates.get(template)
+        if model:
+            provider = model.provider
+            model_name = model.model
+            print(f"{component:20} -> {template:20} -> {provider}/{model_name}") 

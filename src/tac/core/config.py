@@ -158,6 +158,28 @@ class Config:
                 timeout=120,
                 reasoning_effort="high"
             )
+        ),
+        "gemini-1.5-pro": LLMConfig(
+            provider="gemini",
+            model="gemini-1.5-pro",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=2048,
+                verify_ssl=True,
+                timeout=120,
+                reasoning_effort="medium"
+            )
+        ),
+        "gemini-2.5-pro": LLMConfig(
+            provider="gemini",
+            model="gemini-2.5-pro",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=8192,
+                verify_ssl=True,
+                timeout=120,
+                reasoning_effort="high"
+            )
         )
     })
     
@@ -174,6 +196,8 @@ class Config:
         "vision": "gpt-4o",
         "threejs_vision": "gpt-4o",
         "orchestrator": "o3-mini",
+        "gemini": "gemini-1.5-pro",  # Default Gemini component
+        "gemini_vision": "gemini-1.5-pro",  # Gemini for vision tasks
         "default": "o3-mini"  # Default template when component not specified
     })
     
