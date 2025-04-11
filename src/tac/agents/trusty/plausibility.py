@@ -23,7 +23,7 @@ class PlausibilityTestingAgent(TrustyAgent):
 
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
-        self.llm_client = LLMClient(llm_type="strong")
+        self.llm_client = LLMClient(component="plausibility")
         self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
         self._min_score = config.general.trusty_agents.minimum_plausibility_score
 

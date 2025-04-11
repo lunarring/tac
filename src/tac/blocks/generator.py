@@ -25,7 +25,7 @@ def compute_visual_description(image_url: str) -> str:
         return f"Visual description unavailable: {error_msg}"
     
     # Instantiate an LLMClient configured for vision tasks
-    vision_client = LLMClient(llm_type="vision")
+    vision_client = LLMClient(component="vision")
     
     # Construct conversation with appropriate system and user messages
     messages = [
@@ -54,7 +54,7 @@ class ProtoBlockGenerator:
     """
     
     def __init__(self, ui_manager=NullUIManager()):
-        self.llm_client = LLMClient(llm_type="strong")
+        self.llm_client = LLMClient(component="protoblock_generation")
         self.project_files = ProjectFiles()
         self.ui_manager = ui_manager
     

@@ -111,17 +111,73 @@ class Config:
     general: GeneralConfig = field(default_factory=GeneralConfig)
     git: GitConfig = field(default_factory=GitConfig)
     aider: AiderConfig = field(default_factory=AiderConfig)
-    llm_strong: LLMConfig = field(default_factory=lambda: LLMConfig(
-        provider="openai",
-        model="o3-mini",
-        settings=LLMSettings(
-            temperature=0.7,
-            max_tokens=None,
-            verify_ssl=True,
-            timeout=120,
-            reasoning_effort="medium"
+    
+    # Template-based LLM configurations
+    llm_templates: Dict[str, LLMConfig] = field(default_factory=lambda: {
+        # Default templates based on actual model names
+        "gpt-4o": LLMConfig(
+            provider="openai",
+            model="gpt-4o",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=None,
+                verify_ssl=True,
+                timeout=180,
+                reasoning_effort="medium"
+            )
+        ),
+        "gpt-4o-2024-08-06": LLMConfig(
+            provider="openai",
+            model="gpt-4o-2024-08-06",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=None,
+                verify_ssl=True,
+                timeout=120,
+                reasoning_effort="low"
+            )
+        ),
+        "o3-mini": LLMConfig(
+            provider="openai",
+            model="o3-mini",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=None,
+                verify_ssl=True,
+                timeout=120,
+                reasoning_effort="medium"
+            )
+        ),
+        "deepseek-reasoner": LLMConfig(
+            provider="deepseek",
+            model="deepseek-reasoner",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=None,
+                verify_ssl=True,
+                timeout=120,
+                reasoning_effort="high"
+            )
         )
-    ))
+    })
+    
+    # Component-to-template mappings
+    component_llm_mappings: Dict[str, str] = field(default_factory=lambda: {
+        # Specify which template to use for each component
+        "native_agent": "o3-mini",
+        "protoblock_generation": "o3-mini",
+        "plausibility": "o3-mini",
+        "pytest_agent": "o3-mini",
+        "chat": "gpt-4o-2024-08-06",
+        "file_summarizer": "gpt-4o-2024-08-06",
+        "file_peeker": "gpt-4o-2024-08-06",
+        "vision": "gpt-4o",
+        "threejs_vision": "gpt-4o",
+        "orchestrator": "o3-mini",
+        "default": "o3-mini"  # Default template when component not specified
+    })
+    
+    # For backward compatibility - to be removed after migration
     llm_weak: LLMConfig = field(default_factory=lambda: LLMConfig(
         provider="openai",
         model="gpt-4o-2024-08-06",
@@ -131,6 +187,17 @@ class Config:
             verify_ssl=True,
             timeout=120,
             reasoning_effort="low"
+        )
+    ))
+    llm_strong: LLMConfig = field(default_factory=lambda: LLMConfig(
+        provider="openai",
+        model="o3-mini",
+        settings=LLMSettings(
+            temperature=0.7,
+            max_tokens=None,
+            verify_ssl=True,
+            timeout=120,
+            reasoning_effort="medium"
         )
     ))
     llm_vision: LLMConfig = field(default_factory=lambda: LLMConfig(
@@ -144,6 +211,7 @@ class Config:
             reasoning_effort="medium"
         )
     ))
+    
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
 
@@ -178,8 +246,10 @@ class ConfigManager:
             'general': vars(self._config.general),
             'git': vars(self._config.git),
             'aider': vars(self._config.aider),
-            'llm_strong': vars(self._config.llm_strong),
+            'llm_templates': {k: vars(v) for k, v in self._config.llm_templates.items()},
+            'component_llm_mappings': self._config.component_llm_mappings,
             'llm_weak': vars(self._config.llm_weak),
+            'llm_strong': vars(self._config.llm_strong),
             'llm_vision': vars(self._config.llm_vision),
             'logging': vars(self._config.logging)
         }
@@ -199,12 +269,47 @@ class ConfigManager:
         """Get aider configuration."""
         return self._config.aider
 
-    def get_llm_config(self, llm_type: str = "weak") -> LLMConfig:
-        """Get LLM configuration for specified type.
+    def get_llm_config(self, llm_type: str = "weak", component: str = None) -> LLMConfig:
+        """Get LLM configuration for specified type or component.
         
         Args:
-            llm_type: Type of LLM to use ("weak", "strong", or "vision", defaults to "weak")
+            llm_type: For backward compatibility - "weak", "strong", or "vision"
+            component: Component name to get LLM config for (preferred method)
+            
+        Returns:
+            LLMConfig configuration for the specified component or type
         """
+        # If component is specified, use the component mapping
+        if component:
+            template_name = self._config.component_llm_mappings.get(component)
+            if not template_name:
+                self._logger.warning(
+                    f"No template mapping for component '{component}', using default"
+                )
+                template_name = self._config.component_llm_mappings.get("default")
+                
+            # Get the template config
+            if template_name in self._config.llm_templates:
+                return self._config.llm_templates[template_name]
+            else:
+                # Template name was set in mapping but doesn't exist in templates
+                self._logger.warning(
+                    f"Template '{template_name}' mapped for component '{component}' not found, creating on-the-fly"
+                )
+                # Create a default config with the template name as the model name
+                return LLMConfig(
+                    provider="openai",
+                    model=template_name,
+                    settings=LLMSettings(
+                        temperature=0.7,
+                        max_tokens=None,
+                        verify_ssl=True,
+                        timeout=120,
+                        reasoning_effort="medium"
+                    )
+                )
+                
+        # Backward compatibility - to be removed after migration
         return getattr(self._config, f"llm_{llm_type}")
 
     @property

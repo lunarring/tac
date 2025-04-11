@@ -13,11 +13,14 @@ from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 logger = setup_logging('tac.agents.coding.native')
 
 class NativeAgent(Agent):
-    def __init__(self, config: dict):
-        super().__init__(config)
-        self.agent_config = config.get('aider', {})
-        # Initialize LLM client with strong model for implementation
-        self.llm_client = LLMClient(llm_type="strong")
+    """Implementation of the Agent class for native LLM-driven coding."""
+
+    def __init__(self, cwd: str):
+        """Initialize the native coding agent with the current working directory."""
+        self.cwd = cwd
+        self.llm_client = LLMClient(component="native_agent")
+        self.git_manager = None
+        self.agent_config = {}
         # Initialize note attribute
         self.note = ""
     
