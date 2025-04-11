@@ -5,6 +5,19 @@
   <title>tac.vibe</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="index.css">
+  <style>
+    /* Ensure the chat header positions its children relative to it */
+    #chatHeader {
+      position: relative;
+    }
+    /* Center the settings button horizontally at the top of the chat header */
+    #settingsButton {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  </style>
 </head>
 <body>
   <div id="splitContainer">
