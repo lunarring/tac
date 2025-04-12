@@ -593,7 +593,7 @@ if __name__ == "__main__":
     if gemini_api_key:
         print("\nGemini API key found, running Gemini example...")
         try:
-            # Component-based approach - using the "gemini" component
+            # Component-based approach - using the "gemini" component (which maps to gemini-2.5-pro)
             client_gemini = LLMClient(component="gemini")
             
             gemini_response = client_gemini.chat_completion([
@@ -601,7 +601,7 @@ if __name__ == "__main__":
                 Message(role="user", content="What are three key benefits of AI in healthcare?")
             ])
             
-            print("\nResponse from Gemini (component='gemini'):")
+            print("\nResponse from Gemini 2.5 Pro (component='gemini'):")
             print("-" * 50)
             print(gemini_response)
             print("-" * 50)
@@ -613,28 +613,50 @@ if __name__ == "__main__":
             available_models = [model.name for model in models if "generateContent" in model.supported_generation_methods]
             print(f"Available Gemini models: {available_models}")
             
-            # Try to find Gemini 2.5 Pro if available
+            # Check if 2.5 Pro is available or fallback
             gemini_25_pro = [m for m in available_models if "gemini-2.5-pro" in m]
-            if gemini_25_pro:
-                model_name = gemini_25_pro[0]
-                print(f"\nFound Gemini 2.5 Pro! Using model: {model_name}")
+            if not gemini_25_pro:
+                print("\nNote: Gemini 2.5 Pro not found in your available models.")
                 
-                # Demonstrate direct override approach
-                client_gemini_25 = LLMClient(config_override={
-                    "provider": "gemini",
-                    "model": model_name,
-                    "api_key": gemini_api_key
-                })
-                
-                gemini_25_response = client_gemini_25.chat_completion([
-                    Message(role="system", content="You are a helpful assistant who provides concise answers."),
-                    Message(role="user", content="Explain three key concepts of quantum computing.")
-                ])
-                
-                print("\nResponse from Gemini 2.5 Pro (direct override):")
-                print("-" * 50)
-                print(gemini_25_response)
-                print("-" * 50)
+                # Find best available Gemini model for fallback
+                if available_models:
+                    # Look for latest Pro models (prioritize newer versions)
+                    pro_models = [m for m in available_models if "pro" in m]
+                    latest_models = [m for m in pro_models if "latest" in m]
+                    
+                    if latest_models:
+                        fallback_model = latest_models[0]
+                    elif pro_models:
+                        fallback_model = pro_models[0]
+                    else:
+                        fallback_model = available_models[0]
+                    
+                    print(f"Using fallback model: {fallback_model}")
+                    print("Your component config will still specify 2.5 Pro, which will be used when available.")
+                    print("If you want to use Gemini 2.5 Pro, you may need to:")
+                    print("1. Upgrade your Google AI API plan")
+                    print("2. Request access to the model if it's in limited preview")
+                    print("3. Check if 'gemini-2.5-pro' is available in your region")
+                    
+                    # Example with direct fallback override
+                    print("\nTesting fallback with direct override...")
+                    client_fallback = LLMClient(config_override={
+                        "provider": "gemini", 
+                        "model": fallback_model,
+                        "api_key": gemini_api_key
+                    })
+                    
+                    fallback_response = client_fallback.chat_completion([
+                        Message(role="system", content="You are a helpful assistant who provides concise answers."),
+                        Message(role="user", content="What are three examples of emerging AI technologies?")
+                    ])
+                    
+                    print(f"\nResponse from fallback model ({fallback_model}):")
+                    print("-" * 50)
+                    print(fallback_response)
+                    print("-" * 50)
+            else:
+                print(f"\nConfirmed Gemini 2.5 Pro is available: {gemini_25_pro[0]}")
             
             # Example with Gemini Vision (if available)
             image_path = os.path.expanduser("~/Downloads/example.jpg")

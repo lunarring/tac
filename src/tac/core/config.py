@@ -196,34 +196,12 @@ class Config:
         "vision": "gpt-4o",
         "threejs_vision": "gpt-4o",
         "orchestrator": "o3-mini",
-        "gemini": "gemini-1.5-pro",  # Default Gemini component
-        "gemini_vision": "gemini-1.5-pro",  # Gemini for vision tasks
+        "gemini": "gemini-2.5-pro",  # Default Gemini component using 2.5 Pro
+        "gemini_vision": "gemini-2.5-pro",  # Gemini for vision tasks using 2.5 Pro
         "default": "o3-mini"  # Default template when component not specified
     })
     
-    # For backward compatibility - to be removed after migration
-    llm_weak: LLMConfig = field(default_factory=lambda: LLMConfig(
-        provider="openai",
-        model="gpt-4o-2024-08-06",
-        settings=LLMSettings(
-            temperature=0.7,
-            max_tokens=None,
-            verify_ssl=True,
-            timeout=120,
-            reasoning_effort="low"
-        )
-    ))
-    llm_strong: LLMConfig = field(default_factory=lambda: LLMConfig(
-        provider="openai",
-        model="o3-mini",
-        settings=LLMSettings(
-            temperature=0.7,
-            max_tokens=None,
-            verify_ssl=True,
-            timeout=120,
-            reasoning_effort="medium"
-        )
-    ))
+
     llm_vision: LLMConfig = field(default_factory=lambda: LLMConfig(
         provider="openai",
         model="gpt-4o",
