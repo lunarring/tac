@@ -41,6 +41,5 @@ def test_raw_config():
     assert 'general' in raw
     assert 'git' in raw
     assert raw['general']['coding_agent'] in ['aider', 'native']
-    assert 'llm_strong' in raw
-    assert 'llm_weak' in raw
+    # llm_strong and llm_weak keys are no longer in config
     assert 'logging' in raw

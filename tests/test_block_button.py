@@ -40,7 +40,7 @@ def test_buttons_same_class():
     assert "action-button" in mic_classes, "Microphone button missing 'action-button' class"
 
 def test_settings_button_exists():
-    # Verify that the settings button exists in the chat header and uses the same styling
+    # Verify that the settings button exists in the block header and uses the same styling
     index_path = os.path.join(os.path.dirname(__file__), "../src/tac/web/index.html")
     with open(index_path, "r", encoding="utf-8") as f:
         contents = f.read()
@@ -49,9 +49,9 @@ def test_settings_button_exists():
     assert settings_button is not None, "Settings button not found in index.html"
     settings_classes = settings_button.get("class", [])
     assert "action-button" in settings_classes, "Settings button missing 'action-button' class"
-    chat_header = soup.find(id="chatHeader")
-    # Check that settingsButton is within the chatHeader
-    assert settings_button in chat_header.find_all(), "Settings button is not placed within the chat header"
+    block_header = soup.find(id="blockHeader")
+    # Check that settingsButton is within the blockHeader
+    assert settings_button in block_header.find_all(), "Settings button is not placed within the block header"
     
 if __name__ == "__main__":
     import pytest
