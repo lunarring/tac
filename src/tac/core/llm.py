@@ -371,53 +371,60 @@ class LLMClient:
         if self.config.provider == LLMProvider.GEMINI.value:
             return self._gemini_vision_chat_completion(messages, image_path, temperature)
             
-        # Prepare the image for the API call
+        # Process image with downscaling if needed and encode to base64
         try:
-            # Open and potentially resize the image
             with Image.open(image_path) as img:
-                # Ensure image is in a supported format
-                if img.format not in ['JPEG', 'PNG', 'GIF', 'WEBP']:
-                    logger.warning(f"Converting image from {img.format} to PNG")
-                    img = img.convert('RGB')
-                    temp_path = f"{os.path.splitext(image_path)[0]}_converted.png"
-                    img.save(temp_path, format='PNG')
-                    image_path = temp_path
+                width, height = img.size
+                max_dimension = self.config.settings.max_image_dimension
+                if width > max_dimension or height > max_dimension:
+                    scale = max_dimension / max(width, height)
+                    new_width = int(width * scale)
+                    new_height = int(height * scale)
+                    img = img.resize((new_width, new_height))
+                    logger.info(f"Image downscaled from ({width}x{height}) to ({new_width}x{new_height}).")
+                else:
+                    logger.info(f"Image size ({width}x{height}) within limits, no downscaling applied.")
                 
-                # Check if we need to resize the image
-                max_dim = self.config.settings.max_image_dimension
-                if max(img.width, img.height) > max_dim:
-                    logger.info(f"Resizing image to fit within {max_dim}x{max_dim}")
-                    img = self.downscale_image(img, max_dim, max_dim)
-                    temp_path = f"{os.path.splitext(image_path)[0]}_resized.png"
-                    img.save(temp_path, format='PNG')
-                    image_path = temp_path
+                # Determine image format from file extension
+                image_ext = os.path.splitext(image_path)[1].lower()
+                if image_ext in ['.jpg', '.jpeg']:
+                    mime_type = 'image/jpeg'
+                    image_format = 'JPEG'
+                elif image_ext == '.png':
+                    mime_type = 'image/png'
+                    image_format = 'PNG'
+                else:
+                    # Default to JPEG if unknown
+                    mime_type = 'image/jpeg'
+                    image_format = 'JPEG'
+                
+                buffer = BytesIO()
+                img.save(buffer, format=image_format)
+                image_bytes = buffer.getvalue()
+                
+            # Encode to base64
+            base64_image = base64.b64encode(image_bytes).decode('utf-8')
+            logger.info(f"Image encoded successfully: {image_path} as {mime_type}")
+            
         except Exception as e:
-            error_msg = f"Error processing image: {str(e)}"
+            error_msg = f"Failed to process and encode image: {str(e)}"
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
         
-        # Encode the image to base64
-        try:
-            with open(image_path, "rb") as image_file:
-                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-        except Exception as e:
-            error_msg = f"Error encoding image: {str(e)}"
-            logger.error(error_msg)
-            return f"Vision LLM failure: {error_msg}"
-            
-        # Prepare the messages
+        # Convert messages to the format expected by the API
         formatted_messages = []
-        for msg in messages:
-            if msg.role == "user" and msg is messages[-1]:
-                # For the last user message, include the image
+        
+        for i, msg in enumerate(messages):
+            # For the last user message, add the image
+            if i == len(messages) - 1 and msg.role == "user":
                 formatted_messages.append({
-                    "role": "user",
+                    "role": msg.role,
                     "content": [
                         {"type": "text", "text": msg.content},
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
+                                "url": f"data:{mime_type};base64,{base64_image}"
                             }
                         }
                     ]
@@ -428,29 +435,35 @@ class LLMClient:
                     "content": msg.content
                 })
         
-        # Prepare API parameters
-        if temperature is None:
-            temperature = self.config.settings.temperature
-            
+        # Prepare completion parameters without passing 'reasoning_effort'
         params = {
             "model": self.config.model,
             "messages": formatted_messages,
-            "temperature": temperature,
+            "stream": False,
+            "timeout": self.config.settings.timeout,
         }
+        
+        # Use settings from config if not overridden
+        if temperature is None:
+            temperature = self.config.settings.temperature
+        params["temperature"] = temperature
         
         max_tokens = self.config.settings.max_tokens
         if max_tokens:
             params["max_tokens"] = max_tokens
             
-        # Make the API call
         try:
-            # Create a version of params suitable for logging (without the full image data)
+            # Create a sanitized copy of params for logging (without the image data)
             log_params = params.copy()
-            for msg in log_params["messages"]:
-                if isinstance(msg["content"], list):
-                    for content_item in msg["content"]:
-                        if content_item.get("type") == "image_url":
-                            content_item["image_url"]["url"] = "[BASE64_IMAGE_DATA]"
+            if "messages" in log_params:
+                log_params["messages"] = [
+                    m if isinstance(m.get("content", ""), str) else 
+                    {**m, "content": [
+                        c if c.get("type") != "image_url" else {"type": "image_url", "image_url": {"url": "[BASE64_IMAGE_DATA]"}}
+                        for c in m.get("content", [])
+                    ]}
+                    for m in log_params["messages"]
+                ]
             
             logger.debug(f"Vision LLM pre: Params: {log_params}")
             response = self.client.chat.completions.create(**params)
@@ -462,7 +475,14 @@ class LLMClient:
             return response.choices[0].message.content
         except Exception as e:
             provider_name = self.config.provider.capitalize()
+            # Add more detailed error information
             error_msg = f"{provider_name} vision API call failed: {str(e)}"
+            if hasattr(e, 'response'):
+                error_msg += f"\nResponse status: {e.response.status_code}"
+                try:
+                    error_msg += f"\nResponse body: {e.response.text}"
+                except:
+                    pass
             logger.error(error_msg)
             return f"Vision LLM failure: {error_msg}"
     
@@ -572,6 +592,23 @@ class LLMClient:
 
 # Simple test/example code
 if __name__ == "__main__":
+    # Example with vision model
+    print("\nUsing vision model:")
+    # image_path = os.path.expanduser("~/Downloads/tmpip7ugsgv.png")
+    image_path = os.path.expanduser("~/Downloads/tmpig4ajga7.png")
+    # Check if the image exists
+    if os.path.exists(image_path):
+        client_vision = LLMClient(llm_type="vision")
+        vision_messages = [
+            Message(role="system", content="You are a helpful assistant that can analyze images"),
+            Message(role="user", content="Do you see a white background and a blue dot in the middle?")
+        ]
+        print(f"Analyzing image at: {image_path}")
+        response_vision = client_vision.vision_chat_completion(vision_messages, image_path)
+        print(response_vision)
+    else:
+        print(f"Image not found at {image_path}. Vision example skipped.") 
+        
     # Example usage with component-based configuration
     client_default = LLMClient(component="chat")
     default_response = client_default.chat_completion([
