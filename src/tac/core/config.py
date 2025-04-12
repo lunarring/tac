@@ -196,23 +196,9 @@ class Config:
         "vision": "gpt-4o",
         "threejs_vision": "gpt-4o",
         "orchestrator": "o3-mini",
-        "gemini": "gemini-2.5-pro",  # Default Gemini component using 2.5 Pro
-        "gemini_vision": "gemini-2.5-pro",  # Gemini for vision tasks using 2.5 Pro
+
         "default": "o3-mini"  # Default template when component not specified
     })
-    
-
-    llm_vision: LLMConfig = field(default_factory=lambda: LLMConfig(
-        provider="openai",
-        model="gpt-4o",
-        settings=LLMSettings(
-            temperature=0.7,
-            max_tokens=None,
-            verify_ssl=True,
-            timeout=180,
-            reasoning_effort="medium"
-        )
-    ))
     
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
@@ -250,9 +236,6 @@ class ConfigManager:
             'aider': vars(self._config.aider),
             'llm_templates': {k: vars(v) for k, v in self._config.llm_templates.items()},
             'component_llm_mappings': self._config.component_llm_mappings,
-            'llm_weak': vars(self._config.llm_weak),
-            'llm_strong': vars(self._config.llm_strong),
-            'llm_vision': vars(self._config.llm_vision),
             'logging': vars(self._config.logging)
         }
 
@@ -311,8 +294,27 @@ class ConfigManager:
                     )
                 )
                 
-        # Backward compatibility - to be removed after migration
-        return getattr(self._config, f"llm_{llm_type}")
+        # Backward compatibility - map legacy types to component equivalents
+        legacy_mappings = {
+            "weak": "chat",  # Maps to gpt-4o-2024-08-06
+            "strong": "native_agent",  # Maps to o3-mini or whatever current setting is
+            "vision": "vision"  # Maps to gpt-4o
+        }
+        
+        legacy_component = legacy_mappings.get(llm_type)
+        if legacy_component:
+            self._logger.warning(
+                f"Using legacy llm_type='{llm_type}' is deprecated. "
+                f"Please use component='{legacy_component}' instead."
+            )
+            # Recursively call with the mapped component
+            return self.get_llm_config(component=legacy_component)
+        
+        # If we get here, neither component nor valid legacy type was provided
+        self._logger.warning(
+            f"Unknown llm_type='{llm_type}'. Using default component instead."
+        )
+        return self.get_llm_config(component="default")
 
     @property
     def logging(self) -> LoggingConfig:

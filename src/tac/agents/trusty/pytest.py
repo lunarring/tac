@@ -351,11 +351,11 @@ class PytestTestingAgent(TrustyAgent):
             logger.debug(f"Error clearing pytest cache: {e}")
 
 class ErrorAnalyzer:
-    """Analyzes test failures and implementation errors to provide insights using LLM"""
+    """Analyzes test errors using LLMs to provide insightful feedback."""
     
     def __init__(self):
-        logger.info("Initializing ErrorAnalyzer")
-        self.llm_client = LLMClient(llm_type="strong")
+        """Initialize the error analyzer with an LLM client."""
+        self.llm_client = LLMClient(component="pytest_agent")
         self.project_files = ProjectFiles()
 
     def analyze_failure(self, protoblock: ProtoBlock, test_results: str, codebase: Dict[str, str]) -> str:
