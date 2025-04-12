@@ -13,7 +13,8 @@ logger = setup_logging('tac.trusty_agents.plausibility')
 @trusty_agent(
     name="plausibility",
     description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility.",
-    protoblock_prompt="Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description."
+    protoblock_prompt="Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description.",
+    llm="o3-mini"
 )
 class PlausibilityTestingAgent(TrustyAgent):
     """
@@ -23,7 +24,7 @@ class PlausibilityTestingAgent(TrustyAgent):
 
     def __init__(self):
         logger.info("Initializing PlausibilityChecker")
-        self.llm_client = LLMClient(component="plausibility")
+        self.llm_client = LLMClient(model=self.llm)
         self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
         self._min_score = config.general.trusty_agents.minimum_plausibility_score
 

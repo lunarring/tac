@@ -25,6 +25,7 @@ logger = setup_logging('tac.trusty_agents.vision')
     description="Use this vision agent for general purpose visual verification of the output of a program. Do not use for threejs or html.",
     protoblock_prompt="Describe what visual elements you would expect to see in the program's output that would verify the implementation is correct. Be specific about colors, shapes, text, or UI elements that should be visible.",
     prompt_target="coding_agent",
+    llm="gpt-4o"
 )
 class VisionTestingAgent(TrustyAgent):
     """
@@ -34,7 +35,7 @@ class VisionTestingAgent(TrustyAgent):
 
     def __init__(self):
         logger.info("Initializing VisionTestingAgent")
-        self.llm_client = LLMClient(llm_type="vision")
+        self.llm_client = LLMClient(model=self.llm)
         self.program_runner = None
         self.screenshot_path = None
         self.analysis_result = None

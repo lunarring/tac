@@ -31,16 +31,24 @@ class Message:
 class LLMClient:
     """Client for interacting with Language Models."""
     
-    def __init__(self, component: str = None, llm_type: str = "weak", config_override: Optional[Dict] = None):
+    def __init__(self, component: str = None, llm_type: str = "weak", config_override: Optional[Dict] = None, model: str = None):
         """Initialize client with config from file or provided config.
         
         Args:
             component: Component identifier to determine which LLM template to use
             llm_type: Legacy parameter - type of LLM to use ("weak", "strong", or "vision")
             config_override: Optional config override dictionary
+            model: Direct model name to use, bypassing component and llm_type lookup
         """
-        # Get config from centralized config
-        llm_config = config.get_llm_config(llm_type, component)
+        # If model is directly provided, use it to create a config
+        if model:
+            logger.info(f"Using directly provided model: {model}")
+            llm_config = config.get_llm_config(llm_type="default", component=None)
+            llm_config.model = model
+        else:
+            # Get config from centralized config
+            llm_config = config.get_llm_config(llm_type, component)
+            
         if config_override:
             # Override settings if provided
             for key, value in config_override.items():

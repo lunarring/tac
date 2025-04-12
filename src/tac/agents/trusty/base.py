@@ -9,7 +9,7 @@ from tac.agents.trusty.results import TrustyAgentResult
 
 logger = setup_logging('tac.trusty_agents.base')
 
-def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_target: str = ""):
+def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_target: str = "", llm: str = ""):
     """
     Class decorator for registering TrustyAgent subclasses.
     
@@ -22,6 +22,7 @@ def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_tar
         description: Description of the agent for the protoblock genesis prompt
         protoblock_prompt: Prompt content for the protoblock genesis prompt
         prompt_target: Target for the prompt (optional)
+        llm: LLM model to use for the agent (optional)
         
     Returns:
         A decorator function that registers the agent class
@@ -31,6 +32,7 @@ def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_tar
         cls.description = description
         cls.protoblock_prompt = protoblock_prompt
         cls.prompt_target = prompt_target
+        cls.llm = llm
         
         # Register the agent
         cls.register()
@@ -51,6 +53,7 @@ class TrustyAgent(ABC):
         protoblock_prompt: Prompt content for the protoblock genesis prompt
         description: Description of the agent for the protoblock genesis prompt
         prompt_target: Target for the prompt
+        llm: LLM model to use for the agent
     """
     
     # Class variables for registration
@@ -58,6 +61,7 @@ class TrustyAgent(ABC):
     protoblock_prompt: ClassVar[str] = ""
     description: ClassVar[str] = ""
     prompt_target: ClassVar[str] = ""
+    llm: ClassVar[str] = ""
     
     @classmethod
     def register(cls):

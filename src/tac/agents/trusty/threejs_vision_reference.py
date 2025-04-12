@@ -36,7 +36,8 @@ logger = setup_logging('tac.trusty_agents.threejs_vision_reference')
     name="threejs_vision_reference",
     description="Use this trusty agent in case we have a reference image input and are developing something with javascript, html, threejs. Compares the current visual state of a Three.js application against a provided reference image. Captures before and after screenshots, stitches them with the reference image, and uses a vision LLM for analysis.",
     protoblock_prompt="On the left side you see the previous implementation, in the middle is the updated implementation and on the right side you see the provided reference image. Describe the expected changes between the previous implementation and the updated implementation given the reference image.",
-    prompt_target="coding_agent"
+    prompt_target="coding_agent",
+    llm="gpt-4o"
 )
 class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
     """
@@ -48,7 +49,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
 
     def __init__(self):
         logger.info("Initializing ThreeJSVisionReferenceAgent")
-        self.llm_client = LLMClient(llm_type="vision")
+        self.llm_client = LLMClient(model=self.llm)
         self.before_screenshot_path = None
         self.after_screenshot_path = None
         self.comparison_path = None

@@ -188,13 +188,9 @@ class Config:
         # Specify which template to use for each component
         "native_agent": "o3-mini",
         "protoblock_generation": "o3-mini",
-        "plausibility": "o3-mini",
-        "pytest_agent": "o3-mini",
         "chat": "gpt-4o-2024-08-06",
         "file_summarizer": "gpt-4o-2024-08-06",
         "file_peeker": "gpt-4o-2024-08-06",
-        "vision": "gpt-4o",
-        "threejs_vision": "gpt-4o",
         "orchestrator": "o3-mini",
 
         "default": "o3-mini"  # Default template when component not specified
