@@ -120,7 +120,7 @@ class Config:
             model="gpt-4o",
             settings=LLMSettings(
                 temperature=0.7,
-                max_tokens=None,
+                max_tokens=4096,
                 verify_ssl=True,
                 timeout=180,
                 reasoning_effort="medium"
@@ -131,7 +131,7 @@ class Config:
             model="gpt-4o-2024-08-06",
             settings=LLMSettings(
                 temperature=0.7,
-                max_tokens=None,
+                max_tokens=4096,
                 verify_ssl=True,
                 timeout=120,
                 reasoning_effort="low"
@@ -142,7 +142,7 @@ class Config:
             model="o3-mini",
             settings=LLMSettings(
                 temperature=0.7,
-                max_tokens=None,
+                max_tokens=100000,
                 verify_ssl=True,
                 timeout=120,
                 reasoning_effort="medium"
@@ -192,7 +192,6 @@ class Config:
         "file_summarizer": "gpt-4o-2024-08-06",
         "file_peeker": "gpt-4o-2024-08-06",
         "orchestrator": "o3-mini",
-
         "default": "o3-mini"  # Default template when component not specified
     })
     
