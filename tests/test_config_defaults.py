@@ -11,8 +11,8 @@ class TestConfigDefaults(unittest.TestCase):
         self.assertIsInstance(self.config_manager.general, GeneralConfig)
         self.assertIsInstance(self.config_manager.git, GitConfig)
         self.assertIsInstance(self.config_manager.aider, AiderConfig)
-        self.assertIsInstance(self.config_manager.get_llm_config("weak"), LLMConfig)
-        self.assertIsInstance(self.config_manager.get_llm_config("strong"), LLMConfig)
+        self.assertIsInstance(self.config_manager.get_llm_config(component="chat"), LLMConfig)
+        self.assertIsInstance(self.config_manager.get_llm_config(component="native_agent"), LLMConfig)
         self.assertIsInstance(self.config_manager.logging, LoggingConfig)
 
     def test_get_method_default(self):

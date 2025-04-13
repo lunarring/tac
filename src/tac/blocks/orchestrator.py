@@ -223,7 +223,7 @@ class MultiBlockOrchestrator:
     
     def __init__(self, ui_manager=NullUIManager()):
         logger.info("Initializing MultiBlockOrchestrator")
-        self.llm_client = LLMClient(llm_type="strong")
+        self.llm_client = LLMClient(component="native_agent")
         self.ui_manager = ui_manager
     
     def execute(self, task_instructions: str, codebase: str, args=None, voice_ui=None, git_manager=None):

@@ -8,7 +8,7 @@ class ChatAgent:
         """
         self.conversation = []
         self.conversation.append(Message(role="system", content=system_prompt))
-        self.llm_client = LLMClient(llm_type="weak")
+        self.llm_client = LLMClient(component="chat")
     
     def process_message(self, user_message: str) -> str:
         """
@@ -41,8 +41,8 @@ class ChatAgent:
         if len(self.conversation) <= 2:  # Only system prompt and maybe one exchange
             return "No substantial conversation to summarize."
         
-        # Use a stronger LLM for summarization
-        summarizer = LLMClient(llm_type="strong")
+        # Use a native_agent LLM for summarization
+        summarizer = LLMClient(component="native_agent")
         
         # Format the conversation for the summary prompt
         conversation_text = "\n".join([f"{msg.role}: {msg.content}" for msg in self.conversation])
@@ -68,7 +68,7 @@ class ChatAgent:
         Returns:
             str: Compressed conversation as task instructions
         """
-        # Use a stronger LLM for summarization
+        # Use a native_agent LLM for summarization
         # Format the conversation for the summary prompt
         conversation_text = "\n".join([f"{msg.role}: {msg.content}" for msg in self.conversation])
         

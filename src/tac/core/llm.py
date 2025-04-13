@@ -31,7 +31,7 @@ class Message:
 class LLMClient:
     """Client for interacting with Language Models."""
     
-    def __init__(self, component: str = None, llm_type: str = "weak", config_override: Optional[Dict] = None, model: str = None):
+    def __init__(self, component: str = None, llm_type: str = None, config_override: Optional[Dict] = None, model: str = None):
         """Initialize client with config from file or provided config.
         
         Args:
@@ -46,16 +46,22 @@ class LLMClient:
         # If model is directly provided, use it to create a config
         if model:
             logger.info(f"Using directly provided model: {model}")
-            llm_config = config.get_llm_config(llm_type="default", component=None)
+            llm_config = config.get_llm_config(component="default")
             llm_config.model = model
         else:
             # Get config from centralized config - prioritize component over llm_type if both are provided
             if component is not None:
                 llm_config = config.get_llm_config(component=component)
                 logger.debug(f"Using component={component} mapping: {llm_config.provider}/{llm_config.model}")
-            else:
+            elif llm_type is not None:
+                # This is for backward compatibility
+                logger.warning(f"Using deprecated llm_type='{llm_type}'. Please use component parameter instead.")
                 llm_config = config.get_llm_config(llm_type=llm_type)
                 logger.debug(f"Using llm_type={llm_type} mapping: {llm_config.provider}/{llm_config.model}")
+            else:
+                # Use default component if neither component nor llm_type is provided
+                llm_config = config.get_llm_config(component="default")
+                logger.debug(f"Using default component mapping: {llm_config.provider}/{llm_config.model}")
             
         if config_override:
             # Override settings if provided
@@ -126,11 +132,6 @@ class LLMClient:
         Returns:
             str: The content of the model's response message
         """
-        # Lightweight chat functionality for weak LLM: simply append all incoming message contents.
-        if self.config.model.lower() == "weak":
-            combined_response = " ".join(message.content for message in messages)
-            return combined_response
-        
         # Handle Gemini API
         if self.config.provider == LLMProvider.GEMINI.value:
             return self._gemini_chat_completion(messages, temperature, max_tokens, stream)
@@ -173,21 +174,22 @@ class LLMClient:
             "timeout": self.config.settings.timeout,
         }
         
-        # Models that don't support temperature parameter
-        if self.config.model not in ["o1-mini", "deepseek-reasoner", "o3-mini"]:
-            # Use settings from config if not overridden
+        # Check if model supports temperature and max_tokens
+        supports_temperature = self.config.model not in ["o3-mini", "gpt-4o"]
+        supports_max_tokens = self.config.model not in ["o3-mini", "gpt-4o"]
+        
+        # Only add temperature for models that support it
+        if supports_temperature:
             if temperature is None:
                 temperature = self.config.settings.temperature
             params["temperature"] = temperature
         
-        if max_tokens is None:
-            max_tokens = self.config.settings.max_tokens
+        max_tokens = self.config.settings.max_tokens
         if max_tokens:
-            # Use max_completion_tokens for o3-mini model
-            if self.config.model == "o3-mini":
-                params["max_completion_tokens"] = max_tokens
-            else:
+            if supports_max_tokens:
                 params["max_tokens"] = max_tokens
+            else:
+                params["max_completion_tokens"] = max_tokens
             
         try:
             logger.debug(f"LLM pre: Params: {params}")
@@ -465,14 +467,22 @@ class LLMClient:
             "timeout": self.config.settings.timeout,
         }
         
-        # Use settings from config if not overridden
-        if temperature is None:
-            temperature = self.config.settings.temperature
-        params["temperature"] = temperature
+        # Check if model supports temperature and max_tokens
+        supports_temperature = self.config.model not in ["o3-mini", "gpt-4o"]
+        supports_max_tokens = self.config.model not in ["o3-mini", "gpt-4o"]
+        
+        # Only add temperature for models that support it
+        if supports_temperature:
+            if temperature is None:
+                temperature = self.config.settings.temperature
+            params["temperature"] = temperature
         
         max_tokens = self.config.settings.max_tokens
         if max_tokens:
-            params["max_tokens"] = max_tokens
+            if supports_max_tokens:
+                params["max_tokens"] = max_tokens
+            else:
+                params["max_completion_tokens"] = max_tokens
             
         try:
             # Create a sanitized copy of params for logging (without the image data)

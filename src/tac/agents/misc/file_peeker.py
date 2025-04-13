@@ -33,7 +33,7 @@ class FilePeeker:
     and retrieves file content at appropriate detail levels.
     """
     
-    def __init__(self, project_root: str = ".", summary_level: Optional[str] = None, max_files: Optional[int] = None, use_strong_llm: bool = True):
+    def __init__(self, project_root: str = ".", summary_level: Optional[str] = None, max_files: Optional[int] = None, component: str = "native_agent"):
         """
         Initialize the FilePeeker agent.
         
@@ -41,17 +41,18 @@ class FilePeeker:
             project_root: Root directory of the project
             summary_level: Summary level to use ("high_level", "detailed", or "auto")
             max_files: Maximum number of files to include in context
-            use_strong_llm: Whether to use the strong LLM for file analysis
+            component: LLM component to use ("native_agent" or "chat")
         """
         self.project_files = ProjectFiles(project_root)
-        self.use_strong_llm = use_strong_llm
-        self.llm = LLMClient(llm_type="strong" if use_strong_llm else "weak")
+        
+        # Create LLM client with the specified component
+        self.llm = LLMClient(component=component)
         
         # Use provided values or fallback to config
         self.summary_level = summary_level or config.general.file_peeker_summary_level
         self.max_files = max_files or config.general.file_peeker_max_files
         
-        logger.debug(f"FilePeeker initialized with summary_level={self.summary_level}, max_files={self.max_files}, use_strong_llm={use_strong_llm}")
+        logger.debug(f"FilePeeker initialized with summary_level={self.summary_level}, max_files={self.max_files}, component={component}")
         
     def analyze_chat_for_files(self, chat_text: str, max_files: Optional[int] = None) -> List[FileRelevance]:
         """
@@ -602,8 +603,8 @@ if __name__ == "__main__":
                         help='Output format: context, categorized, or both')
     parser.add_argument('--summary-level', '-s', choices=['high_level', 'detailed', 'auto'], default=None,
                         help='Summary level to use (default from config)')
-    parser.add_argument('--weak-llm', action='store_true',
-                        help='Use weak LLM instead of strong LLM for file analysis')
+    parser.add_argument('--use-chat-model', action='store_true',
+                        help='Use chat component model instead of native_agent model for file analysis')
     parser.add_argument('--preview-only', '-P', action='store_true',
                         help='Show only previews of content instead of full content')
     parser.add_argument('--force-full-content', '-F', action='store_true',
@@ -618,11 +619,11 @@ if __name__ == "__main__":
         project_root=args.project_root, 
         summary_level=args.summary_level,
         max_files=args.max_files,
-        use_strong_llm=not args.weak_llm
+        component="chat" if args.use_chat_model else "native_agent"
     )
     
     print(f"Analyzing chat: '{args.chat}'")
-    print(f"Using summary level: {peeker.summary_level}, max files: {peeker.max_files}, model: {'weak' if args.weak_llm else 'strong'}\n")
+    print(f"Using summary level: {peeker.summary_level}, max files: {peeker.max_files}, component: {'chat' if args.use_chat_model else 'native_agent'}\n")
     
     # Import rich if available and requested
     rich_console = None

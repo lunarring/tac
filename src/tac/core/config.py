@@ -249,11 +249,11 @@ class ConfigManager:
         """Get aider configuration."""
         return self._config.aider
 
-    def get_llm_config(self, llm_type: str = "weak", component: str = None) -> LLMConfig:
+    def get_llm_config(self, llm_type: Optional[str] = None, component: str = None) -> LLMConfig:
         """Get LLM configuration for specified type or component.
         
         Args:
-            llm_type: For backward compatibility - "weak", "strong", or "vision"
+            llm_type: Legacy parameter for backward compatibility - "weak", "strong", or "vision"
             component: Component name to get LLM config for (preferred method)
             
         Returns:
@@ -290,26 +290,29 @@ class ConfigManager:
                 )
         
         # Only use the legacy llm_type mapping if component is not specified
-        # Backward compatibility - map legacy types to component equivalents
-        legacy_mappings = {
-            "weak": "chat",  # Maps to gpt-4o-2024-08-06
-            "strong": "native_agent",  # Maps to o3-mini or whatever current setting is
-            "vision": "vision"  # Maps to gpt-4o
-        }
-        
-        legacy_component = legacy_mappings.get(llm_type)
-        if legacy_component:
+        if llm_type:
+            # Backward compatibility - map legacy types to component equivalents
+            legacy_mappings = {
+                "weak": "chat",  # Maps to gpt-4o-2024-08-06
+                "strong": "native_agent",  # Maps to o3-mini or whatever current setting is
+                "vision": "vision"  # Maps to gpt-4o
+            }
+            
+            legacy_component = legacy_mappings.get(llm_type)
+            if legacy_component:
+                self._logger.warning(
+                    f"Using legacy llm_type='{llm_type}' is deprecated. "
+                    f"Please use component='{legacy_component}' instead."
+                )
+                # Recursively call with the mapped component
+                return self.get_llm_config(component=legacy_component)
+            
+            # If we get here, it's an unknown legacy type
             self._logger.warning(
-                f"Using legacy llm_type='{llm_type}' is deprecated. "
-                f"Please use component='{legacy_component}' instead."
+                f"Unknown llm_type='{llm_type}'. Using default component instead."
             )
-            # Recursively call with the mapped component
-            return self.get_llm_config(component=legacy_component)
         
-        # If we get here, neither valid component nor valid legacy type was provided
-        self._logger.warning(
-            f"Unknown llm_type='{llm_type}'. Using default component instead."
-        )
+        # If neither component nor valid llm_type was provided, use default
         return self.get_llm_config(component="default")
 
     @property

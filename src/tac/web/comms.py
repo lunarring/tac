@@ -19,8 +19,8 @@ def process_chat_message(message):
         str: The AI-generated response.
     """
     from tac.core.llm import LLMClient, Message
-    # Create a weak LLM client instance
-    client = LLMClient(llm_type="weak")
+    # Create a chat LLM client instance
+    client = LLMClient(component="chat")
     messages = [
         Message(role="system", content="You are a helpful assistant."),
         Message(role="user", content=message)
