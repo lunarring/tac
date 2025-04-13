@@ -193,6 +193,7 @@ class Config:
         "file_peeker": "gpt-4o-2024-08-06",
         "orchestrator": "o3-mini",
         "vision": "gpt-4o",  # Vision model needs to be gpt-4o
+        "plausibility": "o3-mini",  # Plausibility testing uses o3-mini
         "default": "o3-mini"  # Default template when component not specified
     })
     

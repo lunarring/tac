@@ -46,7 +46,7 @@ class ThreeJSVisionAgent(TrustyAgent):
 
     def __init__(self):
         logger.info("Initializing ThreeJSVisionAgent")
-        self.llm_client = LLMClient(model=self.llm)
+        self.llm_client = LLMClient(component="vision")
         self.screenshot_path = None
         self.analysis_result = None
         self.error_analyzer = ErrorAnalyzer()

@@ -35,7 +35,7 @@ class VisionTestingAgent(TrustyAgent):
 
     def __init__(self):
         logger.info("Initializing VisionTestingAgent")
-        self.llm_client = LLMClient(model=self.llm)
+        self.llm_client = LLMClient(component="vision")
         self.program_runner = None
         self.screenshot_path = None
         self.analysis_result = None

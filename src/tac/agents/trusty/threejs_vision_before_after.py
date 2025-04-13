@@ -47,7 +47,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
 
     def __init__(self):
         logger.info("Initializing ThreeJSVisionBeforeAfterAgent")
-        self.llm_client = LLMClient(model=self.llm)
+        self.llm_client = LLMClient(component="vision")
         self.before_screenshot_path = None
         self.after_screenshot_path = None
         self.comparison_path = None
