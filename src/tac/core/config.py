@@ -142,7 +142,7 @@ class Config:
             model="o3-mini",
             settings=LLMSettings(
                 temperature=0.7,
-                max_tokens=100000,
+                max_tokens=50000,
                 verify_ssl=True,
                 timeout=120,
                 reasoning_effort="medium"
