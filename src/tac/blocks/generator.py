@@ -54,9 +54,13 @@ class ProtoBlockGenerator:
     """
     
     def __init__(self, ui_manager=NullUIManager()):
-        self.llm_client = LLMClient(component="protoblock_generation")
+        # Use explicit model to avoid component/llm_type confusion
+        self.llm_client = LLMClient(model="o3-mini")
         self.project_files = ProjectFiles()
         self.ui_manager = ui_manager
+        
+        # Verify the actual model being used
+        logger.info(f"ProtoBlockGenerator confirmed using: {self.llm_client.config.provider}/{self.llm_client.config.model}")
     
     def get_protoblock_genesis_prompt(self, codebase: str, task_instructions: str) -> str:
         """

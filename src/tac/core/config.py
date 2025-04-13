@@ -259,7 +259,7 @@ class ConfigManager:
         Returns:
             LLMConfig configuration for the specified component or type
         """
-        # If component is specified, use the component mapping
+        # If component is specified, use the component mapping directly and ignore llm_type
         if component:
             template_name = self._config.component_llm_mappings.get(component)
             if not template_name:
@@ -288,7 +288,8 @@ class ConfigManager:
                         reasoning_effort="medium"
                     )
                 )
-                
+        
+        # Only use the legacy llm_type mapping if component is not specified
         # Backward compatibility - map legacy types to component equivalents
         legacy_mappings = {
             "weak": "chat",  # Maps to gpt-4o-2024-08-06
@@ -305,7 +306,7 @@ class ConfigManager:
             # Recursively call with the mapped component
             return self.get_llm_config(component=legacy_component)
         
-        # If we get here, neither component nor valid legacy type was provided
+        # If we get here, neither valid component nor valid legacy type was provided
         self._logger.warning(
             f"Unknown llm_type='{llm_type}'. Using default component instead."
         )
@@ -341,6 +342,30 @@ class ConfigManager:
                 return None
             current = getattr(current, key)
         return current
+
+    def debug_model_mappings(self):
+        """Print current component -> template -> provider/model mappings."""
+        if self._logger:
+            self._logger.info("Current component -> template -> provider/model mappings:")
+            for component, template in self._config.component_llm_mappings.items():
+                model_config = self._config.llm_templates.get(template)
+                if model_config:
+                    provider = model_config.provider
+                    model_name = model_config.model
+                    self._logger.info(f"{component:20} -> {template:20} -> {provider}/{model_name}")
+                else:
+                    self._logger.info(f"{component:20} -> {template:20} -> MISSING TEMPLATE")
+
+    def debug_templates(self):
+        """Print all template definitions."""
+        if self._logger:
+            self._logger.info("Current template definitions:")
+            for template_name, template_config in self._config.llm_templates.items():
+                self._logger.info(f"Template: {template_name}")
+                self._logger.info(f"  Provider: {template_config.provider}")
+                self._logger.info(f"  Model: {template_config.model}")
+                self._logger.info(f"  Settings: {vars(template_config.settings)}")
+                self._logger.info("---")
 
     def override_with_args(self, args: dict) -> None:
         """Override configuration values with command-line arguments.

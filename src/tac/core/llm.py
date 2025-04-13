@@ -40,19 +40,28 @@ class LLMClient:
             config_override: Optional config override dictionary
             model: Direct model name to use, bypassing component and llm_type lookup
         """
+        # Add detailed logging for debugging
+        logger.debug(f"Initializing LLMClient: component={component}, llm_type={llm_type}, model={model}")
+        
         # If model is directly provided, use it to create a config
         if model:
             logger.info(f"Using directly provided model: {model}")
             llm_config = config.get_llm_config(llm_type="default", component=None)
             llm_config.model = model
         else:
-            # Get config from centralized config
-            llm_config = config.get_llm_config(llm_type, component)
+            # Get config from centralized config - prioritize component over llm_type if both are provided
+            if component is not None:
+                llm_config = config.get_llm_config(component=component)
+                logger.debug(f"Using component={component} mapping: {llm_config.provider}/{llm_config.model}")
+            else:
+                llm_config = config.get_llm_config(llm_type=llm_type)
+                logger.debug(f"Using llm_type={llm_type} mapping: {llm_config.provider}/{llm_config.model}")
             
         if config_override:
             # Override settings if provided
             for key, value in config_override.items():
                 setattr(llm_config, key, value)
+                logger.debug(f"Override setting {key}={value}")
         
         self.config = llm_config
         self.client = self._initialize_client()
@@ -174,10 +183,15 @@ class LLMClient:
         if max_tokens is None:
             max_tokens = self.config.settings.max_tokens
         if max_tokens:
-            params["max_tokens"] = max_tokens
+            # Use max_completion_tokens for o3-mini model
+            if self.config.model == "o3-mini":
+                params["max_completion_tokens"] = max_tokens
+            else:
+                params["max_tokens"] = max_tokens
             
         try:
             logger.debug(f"LLM pre: Params: {params}")
+            logger.info(f"Making API call to {self.config.provider}/{self.config.model}")
             response = self.client.chat.completions.create(**params)
             # Log a summary of the response instead of the full object
             logger.debug(f"LLM post: Response received: {response}")
@@ -735,4 +749,16 @@ if __name__ == "__main__":
         if model:
             provider = model.provider
             model_name = model.model
-            print(f"{component:20} -> {template:20} -> {provider}/{model_name}") 
+            print(f"{component:20} -> {template:20} -> {provider}/{model_name}")
+            
+    # Print the o3-mini template definition
+    o3_mini_template = config._config.llm_templates.get("o3-mini")
+    print("\nDirect o3-mini template inspection:")
+    print("-" * 50)
+    if o3_mini_template:
+        print(f"Template: o3-mini")
+        print(f"Provider: {o3_mini_template.provider}")
+        print(f"Model: {o3_mini_template.model}")
+        print(f"Settings: {vars(o3_mini_template.settings)}")
+    else:
+        print("o3-mini template not found!") 
