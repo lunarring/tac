@@ -174,22 +174,25 @@ class LLMClient:
             "timeout": self.config.settings.timeout,
         }
         
-        # Check if model supports temperature and max_tokens
+        # Handle temperature parameter
         supports_temperature = self.config.model not in ["o3-mini", "gpt-4o"]
-        supports_max_tokens = self.config.model not in ["o3-mini", "gpt-4o"]
-        
-        # Only add temperature for models that support it
         if supports_temperature:
             if temperature is None:
                 temperature = self.config.settings.temperature
             params["temperature"] = temperature
         
-        max_tokens = self.config.settings.max_tokens
+        # Handle max_tokens parameter with model-specific limits
+        max_tokens = max_tokens or self.config.settings.max_tokens
         if max_tokens:
-            if supports_max_tokens:
-                params["max_tokens"] = max_tokens
-            else:
+            # Apply model-specific token limits and parameter names
+            if self.config.model == "gpt-4o":
+                # GPT-4o has a 16k completion token limit
+                max_tokens = min(max_tokens, 16000)
                 params["max_completion_tokens"] = max_tokens
+            elif self.config.model == "o3-mini":
+                params["max_completion_tokens"] = max_tokens
+            else:
+                params["max_tokens"] = max_tokens
             
         try:
             logger.debug(f"LLM pre: Params: {params}")
@@ -395,6 +398,11 @@ class LLMClient:
         if self.config.provider == LLMProvider.GEMINI.value:
             return self._gemini_vision_chat_completion(messages, image_path, temperature)
             
+        # IMPORTANT: Don't automatically switch models for vision - honor the configuration
+        # Only log a warning if we're not using a known vision-capable model
+        if self.config.model != "gpt-4o":
+            logger.warning(f"Model {self.config.model} may not fully support vision capabilities. If you encounter errors, consider using gpt-4o.")
+            
         # Process image with downscaling if needed and encode to base64
         try:
             with Image.open(image_path) as img:
@@ -459,30 +467,13 @@ class LLMClient:
                     "content": msg.content
                 })
         
-        # Prepare completion parameters without passing 'reasoning_effort'
+        # Prepare completion parameters - for vision models, only include necessary parameters
         params = {
             "model": self.config.model,
             "messages": formatted_messages,
             "stream": False,
             "timeout": self.config.settings.timeout,
         }
-        
-        # Check if model supports temperature and max_tokens
-        supports_temperature = self.config.model not in ["o3-mini", "gpt-4o"]
-        supports_max_tokens = self.config.model not in ["o3-mini", "gpt-4o"]
-        
-        # Only add temperature for models that support it
-        if supports_temperature:
-            if temperature is None:
-                temperature = self.config.settings.temperature
-            params["temperature"] = temperature
-        
-        max_tokens = self.config.settings.max_tokens
-        if max_tokens:
-            if supports_max_tokens:
-                params["max_tokens"] = max_tokens
-            else:
-                params["max_completion_tokens"] = max_tokens
             
         try:
             # Create a sanitized copy of params for logging (without the image data)
@@ -630,7 +621,7 @@ if __name__ == "__main__":
     image_path = os.path.expanduser("~/Downloads/tmpig4ajga7.png")
     # Check if the image exists
     if os.path.exists(image_path):
-        client_vision = LLMClient(llm_type="vision")
+        client_vision = LLMClient(component="vision")  # Use component="vision" which maps to gpt-4o
         vision_messages = [
             Message(role="system", content="You are a helpful assistant that can analyze images"),
             Message(role="user", content="Do you see a white background and a blue dot in the middle?")

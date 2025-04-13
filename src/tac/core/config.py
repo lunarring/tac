@@ -120,7 +120,7 @@ class Config:
             model="gpt-4o",
             settings=LLMSettings(
                 temperature=0.7,
-                max_tokens=4096,
+                max_tokens=16000,
                 verify_ssl=True,
                 timeout=180,
                 reasoning_effort="medium"
@@ -192,6 +192,7 @@ class Config:
         "file_summarizer": "gpt-4o-2024-08-06",
         "file_peeker": "gpt-4o-2024-08-06",
         "orchestrator": "o3-mini",
+        "vision": "gpt-4o",  # Vision model needs to be gpt-4o
         "default": "o3-mini"  # Default template when component not specified
     })
     
