@@ -821,14 +821,12 @@
           </div>
         </div>
         <div class="trusty-agent-section initially-hidden" id="trustyAgentImageSection">
-          <div class="trusty-agent-section-title">Screenshots</div>
+          <div class="trusty-agent-section-title">Screenshot</div>
           <div id="trustyAgentImageContainer">
-            <div id="mainImageContainer">
-              <h4>Main Screenshot</h4>
-              <img id="trustyAgentImage" alt="Trusty Agent Output Image" class="constrained-image">
+            <div id="mainImageContainer" style="text-align: center; width: 100%;">
+              <img id="trustyAgentImage" alt="ThreeJS Before/After Comparison" class="constrained-image" style="max-width: 90%; height: auto; border: 1px solid #ccc;">
             </div>
             <div id="comparisonImageContainer" class="initially-hidden">
-              <h4>Comparison Screenshot</h4>
               <img id="trustyAgentComparisonImage" alt="Comparison Screenshot" class="constrained-image">
             </div>
           </div>
@@ -1099,13 +1097,12 @@
         if (results.image_url) {
           console.log(`${agentName} image URL:`, results.image_url);
           imageSection.style.display = 'block';
-          imageElement.src = results.image_url;
+          imageElement.src = makePathUsable(results.image_url);
         } else if (results.comparison_path) {
           // Explicitly handle comparison_path that may not be exposed as image_url
+          console.log(`${agentName} comparison path:`, results.comparison_path);
           imageSection.style.display = 'block';
-          const usablePath = makePathUsable(results.comparison_path);
-          imageElement.src = usablePath;
-          console.log(`Setting main image src from comparison_path: ${usablePath}`);
+          imageElement.src = makePathUsable(results.comparison_path);
         } else {
           imageSection.style.display = 'none';
         }
@@ -1242,14 +1239,9 @@
         } else {
           trustyAgentImageSection.style.display = 'none';
         }
-        if (resultObj.comparison_path) {
-          comparisonImageContainer.style.display = 'block';
-          const usablePath = makePathUsable(resultObj.comparison_path);
-          trustyAgentComparisonImage.src = usablePath;
-          console.log(`Setting comparison image src to: ${usablePath}`);
-        } else {
-          comparisonImageContainer.style.display = 'none';
-        }
+        
+        // Always hide the comparison container - we only need one image
+        comparisonImageContainer.style.display = 'none';
       } else {
         trustyAgentResultSection.style.display = 'block';
         trustyAgentResultStatus.style.display = 'none';
