@@ -151,8 +151,8 @@ class ChatPanel(Component):
         """Handle a message sent to this component"""
         message_type = message_data.get("type")
         
-        # Ignore recording_status messages
-        if message_type == "recording_status" or message_data.get("ui_only") is True:
+        # Ignore recording_status messages and execute_script messages
+        if message_type == "recording_status" or message_data.get("ui_only") is True or message_type == "execute_script":
             return
             
         # Process other message types normally

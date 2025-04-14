@@ -262,6 +262,57 @@ class MessageHandlerManager:
         """Handle a git merge request"""
         target_branch = data.get("target_branch", "")
         await self.ui.handle_git_merge_request(target_branch)
+        
+    async def handle_update_component_llm_mappings(self, data, websocket=None):
+        """Handle a request to update component-LLM mappings"""
+        mappings = data.get("mappings", {})
+        if not mappings:
+            await self.send_mapping_update_result(False, "No mappings provided", websocket)
+            return
+            
+        try:
+            # Create a new configuration dictionary with the updated mappings
+            config_update = {
+                'component_llm_mappings': mappings
+            }
+            
+            # Use ConfigManager's override_with_dict method to update the mappings
+            from tac.core.config import config
+            config.override_with_dict(config_update)
+            
+            # Send success response
+            await self.send_mapping_update_result(True, "", websocket)
+            
+            # Log the change
+            print(f"Updated component LLM mappings: {mappings}")
+            await self.ui.send_status_message("Component LLM mappings updated")
+            
+        except Exception as e:
+            print(f"Error updating component LLM mappings: {e}")
+            await self.send_mapping_update_result(False, str(e), websocket)
+    
+    async def send_mapping_update_result(self, success, error="", websocket=None):
+        """Send a response about the mapping update result"""
+        response = {
+            "type": "component_mapping_update_result",
+            "success": success
+        }
+        
+        if error:
+            response["error"] = error
+            
+        if websocket:
+            await websocket.send(json.dumps(response))
+        elif self.ui.websocket:
+            await self.ui.websocket.send(json.dumps(response))
+            
+        # Also send as a window message for iframe communication
+        if self.ui.websocket:
+            script = f"window.postMessage({json.dumps(response)}, '*');"
+            await self.ui.websocket.send(json.dumps({
+                "type": "execute_script",
+                "script": script
+            }))
 
 class UIManager:
     # System prompt template for ChatAgent
@@ -1011,6 +1062,10 @@ class UIManager:
         
         self.server.register_message_handler("transcribed_message", 
             lambda ws, data: asyncio.create_task(self.message_handler.handle_transcribed_message(data, ws)))
+        
+        # Register new handler for updating component LLM mappings
+        self.server.register_message_handler("update_component_llm_mappings", 
+            lambda ws, data: asyncio.create_task(self.message_handler.handle_update_component_llm_mappings(data, ws)))
         
         # Register the settings button click handler
         self.server.register_message_handler("settings_click", 

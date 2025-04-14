@@ -476,181 +476,189 @@
       chatHeader.classList.add("offline");
     });
 
-    // Listen for messages from the server
-    socket.addEventListener('message', (event) => {
+    // Handle incoming messages from the WebSocket
+    socket.onmessage = function(event) {
+      let data;
+      
+      // Check if this is a component_mapping_update_result, forward to any iframe that might be listening
       try {
-        const data = JSON.parse(event.data);
-        // Handle settings page response first
-        if (data.type === "settings_page") {
-          const blockPanel = document.getElementById('blockPanel');
-          blockPanel.innerHTML = data.html;
-          return;
+        data = JSON.parse(event.data);
+        if (data.type === 'component_mapping_update_result') {
+          window.postMessage(data, '*');
+        }
+      } catch (error) {
+        // Not JSON, assume it's a chat message
+        appendMessage(event.data, "assistant");
+        return;
+      }
+      
+      // Handle settings page content
+      if (data.type === 'settings_page') {
+        const settingsFrame = document.getElementById('settingsFrame');
+        if (settingsFrame) {
+          // Use srcdoc to set the content directly
+          settingsFrame.srcdoc = data.html;
+        }
+        return;
+      }
+      
+      // Handle status message updates
+      if (data.type === 'status_message') {
+        // Get status message for status bar display
+        const statusMessage = data.message;
+        
+        // Show different status based on message content
+        if (statusMessage.includes('❌') || statusMessage.includes('Error')) {
+          updateRecipientStatus(statusMessage, 'error');
+          updateRuntimeStatus(statusMessage, 'error');
+        } else if (statusMessage.includes('✅') || statusMessage.includes('success')) {
+          updateRecipientStatus(statusMessage, 'success');
+          updateRuntimeStatus(statusMessage, 'success');
+        } else if (statusMessage.includes('Starting') || statusMessage.includes('Processing') || 
+                   statusMessage.includes('Recording') || statusMessage.includes('Analyzing')) {
+          updateRecipientStatus(statusMessage, 'processing');
+          updateRuntimeStatus(statusMessage, 'processing');
+        } else {
+          updateRecipientStatus(statusMessage);
+          updateRuntimeStatus(statusMessage);
         }
         
-        if (data.type === "status_message") {
-          // Update the right-side status text bar using the new function
-          updateRuntimeStatus(data.message);
-          
-          // Detect status type from the message content for proper styling
-          if (data.message.includes("Starting") || 
-             data.message.includes("Processing") || 
-             data.message.includes("Analyzing") ||
-             data.message.includes("Executing")) {
-            updateRuntimeStatus(data.message, "processing");
-          } else if (data.message.includes("✅") || 
-                    data.message.includes("success")) {
-            updateRuntimeStatus(data.message, "success");
-          } else if (data.message.includes("❌") || 
-                    data.message.includes("Error") || 
-                    data.message.includes("failed")) {
-            updateRuntimeStatus(data.message, "error");
-          }
-          
-          // Check for attempt number updates in status messages - support both formats
-          const attemptMatch = data.message.match(/Starting (?:block creation and execution )?attempt (\d+) of (\d+)/);
-          if (attemptMatch) {
-            const current = attemptMatch[1];
-            const max = attemptMatch[2];
-            // Update the attempt number display in protoblock header
-            document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
-            console.log(`Updated attempt number to ${current}/${max}`);
-          }
-          
-          // Check for block execution failure message
-          if (data.message === "❌ Block execution failed!" || 
-              data.message.startsWith("❌ Error:") ||
-              data.message.includes("Error creating protoblock:") ||
-              data.message.includes("Execution attempt") && data.message.includes("failed")) {
-            console.log("Removing protoblock display due to failure message");
-            // Force the canvas to be shown and protoblock to be hidden
-            document.getElementById('protoblockContainer').style.display = 'none';
-            document.querySelector('#blockPanel canvas').style.display = 'block';
-          }
-          
-          // Show git operations panel after successful block execution
-          if (data.message === "✅ Block executed successfully! Displaying final results...") {
-            console.log("Block successful, showing git operations panel");
-            showGitOperationsPanel(true);
-          }
-          
-          return;
-        } 
-        else if (data.type === "error_message") {
-          // Display prominent error message at the top of the right panel
-          const errorMessage = document.getElementById("errorMessage");
-          errorMessage.textContent = data.message;
-          errorMessage.style.display = "block";
-          
-          errorMessage.classList.remove("animated");
-          void errorMessage.offsetWidth;
-          errorMessage.classList.add("animated");
-          
-          setTimeout(() => {
-            errorMessage.style.display = "none";
-          }, 30000);
-          
-          return;
+        // Check for attempt number updates in status messages - support both formats
+        const attemptMatch = statusMessage.match(/Starting (?:block creation and execution )?attempt (\d+) of (\d+)/);
+        if (attemptMatch) {
+          const current = attemptMatch[1];
+          const max = attemptMatch[2];
+          // Update the attempt number display in protoblock header
+          document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
+          console.log(`Updated attempt number to ${current}/${max}`);
         }
-        else if (data.type === "info_message") {
-          const infoMessage = document.getElementById("infoMessage");
-          infoMessage.textContent = data.message;
-          infoMessage.style.display = "block";
-          
-          setTimeout(() => {
-            infoMessage.style.display = "none";
-          }, 15000);
-          
-          return;
-        }
-        else if (data.type === "remove_protoblock") {
-          console.log("Received explicit remove_protoblock message");
+        
+        // Check for block execution failure message
+        if (statusMessage === "❌ Block execution failed!" || 
+            statusMessage.startsWith("❌ Error:") ||
+            statusMessage.includes("Error creating protoblock:") ||
+            statusMessage.includes("Execution attempt") && statusMessage.includes("failed")) {
+          console.log("Removing protoblock display due to failure message");
+          // Force the canvas to be shown and protoblock to be hidden
           document.getElementById('protoblockContainer').style.display = 'none';
           document.querySelector('#blockPanel canvas').style.display = 'block';
-          
-          document.getElementById('protoblockContainer').innerHTML = '';
-          rebuildProtoblockContainer();
-          
-          // Update status
-          updateRuntimeStatus(data.message || "Block processing complete");
-          return;
         }
-        else if (data.type === "protoblock_data") {
-          console.log("Received protoblock data:", data);
-          
-          document.getElementById('protoblockContainer').style.display = 'block';
-          document.querySelector('#blockPanel canvas').style.display = 'none';
-          
-          displayProtoblockData(data);
-          
-          console.log("Protoblock is now visible");
-          return;
+        
+        // Show git operations panel after successful block execution
+        if (statusMessage === "✅ Block executed successfully! Displaying final results...") {
+          console.log("Block successful, showing git operations panel");
+          showGitOperationsPanel(true);
         }
-        else if (data.type === "transcribed_message") {
-          addChatMessage("User", data.message);
-          
-          const payload = {
-            type: "user_message",
-            message: data.message
-          };
-          socket.send(JSON.stringify(payload));
-          showTypingIndicator();
-          micButton.classList.remove('waiting');
-          micButton.classList.remove('recording');
-          micButton.classList.remove('rotating');
-          micButton.classList.remove('transcribing');
-          return;
-        }
-        else if (data.type === "file_status_response" || 
-                data.type === "file_diff_response" || 
-                data.type === "git_branch_response" || 
-                data.type === "git_operation_response") {
-          console.log(`Received ${data.type}`);
-          return;
-        }
-        else if (data.type === "chat_message") {
-          const role = data.role || "AI";
-          const message = data.message || "";
-          
-          if (role === "user") {
-            addChatMessage("User", message);
-          } else if (role === "assistant") {
-            addChatMessage("AI", message);
-            hideTypingIndicator();
-          } else {
-            addChatMessage(role, message);
-          }
-          
-          return;
-        }
-        else if (data.type === "recording_status") {
-          // Handle recording status updates for microphone button
-          console.log("Received recording status update:", data.is_recording);
-          // Update the microphone button appearance based on recording status
-          return;
-        }
-        else {
-          // For unrecognized message types, just log instead of displaying in chat
-          console.log("Received unknown message type:", data.type);
-          console.warn("Unknown message data:", data);
-          
-          // Only display in chat if it explicitly has a role or appears to be a chat message
-          if (data.role || (data.component_id === "chat_panel" && data.message)) {
-            addChatMessage(data.role || "AI", data.message || JSON.stringify(data));
-            hideTypingIndicator();
-          }
-        }
-      } catch (e) {
-        console.log("Parsing JSON failed, treating as plain text:", e);
-        // Only add raw text to chat if it's likely meant to be a message (starts with text, not JSON)
-        const isLikelyJsonData = event.data.trim().startsWith('{') && event.data.includes('"type":');
-        if (!isLikelyJsonData) {
-          addChatMessage("AI", event.data);
+        
+        return;
+      }
+      
+      // Handle other message types
+      if (data.type === "error_message") {
+        // Display prominent error message at the top of the right panel
+        const errorMessage = document.getElementById("errorMessage");
+        errorMessage.textContent = data.message;
+        errorMessage.style.display = "block";
+        
+        errorMessage.classList.remove("animated");
+        void errorMessage.offsetWidth;
+        errorMessage.classList.add("animated");
+        
+        setTimeout(() => {
+          errorMessage.style.display = "none";
+        }, 30000);
+        
+        return;
+      }
+      else if (data.type === "info_message") {
+        const infoMessage = document.getElementById("infoMessage");
+        infoMessage.textContent = data.message;
+        infoMessage.style.display = "block";
+        
+        setTimeout(() => {
+          infoMessage.style.display = "none";
+        }, 15000);
+        
+        return;
+      }
+      else if (data.type === "remove_protoblock") {
+        console.log("Received explicit remove_protoblock message");
+        document.getElementById('protoblockContainer').style.display = 'none';
+        document.querySelector('#blockPanel canvas').style.display = 'block';
+        
+        document.getElementById('protoblockContainer').innerHTML = '';
+        rebuildProtoblockContainer();
+        
+        // Update status
+        updateRuntimeStatus(data.message || "Block processing complete");
+        return;
+      }
+      else if (data.type === "protoblock_data") {
+        console.log("Received protoblock data:", data);
+        
+        document.getElementById('protoblockContainer').style.display = 'block';
+        document.querySelector('#blockPanel canvas').style.display = 'none';
+        
+        displayProtoblockData(data);
+        
+        console.log("Protoblock is now visible");
+        return;
+      }
+      else if (data.type === "transcribed_message") {
+        addChatMessage("User", data.message);
+        
+        const payload = {
+          type: "user_message",
+          message: data.message
+        };
+        socket.send(JSON.stringify(payload));
+        showTypingIndicator();
+        micButton.classList.remove('waiting');
+        micButton.classList.remove('recording');
+        micButton.classList.remove('rotating');
+        micButton.classList.remove('transcribing');
+        return;
+      }
+      else if (data.type === "file_status_response" || 
+              data.type === "file_diff_response" || 
+              data.type === "git_branch_response" || 
+              data.type === "git_operation_response") {
+        console.log(`Received ${data.type}`);
+        return;
+      }
+      else if (data.type === "chat_message") {
+        const role = data.role || "AI";
+        const message = data.message || "";
+        
+        if (role === "user") {
+          addChatMessage("User", message);
+        } else if (role === "assistant") {
+          addChatMessage("AI", message);
           hideTypingIndicator();
         } else {
-          console.warn("Received malformed JSON that looks like component data:", event.data);
+          addChatMessage(role, message);
+        }
+        
+        return;
+      }
+      else if (data.type === "recording_status") {
+        // Handle recording status updates for microphone button
+        console.log("Received recording status update:", data.is_recording);
+        // Update the microphone button appearance based on recording status
+        return;
+      }
+      else {
+        // For unrecognized message types, just log instead of displaying in chat
+        console.log("Received unknown message type:", data.type);
+        console.warn("Unknown message data:", data);
+        
+        // Only display in chat if it explicitly has a role or appears to be a chat message
+        if (data.role || (data.component_id === "chat_panel" && data.message)) {
+          addChatMessage(data.role || "AI", data.message || JSON.stringify(data));
+          hideTypingIndicator();
         }
       }
-    });
+    };
 
     // Send user message when Enter key is pressed (without Shift)
     userInput.addEventListener("keydown", function(event) {
@@ -763,10 +771,86 @@
     toggleProtoblockDisplay(false);
     rebuildProtoblockContainer();
 
-    // Bind click event for settings: send settings_click message over websocket
-    const settingsButton = document.getElementById('settingsButton');
-    settingsButton.addEventListener('click', function () {
+    // Settings button click handler
+    document.getElementById('settingsButton').addEventListener('click', function () {
+      // Create a settings iframe
+      let settingsFrame = document.getElementById('settingsFrame');
+      if (!settingsFrame) {
+        settingsFrame = document.createElement('iframe');
+        settingsFrame.id = 'settingsFrame';
+        settingsFrame.style.width = '100%';
+        settingsFrame.style.height = '100%';
+        settingsFrame.style.border = 'none';
+        
+        // Clear the block panel and add the iframe
+        const blockPanel = document.getElementById('blockPanel');
+        // Hide the 3D scene temporarily
+        renderer.domElement.style.display = 'none';
+        
+        // Hide the protoblock container if it exists
+        const protoblockContainer = document.getElementById('protoblockContainer');
+        if (protoblockContainer) {
+          protoblockContainer.style.display = 'none';
+        }
+        
+        blockPanel.appendChild(settingsFrame);
+        
+        // Add a close button
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close Settings';
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.top = '10px';
+        closeBtn.style.right = '10px';
+        closeBtn.style.padding = '5px 10px';
+        closeBtn.style.background = '#f44336';
+        closeBtn.style.color = 'white';
+        closeBtn.style.border = 'none';
+        closeBtn.style.borderRadius = '4px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.zIndex = '1000';
+        
+        closeBtn.addEventListener('click', function() {
+          // Remove the iframe and close button
+          if (settingsFrame) blockPanel.removeChild(settingsFrame);
+          blockPanel.removeChild(closeBtn);
+          
+          // Show the 3D scene again
+          renderer.domElement.style.display = 'block';
+          
+          // Update block title and status
+          document.getElementById('blockTitle').textContent = 'Block Status';
+          updateRuntimeStatus('Ready...');
+        });
+        
+        blockPanel.appendChild(closeBtn);
+      }
+      
+      // Update block panel header
+      document.getElementById('blockTitle').textContent = 'Settings';
+      updateRuntimeStatus('Configuring settings...');
+      
+      // Request settings content via websocket
       socket.send(JSON.stringify({ type: "settings_click" }));
+    });
+    
+    // Listen for messages from iframes (for settings page)
+    window.addEventListener('message', function(event) {
+      // Check if this is a websocket message request from the settings iframe
+      if (event.data && event.data.type === 'settings_websocket_message' && event.data.data) {
+        // Forward the message data to the websocket
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify(event.data.data));
+        } else {
+          console.error('WebSocket is not open, cannot send settings update');
+          
+          // Reply with an error message
+          event.source.postMessage({
+            type: 'component_mapping_update_result',
+            success: false,
+            error: 'WebSocket is not connected'
+          }, '*');
+        }
+      }
     });
   </script>
   
