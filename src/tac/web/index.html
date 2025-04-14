@@ -623,20 +623,33 @@
           
           return;
         }
+        else if (data.type === "recording_status") {
+          // Handle recording status updates for microphone button
+          console.log("Received recording status update:", data.is_recording);
+          // Update the microphone button appearance based on recording status
+          return;
+        }
         else {
-          console.log("Received message with unrecognized type:", data.type);
-          if (typeof data === 'object' && data.message) {
-            addChatMessage("AI", data.message);
-          } else {
-            console.warn("Displaying raw message data:", data);
-            addChatMessage("AI", JSON.stringify(data));
+          // For unrecognized message types, just log instead of displaying in chat
+          console.log("Received unknown message type:", data.type);
+          console.warn("Unknown message data:", data);
+          
+          // Only display in chat if it explicitly has a role or appears to be a chat message
+          if (data.role || (data.component_id === "chat_panel" && data.message)) {
+            addChatMessage(data.role || "AI", data.message || JSON.stringify(data));
+            hideTypingIndicator();
           }
-          hideTypingIndicator();
         }
       } catch (e) {
         console.log("Parsing JSON failed, treating as plain text:", e);
-        addChatMessage("AI", event.data);
-        hideTypingIndicator();
+        // Only add raw text to chat if it's likely meant to be a message (starts with text, not JSON)
+        const isLikelyJsonData = event.data.trim().startsWith('{') && event.data.includes('"type":');
+        if (!isLikelyJsonData) {
+          addChatMessage("AI", event.data);
+          hideTypingIndicator();
+        } else {
+          console.warn("Received malformed JSON that looks like component data:", event.data);
+        }
       }
     });
 
