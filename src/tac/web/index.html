@@ -10,13 +10,13 @@
     #chatHeader {
       position: relative;
     }
-    /* Center the settings button horizontally at the top of the chat header */
+    /* Position the settings button to the right side of block header instead of center */
     #settingsButton {
       position: absolute;
       top: 0;
-      left: 50%;
-      transform: translateX(-50%);
+      right: 0;
     }
+    /* CSS for blockStatus removed as it's now in the stylesheet */
   </style>
 </head>
 <body>
@@ -67,6 +67,7 @@
         </div>
         <div id="settingsButton" class="action-button">⚙️</div>
       </div>
+      <div id="runtimeStatus"></div>
       <div id="errorMessage"></div>
       <div id="infoMessage"></div>
       <div id="protoblockContainer">
@@ -206,7 +207,7 @@
         setTimeout(() => {
           hideElement(canvas);
           // Ensure the status is properly visible over the protoblock
-          runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+          if (runtimeStatus) runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
           document.getElementById('blockHeader').style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
         }, 300);
       } else {
@@ -217,7 +218,7 @@
           // Hide the protoblock container
           hideElement(protoblockContainer);
           // Reset status background for cube view
-          runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+          if (runtimeStatus) runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
           document.getElementById('blockHeader').style.backgroundColor = 'transparent';
           document.getElementById('blockHeader').style.boxShadow = 'none';
         }, 50);
@@ -228,10 +229,15 @@
     function updateRuntimeStatus(message, status = "default") {
       const statusTextElement = document.getElementById("blockStatusText");
       const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
+      const runtimeStatusElement = document.getElementById("runtimeStatus");
       
       if (!statusTextElement || !statusDotElement) return;
       
+      // Update both status elements
       statusTextElement.textContent = message;
+      if (runtimeStatusElement) {
+        runtimeStatusElement.textContent = message;
+      }
       
       // Remove all status classes from text and dot
       statusTextElement.classList.remove("processing", "success", "error", "default");
@@ -572,7 +578,8 @@
           document.getElementById('protoblockContainer').innerHTML = '';
           rebuildProtoblockContainer();
           
-          document.getElementById("runtimeStatus").textContent = data.message || "Block processing complete";
+          // Update status elements
+          updateRuntimeStatus(data.message || "Block processing complete");
           return;
         }
         else if (data.type === "protoblock_data") {
