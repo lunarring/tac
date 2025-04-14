@@ -79,7 +79,7 @@ class ProtoBlockGenerator:
         trusty_agents_description = TrustyAgentRegistry.get_trusty_agents_description()
 
         return f"""<purpose>
-You are a senior python software engineer. You are specialized in figuring out how to phrase precise instructions for your employees who are junior software engineers and implement the final code. You have access to the <task_instructions> and <codebase>. The important aspect of your work is that you want to make sure that the resulting code can be easily verified. For this we have a palette of trusty agents from which you choose, and they can run an empirical verification of the code. Each trusty agent is specialized in a different aspect that they can test and your coding instructions and thinking should to be phrased in a way that we can maximize this verification process, given the chosen trusty agents.
+You are a senior software engineer. You are specialized in figuring out how to phrase precise instructions for your employees who are junior software engineers and implement the final code. You have access to the <task_instructions> and <codebase>. The important aspect of your work is that you want to make sure that the resulting code can be easily verified. For this we have a palette of trusty agents from which you choose, and they can run an empirical verification of the code. Each trusty agent is specialized in a different aspect that they can test and your coding instructions and thinking should to be phrased in a way that we can maximize this verification process, given the chosen trusty agents.
 </purpose>
 
 <task_instructions>
