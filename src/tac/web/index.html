@@ -1100,6 +1100,12 @@
           console.log(`${agentName} image URL:`, results.image_url);
           imageSection.style.display = 'block';
           imageElement.src = results.image_url;
+        } else if (results.comparison_path) {
+          // Explicitly handle comparison_path that may not be exposed as image_url
+          imageSection.style.display = 'block';
+          const usablePath = makePathUsable(results.comparison_path);
+          imageElement.src = usablePath;
+          console.log(`Setting main image src from comparison_path: ${usablePath}`);
         } else {
           imageSection.style.display = 'none';
         }
@@ -1177,6 +1183,8 @@
             resultObj = protoblock.trusty_agent_results[key];
             hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
             console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
+            // Debug - log the detailed object contents to check for image paths
+            console.log(`Result object for ${agentKey} - JSON:`, JSON.stringify(resultObj, null, 2));
             break;
           }
         }
@@ -1225,6 +1233,12 @@
           const usablePath = makePathUsable(resultObj.image_url);
           trustyAgentImage.src = usablePath;
           console.log(`Setting main image src to: ${usablePath}`);
+        } else if (resultObj.comparison_path) {
+          // Explicitly handle comparison_path that may not be exposed as image_url
+          trustyAgentImageSection.style.display = 'block';
+          const usablePath = makePathUsable(resultObj.comparison_path);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting main image src from comparison_path: ${usablePath}`);
         } else {
           trustyAgentImageSection.style.display = 'none';
         }

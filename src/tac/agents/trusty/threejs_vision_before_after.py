@@ -176,6 +176,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
                 path=self.before_screenshot_path,
                 description="Before state screenshot"
             )
+            logger.info(f"Added before screenshot to result: {self.before_screenshot_path}")
             
             # Capture after state
             try:
@@ -186,6 +187,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
                     path=self.after_screenshot_path,
                     description="After state screenshot"
                 )
+                logger.info(f"Added after screenshot to result: {self.after_screenshot_path}")
             except Exception as e:
                 error_msg = f"Failed to capture after state: {str(e)}"
                 result.summary = error_msg
@@ -244,6 +246,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
                 description="Before and after comparison"
             )
             result.details["comparison_path"] = self.comparison_path
+            logger.info(f"Added comparison path to result details: {self.comparison_path}")
             
             # Verify the comparison image was created properly
             if not os.path.exists(self.comparison_path):

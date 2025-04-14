@@ -236,6 +236,17 @@ class BlockExecutor:
                     if comparison_paths:
                         ui_friendly_result['comparison_paths'] = comparison_paths
                     
+                    # Set image_url for UI display
+                    # First check if there's a comparison_path in details (for ThreeJSVisionBeforeAfterAgent)
+                    if 'comparison_path' in agent_result.details and agent_result.details['comparison_path']:
+                        ui_friendly_result['image_url'] = agent_result.details['comparison_path']
+                    # Then try screenshots if available
+                    elif screenshot_paths:
+                        ui_friendly_result['image_url'] = screenshot_paths[0]
+                    # Finally, use the first comparison path if available
+                    elif comparison_paths:
+                        ui_friendly_result['image_url'] = comparison_paths[0]
+                    
                     # Add grade information if present
                     for component in agent_result.components:
                         if component.component_type == "grade":
