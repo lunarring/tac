@@ -67,7 +67,6 @@
         </div>
         <div id="settingsButton" class="action-button">⚙️</div>
       </div>
-      <div id="runtimeStatus"></div>
       <div id="errorMessage"></div>
       <div id="infoMessage"></div>
       <div id="protoblockContainer">
@@ -196,7 +195,6 @@
     function toggleProtoblockDisplay(show) {
       const protoblockContainer = document.getElementById('protoblockContainer');
       const canvas = renderer.domElement;
-      const runtimeStatus = document.getElementById('runtimeStatus');
       
       if (show) {
         // First show the protoblock container
@@ -206,8 +204,7 @@
         canvas.style.opacity = '0';
         setTimeout(() => {
           hideElement(canvas);
-          // Ensure the status is properly visible over the protoblock
-          if (runtimeStatus) runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+          // Ensure the header has proper background
           document.getElementById('blockHeader').style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
         }, 300);
       } else {
@@ -217,27 +214,22 @@
           canvas.style.opacity = '1';
           // Hide the protoblock container
           hideElement(protoblockContainer);
-          // Reset status background for cube view
-          if (runtimeStatus) runtimeStatus.style.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+          // Reset background for cube view
           document.getElementById('blockHeader').style.backgroundColor = 'transparent';
           document.getElementById('blockHeader').style.boxShadow = 'none';
         }, 50);
       }
     }
 
-    // Function to update the runtime status with appropriate styling
+    // Function to update the status with appropriate styling
     function updateRuntimeStatus(message, status = "default") {
       const statusTextElement = document.getElementById("blockStatusText");
       const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
-      const runtimeStatusElement = document.getElementById("runtimeStatus");
       
       if (!statusTextElement || !statusDotElement) return;
       
-      // Update both status elements
+      // Update status element
       statusTextElement.textContent = message;
-      if (runtimeStatusElement) {
-        runtimeStatusElement.textContent = message;
-      }
       
       // Remove all status classes from text and dot
       statusTextElement.classList.remove("processing", "success", "error", "default");
@@ -578,7 +570,7 @@
           document.getElementById('protoblockContainer').innerHTML = '';
           rebuildProtoblockContainer();
           
-          // Update status elements
+          // Update status
           updateRuntimeStatus(data.message || "Block processing complete");
           return;
         }
@@ -1065,8 +1057,8 @@
       const imageSection = document.getElementById('trustyAgentImageSection');
       const imageElement = document.getElementById('trustyAgentImage');
       
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const executionSuccessful = runtimeStatus.textContent.includes("✅");
+      const blockStatusText = document.getElementById('blockStatusText');
+      const executionSuccessful = blockStatusText.textContent.includes("✅");
       
       if (results && (results.output || results.image_url)) {
         console.log(`${agentName} has results to display`);
@@ -1212,6 +1204,10 @@
       trustyAgentTestResultsSection.style.display = 'none';
       trustyAgentSummarySection.style.display = 'none';
       trustyAgentPlausibilitySection.style.display = 'none';
+
+      // Check execution status by looking at blockStatusText
+      const blockStatusText = document.getElementById('blockStatusText');
+      const executionSuccessful = blockStatusText.textContent.includes("✅");
 
       if (hasResults && resultObj) {
         if (resultObj.output) {

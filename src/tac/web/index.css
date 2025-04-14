@@ -363,26 +363,6 @@ html, body {
   font-size: 14px;
 }
 
-/* Runtime status styling */
-#runtimeStatus {
-  position: relative;
-  width: 90%;
-  margin: 8px auto;
-  color: #333;
-  font-size: 15px;
-  background-color: rgba(255, 255, 255, 0.9);
-  padding: 8px 16px;
-  border-radius: 8px;
-  text-align: center;
-  z-index: 5;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
-}
-
 /* Chat bubble styles */
 .chat-bubble {
   margin: 10px 0;
