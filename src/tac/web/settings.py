@@ -2,51 +2,32 @@ from tac.core.config import config
 
 def get_config_html():
     """
-    Returns an HTML fragment displaying configuration key-value pairs.
-    The configuration is loaded from the global ConfigManager.
+    Returns an HTML fragment displaying component_llm_mappings from the configuration.
     """
-    # Get the full configuration as a dictionary
-    config_data = config.raw_config
+    # Get only the component_llm_mappings from the configuration
+    component_llm_mappings = config.raw_config.get('component_llm_mappings', {})
 
-    # Start HTML content as a fragment (without full <html>/<head>/<body> tags)
+    # Start HTML content as a fragment
     html = """
     <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>Configuration Settings</h2>
+      <h2>Component LLM Mappings</h2>
     """
-    # Iterate through each configuration section and add a table for its key-value pairs.
-    for section, values in config_data.items():
-        html += f"<h3>{section.capitalize()}</h3>"
-        html += "<table style='border-collapse: collapse; width: 100%; margin-bottom: 20px;'>"
-        html += ("<thead><tr>"
-                 "<th style='border: 1px solid #ccc; padding: 8px; background-color: #f2f2f2;'>Key</th>"
-                 "<th style='border: 1px solid #ccc; padding: 8px; background-color: #f2f2f2;'>Value</th>"
-                 "</tr></thead><tbody>")
-        # values is expected to be a dictionary; if not, just output the value.
-        if isinstance(values, dict):
-            for key, value in values.items():
-                html += (f"<tr>"
-                         f"<td style='border: 1px solid #ccc; padding: 8px;'>{key}</td>"
-                         f"<td style='border: 1px solid #ccc; padding: 8px;'>{value}</td>"
-                         f"</tr>")
-        else:
-            html += (f"<tr>"
-                     f"<td style='border: 1px solid #ccc; padding: 8px;'>value</td>"
-                     f"<td style='border: 1px solid #ccc; padding: 8px;'>{values}</td>"
-                     f"</tr>")
-        html += "</tbody></table>"
-    # Ensure a section for Coding Agent exists if not present in the configuration.
-    if 'coding_agent' not in config_data:
-        html += "<h3>Coding Agent</h3>"
-        html += "<table style='border-collapse: collapse; width: 100%; margin-bottom: 20px;'>"
-        html += ("<thead><tr>"
-                 "<th style='border: 1px solid #ccc; padding: 8px; background-color: #f2f2f2;'>Key</th>"
-                 "<th style='border: 1px solid #ccc; padding: 8px; background-color: #f2f2f2;'>Value</th>"
-                 "</tr></thead><tbody>")
-        html += ("<tr>"
-                 "<td style='border: 1px solid #ccc; padding: 8px;'>coding_agent</td>"
-                 "<td style='border: 1px solid #ccc; padding: 8px;'>active</td>"
-                 "</tr>")
-        html += "</tbody></table>"
+    
+    # Create a table for the component-to-LLM mappings
+    html += "<table style='border-collapse: collapse; width: 100%; margin-bottom: 20px;'>"
+    html += ("<thead><tr>"
+             "<th style='border: 1px solid #ccc; padding: 8px; background-color: #f2f2f2;'>Component</th>"
+             "<th style='border: 1px solid #ccc; padding: 8px; background-color: #f2f2f2;'>LLM</th>"
+             "</tr></thead><tbody>")
+    
+    # Add each component mapping to the table
+    for component, llm in component_llm_mappings.items():
+        html += (f"<tr>"
+                 f"<td style='border: 1px solid #ccc; padding: 8px;'>{component}</td>"
+                 f"<td style='border: 1px solid #ccc; padding: 8px;'>{llm}</td>"
+                 f"</tr>")
+    
+    html += "</tbody></table>"
     html += "</div>"
     return html
 
