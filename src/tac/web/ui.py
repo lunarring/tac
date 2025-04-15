@@ -232,6 +232,15 @@ class MessageHandlerManager:
             # This shouldn't happen normally, but handle it just in case
             system_content = self.ui.CHAT_SYSTEM_PROMPT.format(file_summaries=self.ui.file_summaries or "No file summaries available yet")
             self.ui.chat_agent = ChatAgent(system_prompt=system_content)
+        
+        # Check if there's a message included in the block_click data
+        message = ""
+        if data and isinstance(data, dict) and 'message' in data:
+            message = data.get('message', '').strip()
+            # If there's a message, add it to the chat history without triggering a response
+            if message:
+                # Add the message to the chat agent's history
+                self.ui.chat_agent.add_message(role="user", content=message)
             
         await self.ui.handle_block_click(websocket, self.ui.chat_agent)
     

@@ -833,18 +833,22 @@
       
       const text = userInput.value.trim();
       if (text !== "") {
+        // Add user message to chat display
         addChatMessage("User", text);
-        const messagePayload = {
-          type: "user_message",
-          message: text
-        };
-        socket.send(JSON.stringify(messagePayload));
-        showTypingIndicator();
+        
+        // Don't send as a regular user_message to avoid getting a standard AI response
+        // We'll include the message with the block_click instead
         userInput.value = "";
       }
       
+      // Add a "creating block..." message from AI
+      addChatMessage("AI", "creating block...");
+      // Hide typing indicator since we don't want to show it for the custom message
+      hideTypingIndicator();
+      
       const payload = {
-        type: "block_click"
+        type: "block_click",
+        message: text || ""  // Include user's message if available
       };
       socket.send(JSON.stringify(payload));
     });

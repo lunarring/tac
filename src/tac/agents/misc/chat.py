@@ -30,6 +30,16 @@ class ChatAgent:
         """
         return self.conversation
     
+    def add_message(self, role: str, content: str):
+        """
+        Adds a message to the conversation history without generating a response.
+        
+        Args:
+            role (str): The role of the message sender ('user', 'assistant', or 'system')
+            content (str): The content of the message
+        """
+        self.conversation.append(Message(role=role, content=content))
+    
     def generate_task_instructions_llm(self) -> str:
         """
         Summarizes the conversation history into a clear, concise set of task instructions.
