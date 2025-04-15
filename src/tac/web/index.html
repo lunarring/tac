@@ -488,7 +488,8 @@
         }
       } catch (error) {
         // Not JSON, assume it's a chat message
-        appendMessage(event.data, "assistant");
+        addChatMessage("AI", event.data);
+        hideTypingIndicator();
         return;
       }
       
