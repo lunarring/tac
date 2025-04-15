@@ -292,8 +292,8 @@
       // Rebuild the container structure
       rebuildProtoblockContainer();
       
-      // Update the runtime status to show error
-      updateRuntimeStatus("Block execution failed", "error");
+      // Send status to the chat panel instead
+      updateRecipientStatus("Block execution failed", "error");
     }
     
     // Function to rebuild the empty protoblock container structure
@@ -616,8 +616,8 @@
         document.getElementById('protoblockContainer').innerHTML = '';
         rebuildProtoblockContainer();
         
-        // Update status
-        updateRuntimeStatus(data.message || "Block processing complete");
+        // Update status in chat panel instead
+        updateRecipientStatus(data.message || "Block processing complete");
         return;
       }
       else if (data.type === "protoblock_data") {
@@ -844,9 +844,8 @@
           // Show the 3D scene again
           renderer.domElement.style.display = 'block';
           
-          // Update block title and status
-          document.getElementById('blockTitle').textContent = 'Block Status';
-          updateRuntimeStatus('Ready...');
+          // Update block title back to original
+          document.getElementById('blockTitle').textContent = 'Block Panel';
         });
         
         blockPanel.appendChild(closeBtn);
@@ -854,7 +853,6 @@
       
       // Update block panel header
       document.getElementById('blockTitle').textContent = 'Settings';
-      updateRuntimeStatus('Configuring settings...');
       
       // Request settings content via websocket
       socket.send(JSON.stringify({ type: "settings_click" }));
