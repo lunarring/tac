@@ -389,7 +389,7 @@ class UIManager:
     # Add a new class variable to track the last mic click time
     CLICK_DEBOUNCE_TIME = 1.0  # Seconds to ignore additional clicks
     
-    def __init__(self, base_dir="."):
+    def __init__(self, base_dir=".", port=8765, auto_find_port=True):
         self.base_dir = base_dir
         self.project_files = ProjectFiles(self.base_dir)
         
@@ -410,8 +410,8 @@ class UIManager:
         self.chat_agent = None  # Will be initialized when file summaries are loaded
         self.latest_status = ""  # Added for testing status updates
         
-        # Create a websocket server instance
-        self.server = WebSocketServer(host='localhost', port=8765)
+        # Create a websocket server instance with auto port detection
+        self.server = WebSocketServer(host='localhost', port=port, auto_find_port=auto_find_port)
         
         # Create UI components
         self.chat_panel = ChatPanel()
@@ -1806,5 +1806,5 @@ class UIManager:
         print("UI Manager shutdown complete")
         
 if __name__ == "__main__":
-    ui_manager = UIManager(base_dir=".")
+    ui_manager = UIManager(base_dir=".", port=8765, auto_find_port=True)
     ui_manager.launch_ui()

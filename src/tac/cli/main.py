@@ -260,7 +260,9 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--ui', action='store_true', help='Launch a UI server with WebSocket and serve a Three.js Hello World page')
+    parser.add_argument('--ui', action='store_true', help='Launch a UI server with WebSocket and HTTP to serve the TAC UI')
+    parser.add_argument('--port', type=int, default=8765, help='Port to use for the UI server (default: 8765)')
+    parser.add_argument('--fixed-port', action='store_true', help='Use exactly the specified port, don\'t auto-detect a free port')
     
     # Add global arguments
     parser.add_argument(
@@ -670,7 +672,10 @@ def main():
         print(config._config.component_llm_mappings)
         
         from tac.web.ui import UIManager
-        ui_manager = UIManager()
+        ui_manager = UIManager(
+            port=args.port, 
+            auto_find_port=not args.fixed_port
+        )
         ui_manager.launch_ui()
         sys.exit(0)
     

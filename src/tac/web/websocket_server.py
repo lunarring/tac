@@ -6,8 +6,51 @@ import os
 import signal
 import subprocess
 import traceback
+import http.server
+import threading
+import socketserver
+from pathlib import Path
 from typing import Callable, Dict, Optional, Any, List, Set
 from tac.web.ui_components import ComponentRegistry, StatusBar
+
+
+class TACHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+    """HTTP handler that serves the UI HTML file directly"""
+    
+    def __init__(self, *args, base_path=None, index_html=None, **kwargs):
+        self.base_path = base_path
+        self.index_html = index_html
+        super().__init__(*args, **kwargs)
+    
+    def do_GET(self):
+        """Handle GET requests by serving the UI files"""
+        if self.path == '/' or self.path == '/index.html':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            with open(self.index_html, 'rb') as file:
+                self.wfile.write(file.read())
+        else:
+            # For other files (CSS, JS, etc.), try to serve from base_path
+            try:
+                # Get requested file path relative to web directory
+                file_path = Path(self.base_path) / self.path.lstrip('/')
+                if file_path.exists() and file_path.is_file():
+                    self.send_response(200)
+                    # Set content type based on file extension
+                    if file_path.suffix == '.css':
+                        self.send_header('Content-type', 'text/css')
+                    elif file_path.suffix == '.js':
+                        self.send_header('Content-type', 'application/javascript')
+                    else:
+                        self.send_header('Content-type', 'application/octet-stream')
+                    self.end_headers()
+                    with open(file_path, 'rb') as file:
+                        self.wfile.write(file.read())
+                else:
+                    self.send_error(404, "File not found")
+            except Exception as e:
+                self.send_error(500, str(e))
 
 
 class WebSocketServer:
@@ -15,11 +58,21 @@ class WebSocketServer:
     WebSocket server that handles connections, message routing and server lifecycle.
     This class extracts the WebSocket functionality from UIManager to separate concerns.
     """
-    def __init__(self, host: str = 'localhost', port: int = 8765):
+    # Add static list to track instances
+    active_instances = []
+    
+    def __init__(self, host: str = 'localhost', port: int = 8765, auto_find_port: bool = True):
         self.host = host
-        self.port = port
+        self.requested_port = port
+        self.port = port  # Will be updated if auto_find_port is True
+        self.auto_find_port = auto_find_port
         self.websocket = None
         self._loop = None
+        self.http_server = None
+        self.http_port = None
+        
+        # Register active instances
+        WebSocketServer.active_instances.append(self)
         
         # Component registry for UI components
         self.component_registry = ComponentRegistry()
@@ -33,6 +86,57 @@ class WebSocketServer:
         # Create and register core components
         self.status_bar = StatusBar()
         self.component_registry.register_component(self.status_bar)
+
+    def find_free_port(self, start_port=None):
+        """Find a free port starting from the specified port"""
+        if start_port is None:
+            start_port = self.requested_port
+            
+        port = start_port
+        max_attempts = 100  # Limit the search to 100 ports
+        
+        for _ in range(max_attempts):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind((self.host, port))
+                    s.close()
+                    return port
+            except OSError:
+                # Port is in use, try the next one
+                port += 1
+                
+        # If we reach here, we couldn't find a free port
+        raise RuntimeError(f"Could not find a free port after {max_attempts} attempts.")
+    
+    def start_http_server(self):
+        """Start an HTTP server to serve the UI files"""
+        # Find the index.html file
+        module_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+        index_html = module_dir / "index.html"
+        
+        if not index_html.exists():
+            print(f"Warning: index.html not found at {index_html}. UI may not work properly.")
+            return False
+            
+        # Find a free port for HTTP, starting at WS port + 1 
+        self.http_port = self.find_free_port(self.port + 1)
+        
+        # Create a handler that knows about the base path and index file
+        handler = lambda *args, **kwargs: TACHTTPRequestHandler(
+            *args, 
+            base_path=module_dir,
+            index_html=index_html,
+            **kwargs
+        )
+        
+        # Start the HTTP server in a separate thread
+        self.http_server = socketserver.TCPServer((self.host, self.http_port), handler)
+        thread = threading.Thread(target=self.http_server.serve_forever)
+        thread.daemon = True
+        thread.start()
+        
+        print(f"HTTP server started on http://{self.host}:{self.http_port}")
+        return True
 
     def register_component(self, component):
         """Register a UI component with the server"""
@@ -198,62 +302,86 @@ class WebSocketServer:
     async def run_server(self):
         """Run the WebSocket server"""
         try:
-            # Check if port is in use
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((self.host, self.port))
-                s.close()
-        except OSError:
-            # Port is in use, try to kill existing process
+            # Find a free port if auto_find_port is enabled
+            if self.auto_find_port:
+                self.port = self.find_free_port()
+                if self.port != self.requested_port:
+                    print(f"Requested port {self.requested_port} is in use, using port {self.port} instead.")
+            else:
+                # Check if port is in use
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.bind((self.host, self.port))
+                        s.close()
+                except OSError:
+                    print(f"Port {self.port} is already in use. Please select a different port.")
+                    raise
+            
+            # Start the HTTP server to serve the UI
+            self.start_http_server()
+            
+            # Start the WebSocket server
+            server = await websockets.serve(self.handle_connection, self.host, self.port)
+            print(f"WebSocket server started on ws://{self.host}:{self.port}")
+            print(f"Please open http://{self.host}:{self.http_port} in your browser to view the UI.")
+            
+            # Use a different approach that allows for proper cancellation
+            stop_event = asyncio.Event()
+            
+            def signal_handler():
+                stop_event.set()
+                
+            # Add signal handlers for graceful shutdown
+            loop = asyncio.get_running_loop()
+            for sig in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(sig, signal_handler)
+                
             try:
-                result = subprocess.run(['pgrep', '-f', 'python.*tac'], capture_output=True, text=True)
-                if result.stdout.strip():
-                    pids = result.stdout.strip().split('\n')
-                    for pid_str in pids:
-                        try:
-                            pid = int(pid_str)
-                            print(f"Killing existing Python process (PID: {pid}) using port {self.port}")
-                            os.kill(pid, signal.SIGTERM)
-                        except Exception as e:
-                            print(f"Failed to kill process {pid_str}: {e}")
-                    await asyncio.sleep(1)
-                else:
-                    print(f"Port {self.port} is in use but no Python TAC processes found. Please free the port manually.")
-                    raise OSError(f"Port {self.port} is in use by non-Python process")
-            except Exception as e:
-                print(f"Failed to kill existing processes: {e}")
-
-        # Start the WebSocket server
-        server = await websockets.serve(self.handle_connection, self.host, self.port)
-        print(f"WebSocket server started on ws://{self.host}:{self.port}")
-        print("Please open 'src/tac/web/index.html' in your browser to view the UI.")
+                # Wait until stopped
+                await stop_event.wait()
+            finally:
+                # Clean up
+                if self.http_server:
+                    self.http_server.shutdown()
+                    self.http_server = None
+                
+                server.close()
+                await server.wait_closed()
+                
+                # Remove from active instances
+                if self in WebSocketServer.active_instances:
+                    WebSocketServer.active_instances.remove(self)
         
-        # Use a different approach that allows for proper cancellation
-        stop_event = asyncio.Event()
-        
-        def signal_handler():
-            stop_event.set()
+        except Exception as e:
+            print(f"Error starting WebSocket server: {e}")
+            # Clean up HTTP server if it was started
+            if self.http_server:
+                self.http_server.shutdown()
+                self.http_server = None
             
-        # Add signal handlers for graceful shutdown
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, signal_handler)
-            
-        try:
-            # Wait until stopped
-            await stop_event.wait()
-        finally:
-            # Clean up
-            server.close()
-            await server.wait_closed()
+            # Remove from active instances
+            if self in WebSocketServer.active_instances:
+                WebSocketServer.active_instances.remove(self)
+                
+            # Re-raise the exception
+            raise
 
     def launch(self):
         """Start the WebSocket server"""
+        loop = self._get_loop()
         try:
-            asyncio.run(self.run_server())
+            loop.run_until_complete(self.run_server())
         except KeyboardInterrupt:
-            print("WebSocket server stopped by user.")
+            print("WebSocket server stopped by user")
         except Exception as e:
             print(f"Error in WebSocket server: {e}")
             traceback.print_exc()
         finally:
-            print("WebSocket server has shut down.") 
+            # Close any lingering tasks
+            pending = asyncio.all_tasks(loop)
+            for task in pending:
+                task.cancel()
+                
+            # Remove from active instances on shutdown
+            if self in WebSocketServer.active_instances:
+                WebSocketServer.active_instances.remove(self) 
