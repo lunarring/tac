@@ -14,6 +14,9 @@ def get_config_html():
     <div style="font-family: Arial, sans-serif; padding: 20px;">
       <h2>Component LLM Mappings</h2>
       <p>Select which LLM to use for each component:</p>
+      <div style="background-color: #FFF3CD; color: #856404; padding: 10px; margin-bottom: 15px; border-radius: 4px;">
+        <strong>Note:</strong> After saving changes, you will need to restart the application for them to take effect.
+      </div>
       <form id="component-mapping-form" style="margin-bottom: 20px;">
     """
     
@@ -88,7 +91,7 @@ def get_config_html():
           if (event.data && event.data.type === 'component_mapping_update_result') {
             const statusEl = document.getElementById('status-message');
             if (event.data.success) {
-              statusEl.textContent = 'Component mappings updated successfully!';
+              statusEl.textContent = 'Component mappings updated successfully! Please restart the application for changes to take effect.';
               statusEl.style.backgroundColor = '#D4EDDA';
               statusEl.style.color = '#155724';
             } else {

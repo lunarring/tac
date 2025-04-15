@@ -280,12 +280,60 @@ class MessageHandlerManager:
             from tac.core.config import config
             config.override_with_dict(config_update)
             
+            # Save the config to disk
+            if hasattr(config, 'save_config_to_file'):
+                save_result = config.save_config_to_file()
+                if not save_result:
+                    await self.send_mapping_update_result(False, "Failed to save configuration to disk", websocket)
+                    return
+            else:
+                # Add the method if it doesn't exist (temporary for backward compatibility)
+                from pathlib import Path
+                import json
+                
+                config_dir = Path.home() / ".tac"
+                config_dir.mkdir(exist_ok=True)
+                config_file = config_dir / "config.json"
+                
+                # Convert config to dict
+                config_dict = {
+                    'general': vars(config._config.general),
+                    'git': vars(config._config.git),
+                    'aider': vars(config._config.aider),
+                    'llm_templates': {k: {
+                        'provider': v.provider,
+                        'model': v.model,
+                        'settings': vars(v.settings) if v.settings else {},
+                        'api_key': v.api_key,
+                        'base_url': v.base_url
+                    } for k, v in config._config.llm_templates.items()},
+                    'component_llm_mappings': config._config.component_llm_mappings,
+                    'logging': vars(config._config.logging)
+                }
+                
+                # Handle nested dataclasses
+                general_trusty_agents = config_dict['general'].pop('trusty_agents', None)
+                if general_trusty_agents:
+                    config_dict['general']['trusty_agents'] = vars(general_trusty_agents)
+                
+                # Save to file
+                try:
+                    with open(config_file, 'w') as f:
+                        json.dump(config_dict, f, indent=2)
+                    print(f"Configuration saved to {config_file}")
+                except Exception as e:
+                    print(f"Error saving configuration: {e}")
+                    await self.send_mapping_update_result(False, f"Error saving configuration: {str(e)}", websocket)
+                    return
+            
             # Send success response
             await self.send_mapping_update_result(True, "", websocket)
             
             # Log the change
             print(f"Updated component LLM mappings: {mappings}")
-            await self.ui.send_status_message("Component LLM mappings updated")
+            # Verify the mappings were saved correctly
+            print(f"Current component_llm_mappings: {config._config.component_llm_mappings}")
+            await self.ui.send_status_message("Component LLM mappings updated and saved to disk. Please restart the application for changes to take effect.")
             
         except Exception as e:
             print(f"Error updating component LLM mappings: {e}")

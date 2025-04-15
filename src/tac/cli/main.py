@@ -661,6 +661,14 @@ def main():
     parser, args = parse_args()
 
     if args.ui:
+        # Load config before initializing UI manager
+        config.load_config()
+        config.override_with_args(vars(args))
+        
+        # Debug print the current component_llm_mappings
+        print("Current component_llm_mappings:")
+        print(config._config.component_llm_mappings)
+        
         from tac.web.ui import UIManager
         ui_manager = UIManager()
         ui_manager.launch_ui()
