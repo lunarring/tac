@@ -90,10 +90,7 @@ class NativeAgent(Agent):
 
 Task Description: {task_description}
 
-Context Files, please do not edit these files:
-{context_files_section}
-
-Write files, these are the ones you need to modify:
+Write files, these are the ones you need to modify and also files that are useful for context:
 {write_files_section}
 
 
@@ -119,7 +116,7 @@ import numpy as np
 a = np.random.randn(10, 10)
 ###END_FILE
 
-Additionally, below, you add a small note to the user about the changes you made, should be maximum three sentences. The format is:
+Only send me back the files that you have modified, leave the unmodified files out and don't return them here. Additionally, below, you add a small note to the user about the changes you made, should be maximum three sentences. The format is:
 
 ###NOTE:
 # insert the note here
