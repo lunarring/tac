@@ -12,6 +12,7 @@ import socketserver
 from pathlib import Path
 from typing import Callable, Dict, Optional, Any, List, Set
 from tac.web.ui_components import ComponentRegistry, StatusBar
+import tempfile
 
 
 class TACHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -30,6 +31,9 @@ class TACHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             with open(self.index_html, 'rb') as file:
                 self.wfile.write(file.read())
+        elif self.path.startswith('/screenshots/'):
+            # Handle screenshot requests
+            self.serve_screenshot(self.path[12:])  # Remove '/screenshots/' prefix
         else:
             # For other files (CSS, JS, etc.), try to serve from base_path
             try:
@@ -51,6 +55,77 @@ class TACHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_error(404, "File not found")
             except Exception as e:
                 self.send_error(500, str(e))
+    
+    def serve_screenshot(self, screenshot_path):
+        """
+        Serve a screenshot file from anywhere on the filesystem.
+        
+        Args:
+            screenshot_path: The full path to the screenshot, or a relative path from /tmp
+        """
+        try:
+            # Handle absolute and relative paths
+            if screenshot_path.startswith('/'):
+                # Absolute path
+                file_path = screenshot_path
+            else:
+                # Check common locations for temp files
+                tmp_locations = [
+                    os.path.join('/tmp', screenshot_path),
+                    os.path.join(os.path.expanduser('~'), '.tac', 'tmp', screenshot_path),
+                    os.path.join(tempfile.gettempdir(), screenshot_path)
+                ]
+                
+                # Try each location
+                file_path = None
+                for loc in tmp_locations:
+                    if os.path.exists(loc):
+                        file_path = loc
+                        break
+                
+                # If not found in known locations, try as a relative path
+                if not file_path:
+                    relative_path = os.path.join(os.getcwd(), screenshot_path)
+                    if os.path.exists(relative_path):
+                        file_path = relative_path
+                    else:
+                        # Last resort - use as is
+                        file_path = screenshot_path
+            
+            # Log attempt
+            print(f"Attempting to serve screenshot: {file_path}")
+            
+            # Check if file exists
+            if not os.path.exists(file_path):
+                print(f"Screenshot not found: {file_path}")
+                self.send_error(404, f"Screenshot not found: {file_path}")
+                return
+            
+            # Get file size for logging
+            file_size = os.path.getsize(file_path)
+            print(f"Screenshot found: {file_path} ({file_size} bytes)")
+            
+            # Determine content type based on extension
+            content_type = "image/png"  # Default to PNG
+            if file_path.lower().endswith('.jpg') or file_path.lower().endswith('.jpeg'):
+                content_type = "image/jpeg"
+            
+            # Serve the file
+            with open(file_path, 'rb') as f:
+                file_data = f.read()
+                
+            self.send_response(200)
+            self.send_header('Content-type', content_type)
+            self.send_header('Content-length', str(len(file_data)))
+            self.end_headers()
+            self.wfile.write(file_data)
+            print(f"Successfully served screenshot: {file_path} ({len(file_data)} bytes)")
+            
+        except Exception as e:
+            print(f"Error serving screenshot: {e}")
+            import traceback
+            traceback.print_exc()
+            self.send_error(500, str(e))
 
 
 class WebSocketServer:
@@ -136,6 +211,7 @@ class WebSocketServer:
         thread.start()
         
         print(f"HTTP server started on http://{self.host}:{self.http_port}")
+        print(f"Screenshots will be served via: http://{self.host}:{self.http_port}/screenshots/{{path}}")
         return True
 
     def register_component(self, component):

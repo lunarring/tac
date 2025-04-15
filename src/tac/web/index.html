@@ -1411,15 +1411,26 @@
       
       function makePathUsable(path) {
         if (!path) return null;
-        if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('./') || path.startsWith('/')) {
+        
+        // Already a usable URL
+        if (path.startsWith('http') || path.startsWith('data:')) {
           return path;
         }
-        try {
-          return 'file://' + path;
-        } catch (e) {
-          console.error('Error processing path:', e);
+        
+        // Paths that are already relative to the web server root
+        if (path.startsWith('./') || path.startsWith('../')) {
           return path;
         }
+        
+        // For absolute file paths, use our screenshot server route
+        if (path.startsWith('/')) {
+          console.log(`Converting absolute path to screenshot URL: ${path}`);
+          return `/screenshots${path}`;
+        }
+        
+        // For relative paths (likely in /tmp), route through screenshots endpoint
+        console.log(`Converting path to screenshot URL: ${path}`);
+        return `/screenshots/${path}`;
       }
 
       trustyAgentResultSection.style.display = 'none';
