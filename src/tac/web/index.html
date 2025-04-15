@@ -937,40 +937,12 @@
         
         blockPanel.appendChild(settingsFrame);
         
-        // Add a close button
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = 'Close Settings';
-        closeBtn.style.position = 'absolute';
-        closeBtn.style.top = '10px';
-        closeBtn.style.right = '10px';
-        closeBtn.style.padding = '5px 10px';
-        closeBtn.style.background = '#f44336';
-        closeBtn.style.color = 'white';
-        closeBtn.style.border = 'none';
-        closeBtn.style.borderRadius = '4px';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.zIndex = '1000';
+        // Update block panel header
+        document.getElementById('blockTitle').textContent = 'Settings';
         
-        closeBtn.addEventListener('click', function() {
-          // Remove the iframe and close button
-          if (settingsFrame) blockPanel.removeChild(settingsFrame);
-          blockPanel.removeChild(closeBtn);
-          
-          // Show the 3D scene again
-          renderer.domElement.style.display = 'block';
-          
-          // Update block title back to original
-          document.getElementById('blockTitle').textContent = 'Block Panel';
-        });
-        
-        blockPanel.appendChild(closeBtn);
+        // Request settings content via websocket
+        socket.send(JSON.stringify({ type: "settings_click" }));
       }
-      
-      // Update block panel header
-      document.getElementById('blockTitle').textContent = 'Settings';
-      
-      // Request settings content via websocket
-      socket.send(JSON.stringify({ type: "settings_click" }));
     });
     
     // Listen for messages from iframes (for settings page)
