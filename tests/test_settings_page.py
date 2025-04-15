@@ -7,10 +7,10 @@ def test_get_config_html_contains_key_elements():
     to ensure that configuration values are being loaded and formatted.
     """
     html_output = get_config_html()
-    # Check for elements from the 'general' section (e.g., coding_agent may be included)
-    assert "coding_agent" in html_output, "Expected 'coding_agent' to be present in the configuration HTML."
-    # Check for the 'git' section label
-    assert "git" in html_output.lower(), "Expected 'git' section to be present in the configuration HTML."
+    # Check for elements related to component LLM mappings
+    assert "Component LLM Mappings" in html_output, "Expected 'Component LLM Mappings' to be present in the configuration HTML."
+    # Check for the component selector
+    assert "llm-selector" in html_output, "Expected 'llm-selector' to be present in the configuration HTML."
     
 if __name__ == "__main__":
     pytest.main([__file__])

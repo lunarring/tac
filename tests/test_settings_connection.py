@@ -23,8 +23,8 @@ async def test_settings_button_click():
     assert message_data.get("type") == "settings_page"
     html_content = message_data.get("html")
     # Check that key configuration elements are present in the HTML
-    assert "coding_agent" in html_content, "Expected 'coding_agent' in settings HTML"
-    assert "git" in html_content.lower(), "Expected 'git' in settings HTML"
+    assert "Component LLM Mappings" in html_content, "Expected 'Component LLM Mappings' in settings HTML"
+    assert "llm-selector" in html_content, "Expected 'llm-selector' in settings HTML"
     
 if __name__ == "__main__":
     pytest.main([__file__])

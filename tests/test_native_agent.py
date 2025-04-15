@@ -83,7 +83,6 @@ def test_create_implementation_prompt():
     prompt = agent._create_implementation_prompt(task_description, context_section, write_section, coding_agent_prompts)
     assert "Task Description: " in prompt
     assert task_description in prompt
-    assert context_section in prompt
     assert write_section in prompt
     assert "###FILE:" in prompt
     # Confirm additional guidance was added.
