@@ -82,6 +82,83 @@ class LLMClient:
                 if not api_key:
                     raise ValueError("Gemini API key is required. Set it in the config or as GEMINI_API_KEY environment variable.")
                 genai.configure(api_key=api_key)
+                
+                # Preserve the originally requested model for reference
+                original_model = self.config.model
+                
+                # Get available models
+                try:
+                    models = genai.list_models()
+                    available_models = [model.name for model in models if "generateContent" in model.supported_generation_methods]
+                    logger.debug(f"Available models: {available_models}")
+                    
+                    # Check if we want gemini-2.5-pro
+                    if original_model == "gemini-2.5-pro" or "2.5-pro" in original_model:
+                        # Look for the best available model in priority order
+                        preferred_models = [
+                            # Try to find 2.5 models first - experimental has free quota, preview doesn't
+                            "models/gemini-2.5-pro-exp-03-25",  # This one has free quota
+                            "models/gemini-2.5.pro-exp-03-25",  # Alternative spelling (with dot instead of dash)
+                            # Only use preview if nothing else is available
+                            "models/gemini-2.5-pro-preview-03-25",
+                            # Then try other powerful models
+                            "models/gemini-1.5-pro-latest",
+                            "models/gemini-1.5-pro",
+                            "models/gemini-1.5-pro-002",
+                            "models/gemini-1.5-pro-001"
+                        ]
+                        
+                        # Find the first matching model that's available
+                        for preferred in preferred_models:
+                            if preferred in available_models:
+                                self.config.model = preferred
+                                logger.info(f"Using available model {preferred} instead of requested {original_model}")
+                                break
+                        else:
+                            # If none of the preferred models are available, use any pro model
+                            pro_models = [m for m in available_models if "pro" in m]
+                            if pro_models:
+                                self.config.model = pro_models[0]
+                                logger.info(f"Using {self.config.model} instead of requested {original_model}")
+                            elif available_models:
+                                # Last resort: use any available model
+                                self.config.model = available_models[0]
+                                logger.info(f"No Pro models available. Using {self.config.model}")
+                            else:
+                                logger.error("No Gemini models available")
+                    else:
+                        # For other models, handle normally with models/ prefix
+                        if not original_model.startswith("models/") and original_model.startswith("gemini-"):
+                            model_with_prefix = f"models/{original_model}"
+                            if model_with_prefix in available_models:
+                                self.config.model = model_with_prefix
+                                logger.info(f"Using model with full path: {self.config.model}")
+                            else:
+                                # Try to find a similar model
+                                similar_models = [m for m in available_models if original_model in m]
+                                if similar_models:
+                                    self.config.model = similar_models[0]
+                                    logger.info(f"Using similar model: {self.config.model}")
+                                elif available_models:
+                                    self.config.model = available_models[0]
+                                    logger.info(f"Model {original_model} not found. Using {self.config.model}")
+                        elif original_model in available_models:
+                            # Model name already includes prefix and exists
+                            logger.info(f"Using specified model: {original_model}")
+                        else:
+                            # Model not found, try to find a suitable replacement
+                            logger.warning(f"Model {original_model} not found in available models")
+                            if available_models:
+                                self.config.model = available_models[0]
+                                logger.info(f"Using {self.config.model} instead")
+                
+                except Exception as e:
+                    logger.warning(f"Error listing models: {str(e)}")
+                    # Make a best guess if model listing fails
+                    if original_model.startswith("gemini-2.5"):
+                        self.config.model = "models/gemini-1.5-pro-latest"
+                        logger.info(f"Error listing models. Defaulting to {self.config.model}")
+                
                 return genai
             except ImportError:
                 logger.error("To use Gemini, please install the google-generativeai package: pip install google-generativeai")
@@ -279,30 +356,132 @@ class LLMClient:
             if max_tokens:
                 generation_config["max_output_tokens"] = max_tokens
             
-            # Get the model
-            model = self.client.GenerativeModel(self.config.model)
+            # Log the exact model name being used for debugging
+            logger.info(f"Sending request to Gemini model: {self.config.model}")
             
-            # Create the chat session
-            chat = model.start_chat(history=gemini_messages[:-1] if gemini_messages else [])
-            
-            # Generate the response
-            logger.debug(f"Gemini pre: Messages: {gemini_messages}, Config: {generation_config}")
-            response = chat.send_message(
-                gemini_messages[-1]["parts"][0]["text"] if gemini_messages else "",
-                generation_config=generation_config,
-                stream=stream
-            )
-            logger.debug(f"Gemini post: Response received")
-            
-            if stream:
-                # Collect streamed response
-                full_response = ""
-                for chunk in response:
-                    if chunk.text:
-                        full_response += chunk.text
-                return full_response
-            else:
-                return response.text
+            try:
+                # Create the model instance with the configured model
+                model = self.client.GenerativeModel(model_name=self.config.model)
+                
+                # Get the last user message
+                last_user_message = ""
+                for msg in reversed(messages):
+                    if msg.role == "user":
+                        last_user_message = msg.content
+                        break
+                
+                # Add system content if available
+                if system_content:
+                    last_user_message = system_content + "\n" + last_user_message
+                
+                # Generate the response
+                logger.debug(f"Gemini pre: Using message: {last_user_message}, Config: {generation_config}")
+                
+                # Use generate_content which is more widely supported
+                response = model.generate_content(
+                    last_user_message,
+                    generation_config=generation_config,
+                    stream=stream
+                )
+                
+                if stream:
+                    full_response = ""
+                    for chunk in response:
+                        if hasattr(chunk, 'text'):
+                            full_response += chunk.text
+                    return full_response
+                else:
+                    return response.text
+                    
+            except Exception as model_error:
+                # Log the detailed error
+                error_message = str(model_error).lower()
+                logger.error(f"Gemini error details: {str(model_error)}")
+                
+                # Special handling for quota issues - use the recommended model from error message
+                if "429" in error_message and "gemini-2.5-pro-exp-03-25" in str(model_error):
+                    logger.warning("Quota error with preview model, switching to experimental model")
+                    try:
+                        # Extract the recommended model name from the error message
+                        recommended_model = "models/gemini-2.5-pro-exp-03-25"  # Directly using the recommended model
+                        logger.info(f"Switching to recommended model: {recommended_model}")
+                        
+                        model = self.client.GenerativeModel(model_name=recommended_model)
+                        
+                        # Get the last user message again
+                        last_user_message = ""
+                        for msg in reversed(messages):
+                            if msg.role == "user":
+                                last_user_message = msg.content
+                                break
+                        
+                        response = model.generate_content(
+                            last_user_message,
+                            generation_config=generation_config
+                        )
+                        
+                        # Save the working model for future use
+                        self.config.model = recommended_model
+                        return response.text
+                    except Exception as quota_error:
+                        logger.error(f"Failed with recommended model: {str(quota_error)}")
+                        # Continue to general fallback
+                
+                # Try another approach if the first one fails
+                if "not found" in error_message or "not supported" in error_message or "429" in error_message:
+                    logger.warning(f"Error with model {self.config.model}, trying to find an alternative model")
+                    try:
+                        # Get available models again to find alternatives - prioritize non-preview 2.5 models
+                        models = self.client.list_models()
+                        available_models = [model.name for model in models 
+                                         if "generateContent" in model.supported_generation_methods]
+                        
+                        # First try experimental models, then 1.5 or others
+                        prioritized_models = [m for m in available_models if "exp" in m and "2.5" in m]
+                        if not prioritized_models:
+                            prioritized_models = [m for m in available_models if "pro" in m]
+                        
+                        if prioritized_models:
+                            fallback_model = prioritized_models[0]
+                            logger.info(f"Using fallback model: {fallback_model}")
+                            
+                            model = self.client.GenerativeModel(model_name=fallback_model)
+                            
+                            # Get the last user message again
+                            last_user_message = ""
+                            for msg in reversed(messages):
+                                if msg.role == "user":
+                                    last_user_message = msg.content
+                                    break
+                            
+                            response = model.generate_content(
+                                last_user_message,
+                                generation_config=generation_config
+                            )
+                            
+                            # Save the working model for future use
+                            self.config.model = fallback_model
+                            return response.text
+                        elif available_models:
+                            # Last resort - any available model
+                            fallback_model = available_models[0]
+                            logger.info(f"Using any available model: {fallback_model}")
+                            
+                            model = self.client.GenerativeModel(model_name=fallback_model)
+                            response = model.generate_content(
+                                last_user_message,
+                                generation_config=generation_config
+                            )
+                            
+                            self.config.model = fallback_model
+                            return response.text
+                        else:
+                            raise ValueError("No available Gemini models found")
+                    except Exception as fallback_error:
+                        raise Exception(f"Fallback attempt failed: {str(fallback_error)}")
+                else:
+                    # Some other error occurred
+                    raise
                 
         except Exception as e:
             error_msg = f"Gemini API call failed: {str(e)}"
@@ -564,18 +743,51 @@ class LLMClient:
                 {"image": img}
             ]
             
-            # Get the model
-            model = self.client.GenerativeModel(self.config.model)
+            # Get the model - try with a vision-capable model if current model fails
+            logger.debug(f"Using Gemini model for vision: {self.config.model}")
             
-            # Generate the response
-            logger.debug(f"Gemini Vision pre: Text: {user_message}, Config: {generation_config}")
-            response = model.generate_content(
-                contents,
-                generation_config=generation_config
-            )
-            logger.debug(f"Gemini Vision post: Response received")
-            
-            return response.text
+            try:
+                model = self.client.GenerativeModel(model_name=self.config.model)
+                
+                # Generate the response
+                logger.debug(f"Gemini Vision pre: Text: {user_message}, Config: {generation_config}")
+                response = model.generate_content(
+                    contents,
+                    generation_config=generation_config
+                )
+                logger.debug(f"Gemini Vision post: Response received")
+                
+                return response.text
+            except Exception as vision_error:
+                # If current model doesn't support vision, try to find a vision-capable model
+                if "not supported" in str(vision_error) or "not found" in str(vision_error):
+                    logger.warning(f"Model {self.config.model} doesn't support vision. Looking for alternatives...")
+                    
+                    try:
+                        # Check available models for vision capability
+                        models = self.client.list_models()
+                        vision_models = [model.name for model in models 
+                                        if "generateContent" in model.supported_generation_methods 
+                                        and hasattr(model, "supported_generation_methods") 
+                                        and getattr(model, "input_mime_types", [])
+                                        and any("image/" in mime_type for mime_type in getattr(model, "input_mime_types", []))]
+                        
+                        if vision_models:
+                            fallback_model_name = vision_models[0]
+                            logger.info(f"Using vision-capable model: {fallback_model_name}")
+                            
+                            fallback_model = self.client.GenerativeModel(model_name=fallback_model_name)
+                            response = fallback_model.generate_content(
+                                contents,
+                                generation_config=generation_config
+                            )
+                            return response.text
+                        else:
+                            return f"Vision LLM failure: No vision-capable Gemini models available"
+                    except Exception as fallback_error:
+                        return f"Vision LLM failure: {str(vision_error)}. Fallback attempt also failed: {str(fallback_error)}"
+                else:
+                    raise
                 
         except Exception as e:
             error_msg = f"Gemini Vision API call failed: {str(e)}"
