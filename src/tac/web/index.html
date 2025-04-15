@@ -60,8 +60,8 @@
     </div>
     <div id="blockPanel">
       <div id="blockHeader">
-        <div id="blockTitle">Block Status</div>
-        <div id="blockStatus">
+        <div id="blockTitle">Block Panel</div>
+        <div id="blockStatus" style="display: none;">
           <span class="statusDot blockStatusDot"></span>
           <span id="blockStatusText">Ready...</span>
         </div>
@@ -222,6 +222,36 @@
     }
 
     // Function to update the status with appropriate styling
+    function updateRecipientStatus(message, status = "default") {
+      const statusTextElement = document.getElementById("statusText");
+      const statusDotElement = document.querySelector("#recipientStatus .statusDot");
+      
+      if (!statusTextElement || !statusDotElement) return;
+      
+      // Update status element
+      statusTextElement.textContent = message;
+      
+      // Make status visible
+      document.getElementById("recipientStatus").style.display = "flex";
+      
+      // Remove all status classes from dot
+      statusDotElement.classList.remove("processing", "success", "error", "default", "online", "offline");
+      
+      // Add appropriate class based on status
+      if (status === "processing") {
+        statusDotElement.style.backgroundColor = "#ffc107"; // Yellow dot for processing
+      } else if (status === "success") {
+        statusDotElement.style.backgroundColor = "#4caf50"; // Green dot for success
+      } else if (status === "error") {
+        statusDotElement.style.backgroundColor = "#f44336"; // Red dot for error
+      } else {
+        statusDotElement.style.backgroundColor = "#4caf50"; // Default to green/online dot
+      }
+      
+      // Log the status update to console for debugging
+      console.log(`Status updated: ${message} (${status})`);
+    }
+
     function updateRuntimeStatus(message, status = "default") {
       const statusTextElement = document.getElementById("blockStatusText");
       const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
@@ -511,17 +541,13 @@
         // Show different status based on message content
         if (statusMessage.includes('❌') || statusMessage.includes('Error')) {
           updateRecipientStatus(statusMessage, 'error');
-          updateRuntimeStatus(statusMessage, 'error');
         } else if (statusMessage.includes('✅') || statusMessage.includes('success')) {
           updateRecipientStatus(statusMessage, 'success');
-          updateRuntimeStatus(statusMessage, 'success');
         } else if (statusMessage.includes('Starting') || statusMessage.includes('Processing') || 
                    statusMessage.includes('Recording') || statusMessage.includes('Analyzing')) {
           updateRecipientStatus(statusMessage, 'processing');
-          updateRuntimeStatus(statusMessage, 'processing');
         } else {
           updateRecipientStatus(statusMessage);
-          updateRuntimeStatus(statusMessage);
         }
         
         // Check for attempt number updates in status messages - support both formats
@@ -684,7 +710,7 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      updateRuntimeStatus("Executing protoblock...", "processing");
+      // Don't update runtime status - we only want it in the chat panel
       toggleProtoblockDisplay(false);
       document.getElementById('protoblockContainer').innerHTML = '';
       rebuildProtoblockContainer();
