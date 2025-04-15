@@ -17,6 +17,63 @@
       right: 0;
     }
     /* CSS for blockStatus removed as it's now in the stylesheet */
+    
+    /* Styles for clickable file items */
+    .file-list li.clickable {
+      cursor: pointer;
+      transition: background-color 0.2s;
+      padding: 4px 8px;
+      border-radius: 4px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .file-list li.clickable:hover {
+      background-color: rgba(0, 120, 215, 0.1);
+    }
+    
+    .file-diff-icon {
+      color: #0078d7;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+    
+    /* Diff content styling */
+    .diff-content {
+      font-family: monospace;
+      white-space: pre;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+    
+    .diff-line {
+      padding: 2px 4px;
+    }
+    
+    .diff-added {
+      background-color: rgba(0, 255, 0, 0.15);
+    }
+    
+    .diff-removed {
+      background-color: rgba(255, 0, 0, 0.15);
+    }
+    
+    .diff-info {
+      background-color: rgba(0, 0, 255, 0.1);
+      color: #0066cc;
+    }
+    
+    .diff-header {
+      font-weight: bold;
+      color: #666;
+    }
+    
+    .diff-empty {
+      padding: 20px;
+      text-align: center;
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -432,6 +489,43 @@
       }
     }
 
+    // Function to make files in the protoblock clickable to view diffs
+    function makeFilesClickable() {
+      const writeFilesList = document.getElementById('writeFilesList');
+      if (!writeFilesList) return;
+      
+      const fileItems = writeFilesList.querySelectorAll('li');
+      fileItems.forEach(item => {
+        // Get the filename from the text content
+        const filename = item.textContent.trim();
+        
+        // Add click functionality
+        item.classList.add('clickable');
+        item.addEventListener('click', () => {
+          showFileDiff(filename);
+        });
+        
+        // Add visual cue
+        if (!item.querySelector('.file-diff-icon')) {
+          const diffIcon = document.createElement('span');
+          diffIcon.className = 'file-diff-icon';
+          diffIcon.innerHTML = ' 🔍';
+          diffIcon.title = 'Click to view file changes';
+          item.appendChild(diffIcon);
+        }
+      });
+    }
+    
+    // Function to request file diff from the server
+    function requestFileDiff(filename) {
+      const payload = {
+        type: "file_diff_request",
+        filename: filename
+      };
+      
+      socket.send(JSON.stringify(payload));
+    }
+
     // Update renderer and camera on resize for block panel
     window.addEventListener('resize', () => {
       const width = threeContainer.clientWidth;
@@ -651,6 +745,23 @@
               data.type === "git_branch_response" || 
               data.type === "git_operation_response") {
         console.log(`Received ${data.type}`);
+        
+        // Handle file diff response
+        if (data.type === "file_diff_response" && data.diff) {
+          fileDiffBody.innerHTML = formatDiff(data.diff);
+          
+          // Also prepare split view if it's needed
+          const splitViewData = parseDiffForSplitView(data.diff);
+          fileDiffLeft.innerHTML = splitViewData.left;
+          fileDiffRight.innerHTML = splitViewData.right;
+          window.currentDiffLineCount = splitViewData.lineCount;
+          
+          // Make sure the scroll handler is set up
+          if (diffViewMode === 'split') {
+            setupSplitViewScrolling();
+          }
+        }
+        
         return;
       }
       else if (data.type === "chat_message") {
@@ -963,6 +1074,33 @@
     const fileDiffViewToggle = document.getElementById('fileDiffViewToggle');
 
     let diffViewMode = 'unified'; // 'unified' or 'split'
+    
+    // Function to format the unified diff output with syntax highlighting
+    function formatDiff(diffText) {
+      if (!diffText || diffText.trim() === '') {
+        return '<div class="diff-empty">No changes found</div>';
+      }
+      
+      const lines = diffText.split('\n');
+      let html = '<div class="diff-content">';
+      
+      lines.forEach(line => {
+        if (line.startsWith('+')) {
+          html += `<div class="diff-line diff-added">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('-')) {
+          html += `<div class="diff-line diff-removed">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('@@')) {
+          html += `<div class="diff-line diff-info">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('diff') || line.startsWith('index')) {
+          html += `<div class="diff-line diff-header">${escapeHtml(line)}</div>`;
+        } else {
+          html += `<div class="diff-line">${escapeHtml(line)}</div>`;
+        }
+      });
+      
+      html += '</div>';
+      return html;
+    }
 
     // Toggle between unified and split view
     fileDiffViewToggle.addEventListener('click', () => {
