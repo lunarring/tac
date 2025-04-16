@@ -751,10 +751,11 @@ class UIManager:
                         self.git_clean = True
                         self.git_status_message = "✅ Changes successfully stashed."
                         await self.send_status_message("✅ Changes successfully stashed.")
-                    return True
-                else:
-                    self.git_status_message = "❌ Failed to stash changes. Please clean your git workspace manually."
-                    await self.send_status_message("❌ Failed to stash changes.")
+                        return True
+                    else:
+                        self.git_status_message = "❌ Failed to stash changes. Please clean your git workspace manually."
+                        await self.send_status_message("❌ Failed to stash changes.")
+                        return False
             else:
                 self.git_status_message = "✅ Git workspace is clean."
                 
