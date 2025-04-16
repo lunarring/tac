@@ -658,7 +658,7 @@
         if (statusMessage === "❌ Block execution failed!" || 
             statusMessage.startsWith("❌ Error:") ||
             statusMessage.includes("Error creating protoblock:") ||
-            statusMessage.includes("Execution attempt") && statusMessage.includes("failed")) {
+            (statusMessage.includes("Execution attempt") && statusMessage.includes("failed"))) {
           console.log("Removing protoblock display due to failure message");
           // Force the canvas to be shown and protoblock to be hidden
           document.getElementById('protoblockContainer').style.display = 'none';
@@ -821,6 +821,12 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
+      // Trigger wild animation on the cube in the button
+      wildMode = true;
+      setTimeout(() => {
+        wildMode = false;
+      }, 2000);
+      
       // Don't update runtime status - we only want it in the chat panel
       toggleProtoblockDisplay(false);
       document.getElementById('protoblockContainer').innerHTML = '';
@@ -901,10 +907,18 @@
     const btnAmbient = new THREE.AmbientLight(0xffffff, 0.8);
     btnScene.add(btnAmbient);
 
+    // Global flag for wild animation mode
+    let wildMode = false;
     function animateBtnCube() {
       requestAnimationFrame(animateBtnCube);
-      btnCube.rotation.x += 0.02;
-      btnCube.rotation.y += 0.02;
+      if(wildMode){
+         btnCube.rotation.x += 0.2;
+         btnCube.rotation.y += 0.2;
+         btnCube.rotation.z += 0.15;
+      } else {
+         btnCube.rotation.x += 0.02;
+         btnCube.rotation.y += 0.02;
+      }
       btnRenderer.render(btnScene, btnCamera);
     }
     animateBtnCube();
