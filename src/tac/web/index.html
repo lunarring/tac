@@ -570,9 +570,52 @@
       typingAnimation.style.display = "none";
     }
 
-    // Create WebSocket connection
-    const socket = new WebSocket("ws://localhost:8765");
+    // Create WebSocket connection with dynamic port detection
+    function getWebSocketUrl() {
+      // Check URL params for 'ws' parameter (e.g., ?ws=8766)
+      const urlParams = new URLSearchParams(window.location.search);
+      const wsPort = urlParams.get('ws');
+      
+      // If ws param exists, use it
+      if (wsPort) {
+        return `ws://localhost:${wsPort}`;
+      }
+      
+      // Check localStorage for previously saved port from server_info message
+      const savedWsPort = localStorage.getItem('tac_ws_port');
+      if (savedWsPort) {
+        console.log(`Using saved WebSocket port from previous connection: ${savedWsPort}`);
+        return `ws://localhost:${savedWsPort}`;
+      }
+      
+      // If browser URL is on localhost, extract port and calculate WS port
+      // HTTP typically runs on WebSocket port + 1
+      const currentLocation = window.location;
+      if (currentLocation.hostname === 'localhost' || currentLocation.hostname === '127.0.0.1') {
+        // If we're on port 8767, websocket is likely on 8766
+        const httpPort = parseInt(currentLocation.port);
+        if (!isNaN(httpPort) && httpPort > 1) {
+          // WebSocket port is typically 1 less than HTTP port
+          const wsPort = httpPort - 1;
+          return `ws://localhost:${wsPort}`;
+        }
+      }
+      
+      // Default fallback
+      return "ws://localhost:8765";
+    }
+    
+    // Connect using dynamic WebSocket URL
+    const socket = new WebSocket(getWebSocketUrl());
+    
+    // Log the connection URL
+    console.log(`Connecting to WebSocket: ${socket.url}`);
 
+    // Add automatic reconnection support
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout = null;
+    
     // Connection opened
     socket.addEventListener('open', (event) => {
       console.log('Connected to WebSocket server');
@@ -589,6 +632,25 @@
       statusText.textContent = "offline";
       messageContainer.classList.add("offline");
       chatHeader.classList.add("offline");
+      
+      // Try to reconnect if not a clean closure or if we've forced a reconnect
+      if (!event.wasClean && reconnectAttempts < maxReconnectAttempts) {
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 10000);
+        statusText.textContent = `reconnecting in ${Math.round(delay/1000)}s...`;
+        
+        // Clear any existing reconnect timeout
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+        }
+        
+        // Set a new reconnect timeout
+        reconnectTimeout = setTimeout(() => {
+          statusText.textContent = "reconnecting...";
+          // Reload the page to reinitialize everything
+          window.location.reload();
+        }, delay);
+      }
     });
     
     // Handle WebSocket errors to indicate offline status (red indicator)
@@ -598,17 +660,44 @@
       statusText.textContent = "offline";
       messageContainer.classList.add("offline");
       chatHeader.classList.add("offline");
+      
+      // Don't start reconnect logic here - the close event will handle it
     });
 
     // Handle incoming messages from the WebSocket
     socket.onmessage = function(event) {
       let data;
       
-      // Check if this is a component_mapping_update_result, forward to any iframe that might be listening
+      // Parse JSON data if possible
       try {
         data = JSON.parse(event.data);
+        
+        // Forward component mapping updates to any iframe that might be listening
         if (data.type === 'component_mapping_update_result') {
           window.postMessage(data, '*');
+        }
+        
+        // Handle server port information
+        if (data.type === 'server_info') {
+          console.log(`Received server info: WS port=${data.ws_port}, HTTP port=${data.http_port}`);
+          
+          // Check if we need to reconnect with the correct port
+          const currentWsUrl = new URL(socket.url);
+          const currentPort = currentWsUrl.port;
+          
+          if (currentPort !== data.ws_port.toString()) {
+            console.log(`Port mismatch! Connected to ${currentPort} but server is on ${data.ws_port}`);
+            
+            // Store the correct port in localStorage for future connections
+            localStorage.setItem('tac_ws_port', data.ws_port);
+            localStorage.setItem('tac_http_port', data.http_port);
+          } else {
+            console.log('Connected to correct WebSocket port');
+            // Reset reconnect attempts since we're connected properly
+            reconnectAttempts = 0;
+          }
+          
+          return;
         }
       } catch (error) {
         // Not JSON, assume it's a chat message

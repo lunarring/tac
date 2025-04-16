@@ -271,6 +271,18 @@ class WebSocketServer:
         self.websocket = websocket
         self._loop = asyncio.get_running_loop()
         
+        # Send port information immediately after connection
+        try:
+            port_info = {
+                "type": "server_info",
+                "ws_port": self.port,
+                "http_port": self.http_port
+            }
+            await websocket.send(json.dumps(port_info))
+            print(f"Sent port information to client: WS={self.port}, HTTP={self.http_port}")
+        except Exception as e:
+            print(f"Error sending port information: {e}")
+        
         # Set the websocket for all components
         self.component_registry.set_websocket_for_all(websocket)
         
