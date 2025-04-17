@@ -884,27 +884,29 @@ html, body {
 /* Line count badge styles */
 .line-count-badge {
   display: inline-flex;
+  float: right;
+  margin-right: 12px;
   margin-left: 8px;
-  font-size: 0.8em;
+  font-size: 0.9em;
+  font-weight: bold;
   border-radius: 4px;
   overflow: hidden;
+  position: relative;
+  z-index: 10;
 }
 
 .line-count-added {
   background-color: #c8e6c9;
   color: #2e7d32;
-  padding: 2px 4px;
+  padding: 2px 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .line-count-removed {
   background-color: #ffcdd2;
   color: #c62828;
-  padding: 2px 4px;
-}
-
-.clickable-file .line-count-badge {
-  float: right;
-  margin-right: 4px;
+  padding: 2px 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Clickable file styles */

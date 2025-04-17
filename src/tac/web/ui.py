@@ -1808,6 +1808,25 @@ class UIManager:
             
         print("UI Manager shutdown complete")
         
+    def count_diff_lines(self, diff_text):
+        """Count the number of added and removed lines in a diff."""
+        added_lines = 0
+        removed_lines = 0
+        
+        if not diff_text:
+            return added_lines, removed_lines
+            
+        for line in diff_text.splitlines():
+            if line.startswith('+') and not line.startswith('+++'):
+                added_lines += 1
+            elif line.startswith('-') and not line.startswith('---'):
+                removed_lines += 1
+                
+        # Log the results for debugging
+        print(f"Counted diff lines: +{added_lines} -{removed_lines}")
+        
+        return added_lines, removed_lines
+
 if __name__ == "__main__":
     ui_manager = UIManager(base_dir=".", port=8765, auto_find_port=True)
     ui_manager.launch_ui()

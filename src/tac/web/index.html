@@ -465,12 +465,13 @@
       if (!writeFilesList) return;
       
       const fileItems = writeFilesList.querySelectorAll('li');
-      fileItems.forEach(item => {
+      fileItems.forEach((item, index) => {
         // Get the filename from the text content
         const filename = item.textContent.trim();
         
         // Add click functionality
         item.classList.add('clickable');
+        item.classList.add('clickable-file');
         item.addEventListener('click', () => {
           showFileDiff(filename);
         });
@@ -483,7 +484,94 @@
           diffIcon.title = 'Click to view file changes';
           item.appendChild(diffIcon);
         }
+        
+        // Request file status with a slight delay to ensure the DOM has updated
+        // Stagger requests to avoid overwhelming the server
+        setTimeout(() => {
+          requestFileStatus(filename);
+        }, 100 * (index + 1));
       });
+    }
+    
+    // Function to request file status from the server
+    function requestFileStatus(filename) {
+      const payload = {
+        type: "file_status_request",
+        filename: filename
+      };
+      
+      socket.send(JSON.stringify(payload));
+    }
+    
+    // Function to update file badge with line count information
+    function updateFileBadge(filename, addedLines, removedLines) {
+      console.log(`Updating badge for ${filename}: +${addedLines} -${removedLines}`);
+      const writeFilesList = document.getElementById('writeFilesList');
+      if (!writeFilesList) {
+        console.log('writeFilesList not found');
+        return;
+      }
+      
+      const fileItems = writeFilesList.querySelectorAll('li');
+      console.log(`Found ${fileItems.length} file items`);
+      
+      let fileFound = false;
+      fileItems.forEach(item => {
+        // Get the filename - the first text node contains the filename
+        let itemFilename = '';
+        
+        // Try different approaches to get the filename
+        if (item.childNodes[0] && item.childNodes[0].nodeType === Node.TEXT_NODE) {
+          itemFilename = item.childNodes[0].nodeValue.trim();
+        } else {
+          // If not a direct text node, get the text content and remove any icon text
+          itemFilename = item.textContent.replace('🔍', '').trim();
+        }
+        
+        console.log(`Checking item with filename: "${itemFilename}" against "${filename}"`);
+        
+        if (itemFilename === filename) {
+          fileFound = true;
+          console.log(`Match found for ${filename}`);
+          
+          // Add clickable-file class if not already there
+          if (!item.classList.contains('clickable-file')) {
+            item.classList.add('clickable-file');
+          }
+          
+          // Check if badge already exists
+          let badge = item.querySelector('.line-count-badge');
+          if (!badge) {
+            console.log(`Creating new badge for ${filename}`);
+            badge = document.createElement('span');
+            badge.className = 'line-count-badge';
+            item.appendChild(badge);
+          } else {
+            console.log(`Updating existing badge for ${filename}`);
+          }
+          
+          // Update badge content
+          badge.innerHTML = '';
+          
+          if (addedLines > 0) {
+            const addedSpan = document.createElement('span');
+            addedSpan.className = 'line-count-added';
+            addedSpan.textContent = `+${addedLines}`;
+            badge.appendChild(addedSpan);
+          }
+          
+          if (removedLines > 0) {
+            const removedSpan = document.createElement('span');
+            removedSpan.className = 'line-count-removed';
+            removedSpan.textContent = `-${removedLines}`;
+            badge.appendChild(removedSpan);
+          }
+        }
+      });
+      
+      if (!fileFound) {
+        console.log(`No matching file item found for ${filename}`);
+      }
     }
     
     // Function to request file diff from the server
@@ -865,6 +953,27 @@
           // Make sure the scroll handler is set up
           if (diffViewMode === 'split') {
             setupSplitViewScrolling();
+          }
+        }
+        
+        // Handle file status response
+        if (data.type === "file_status_response") {
+          console.log("File status response:", data);
+          
+          // If at least one file has changes, make sure files are clickable
+          if (data.is_modified && data.filename) {
+            updateFileBadge(data.filename, data.added_lines || 0, data.removed_lines || 0);
+            
+            // Ensure files are clickable after getting status
+            const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
+            const isSuccess = blockStatusTextContent.includes("✅") || 
+                             blockStatusTextContent.includes("successful") ||
+                             blockStatusTextContent.includes("Ready");
+                             
+            if (isSuccess) {
+              // Make sure this file is clickable
+              makeFilesClickable();
+            }
           }
         }
         
@@ -1607,5 +1716,8 @@
     // The settings button now sends a WebSocket message ("settings_click")
     // which is handled by the UIManager on the backend to generate settings HTML via get_config_html.
   </script>
+
+  <!-- File badges script -->
+  <script src="file_badges.js"></script>
 </body>
 </html>
