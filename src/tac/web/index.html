@@ -943,17 +943,6 @@
         // Handle file diff response
         if (data.type === "file_diff_response" && data.diff) {
           fileDiffBody.innerHTML = formatDiff(data.diff);
-          
-          // Also prepare split view if it's needed
-          const splitViewData = parseDiffForSplitView(data.diff);
-          fileDiffLeft.innerHTML = splitViewData.left;
-          fileDiffRight.innerHTML = splitViewData.right;
-          window.currentDiffLineCount = splitViewData.lineCount;
-          
-          // Make sure the scroll handler is set up
-          if (diffViewMode === 'split') {
-            setupSplitViewScrolling();
-          }
         }
         
         // Handle file status response
@@ -1191,18 +1180,10 @@
       <div id="fileDiffHeader">
         <h3 id="fileDiffTitle">File Changes</h3>
         <div>
-          <button id="fileDiffViewToggle" title="Toggle between unified and split view">Split View</button>
           <button id="fileDiffCloseBtn">×</button>
         </div>
       </div>
       <div id="fileDiffBody"></div>
-      <div id="fileDiffSplitView" class="initially-hidden">
-        <div id="fileDiffLeft"></div>
-        <div id="fileDiffRight"></div>
-        <div id="fileDiffScrollContainer">
-          <div id="fileDiffScrollContent"></div>
-        </div>
-      </div>
     </div>
   </div>
   
@@ -1263,12 +1244,6 @@
     const fileDiffCloseBtn = document.getElementById('fileDiffCloseBtn');
     const fileDiffBody = document.getElementById('fileDiffBody');
     const fileDiffTitle = document.getElementById('fileDiffTitle');
-    const fileDiffSplitView = document.getElementById('fileDiffSplitView');
-    const fileDiffLeft = document.getElementById('fileDiffLeft');
-    const fileDiffRight = document.getElementById('fileDiffRight');
-    const fileDiffViewToggle = document.getElementById('fileDiffViewToggle');
-
-    let diffViewMode = 'unified'; // 'unified' or 'split'
     
     // Function to format the unified diff output with syntax highlighting
     function formatDiff(diffText) {
@@ -1297,149 +1272,6 @@
       return html;
     }
 
-    // Toggle between unified and split view
-    fileDiffViewToggle.addEventListener('click', () => {
-      if (diffViewMode === 'unified') {
-        diffViewMode = 'split';
-        fileDiffBody.style.display = 'none';
-        fileDiffSplitView.style.display = 'flex';
-        fileDiffViewToggle.textContent = 'Unified View';
-        setupSplitViewScrolling();
-      } else {
-        diffViewMode = 'unified';
-        fileDiffBody.style.display = 'block';
-        fileDiffSplitView.style.display = 'none';
-        fileDiffViewToggle.textContent = 'Split View';
-      }
-    });
-    
-    function setupSplitViewScrolling() {
-      const scrollContainer = document.getElementById('fileDiffScrollContainer');
-      const scrollContent = document.getElementById('fileDiffScrollContent');
-      const leftPane = document.getElementById('fileDiffLeft');
-      const rightPane = document.getElementById('fileDiffRight');
-      
-      if (window.currentDiffLineCount) {
-        scrollContent.style.height = (window.currentDiffLineCount * 22) + 'px';
-      }
-      
-      scrollContainer.onscroll = function() {
-        leftPane.scrollTop = scrollContainer.scrollTop;
-        rightPane.scrollTop = scrollContainer.scrollTop;
-      };
-    }
-
-    function parseDiffForSplitView(diff) {
-      const leftContent = [];
-      const rightContent = [];
-      
-      const fileHeaderRegex = /^diff --git a\/(.*) b\/(.*)$/;
-      const hunkHeaderRegex = /^@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)$/;
-      
-      let leftLineNumber = 1;
-      let rightLineNumber = 1;
-      let currentFile = '';
-      let inHunk = false;
-      let diffLineCount = 0;
-      
-      leftContent.push('<div class="diff-file-header">Original</div>');
-      rightContent.push('<div class="diff-file-header">Modified</div>');
-      diffLineCount++;
-      
-      const lines = diff.split('\n');
-      lines.forEach(line => {
-        const fileHeaderMatch = line.match(fileHeaderRegex);
-        if (fileHeaderMatch) {
-          currentFile = fileHeaderMatch[1];
-          leftContent.push(`<div class="diff-section-header">${currentFile}</div>`);
-          rightContent.push(`<div class="diff-section-header">${currentFile}</div>`);
-          diffLineCount++;
-          return;
-        }
-        
-        const hunkHeaderMatch = line.match(hunkHeaderRegex);
-        if (hunkHeaderMatch) {
-          const leftStart = parseInt(hunkHeaderMatch[1]);
-          const rightStart = parseInt(hunkHeaderMatch[3]);
-          
-          inHunk = true;
-          leftLineNumber = leftStart;
-          rightLineNumber = rightStart;
-          
-          leftContent.push(`<div class="diff-section-header">${line}</div>`);
-          rightContent.push(`<div class="diff-section-header">${line}</div>`);
-          diffLineCount++;
-          return;
-        }
-        
-        if (line.startsWith('---') || line.startsWith('+++') || line.startsWith('index ')) {
-          return;
-        }
-        
-        if (inHunk) {
-          if (line.startsWith('-')) {
-            leftContent.push(`
-              <div class="diff-line diff-removed-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightContent.push(`<div class="diff-line diff-filler"></div>`);
-            leftLineNumber++;
-            diffLineCount++;
-          } else if (line.startsWith('+')) {
-            leftContent.push(`<div class="diff-line diff-filler"></div>`);
-            rightContent.push(`
-              <div class="diff-line diff-added-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightLineNumber++;
-            diffLineCount++;
-          } else if (line.startsWith(' ')) {
-            leftContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            rightContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content">${escapeHtml(line.substring(1))}</span>
-              </div>
-            `);
-            leftLineNumber++;
-            rightLineNumber++;
-            diffLineCount++;
-          } else if (line.trim() === '') {
-            leftContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${leftLineNumber}</span>
-                <span class="diff-line-content"></span>
-              </div>
-            `);
-            rightContent.push(`
-              <div class="diff-line">
-                <span class="diff-line-number">${rightLineNumber}</span>
-                <span class="diff-line-content"></span>
-              </div>
-            `);
-            leftLineNumber++;
-            rightLineNumber++;
-            diffLineCount++;
-          }
-        }
-      });
-      
-      return {
-        left: leftContent.join(''),
-        right: rightContent.join(''),
-        lineCount: diffLineCount
-      };
-    }
-
     function escapeHtml(unsafe) {
       return unsafe
           .replace(/&/g, "&amp;")
@@ -1462,8 +1294,6 @@
     async function showFileDiff(filename) {
       fileDiffTitle.textContent = `Changes in ${filename}`;
       fileDiffBody.innerHTML = 'Loading diff...';
-      fileDiffLeft.innerHTML = 'Loading...';
-      fileDiffRight.innerHTML = 'Loading...';
       fileDiffOverlay.style.display = 'flex';
       
       requestFileDiff(filename);
