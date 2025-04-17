@@ -984,21 +984,13 @@ html, body {
   top: 0;
 }
 
-#blockTitle {
-  font-weight: 500;
-  font-size: 18px;
-  color: #333;
-  width: 120px; /* Fixed width for title */
-  flex-shrink: 0; /* Prevent title from shrinking */
-}
-
 #blockStatus {
   flex: 1;
   display: flex;
   align-items: center;
   font-size: 14px;
   color: #4caf50;
-  padding-right: 60px; /* Space for settings button */
+  padding-left: 5px; /* Add left padding */
 }
 
 #blockStatusText {

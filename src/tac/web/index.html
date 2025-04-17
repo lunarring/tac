@@ -86,10 +86,6 @@
           <span class="dot"></span>
           <span class="dot"></span>
         </div>
-        <div id="recipientStatus">
-          <span class="statusDot"></span>
-          <span id="statusText">connecting...</span>
-        </div>
       </div>
       <div id="messageContainer"></div>
       <div id="gitOperationsPanel" class="initially-hidden">
@@ -117,10 +113,9 @@
     </div>
     <div id="blockPanel">
       <div id="blockHeader">
-        <div id="blockTitle">Block Panel</div>
-        <div id="blockStatus" style="display: none;">
-          <span class="statusDot blockStatusDot"></span>
-          <span id="blockStatusText">Ready...</span>
+        <div id="blockStatus">
+          <span class="blockStatusDot"></span>
+          <span id="blockStatusText">connecting...</span>
         </div>
         <div id="settingsButton" class="action-button">⚙️</div>
       </div>
@@ -280,36 +275,6 @@
 
     // Function to update the status with appropriate styling
     function updateRecipientStatus(message, status = "default") {
-      const statusTextElement = document.getElementById("statusText");
-      const statusDotElement = document.querySelector("#recipientStatus .statusDot");
-      
-      if (!statusTextElement || !statusDotElement) return;
-      
-      // Update status element
-      statusTextElement.textContent = message;
-      
-      // Make status visible
-      document.getElementById("recipientStatus").style.display = "flex";
-      
-      // Remove all status classes from dot
-      statusDotElement.classList.remove("processing", "success", "error", "default", "online", "offline");
-      
-      // Add appropriate class based on status
-      if (status === "processing") {
-        statusDotElement.style.backgroundColor = "#ffc107"; // Yellow dot for processing
-      } else if (status === "success") {
-        statusDotElement.style.backgroundColor = "#4caf50"; // Green dot for success
-      } else if (status === "error") {
-        statusDotElement.style.backgroundColor = "#f44336"; // Red dot for error
-      } else {
-        statusDotElement.style.backgroundColor = "#4caf50"; // Default to green/online dot
-      }
-      
-      // Log the status update to console for debugging
-      console.log(`Status updated: ${message} (${status})`);
-    }
-
-    function updateRuntimeStatus(message, status = "default") {
       const statusTextElement = document.getElementById("blockStatusText");
       const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
       
@@ -318,24 +283,30 @@
       // Update status element
       statusTextElement.textContent = message;
       
-      // Remove all status classes from text and dot
+      // Make status visible
+      document.getElementById("blockStatus").style.display = "flex";
+      
+      // Remove all status classes from dot and text
       statusTextElement.classList.remove("processing", "success", "error", "default");
       statusDotElement.classList.remove("processing", "success", "error", "default", "online", "offline");
       
       // Add appropriate class based on status
       if (status === "processing") {
         statusTextElement.classList.add("processing");
-        statusDotElement.classList.add("processing"); // Yellow dot for processing
+        statusDotElement.classList.add("processing");
       } else if (status === "success") {
         statusTextElement.classList.add("success");
-        statusDotElement.classList.add("success"); // Green dot for success
+        statusDotElement.classList.add("success");
       } else if (status === "error") {
         statusTextElement.classList.add("error");
-        statusDotElement.classList.add("error"); // Red dot for error
+        statusDotElement.classList.add("error");
       } else {
         statusTextElement.classList.add("default");
-        statusDotElement.classList.add("online"); // Default to green/online dot
+        statusDotElement.classList.add("online"); // Default to online dot
       }
+      
+      // Log the status update to console for debugging
+      console.log(`Status updated: ${message} (${status})`);
     }
     
     // Function to handle block execution failure
@@ -536,8 +507,6 @@
 
     // Chat functionality in the chat panel
     const messageContainer = document.getElementById("messageContainer");
-    const statusText = document.getElementById("statusText");
-    const statusDot = document.querySelector("#recipientStatus .statusDot");
     const userInput = document.getElementById("userInput");
     const typingAnimation = document.getElementById("typingAnimation");
     const micButton = document.getElementById('micButton');
@@ -624,8 +593,18 @@
     // Connection opened
     socket.addEventListener('open', (event) => {
       console.log('Connected to WebSocket server');
-      statusDot.style.backgroundColor = "#4caf50";
-      statusText.textContent = "online";
+      const blockStatusText = document.getElementById("blockStatusText");
+      const statusDot = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (statusDot) {
+        statusDot.classList.remove("error", "offline");
+        statusDot.classList.add("online");
+      }
+      
+      if (blockStatusText) {
+        blockStatusText.textContent = "online";
+      }
+      
       messageContainer.classList.remove("offline");
       chatHeader.classList.remove("offline");
     });
@@ -633,8 +612,18 @@
     // Handle WebSocket closure to indicate offline status (red indicator)
     socket.addEventListener('close', (event) => {
       console.log('WebSocket connection closed');
-      statusDot.style.backgroundColor = "#f44336";
-      statusText.textContent = "offline";
+      const blockStatusText = document.getElementById("blockStatusText"); 
+      const statusDot = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (statusDot) {
+        statusDot.classList.remove("online");
+        statusDot.classList.add("error", "offline");
+      }
+      
+      if (blockStatusText) {
+        blockStatusText.textContent = "offline";
+      }
+      
       messageContainer.classList.add("offline");
       chatHeader.classList.add("offline");
       
@@ -642,7 +631,10 @@
       if (!event.wasClean && reconnectAttempts < maxReconnectAttempts) {
         reconnectAttempts++;
         const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 10000);
-        statusText.textContent = `reconnecting in ${Math.round(delay/1000)}s...`;
+        
+        if (blockStatusText) {
+          blockStatusText.textContent = `reconnecting in ${Math.round(delay/1000)}s...`;
+        }
         
         // Clear any existing reconnect timeout
         if (reconnectTimeout) {
@@ -651,7 +643,9 @@
         
         // Set a new reconnect timeout
         reconnectTimeout = setTimeout(() => {
-          statusText.textContent = "reconnecting...";
+          if (blockStatusText) {
+            blockStatusText.textContent = "reconnecting...";
+          }
           // Reload the page to reinitialize everything
           window.location.reload();
         }, delay);
@@ -661,8 +655,18 @@
     // Handle WebSocket errors to indicate offline status (red indicator)
     socket.addEventListener('error', (event) => {
       console.log('WebSocket error');
-      statusDot.style.backgroundColor = "#f44336";
-      statusText.textContent = "offline";
+      const blockStatusText = document.getElementById("blockStatusText");
+      const statusDot = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (statusDot) {
+        statusDot.classList.remove("online");
+        statusDot.classList.add("error", "offline");
+      }
+      
+      if (blockStatusText) {
+        blockStatusText.textContent = "offline";
+      }
+      
       messageContainer.classList.add("offline");
       chatHeader.classList.add("offline");
       
