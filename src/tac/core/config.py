@@ -147,6 +147,17 @@ class Config:
                 timeout=120,
                 reasoning_effort="medium"
             )
+        ),        
+        "o4-mini": LLMConfig(
+            provider="openai",
+            model="o4-mini",
+            settings=LLMSettings(
+                temperature=0.7,
+                max_tokens=50000,
+                verify_ssl=True,
+                timeout=120,
+                reasoning_effort="medium"
+            )
         ),
         "deepseek-reasoner": LLMConfig(
             provider="deepseek",
@@ -186,15 +197,15 @@ class Config:
     # Component-to-template mappings
     component_llm_mappings: Dict[str, str] = field(default_factory=lambda: {
         # Specify which template to use for each component
-        "native_agent": "o3-mini",
-        "protoblock_generation": "o3-mini",
+        "native_agent": "o4-mini",
+        "protoblock_generation": "o4-mini",
         "chat": "gpt-4o-2024-08-06",
         "file_summarizer": "gpt-4o-2024-08-06",
         "file_peeker": "gpt-4o-2024-08-06",
         "orchestrator": "o3-mini",
         "vision": "gpt-4o",  # Vision model needs to be gpt-4o
-        "plausibility": "o3-mini",  # Plausibility testing uses o3-mini
-        "default": "o3-mini"  # Default template when component not specified
+        "plausibility": "o4-mini",  # Plausibility testing uses o3-mini
+        "default": "o4-mini"  # Default template when component not specified
     })
     
     logging: LoggingConfig = field(default_factory=LoggingConfig)

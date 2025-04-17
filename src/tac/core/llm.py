@@ -220,7 +220,7 @@ class LLMClient:
         formatted_messages = []
         
         # Special handling for models that don't support system messages
-        if self.config.model in ["o1-mini", "deepseek-reasoner", "o3-mini"]:
+        if self.config.model in ["o1-mini", "deepseek-reasoner", "o3-mini", "o4-mini"]:
             for msg in messages:
                 if msg.role == "system":
                     # Convert system message to user message
@@ -252,7 +252,7 @@ class LLMClient:
         }
         
         # Handle temperature parameter
-        supports_temperature = self.config.model not in ["o3-mini", "gpt-4o"]
+        supports_temperature = self.config.model not in ["o3-mini", "gpt-4o", "o4-mini"]
         if supports_temperature:
             if temperature is None:
                 temperature = self.config.settings.temperature
@@ -266,7 +266,7 @@ class LLMClient:
                 # GPT-4o has a 16k completion token limit
                 max_tokens = min(max_tokens, 16000)
                 params["max_completion_tokens"] = max_tokens
-            elif self.config.model == "o3-mini":
+            elif self.config.model in ["o3-mini", "o4-mini"]:
                 params["max_completion_tokens"] = max_tokens
             else:
                 params["max_tokens"] = max_tokens
@@ -827,6 +827,15 @@ class LLMClient:
 
 # Simple test/example code
 if __name__ == "__main__":
+        # Example usage with specific template (component-based)
+    client_component = LLMClient(component="native_agent")  # Will use o3-mini
+    component_response = client_component.chat_completion([
+        Message(role="system", content="You are a helpful assistant."),
+        Message(role="user", content="What are three interesting Python features?")
+    ])
+    print(f"\nComponent-based template (native_agent) response:")
+    print(component_response)
+    
     # Example with vision model
     print("\nUsing vision model:")
     # image_path = os.path.expanduser("~/Downloads/tmpip7ugsgv.png")
@@ -851,14 +860,7 @@ if __name__ == "__main__":
     ])
     print(f"Default response: {default_response}")
     
-    # Example usage with specific template (component-based)
-    client_component = LLMClient(component="native_agent")  # Will use o3-mini
-    component_response = client_component.chat_completion([
-        Message(role="system", content="You are a helpful assistant."),
-        Message(role="user", content="What are three interesting Python features?")
-    ])
-    print(f"\nComponent-based template (native_agent) response:")
-    print(component_response)
+
     
     # Example usage with Gemini model (component-based)
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
