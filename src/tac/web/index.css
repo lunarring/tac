@@ -915,10 +915,7 @@ html, body {
 }
 
 .clickable-file::after {
-  content: "🔍";
-  margin-left: 5px;
-  font-size: 10px;
-  opacity: 0.7;
+  content: "";
 }
 
 .modified-file {
