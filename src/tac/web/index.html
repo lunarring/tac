@@ -145,7 +145,7 @@
         <div id="settingsButton" class="action-button">⚙️</div>
       </div>
       <div id="errorMessage"></div>
-      <div id="infoMessage"></div>
+      <div id="infoMessage" style="display: none;"></div>
       <div id="protoblockContainer">
         <!-- Protoblock container structure -->
         <div id="protoblockHeader">
@@ -306,6 +306,19 @@
 
     // Function to update the status with appropriate styling
     function updateRecipientStatus(message, status = "default") {
+      // Skip git-related status messages
+      if (message && (
+          message.toLowerCase().includes("git") ||
+          message.toLowerCase().includes("commit") ||
+          message.toLowerCase().includes("discard") ||
+          message.toLowerCase().includes("branch") ||
+          message.toLowerCase().includes("merge") ||
+          message.toLowerCase().includes("stash")
+      )) {
+        console.log(`Skipping git-related status message: ${message}`);
+        return;
+      }
+      
       const statusTextElement = document.getElementById("blockStatusText");
       const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
       
@@ -931,6 +944,22 @@
         return;
       }
       else if (data.type === "info_message") {
+        // Check if the message is about uncommitted changes
+        if (data.message && (
+            data.message.toLowerCase().includes("not committed") || 
+            data.message.toLowerCase().includes("uncommitted") || 
+            data.message.toLowerCase().includes("changes will be lost") ||
+            data.message.toLowerCase().includes("unsaved changes") ||
+            data.message.toLowerCase().includes("changes detected") ||
+            data.message.toLowerCase().includes("stash") ||
+            data.message.toLowerCase().includes("git commit")
+        )) {
+          // Skip showing messages about uncommitted changes
+          console.log("Skipping info message about uncommitted changes:", data.message);
+          return;
+        }
+
+        // Show other info messages
         const infoMessage = document.getElementById("infoMessage");
         infoMessage.textContent = data.message;
         infoMessage.style.display = "block";
