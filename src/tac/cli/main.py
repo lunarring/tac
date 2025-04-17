@@ -260,7 +260,7 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--ui', action='store_true', help='Launch a UI server with WebSocket and HTTP to serve the TAC UI')
+    parser.add_argument('--no-ui', action='store_true', help='Do not launch the UI server (default is to launch UI if no command is specified)')
     parser.add_argument('--port', type=int, default=8765, help='Port to use for the UI server (default: 8765)')
     parser.add_argument('--fixed-port', action='store_true', help='Use exactly the specified port, don\'t auto-detect a free port')
     
@@ -662,7 +662,8 @@ def execute_command(task_instructions=None, config_overrides=None, ui_manager=Nu
 def main():
     parser, args = parse_args()
 
-    if args.ui:
+    # If no command is specified and --no-ui is not set, start UI mode by default
+    if not args.command and not args.no_ui:
         # Load config before initializing UI manager
         config.load_config()
         config.override_with_args(vars(args))
@@ -810,8 +811,10 @@ def main():
         if not success:
             sys.exit(1)
     else:
-        parser.print_help()
-        sys.exit(1)
+        # Only show help if no command is specified and --no-ui is set
+        if not args.command and args.no_ui:
+            parser.print_help()
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
