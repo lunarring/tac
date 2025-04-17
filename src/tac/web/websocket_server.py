@@ -9,6 +9,7 @@ import traceback
 import http.server
 import threading
 import socketserver
+import webbrowser
 from pathlib import Path
 from typing import Callable, Dict, Optional, Any, List, Set
 from tac.web.ui_components import ComponentRegistry, StatusBar
@@ -411,7 +412,12 @@ class WebSocketServer:
             # Start the WebSocket server
             server = await websockets.serve(self.handle_connection, self.host, self.port)
             print(f"WebSocket server started on ws://{self.host}:{self.port}")
-            print(f"Please open http://{self.host}:{self.http_port} in your browser to view the UI.")
+            ui_url = f"http://{self.host}:{self.http_port}"
+            print(f"Please open {ui_url} in your browser to view the UI.")
+            
+            # Automatically open browser in a separate thread to avoid blocking
+            print("Attempting to open browser automatically...")
+            threading.Thread(target=lambda: webbrowser.open(ui_url)).start()
             
             # Use a different approach that allows for proper cancellation
             stop_event = asyncio.Event()

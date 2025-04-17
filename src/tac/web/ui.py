@@ -28,6 +28,8 @@ from tac.web.ui_components import (
 )
 from tac.blocks.generator import ProtoBlockGenerator  # Add this import
 import time
+import webbrowser
+from datetime import datetime
 
 class MessageHandlerManager:
     """
