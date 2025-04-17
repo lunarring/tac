@@ -1141,10 +1141,24 @@ class UIManager:
         Handle the settings button click event by invoking get_config_html from the settings module
         and sending the formatted HTML back to the client.
         """
-        from tac.web import settings as settings_module
-        html = settings_module.get_config_html()
-        response = json.dumps({"type": "settings_page", "html": html})
-        await websocket.send(response)
+        print(f"Handling settings click event, websocket: {websocket}, data: {data}")
+        try:
+            from tac.web import settings as settings_module
+            html = settings_module.get_config_html()
+            response = json.dumps({"type": "settings_page", "html": html})
+            print(f"Settings HTML generated, sending response of length: {len(response)}")
+            await websocket.send(response)
+            print("Settings response sent successfully")
+        except Exception as e:
+            print(f"Error handling settings click: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Try to send an error response
+            error_response = json.dumps({"type": "error_message", "message": f"Error loading settings: {str(e)}"})
+            try:
+                await websocket.send(error_response)
+            except:
+                print("Failed to send error response")
 
     async def notify_tests_run(self):
         """

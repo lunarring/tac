@@ -829,6 +829,13 @@
       try {
         data = JSON.parse(event.data);
         
+        // Debug: log all settings-related messages
+        if (data.type === 'settings_page' || 
+            data.type === 'component_mapping_update_result' || 
+            (data.type === 'error_message' && data.message && data.message.includes('settings'))) {
+          console.log("Received settings-related message:", data.type);
+        }
+        
         // Forward component mapping updates to any iframe that might be listening
         if (data.type === 'component_mapping_update_result') {
           window.postMessage(data, '*');
@@ -1197,9 +1204,12 @@
 
     // Settings button click handler
     document.getElementById('settingsButton').addEventListener('click', function () {
+      console.log("Settings button clicked");
+      
       // Create a settings iframe
       let settingsFrame = document.getElementById('settingsFrame');
       if (!settingsFrame) {
+        console.log("Creating new settings frame");
         settingsFrame = document.createElement('iframe');
         settingsFrame.id = 'settingsFrame';
         settingsFrame.style.width = '100%';
@@ -1208,22 +1218,57 @@
         
         // Clear the block panel and add the iframe
         const blockPanel = document.getElementById('blockPanel');
+        console.log("Block panel found:", !!blockPanel);
+        
         // Hide the 3D scene temporarily
         renderer.domElement.style.display = 'none';
         
         // Hide the protoblock container if it exists
         const protoblockContainer = document.getElementById('protoblockContainer');
         if (protoblockContainer) {
+          console.log("Hiding protoblock container");
           protoblockContainer.style.display = 'none';
         }
         
+        // Create a close button for the settings
+        const closeButton = document.createElement('button');
+        closeButton.id = 'settingsCloseButton';
+        closeButton.textContent = '×';
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '10px';
+        closeButton.style.right = '10px';
+        closeButton.style.fontSize = '24px';
+        closeButton.style.background = 'transparent';
+        closeButton.style.border = 'none';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.zIndex = '1000';
+        closeButton.onclick = function() {
+          console.log("Settings close button clicked");
+          // Remove the settings frame
+          blockPanel.removeChild(settingsFrame);
+          if (closeButton.parentNode) {
+            blockPanel.removeChild(closeButton);
+          }
+          
+          // Show either the protoblock container or the 3D scene
+          if (protoblockContainer && protoblockContainer.firstChild) {
+            console.log("Restoring protoblock container");
+            protoblockContainer.style.display = 'block';
+          } else {
+            console.log("Restoring 3D scene");
+            renderer.domElement.style.display = 'block';
+            renderer.domElement.style.opacity = '1';
+          }
+        };
+        
         blockPanel.appendChild(settingsFrame);
+        blockPanel.appendChild(closeButton);
         
-        // Update block panel header
-        document.getElementById('blockTitle').textContent = 'Settings';
-        
+        console.log("Sending settings_click websocket message");
         // Request settings content via websocket
         socket.send(JSON.stringify({ type: "settings_click" }));
+      } else {
+        console.log("Settings frame already exists");
       }
     });
     
@@ -1231,8 +1276,10 @@
     window.addEventListener('message', function(event) {
       // Check if this is a websocket message request from the settings iframe
       if (event.data && event.data.type === 'settings_websocket_message' && event.data.data) {
+        console.log("Received message from iframe:", event.data.type);
         // Forward the message data to the websocket
         if (socket && socket.readyState === WebSocket.OPEN) {
+          console.log("Forwarding message to websocket:", event.data.data);
           socket.send(JSON.stringify(event.data.data));
         } else {
           console.error('WebSocket is not open, cannot send settings update');
