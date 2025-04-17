@@ -828,7 +828,7 @@ class LLMClient:
 # Simple test/example code
 if __name__ == "__main__":
         # Example usage with specific template (component-based)
-    client_component = LLMClient(component="native_agent")  # Will use o3-mini
+    client_component = LLMClient(component="protoblock_generation")  # Will use o4-mini
     component_response = client_component.chat_completion([
         Message(role="system", content="You are a helpful assistant."),
         Message(role="user", content="What are three interesting Python features?")

@@ -54,8 +54,8 @@ class ProtoBlockGenerator:
     """
     
     def __init__(self, ui_manager=NullUIManager()):
-        # Use explicit model to avoid component/llm_type confusion
-        self.llm_client = LLMClient(model="o3-mini")
+        # Use component-based configuration for model selection
+        self.llm_client = LLMClient(component="protoblock_generation")
         self.project_files = ProjectFiles()
         self.ui_manager = ui_manager
         

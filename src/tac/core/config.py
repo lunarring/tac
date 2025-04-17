@@ -430,30 +430,9 @@ class ConfigManager:
                     )
                 )
         
-        # Only use the legacy llm_type mapping if component is not specified
-        if llm_type:
-            # Backward compatibility - map legacy types to component equivalents
-            legacy_mappings = {
-                "weak": "chat",  # Maps to gpt-4o-2024-08-06
-                "strong": "native_agent",  # Maps to o3-mini or whatever current setting is
-                "vision": "vision"  # Maps to gpt-4o
-            }
-            
-            legacy_component = legacy_mappings.get(llm_type)
-            if legacy_component:
-                self._logger.warning(
-                    f"Using legacy llm_type='{llm_type}' is deprecated. "
-                    f"Please use component='{legacy_component}' instead."
-                )
-                # Recursively call with the mapped component
-                return self.get_llm_config(component=legacy_component)
-            
-            # If we get here, it's an unknown legacy type
-            self._logger.warning(
-                f"Unknown llm_type='{llm_type}'. Using default component instead."
-            )
-        
-        # If neither component nor valid llm_type was provided, use default
+        # If component was not provided, use default
+        if self._logger:
+            self._logger.warning("Component not specified for get_llm_config, using default.")
         return self.get_llm_config(component="default")
 
     @property
