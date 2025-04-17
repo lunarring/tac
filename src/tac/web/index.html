@@ -74,6 +74,28 @@
       text-align: center;
       color: #666;
     }
+    
+    /* Styles for disabled buttons */
+    .git-button.disabled {
+      background-color: #ccc;
+      color: #888;
+      cursor: not-allowed;
+      pointer-events: none;
+      opacity: 0.7;
+      border: 1px solid #aaa;
+    }
+    
+    .git-button.accepted {
+      background-color: rgba(0, 180, 0, 0.8);
+      color: white;
+      border: 1px solid #007700;
+    }
+    
+    .git-button.rejected {
+      background-color: rgba(180, 0, 0, 0.8);
+      color: white;
+      border: 1px solid #770000;
+    }
   </style>
 </head>
 <body>
@@ -88,19 +110,6 @@
         </div>
       </div>
       <div id="messageContainer"></div>
-      <div id="gitOperationsPanel" class="initially-hidden">
-        <div class="section-title">Git Operations</div>
-        <div class="git-buttons">
-          <button id="commitChangesBtn" class="git-button">Commit Changes</button>
-          <button id="discardChangesBtn" class="git-button">Discard Changes</button>
-          <div class="merge-container">
-            <button id="mergeBtn" class="git-button">Merge with Branch</button>
-            <select id="branchSelect" class="branch-select">
-              <option value="">Select Branch</option>
-            </select>
-          </div>
-        </div>
-      </div>
       <div id="inputContainer">
         <textarea id="userInput" placeholder="Type your message here..." rows="2"></textarea>
         <div id="buttonContainer">
@@ -139,7 +148,13 @@
           <div class="section-title">Trusty Agents</div>
           <div id="trustyAgentsSection">
             <ul id="trustyAgentsList" class="file-list"></ul>
-            
+          </div>
+        </div>
+        <div class="section" id="humanReviewerSection" style="display: none;">
+          <div class="section-title">Human Reviewer</div>
+          <div class="git-buttons" style="display: flex; justify-content: center; gap: 20px;">
+            <button id="acceptChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Accept Changes</button>
+            <button id="rejectChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Reject Changes</button>
           </div>
         </div>
       </div>
@@ -360,6 +375,20 @@
                                      '<ul id="trustyAgentsList" class="file-list"></ul>' +
                                      '</div>';
       container.appendChild(trustyAgentsSection);
+      
+      // Human Reviewer
+      const humanReviewerSection = document.createElement('div');
+      humanReviewerSection.className = 'section';
+      humanReviewerSection.id = 'humanReviewerSection';
+      humanReviewerSection.style.display = 'none'; // Initially hidden
+      humanReviewerSection.innerHTML = '<div class="section-title">Human Reviewer</div>' +
+                                     '<div class="git-buttons" style="display: flex; justify-content: center; gap: 20px;">' +
+                                     '<button id="acceptChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Accept Changes</button>' +
+                                     '<button id="rejectChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Reject Changes</button>' +
+                                     '</div>';
+      container.appendChild(humanReviewerSection);
+      
+      console.log("Protoblock container rebuilt with Human Reviewer section");
     }
 
     // Function to display protoblock data
@@ -456,6 +485,14 @@
       if (isSuccess) {
         // Make files clickable after a delay to ensure the DOM is ready
         setTimeout(makeFilesClickable, 300);
+        
+        // Show the Human Reviewer section
+        console.log("Success detected in displayProtoblockData, showing Human Reviewer section");
+        showHumanReviewerSection(true);
+      } else {
+        // Hide the Human Reviewer section if not successful
+        console.log("No success detected in displayProtoblockData, hiding Human Reviewer section");
+        showHumanReviewerSection(false);
       }
     }
 
@@ -475,15 +512,6 @@
         item.addEventListener('click', () => {
           showFileDiff(filename);
         });
-        
-        // Add visual cue
-        if (!item.querySelector('.file-diff-icon')) {
-          const diffIcon = document.createElement('span');
-          diffIcon.className = 'file-diff-icon';
-          diffIcon.innerHTML = ' 🔍';
-          diffIcon.title = 'Click to view file changes';
-          item.appendChild(diffIcon);
-        }
         
         // Request file status with a slight delay to ensure the DOM has updated
         // Stagger requests to avoid overwhelming the server
@@ -861,8 +889,9 @@
         
         // Show git operations panel after successful block execution
         if (statusMessage === "✅ Block executed successfully! Displaying final results...") {
-          console.log("Block successful, showing git operations panel");
-          showGitOperationsPanel(true);
+          console.log("Block successful, showing Human Reviewer section");
+          // Also show the Human Reviewer section
+          showHumanReviewerSection();
         }
         
         return;
@@ -1172,6 +1201,140 @@
         }
       }
     });
+
+    // Add event listeners for Human Reviewer buttons
+    document.addEventListener('DOMContentLoaded', function() {
+      // We need to use event delegation since the buttons might be created dynamically
+      document.body.addEventListener('click', function(event) {
+        // Accept Changes button
+        if (event.target.id === 'acceptChangesBtn') {
+          console.log('Accept Changes clicked');
+          // Use task description as commit message
+          const taskDescription = document.getElementById('taskDescription')?.textContent || 'Accept changes from protoblock';
+          const commitMessage = taskDescription.substring(0, 100); // Limit to 100 chars in case it's too long
+          
+          // Disable both buttons and change appearance
+          const acceptBtn = document.getElementById('acceptChangesBtn');
+          const rejectBtn = document.getElementById('rejectChangesBtn');
+          
+          if (acceptBtn) {
+            acceptBtn.classList.add('accepted');
+            acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
+          }
+          
+          if (rejectBtn) {
+            rejectBtn.classList.add('disabled');
+            rejectBtn.disabled = true;
+          }
+          
+          const payload = {
+            type: "git_commit_request",
+            message: commitMessage
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Committing changes...', 'processing');
+        }
+        
+        // Reject Changes button
+        if (event.target.id === 'rejectChangesBtn') {
+          console.log('Reject Changes clicked');
+          // No confirm needed - immediately discard
+          
+          // Disable both buttons and change appearance
+          const acceptBtn = document.getElementById('acceptChangesBtn');
+          const rejectBtn = document.getElementById('rejectChangesBtn');
+          
+          if (rejectBtn) {
+            rejectBtn.classList.add('rejected');
+            rejectBtn.classList.add('disabled');
+            rejectBtn.disabled = true;
+          }
+          
+          if (acceptBtn) {
+            acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
+          }
+          
+          const payload = {
+            type: "git_discard_request"
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Discarding changes...', 'processing');
+        }
+      });
+    });
+    
+    // Also set up the buttons directly in case DOMContentLoaded already fired
+    function setupHumanReviewerButtons() {
+      const acceptBtn = document.getElementById('acceptChangesBtn');
+      const rejectBtn = document.getElementById('rejectChangesBtn');
+      
+      if (acceptBtn) {
+        acceptBtn.onclick = function() {
+          console.log('Accept Changes clicked (direct handler)');
+          // Use task description as commit message
+          const taskDescription = document.getElementById('taskDescription')?.textContent || 'Accept changes from protoblock';
+          const commitMessage = taskDescription.substring(0, 100); // Limit to 100 chars in case it's too long
+          
+          // Disable both buttons and change appearance
+          acceptBtn.classList.add('accepted');
+          acceptBtn.classList.add('disabled');
+          acceptBtn.disabled = true;
+          
+          if (rejectBtn) {
+            rejectBtn.classList.add('disabled');
+            rejectBtn.disabled = true;
+          }
+          
+          const payload = {
+            type: "git_commit_request",
+            message: commitMessage
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Committing changes...', 'processing');
+        };
+      }
+      
+      if (rejectBtn) {
+        rejectBtn.onclick = function() {
+          console.log('Reject Changes clicked (direct handler)');
+          // No confirm needed - immediately discard
+          
+          // Disable both buttons and change appearance
+          rejectBtn.classList.add('rejected');
+          rejectBtn.classList.add('disabled');
+          rejectBtn.disabled = true;
+          
+          if (acceptBtn) {
+            acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
+          }
+          
+          const payload = {
+            type: "git_discard_request"
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Discarding changes...', 'processing');
+        };
+      }
+    }
+    
+    // Call setup function after block display is shown
+    function showHumanReviewerSection(show = true) {
+      const humanReviewerSection = document.getElementById('humanReviewerSection');
+      if (humanReviewerSection) {
+        console.log(`${show ? 'Showing' : 'Hiding'} Human Reviewer section`);
+        humanReviewerSection.style.display = show ? 'block' : 'none';
+        
+        if (show) {
+          // Make sure the buttons are set up correctly when shown
+          setTimeout(setupHumanReviewerButtons, 100);
+        }
+      } else {
+        console.error('Human Reviewer section not found');
+      }
+    }
   </script>
   
   <!-- File diff overlay -->
