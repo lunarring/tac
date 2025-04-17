@@ -443,8 +443,7 @@
           
           // Log whether this agent has results
           const hasPrompt = window.trustyAgentPrompts[agent];
-          const resultObj = window.trustyAgentResults && 
-                        (window.trustyAgentResults[agent] || window.trustyAgentResults[agentKey]);
+          const resultObj = window.trustyAgentResults && (window.trustyAgentResults[agent] || window.trustyAgentResults[agentKey]);
           const hasResults = resultObj && (resultObj.output || resultObj.image_url);
           
           console.log(`Agent ${agent} (key: ${agentKey}): has prompt: ${!!hasPrompt}, has results: ${!!hasResults}`, resultObj);
@@ -588,8 +587,14 @@
         return `ws://localhost:${savedWsPort}`;
       }
       
+      // Check localStorage for http port as well (if available)
+      const savedHttpPort = localStorage.getItem('tac_http_port');
+      if (savedHttpPort) {
+        // WebSocket port is often one less than HTTP port
+        return `ws://localhost:${parseInt(savedHttpPort)-1}`;
+      }
+      
       // If browser URL is on localhost, extract port and calculate WS port
-      // HTTP typically runs on WebSocket port + 1
       const currentLocation = window.location;
       if (currentLocation.hostname === 'localhost' || currentLocation.hostname === '127.0.0.1') {
         // If we're on port 8767, websocket is likely on 8766
@@ -663,6 +668,9 @@
       
       // Don't start reconnect logic here - the close event will handle it
     });
+
+    // Global flag for controlling the block button animation speed
+    let wildMode = false;
 
     // Handle incoming messages from the WebSocket
     socket.onmessage = function(event) {
@@ -743,7 +751,12 @@
           console.log(`Updated attempt number to ${current}/${max}`);
         }
         
-        // Check for block execution failure message
+        // If the status message indicates the block execution has finished (success, failure, or cancellation), stop fast spinning.
+        if (statusMessage.includes("Block executed successfully") || statusMessage.includes("Block execution failed") || statusMessage.toLowerCase().includes("cancelled")) {
+          wildMode = false;
+        }
+        
+        // Check for block execution failure message to remove protoblock display if needed
         if (statusMessage === "❌ Block execution failed!" || 
             statusMessage.startsWith("❌ Error:") ||
             statusMessage.includes("Error creating protoblock:") ||
@@ -868,12 +881,6 @@
         
         return;
       }
-      else if (data.type === "recording_status") {
-        // Handle recording status updates for microphone button
-        console.log("Received recording status update:", data.is_recording);
-        // Update the microphone button appearance based on recording status
-        return;
-      }
       else {
         // For unrecognized message types, just log instead of displaying in chat
         console.log("Received unknown message type:", data.type);
@@ -910,13 +917,10 @@
     // Bind click event to the block button for cube-like interaction
     const blockButton = document.getElementById('blockButton');
     blockButton.addEventListener('click', function() {
-      // Trigger wild animation on the cube in the button
+      // Trigger fast spinning animation on the cube until backend confirmation arrives
       wildMode = true;
-      setTimeout(() => {
-        wildMode = false;
-      }, 2000);
       
-      // Don't update runtime status - we only want it in the chat panel
+      // Do not use a set timeout; the spinning will continue until a status message stops it
       toggleProtoblockDisplay(false);
       document.getElementById('protoblockContainer').innerHTML = '';
       rebuildProtoblockContainer();
@@ -996,8 +1000,7 @@
     const btnAmbient = new THREE.AmbientLight(0xffffff, 0.8);
     btnScene.add(btnAmbient);
 
-    // Global flag for wild animation mode
-    let wildMode = false;
+    // Global flag for wild animation mode is controlled by "wildMode"
     function animateBtnCube() {
       requestAnimationFrame(animateBtnCube);
       if(wildMode){
@@ -1423,11 +1426,13 @@
           console.log(`${agentName} image URL:`, results.image_url);
           imageSection.style.display = 'block';
           imageElement.src = makePathUsable(results.image_url);
+          console.log(`Setting main image src to: ${makePathUsable(results.image_url)}`);
         } else if (results.comparison_path) {
           // Explicitly handle comparison_path that may not be exposed as image_url
           console.log(`${agentName} comparison path:`, results.comparison_path);
           imageSection.style.display = 'block';
           imageElement.src = makePathUsable(results.comparison_path);
+          console.log(`Setting main image src from comparison_path: ${makePathUsable(results.comparison_path)}`);
         } else {
           imageSection.style.display = 'none';
         }
@@ -1436,11 +1441,8 @@
         
         resultSection.style.display = 'block';
         resultStatusElement.style.display = 'none';
-        if (executionSuccessful) {
-          resultTextElement.innerHTML = '<div class="diff-empty">This agent was executed but did not produce any output.</div>';
-        } else {
-          resultTextElement.innerHTML = '<div class="diff-empty">No results available yet for this agent.</div>';
-        }
+        resultTextElement.textContent = "No results found for this agent.";
+        console.log(`No results found for agent: ${agentKey}`);
         imageSection.style.display = 'none';
       }
       
@@ -1505,7 +1507,6 @@
             resultObj = protoblock.trusty_agent_results[key];
             hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
             console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
-            // Debug - log the detailed object contents to check for image paths
             console.log(`Result object for ${agentKey} - JSON:`, JSON.stringify(resultObj, null, 2));
             break;
           }
@@ -1515,23 +1516,19 @@
       function makePathUsable(path) {
         if (!path) return null;
         
-        // Already a usable URL
         if (path.startsWith('http') || path.startsWith('data:')) {
           return path;
         }
         
-        // Paths that are already relative to the web server root
         if (path.startsWith('./') || path.startsWith('../')) {
           return path;
         }
         
-        // For absolute file paths, use our screenshot server route
         if (path.startsWith('/')) {
           console.log(`Converting absolute path to screenshot URL: ${path}`);
           return `/screenshots${path}`;
         }
         
-        // For relative paths (likely in /tmp), route through screenshots endpoint
         console.log(`Converting path to screenshot URL: ${path}`);
         return `/screenshots/${path}`;
       }
@@ -1542,7 +1539,6 @@
       trustyAgentSummarySection.style.display = 'none';
       trustyAgentPlausibilitySection.style.display = 'none';
 
-      // Check execution status by looking at blockStatusText
       const blockStatusText = document.getElementById('blockStatusText');
       const executionSuccessful = blockStatusText.textContent.includes("✅");
 
@@ -1564,14 +1560,16 @@
             trustyAgentResultStatus.className = 'agent-status';
           }
           trustyAgentResultText.textContent = resultObj.output || "No text output available";
+        } else {
+          trustyAgentResultSection.style.display = 'none';
         }
+        
         if (resultObj.image_url) {
           trustyAgentImageSection.style.display = 'block';
           const usablePath = makePathUsable(resultObj.image_url);
           trustyAgentImage.src = usablePath;
           console.log(`Setting main image src to: ${usablePath}`);
         } else if (resultObj.comparison_path) {
-          // Explicitly handle comparison_path that may not be exposed as image_url
           trustyAgentImageSection.style.display = 'block';
           const usablePath = makePathUsable(resultObj.comparison_path);
           trustyAgentImage.src = usablePath;
@@ -1579,15 +1577,13 @@
         } else {
           trustyAgentImageSection.style.display = 'none';
         }
-        
-        // Always hide the comparison container - we only need one image
-        comparisonImageContainer.style.display = 'none';
       } else {
         trustyAgentResultSection.style.display = 'block';
         trustyAgentResultStatus.style.display = 'none';
         trustyAgentAgentType.style.display = 'none';
         trustyAgentResultText.textContent = "No results found for this agent.";
         console.log(`No results found for agent: ${agentKey}`);
+        trustyAgentImageSection.style.display = 'none';
       }
 
       const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
