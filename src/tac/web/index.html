@@ -96,6 +96,22 @@
       color: white;
       border: 1px solid #770000;
     }
+    
+    .git-buttons {
+      display: flex;
+      flex-direction: row !important;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 10px;
+    }
+    
+    .git-button {
+      flex: 1;
+      max-width: 180px;
+      padding: 10px 15px;
+      height: 40px;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -152,9 +168,9 @@
         </div>
         <div class="section" id="humanReviewerSection" style="display: none;">
           <div class="section-title">Human Reviewer</div>
-          <div class="git-buttons" style="display: flex; justify-content: center; gap: 20px;">
-            <button id="acceptChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Accept Changes</button>
-            <button id="rejectChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Reject Changes</button>
+          <div class="git-buttons">
+            <button id="acceptChangesBtn" class="git-button">Accept Changes</button>
+            <button id="rejectChangesBtn" class="git-button">Reject Changes</button>
           </div>
         </div>
       </div>
@@ -382,9 +398,9 @@
       humanReviewerSection.id = 'humanReviewerSection';
       humanReviewerSection.style.display = 'none'; // Initially hidden
       humanReviewerSection.innerHTML = '<div class="section-title">Human Reviewer</div>' +
-                                     '<div class="git-buttons" style="display: flex; justify-content: center; gap: 20px;">' +
-                                     '<button id="acceptChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Accept Changes</button>' +
-                                     '<button id="rejectChangesBtn" class="git-button" style="flex: 1; max-width: 180px;">Reject Changes</button>' +
+                                     '<div class="git-buttons">' +
+                                     '<button id="acceptChangesBtn" class="git-button">Accept Changes</button>' +
+                                     '<button id="rejectChangesBtn" class="git-button">Reject Changes</button>' +
                                      '</div>';
       container.appendChild(humanReviewerSection);
       
