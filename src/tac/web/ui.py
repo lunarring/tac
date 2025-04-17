@@ -783,7 +783,8 @@ class UIManager:
             # Standardize the filename to reduce path issues
             filename = filename.strip()
             
-            await self.send_status_message(f"Getting diff for {filename}...")
+            # No longer send unnecessary status message
+            # await self.send_status_message(f"Getting diff for {filename}...")
             
             # Check if the file exists
             filepath = os.path.join(self.base_dir, filename)
