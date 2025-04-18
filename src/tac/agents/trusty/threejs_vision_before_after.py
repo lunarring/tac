@@ -275,56 +275,8 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             # Add expected changes to result details
             result.details["expected_changes"] = expected_changes
             
-            # Create a detailed prompt for analysis
-            prompt = f"""Analyze this side-by-side comparison of a Three.js application:
-- Left side shows the before state
-- Right side shows the after state
-- Expected changes: {expected_changes}
 
-Please provide:
-1. GRADE: [A-F] - Overall grade for the implementation
-2. ANALYSIS: Detailed explanation of what changed and why the grade was given
-3. IMPROVEMENTS: Specific suggestions for improvement if grade is below A
-
-Focus on:
-- Visual accuracy of the changes
-- Implementation completeness
-- Quality of the visual elements
-- Any unexpected or missing changes"""
-            
-            logger.info(f"Analyzing comparison with prompt: {prompt}")
-            
-            # Sleep to ensure the image is fully written to disk
-            time.sleep(2)
-            
-            # Direct call to LLM client for vision analysis to ensure image is passed correctly
-            messages = [
-                Message(role="system", content="""You are a helpful assistant that can analyze 3D visualizations created with Three.js.
-                You will grade the visualization on a scale from A to F where:
-                A: Perfect match with all expected elements present and correctly rendered
-                B: Good match with minor visual discrepancies
-                C: Acceptable but with noticeable issues
-                D: Minimum passing grade - basic elements present but with significant issues
-                F: Failed - major elements missing or severe rendering problems
-                
-                Provide your analysis in this format:
-                
-                GRADE: [A-F]
-                
-                ANALYSIS:
-                (Detailed analysis of what matches or doesn't match expectations)
-                
-                ISSUES:
-                (List any visual issues or missing elements)
-                
-                RECOMMENDATIONS:
-                (Suggestions for improvement if needed)"""),
-                Message(role="user", content=prompt)
-            ]
-            
-            # Use vision_chat_completion with the comparison image path
-            logger.info(f"Sending comparison image to vision model: {self.comparison_path}")
-            self.analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
+            self.analysis_result = self.analyze_comparison(self.comparison_path, expected_changes)
             
             # Add analysis to result
             result.add_report(self.analysis_result, "Visual Analysis")
@@ -369,6 +321,52 @@ Focus on:
             # Clean up browser resources
             self._cleanup_browser()
 
+    def analyze_comparison(self, comparison_path: str, expected_changes: str) -> str:
+                    # Create a detailed prompt for analysis
+            prompt = f"""You are a visual expert analyzes comparative screenshots of a threejs application. The before state of the application is on the left and the after state is on the right. You will need to compare the left (before) to the right (after) and provide a detailed analysis of the changes you see. 
+We expect the following changes, here are the expected changes: {expected_changes}
+            
+We want the following output format:
+DIFFERENCES BEFORE VS AFTER:
+(Extensive list the differences you see between the before and after screenshots)
+
+ACCURACY OF EXPECTED CHANGES:
+(How accurately are the expected changes reflected in the after screenshot, as compared to the before screenshot?)
+
+UNEXPECTED CHANGES:
+(Are there any further changes in the after screenshot that were not expected? If so, list them. Cross-check the differences you listed in the DIFFERENCES BEFORE VS AFTER section. with the expected changes.)
+
+RATING:
+(How appropriate would you rate the TOTAL changes, on a scale of A to F? A is the best, F is the worst. 
+Your responsibility is to FAIL the test (D or F) if one of two conditions is met: 
+-the changes are not accurate with regards to the expected changes
+-there are ANY unexpected changes that we did not expect
+ONLY RETURN HERE A SINGLE LETTER, A, B, C, D, F)
+
+OUT OF SCOPE REPORT:
+(Report here if the expected changes are out of scope of what you can do to judge, given two screenshots)
+
+RECOMMENDATIONS:
+(Suggest how the expected changes from the left before image could be implemented better in the right after image)."""
+            
+            logger.info(f"Analyzing comparison with prompt: {prompt}")
+            
+            # Sleep to ensure the image is fully written to disk
+            time.sleep(0.5)
+            
+            # Direct call to LLM client for vision analysis to ensure image is passed correctly
+            messages = [
+                Message(role="user", content=prompt),
+            ]
+            
+            # Use vision_chat_completion with the comparison image path
+            logger.info(f"Sending comparison image to vision model: {self.comparison_path}")
+            
+
+            analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
+
+            return analysis_result
+
     def _get_app_file_path(self, protoblock: ProtoBlock) -> Optional[str]:
         """
         Determine which HTML file to run based on the protoblock.
@@ -399,3 +397,44 @@ Focus on:
                 return file_path
         
         return None 
+
+if __name__ == "__main__":
+    # Example of using the ThreeJSVisionBeforeAfterAgent with an existing image
+    agent = ThreeJSVisionBeforeAfterAgent()
+    
+    # Existing comparison image to analyze
+    comparison_image = "/Users/jjj/Downloads/comparison_bb59c33a-f596-4b66-9c37-7dd137582b7e.png"
+    
+    # Create a simple ProtoBlock with the expected changes
+    from tac.blocks import ProtoBlock
+    
+    # Fix ProtoBlock initialization to match the class definition
+    protoblock = ProtoBlock(
+        task_description="Analyze starfield visualization",
+        write_files=[],
+        context_files=[],
+        block_id="example_test",
+        trusty_agent_prompts={
+            "threejs_vision_before_after": "Assert that the star field covers the full screen in the after image."
+        }
+    )
+
+    expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_before_after")
+    # Set the comparison path and protoblock
+    agent.comparison_path = comparison_image
+    agent.set_protoblock(protoblock)
+    
+    # Directly use the _check_impl method with the existing image
+    # Provide empty codebase and code_diff since we're just analyzing an image
+    result = agent.analyze_comparison(comparison_image, expected_changes)
+    
+    # Print the result
+    print(result)
+
+
+"""
+BACK TO OLD RULE:
+how accurate is change there?
+is there something else that got changed?
+outof scope things mention explicitly.
+"""

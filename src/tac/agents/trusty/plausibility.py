@@ -103,30 +103,31 @@ For context, here are the full files that the junior developer had access to.
 </analysis_rules>
 
 <output_format>
-Provide your analysis in the following format:
-
-BRIEF SUMMARY OF THE APPROACH
+BRIEF SUMMARY OF THE APPROACH:
 (Provide a brief summary of the approach taken to implement the changes)
 
-DETAILED ANALYSIS:
-(Provide in-depth analysis of what matches or mismatches with requirements)
+ALIGNMENT OF IMPLEMENTED CHANGES WITH TASK DESCRIPTION:
+(How well does the implemented changes align with the task description? Do they fulfill the task description? Are they aligned with the task description?)
 
-ISSUES:
-(If implausible, explain the fundamental issues)
+UNEXPECTED CHANGES:
+(List any unexpected changes that we did not expect, or are not aligned with the task description. Cross-check the changes in the <code_diff> section with the task description and list everything unrelated here)
+
+RATING:
+(How would appropriate would you rate the code changes, on a scale of A to F? A is the best, F is the worst. 
+Your responsibility is to FAIL the test (D or F) if one of two conditions is met: 
+-the changes are not accurate with regards to the expected changes
+-there are ANY unexpected changes that we did not expect
+ONLY RETURN HERE A SINGLE LETTER, A, B, C, D, F)
+
+OUT OF SCOPE REPORT:
+(Report here if the expected changes are out of scope of what you can do to judge, given the <code_diff> section)
 
 RECOMMENDATIONS:
-(List specific suggestions for improvement if needed)
-
-PLAUSIBILITY SCORE RATING:
-(answer only with one letter with the rating, where:
-"A" is the best possible score
-"B" is good, but not perfect because some minor things that could have been done better
-"C" is acceptable, but there are some issues
-"D" is the minimum passing score, not a nice implementation but it will work
-"F" is failed, because the implementation is not even close to the requirements, or because it probably will not work or breaks something.)
-
 HUMAN VERIFICATION:
 Provide me here briefly how I can run the code myself to verify the changes. This could be for instance "python main.py" or "python -m tests.test_piano_trainer_main" or similar.
+
+MISSING FILES:
+(List all files that you think should have been available to implement the desired changes, but were not present in the <modified_files> section)
 </output_format>"""
 
             logger.debug(f"Prompt for plausibility check: {analysis_prompt}")
@@ -187,7 +188,7 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                 missing_files_parts = analysis.split("MISSING FILES:")
                 if len(missing_files_parts) > 1:
                     end_marker = None
-                    for marker in ["RECOMMENDATIONS:", "PLAUSIBILITY SCORE RATING:", "HUMAN VERIFICATION:"]:
+                    for marker in ["RECOMMENDATIONS:", "RATING:", "HUMAN VERIFICATION:"]:
                         if marker in missing_files_parts[1]:
                             end_marker = marker
                             break
@@ -202,8 +203,8 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
 
             # Extract plausibility score
             final_plausibility_score = ""
-            if "PLAUSIBILITY SCORE RATING:" in analysis:
-                score_section = analysis.split("PLAUSIBILITY SCORE RATING:")[1].strip()
+            if "RATING:" in analysis:
+                score_section = analysis.split("RATING:")[1].strip()
                 # Extract just the letter grade, ignoring any additional text
                 for char in score_section:
                     if char in "ABCDF":
