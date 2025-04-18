@@ -336,7 +336,7 @@ ACCURACY OF EXPECTED CHANGES:
 UNEXPECTED CHANGES:
 (Are there any further changes in the after screenshot that were not expected? If so, list them. Cross-check the differences you listed in the DIFFERENCES BEFORE VS AFTER section. with the expected changes.)
 
-RATING:
+GRADE:
 (How appropriate would you rate the TOTAL changes, on a scale of A to F? A is the best, F is the worst. 
 Your responsibility is to FAIL the test (D or F) if one of two conditions is met: 
 -the changes are not accurate with regards to the expected changes
