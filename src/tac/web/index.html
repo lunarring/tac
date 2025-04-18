@@ -594,6 +594,17 @@
           // Always make agents clickable to view their prompts and any results
           li.classList.add('trusty-agent-item');
           li.classList.add('clickable');
+          
+          // Add grade badge if available
+          if (hasResults && (resultObj.grade || (resultObj.details && resultObj.details.grade))) {
+            const grade = resultObj.grade || (resultObj.details && resultObj.details.grade);
+            if (grade && grade.match(/^[A-F]$/)) {
+              const gradeBadge = document.createElement('span');
+              gradeBadge.className = `grade-badge ${grade}`;
+              gradeBadge.textContent = grade;
+              li.prepend(gradeBadge); // Add to the beginning of the list item
+            }
+          }
             
           // Add has-results class if agent has results
           if (hasResults) {
@@ -1618,6 +1629,9 @@
     <div id="trustyAgentContent">
       <div id="trustyAgentHeader">
         <h3 id="trustyAgentTitle">Trusty Agent</h3>
+        <div id="trustyAgentHeaderGrade" class="header-grade" style="display: none;">
+          <span class="grade-letter">A</span>
+        </div>
         <button id="trustyAgentCloseBtn">×</button>
       </div>
       <div id="trustyAgentBody">
@@ -1733,6 +1747,26 @@
     const trustyAgentBody = document.getElementById('trustyAgentBody');
     const trustyAgentTitle = document.getElementById('trustyAgentTitle');
 
+    // Function to update header grade display
+    function updateHeaderGrade(grade) {
+      if (!grade) return;
+      
+      const headerGrade = document.getElementById('trustyAgentHeaderGrade');
+      const gradeLetter = headerGrade.querySelector('.grade-letter');
+      
+      // Remove any existing grade classes
+      gradeLetter.classList.remove('A', 'B', 'C', 'D', 'F');
+      
+      // Set the grade letter text
+      gradeLetter.textContent = grade;
+      
+      // Add the appropriate class for styling
+      gradeLetter.classList.add(grade);
+      
+      // Show the grade
+      headerGrade.style.display = 'flex';
+    }
+
     function showTrustyAgentPrompt(agentName, agentKey) {
       console.log(`Showing prompt for agent: ${agentName} (key: ${agentKey})`);
       
@@ -1831,6 +1865,15 @@
           verificationSection.innerHTML = renderMarkdown(verificationInfo);
           verificationSection.classList.add('markdown-content');
         }
+      }
+      
+      // Show grade in header if available
+      if (results && results.grade) {
+        updateHeaderGrade(results.grade);
+      } else if (results && results.details && results.details.grade) {
+        updateHeaderGrade(results.details.grade);
+      } else {
+        document.getElementById('trustyAgentHeaderGrade').style.display = 'none';
       }
       
       trustyAgentOverlay.style.display = 'flex';
@@ -1993,6 +2036,15 @@
           trustyAgentVerificationInfo.innerHTML = renderMarkdown(verificationInfo);
           trustyAgentVerificationInfo.classList.add('markdown-content');
         }
+      }
+
+      // Show grade in header if available
+      if (resultObj && resultObj.grade) {
+        updateHeaderGrade(resultObj.grade);
+      } else if (resultObj && resultObj.details && resultObj.details.grade) {
+        updateHeaderGrade(resultObj.details.grade);
+      } else {
+        document.getElementById('trustyAgentHeaderGrade').style.display = 'none';
       }
 
       const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');

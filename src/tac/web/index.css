@@ -1169,3 +1169,103 @@ html, body {
 #trustyAgentBody .verification-info {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
 }
+
+/* Header grade styling */
+.header-grade {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20px;
+  position: absolute;
+  right: 40px;
+}
+
+.grade-letter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Different grade colors */
+.grade-letter.A {
+  background-color: #4CAF50;
+  border: 2px solid #388E3C;
+}
+
+.grade-letter.B {
+  background-color: #8BC34A;
+  border: 2px solid #689F38;
+}
+
+.grade-letter.C {
+  background-color: #FFC107;
+  border: 2px solid #FFA000;
+}
+
+.grade-letter.D {
+  background-color: #FF9800;
+  border: 2px solid #F57C00;
+}
+
+.grade-letter.F {
+  background-color: #F44336;
+  border: 2px solid #D32F2F;
+}
+
+/* Grade badge for trusty agent items */
+.grade-badge {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  margin-right: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.grade-badge.A {
+  background-color: #4CAF50;
+  border: 1px solid #388E3C;
+}
+
+.grade-badge.B {
+  background-color: #8BC34A;
+  border: 1px solid #689F38;
+}
+
+.grade-badge.C {
+  background-color: #FFC107;
+  border: 1px solid #FFA000;
+}
+
+.grade-badge.D {
+  background-color: #FF9800;
+  border: 1px solid #F57C00;
+}
+
+.grade-badge.F {
+  background-color: #F44336;
+  border: 1px solid #D32F2F;
+}
+
+/* Modify the trusty agent item styling to accommodate the grade */
+.file-list li.trusty-agent-item {
+  display: flex;
+  align-items: center;
+}
+
+/* Move the status indicators to accommodate both grade and status */
+.file-list li.trusty-agent-item.has-results::after {
+  margin-left: auto;
+}
