@@ -471,8 +471,9 @@
           
           console.log(`Agent ${agent} (key: ${agentKey}): has prompt: ${!!hasPrompt}, has results: ${!!hasResults}`, resultObj);
           
-          // Always make the agent clickable if it has a prompt (even without results)
+          // Always make agents clickable to view their prompts and any results
           li.classList.add('trusty-agent-item');
+          li.classList.add('clickable');
             
           // Add has-results class if agent has results
           if (hasResults) {
@@ -501,19 +502,19 @@
       // Check if we should attempt to make files clickable (only after success)
       const runtimeStatus = document.getElementById('runtimeStatus');
       const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
+      
+      // Make files clickable regardless of success/failure status - always allow viewing reports
+      setTimeout(makeFilesClickable, 300);
+      
+      // Show the Human Reviewer section only on success
       const isSuccess = blockStatusTextContent.includes("✅") || 
                        blockStatusTextContent.includes("successful") ||
                        blockStatusTextContent.includes("Ready");
       
       if (isSuccess) {
-        // Make files clickable after a delay to ensure the DOM is ready
-        setTimeout(makeFilesClickable, 300);
-        
-        // Show the Human Reviewer section
         console.log("Success detected in displayProtoblockData, showing Human Reviewer section");
         showHumanReviewerSection(true);
       } else {
-        // Hide the Human Reviewer section if not successful
         console.log("No success detected in displayProtoblockData, hiding Human Reviewer section");
         showHumanReviewerSection(false);
       }

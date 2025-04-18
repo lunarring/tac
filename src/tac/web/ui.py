@@ -1304,7 +1304,7 @@ class UIManager:
                 traceback.print_exc()
                 await self.send_status_message(f"❌ Error creating protoblock: {str(e)[:100]}...")
                 # Ensure we remove any previous protoblock display
-                await self.protoblock_view.remove_protoblock("Failed to create protoblock")
+                # await self.protoblock_view.remove_protoblock("Failed to create protoblock")
                 return
             
             # Execute the processor directly
@@ -1348,13 +1348,18 @@ class UIManager:
                 else:
                     # If block execution failed, send explicit failure message
                     await self.send_status_message("❌ Block execution failed!")
-                    # Force removal of protoblock display
-                    await self.protoblock_view.remove_protoblock("Block execution failed")
+                    
+                    # We want to keep the protoblock visible on failure so users can see the reports
+                    # await self.protoblock_view.remove_protoblock("Block execution failed")
+                    
+                    # Send updated protoblock data even on failure, to ensure trusty agent results are visible
+                    if processor.protoblock and hasattr(processor.protoblock, 'trusty_agent_results'):
+                        print(f"Sending updated protoblock with {len(processor.protoblock.trusty_agent_results)} trusty agent results after failure")
+                        await self.protoblock_view.send_protoblock_data(processor.protoblock)
                     
             except asyncio.CancelledError:
                 # Task was cancelled (e.g., by CTRL+C)
                 await self.send_status_message("❌ Block execution cancelled by user.")
-                await self.protoblock_view.remove_protoblock("Execution cancelled by user")
                 # Re-raise the exception to propagate the cancellation
                 raise
                 
@@ -1362,7 +1367,11 @@ class UIManager:
                 print(f"Error during block execution: {exec_err}")
                 traceback.print_exc()
                 await self.send_status_message(f"❌ Block execution failed: {str(exec_err)}")
-                await self.protoblock_view.remove_protoblock(f"Execution error: {str(exec_err)[:100]}")
+                
+                # Send updated protoblock data even on error, to ensure trusty agent results are visible
+                if processor.protoblock and hasattr(processor.protoblock, 'trusty_agent_results'):
+                    print(f"Sending updated protoblock with {len(processor.protoblock.trusty_agent_results)} trusty agent results after error")
+                    await self.protoblock_view.send_protoblock_data(processor.protoblock)
                 
             finally:
                 # Clean up the task reference
@@ -1379,8 +1388,8 @@ class UIManager:
             print(f"Error during block execution: {e}")
             traceback.print_exc()
             await self.send_status_message(f"❌ Error: {str(e)}")
-            # Force removal of protoblock display on any exception
-            await self.protoblock_view.remove_protoblock(f"Error: {str(e)[:100]}")
+            # Ensure we remove any previous protoblock display
+            # await self.protoblock_view.remove_protoblock(f"Error: {str(e)[:100]}")
 
     async def handle_git_branch_request(self):
         """Handle request to get all available git branches"""

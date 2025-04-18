@@ -239,6 +239,16 @@ class BlockProcessor:
                 # Store the previous protoblock
                 self.store_previous_protoblock()
                 
+                # Send updated protoblock with results even on failure
+                if hasattr(self.ui_manager, 'send_protoblock_data') and hasattr(self.protoblock, 'trusty_agent_results'):
+                    logger.info(f"Sending updated protoblock with {len(self.protoblock.trusty_agent_results)} trusty agent results after failure")
+                    # Import asyncio here to make sure it's available
+                    import asyncio
+                    asyncio.run_coroutine_threadsafe(
+                        self.ui_manager.send_protoblock_data(self.protoblock),
+                        self.ui_manager._loop
+                    )
+                
                 # If run_error_analysis is disabled, set error_analysis to empty string
                 if not config.general.trusty_agents.run_error_analysis:
                     error_analysis = ""
