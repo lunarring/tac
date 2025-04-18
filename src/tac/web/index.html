@@ -39,31 +39,45 @@
       justify-content: space-between;
       align-items: center;
       padding-left: 5px;
+      transition: background-color 0.2s;
     }
     
     .file-list li.trusty-agent-item.has-results.success {
       border-left: 3px solid #00aa00;
+      background-color: rgba(0, 170, 0, 0.15);
     }
     
     .file-list li.trusty-agent-item.has-results.failure {
       border-left: 3px solid #cc0000;
+      background-color: rgba(204, 0, 0, 0.15);
     }
     
+    .file-list li.trusty-agent-item.has-results:hover.success {
+      background-color: rgba(0, 170, 0, 0.25);
+    }
+    
+    .file-list li.trusty-agent-item.has-results:hover.failure {
+      background-color: rgba(204, 0, 0, 0.25);
+    }
+    
+    /* Status indicator dots */
     .file-list li.trusty-agent-item.has-results::after {
       content: "";
       display: inline-block;
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       margin-right: 10px;
     }
     
     .file-list li.trusty-agent-item.has-results.success::after {
       background-color: #00aa00;
+      box-shadow: 0 0 3px #00aa00;
     }
     
     .file-list li.trusty-agent-item.has-results.failure::after {
       background-color: #cc0000;
+      box-shadow: 0 0 3px #cc0000;
     }
     
     .file-diff-icon {
