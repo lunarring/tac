@@ -33,6 +33,39 @@
       background-color: rgba(0, 120, 215, 0.1);
     }
     
+    /* Add styling for trusty agent items based on status */
+    .file-list li.trusty-agent-item.has-results {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-left: 5px;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.success {
+      border-left: 3px solid #00aa00;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.failure {
+      border-left: 3px solid #cc0000;
+    }
+    
+    .file-list li.trusty-agent-item.has-results::after {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.success::after {
+      background-color: #00aa00;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.failure::after {
+      background-color: #cc0000;
+    }
+    
     .file-diff-icon {
       color: #0078d7;
       font-size: 14px;
@@ -83,6 +116,33 @@
       pointer-events: none;
       opacity: 0.7;
       border: 1px solid #aaa;
+    }
+    
+    /* Agent status styling in popup dialog */
+    .agent-status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .agent-status.passed {
+      background-color: rgba(0, 180, 0, 0.15);
+      color: #007700;
+      border: 1px solid #00aa00;
+    }
+    
+    .agent-status.failed {
+      background-color: rgba(180, 0, 0, 0.15);
+      color: #990000;
+      border: 1px solid #cc0000;
+    }
+    
+    .agent-status.error {
+      background-color: rgba(255, 180, 0, 0.15);
+      color: #996600;
+      border: 1px solid #cc9900;
     }
     
     .git-button.accepted {
@@ -466,7 +526,8 @@
           
           // Log whether this agent has results
           const hasPrompt = window.trustyAgentPrompts[agent];
-          const resultObj = window.trustyAgentResults && (window.trustyAgentResults[agent] || window.trustyAgentResults[agentKey]);
+          const resultObj = window.trustyAgentResults && 
+                           (window.trustyAgentResults[agent] || window.trustyAgentResults[agentKey]);
           const hasResults = resultObj && (resultObj.output || resultObj.image_url);
           
           console.log(`Agent ${agent} (key: ${agentKey}): has prompt: ${!!hasPrompt}, has results: ${!!hasResults}`, resultObj);
@@ -479,6 +540,15 @@
           if (hasResults) {
             li.classList.add('has-results');
             console.log(`Adding has-results class to ${agent}`);
+            
+            // Add success/failure class based on result status
+            if (resultObj.status) {
+              if (resultObj.status === 'passed' || resultObj.status === 'success') {
+                li.classList.add('success');
+              } else if (resultObj.status === 'failed' || resultObj.status === 'error') {
+                li.classList.add('failure');
+              }
+            }
           }
             
           li.addEventListener('click', () => {
