@@ -132,6 +132,24 @@
       border: 1px solid #aaa;
     }
     
+    /* Styles for Human Reviewer section - success and failure states */
+    #humanReviewerSection.success {
+      background-color: rgba(0, 170, 0, 0.05);
+      border-radius: 4px;
+      padding: 10px;
+    }
+    
+    #humanReviewerSection.failure {
+      background-color: rgba(204, 0, 0, 0.1);
+      border-radius: 4px;
+      padding: 10px;
+    }
+    
+    #humanReviewerSection.failure .section-title {
+      color: #cc0000;
+      font-weight: bold;
+    }
+    
     /* Agent status styling in popup dialog */
     .agent-status {
       display: inline-block;
@@ -181,10 +199,13 @@
     
     .git-button {
       flex: 1;
-      max-width: 180px;
+      max-width: 200px;
       padding: 10px 15px;
       height: 40px;
       border-radius: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   </style>
 </head>
@@ -242,6 +263,7 @@
         </div>
         <div class="section" id="humanReviewerSection" style="display: none;">
           <div class="section-title">Human Reviewer</div>
+          <div id="gitStatusMessage"></div>
           <div class="git-buttons">
             <button id="acceptChangesBtn" class="git-button">Accept Changes</button>
             <button id="rejectChangesBtn" class="git-button">Reject Changes</button>
@@ -583,25 +605,11 @@
         trustyAgentsList.appendChild(li);
       }
       
-      // Check if we should attempt to make files clickable (only after success)
-      const runtimeStatus = document.getElementById('runtimeStatus');
-      const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
-      
       // Make files clickable regardless of success/failure status - always allow viewing reports
       setTimeout(makeFilesClickable, 300);
       
-      // Show the Human Reviewer section only on success
-      const isSuccess = blockStatusTextContent.includes("✅") || 
-                       blockStatusTextContent.includes("successful") ||
-                       blockStatusTextContent.includes("Ready");
-      
-      if (isSuccess) {
-        console.log("Success detected in displayProtoblockData, showing Human Reviewer section");
-        showHumanReviewerSection(true);
-      } else {
-        console.log("No success detected in displayProtoblockData, hiding Human Reviewer section");
-        showHumanReviewerSection(false);
-      }
+      // The Human Reviewer section is now shown only when we get a completion status message
+      // This ensures it only appears after all trusty agents have completed
     }
 
     // Function to make files in the protoblock clickable to view diffs
@@ -991,11 +999,34 @@
           wildMode = false;
         }
         
-        // Show git operations panel after successful block execution
+        // Show Human Reviewer section only when we get a completion message
         if (statusMessage === "✅ Block executed successfully! Displaying final results...") {
           console.log("Block successful, showing Human Reviewer section");
-          // Also show the Human Reviewer section
-          showHumanReviewerSection();
+          // Show the Human Reviewer section for successful execution
+          setTimeout(() => {
+            if (window.trustyAgentResults && Object.keys(window.trustyAgentResults).length > 0) {
+              showHumanReviewerSection(true, 'success');
+            }
+          }, 500); // Small delay to ensure trusty agent results are processed
+        } else if (statusMessage.includes("Block execution failed") && 
+                  !statusMessage.includes("creating protoblock") && 
+                  !statusMessage.includes("cancelled")) {
+          console.log("Block failed but trusty agents ran, checking for results to show Human Reviewer section");
+          // Allow a small delay to ensure agent results are fully processed
+          setTimeout(() => {
+            if (window.trustyAgentResults && Object.keys(window.trustyAgentResults).length > 0) {
+              // Check if any agents failed
+              let hasFailedAgents = false;
+              for (const agentName in window.trustyAgentResults) {
+                const result = window.trustyAgentResults[agentName];
+                if (result && result.status && (result.status === 'failed' || result.status === 'error')) {
+                  hasFailedAgents = true;
+                  break;
+                }
+              }
+              showHumanReviewerSection(true, hasFailedAgents ? 'failure' : 'success');
+            }
+          }, 500); // Small delay to ensure trusty agent results are processed
         }
         
         return;
@@ -1433,6 +1464,43 @@
     function setupHumanReviewerButtons() {
       const acceptBtn = document.getElementById('acceptChangesBtn');
       const rejectBtn = document.getElementById('rejectChangesBtn');
+      const gitStatusMessage = document.getElementById('gitStatusMessage');
+      const humanReviewerSection = document.getElementById('humanReviewerSection');
+      
+      // Check if we're in failure mode
+      const isFailureMode = humanReviewerSection && humanReviewerSection.classList.contains('failure');
+      
+      // Update button text and status message based on mode
+      if (isFailureMode) {
+        if (gitStatusMessage) {
+          gitStatusMessage.textContent = "Some verification agents failed, but you can still choose to accept or reject the changes.";
+          gitStatusMessage.style.color = "#cc0000";
+          gitStatusMessage.style.marginBottom = "10px";
+        }
+        
+        if (acceptBtn) {
+          acceptBtn.textContent = "Accept Anyway";
+        }
+        
+        if (rejectBtn) {
+          rejectBtn.textContent = "Reject Changes";
+        }
+      } else {
+        // Success mode
+        if (gitStatusMessage) {
+          gitStatusMessage.textContent = "All verification agents approved the changes.";
+          gitStatusMessage.style.color = "#007700";
+          gitStatusMessage.style.marginBottom = "10px";
+        }
+        
+        if (acceptBtn) {
+          acceptBtn.textContent = "Accept Changes";
+        }
+        
+        if (rejectBtn) {
+          rejectBtn.textContent = "Reject Changes";
+        }
+      }
       
       if (acceptBtn) {
         acceptBtn.onclick = function() {
@@ -1485,11 +1553,19 @@
     }
     
     // Call setup function after block display is shown
-    function showHumanReviewerSection(show = true) {
+    function showHumanReviewerSection(show = true, status = "default") {
       const humanReviewerSection = document.getElementById('humanReviewerSection');
       if (humanReviewerSection) {
-        console.log(`${show ? 'Showing' : 'Hiding'} Human Reviewer section`);
+        console.log(`${show ? 'Showing' : 'Hiding'} Human Reviewer section with status: ${status}`);
         humanReviewerSection.style.display = show ? 'block' : 'none';
+        
+        // Remove any existing status classes
+        humanReviewerSection.classList.remove('success', 'failure');
+        
+        // Add appropriate status class if showing
+        if (show && status !== 'default') {
+          humanReviewerSection.classList.add(status);
+        }
         
         if (show) {
           // Make sure the buttons are set up correctly when shown
