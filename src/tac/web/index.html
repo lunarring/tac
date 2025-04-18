@@ -5,6 +5,29 @@
   <title>tac.vibe</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="index.css">
+  <!-- Add Marked.js for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Add DOMPurify for HTML sanitization -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.3/dist/purify.min.js"></script>
+  <script>
+    // Configure Marked.js with security options
+    marked.setOptions({
+      renderer: new marked.Renderer(),
+      gfm: true,
+      breaks: true,
+      sanitize: false, // Sanitize is deprecated, we'll use DOMPurify instead
+      smartLists: true,
+      smartypants: false,
+      xhtml: false
+    });
+    
+    // Helper function to safely render markdown
+    function renderMarkdown(text) {
+      if (!text) return '';
+      const rawHtml = marked.parse(text);
+      return DOMPurify.sanitize(rawHtml);
+    }
+  </script>
   <style>
     /* Ensure the chat header positions its children relative to it */
     #chatHeader {
@@ -1741,29 +1764,24 @@
         if (results.output) {
           console.log(`${agentName} output:`, results.output);
           resultSection.style.display = 'block';
-          resultTextElement.textContent = results.output;
-          
           if (results.status) {
-            resultStatusElement.className = 'agent-status ' + results.status;
-            let statusText = '';
-            switch (results.status) {
-              case 'passed':
-                statusText = 'Verification Passed ✅';
-                break;
-              case 'failed':
-                statusText = 'Verification Failed ❌';
-                break;
-              case 'error':
-                statusText = 'Execution Error ⚠️';
-                break;
-              default:
-                statusText = results.status;
+            resultStatusElement.textContent = results.status;
+            resultStatusElement.className = 'agent-status';
+            if (results.status.toLowerCase() === 'passed') {
+              resultStatusElement.classList.add('passed');
+            } else if (results.status.toLowerCase() === 'failed') {
+              resultStatusElement.classList.add('failed');
+            } else {
+              resultStatusElement.classList.add('error');
             }
-            resultStatusElement.textContent = statusText;
-            resultStatusElement.style.display = 'inline-block';
           } else {
-            resultStatusElement.style.display = 'none';
+            resultStatusElement.textContent = '';
+            resultStatusElement.className = 'agent-status';
           }
+          
+          // Apply markdown formatting to the output text
+          resultTextElement.innerHTML = renderMarkdown(results.output || "No text output available");
+          resultTextElement.classList.add('markdown-content');
         } else {
           resultSection.style.display = 'none';
         }
@@ -1790,6 +1808,29 @@
         resultTextElement.textContent = "No results found for this agent.";
         console.log(`No results found for agent: ${agentKey}`);
         imageSection.style.display = 'none';
+      }
+      
+      // If we have summary data, display it with markdown formatting
+      if (results && results.summary) {
+        const summary = results.summary;
+        if (summary) {
+          const summarySection = document.getElementById('trustyAgentSummarySection');
+          const summaryText = document.getElementById('trustyAgentSummary');
+          
+          summarySection.style.display = 'block';
+          summaryText.innerHTML = renderMarkdown(summary);
+          summaryText.classList.add('markdown-content');
+        }
+      }
+      
+      // If we have verification info or plausibility data, apply markdown
+      if (results && results.verification_info) {
+        const verificationInfo = results.verification_info;
+        if (verificationInfo) {
+          const verificationSection = document.getElementById('trustyAgentVerificationInfo');
+          verificationSection.innerHTML = renderMarkdown(verificationInfo);
+          verificationSection.classList.add('markdown-content');
+        }
       }
       
       trustyAgentOverlay.style.display = 'flex';
@@ -1905,7 +1946,10 @@
             trustyAgentResultStatus.textContent = '';
             trustyAgentResultStatus.className = 'agent-status';
           }
-          trustyAgentResultText.textContent = resultObj.output || "No text output available";
+          
+          // Apply markdown formatting to the output text
+          trustyAgentResultText.innerHTML = renderMarkdown(resultObj.output || "No text output available");
+          trustyAgentResultText.classList.add('markdown-content');
         } else {
           trustyAgentResultSection.style.display = 'none';
         }
@@ -1930,6 +1974,25 @@
         trustyAgentResultText.textContent = "No results found for this agent.";
         console.log(`No results found for agent: ${agentKey}`);
         trustyAgentImageSection.style.display = 'none';
+      }
+
+      // If we have summary data, display it with markdown formatting
+      if (resultObj && resultObj.summary) {
+        const summary = resultObj.summary;
+        if (summary) {
+          trustyAgentSummarySection.style.display = 'block';
+          trustyAgentSummary.innerHTML = renderMarkdown(summary);
+          trustyAgentSummary.classList.add('markdown-content');
+        }
+      }
+      
+      // If we have verification info or plausibility data, apply markdown
+      if (resultObj && resultObj.verification_info) {
+        const verificationInfo = resultObj.verification_info;
+        if (verificationInfo) {
+          trustyAgentVerificationInfo.innerHTML = renderMarkdown(verificationInfo);
+          trustyAgentVerificationInfo.classList.add('markdown-content');
+        }
       }
 
       const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
