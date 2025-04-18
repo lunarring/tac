@@ -284,10 +284,15 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             # Extract grade from analysis if available
             grade = None
             grade_scale = "A-F"
-            if "GRADE:" in self.analysis_result:
-                grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
-                if grade_line:
-                    grade = grade_line[0].upper()  # Take first character as grade
+            if "## GRADE" in self.analysis_result:
+                # Extract grade section
+                score_section = self.analysis_result.split("## GRADE")[1].strip()
+                # Extract just the letter grade, ignoring any additional text
+                for char in score_section:
+                    if char in "ABCDF":
+                        grade = char
+                        break
+                if grade:
                     result.add_grade(grade, grade_scale, f"Graded on scale from A (best) to F (worst)")
             
             # Log the detailed analysis
@@ -326,27 +331,27 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             prompt = f"""You are a visual expert analyzes comparative screenshots of a threejs application. The before state of the application is on the left and the after state is on the right. You will need to compare the left (before) to the right (after) and provide a detailed analysis of the changes you see. 
 We expect the following changes, here are the expected changes: {expected_changes}
             
-We want the following output format:
-DIFFERENCES BEFORE VS AFTER:
+For the output, please follow the following format. Please use markdown formatting, at least for the headings.
+## DIFFERENCES BEFORE VS AFTER
 (Extensive list the differences you see between the before and after screenshots)
 
-ACCURACY OF EXPECTED CHANGES:
+## ACCURACY OF EXPECTED CHANGES
 (How accurately are the expected changes reflected in the after screenshot, as compared to the before screenshot?)
 
-UNEXPECTED CHANGES:
+## UNEXPECTED CHANGES
 (Are there any further changes in the after screenshot that were not expected? If so, list them. Cross-check the differences you listed in the DIFFERENCES BEFORE VS AFTER section. with the expected changes.)
 
-GRADE:
+## GRADE
 (How appropriate would you rate the TOTAL changes, on a scale of A to F? A is the best, F is the worst. 
 Your responsibility is to FAIL the test (D or F) if one of two conditions is met: 
 -the changes are not accurate with regards to the expected changes
 -there are ANY unexpected changes that we did not expect
 ONLY RETURN HERE A SINGLE LETTER, A, B, C, D, F)
 
-OUT OF SCOPE REPORT:
+## OUT OF SCOPE REPORT
 (Report here if the expected changes are out of scope of what you can do to judge, given two screenshots)
 
-RECOMMENDATIONS:
+## RECOMMENDATIONS
 (Suggest how the expected changes from the left before image could be implemented better in the right after image)."""
             
             logger.info(f"Analyzing comparison with prompt: {prompt}")

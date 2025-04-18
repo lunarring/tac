@@ -102,31 +102,34 @@ For context, here are the full files that the junior developer had access to.
 8. Finally, come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
 </analysis_rules>
 
+For the output, please follow the following format. Please use markdown formatting, at least for the headings.
 <output_format>
-BRIEF SUMMARY OF THE APPROACH:
+## BRIEF SUMMARY OF THE APPROACH
 (Provide a brief summary of the approach taken to implement the changes)
 
-ALIGNMENT OF IMPLEMENTED CHANGES WITH TASK DESCRIPTION:
+## ALIGNMENT OF IMPLEMENTED CHANGES WITH TASK DESCRIPTION
 (How well does the implemented changes align with the task description? Do they fulfill the task description? Are they aligned with the task description?)
 
-UNEXPECTED CHANGES:
+## UNEXPECTED CHANGES
 (List any unexpected changes that we did not expect, or are not aligned with the task description. Cross-check the changes in the <code_diff> section with the task description and list everything unrelated here)
 
-RATING:
+## RATING
 (How would appropriate would you rate the code changes, on a scale of A to F? A is the best, F is the worst. 
 Your responsibility is to FAIL the test (D or F) if one of two conditions is met: 
 -the changes are not accurate with regards to the expected changes
 -there are ANY unexpected changes that we did not expect
 ONLY RETURN HERE A SINGLE LETTER, A, B, C, D, F)
 
-OUT OF SCOPE REPORT:
+## OUT OF SCOPE REPORT
 (Report here if the expected changes are out of scope of what you can do to judge, given the <code_diff> section)
 
-RECOMMENDATIONS:
-HUMAN VERIFICATION:
+## RECOMMENDATIONS
+(Provide recommendations for the junior developer to improve the implementation)
+
+## HUMAN VERIFICATION
 Provide me here briefly how I can run the code myself to verify the changes. This could be for instance "python main.py" or "python -m tests.test_piano_trainer_main" or similar.
 
-MISSING FILES:
+## MISSING FILES
 (List all files that you think should have been available to implement the desired changes, but were not present in the <modified_files> section)
 </output_format>"""
 
@@ -203,8 +206,8 @@ MISSING FILES:
 
             # Extract plausibility score
             final_plausibility_score = ""
-            if "RATING:" in analysis:
-                score_section = analysis.split("RATING:")[1].strip()
+            if "## RATING" in analysis:
+                score_section = analysis.split("## RATING")[1].strip()
                 # Extract just the letter grade, ignoring any additional text
                 for char in score_section:
                     if char in "ABCDF":
