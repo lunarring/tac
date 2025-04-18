@@ -355,16 +355,10 @@
     
     // Function to handle block execution failure
     function handleBlockFailure() {
-      // Hide the protoblock display completely
-      toggleProtoblockDisplay(false);
+      // No longer hide the protoblock display on failure
+      // Instead, keep it visible so users can see what failed
       
-      // Reset any protoblock data displayed
-      document.getElementById('protoblockContainer').innerHTML = '';
-      
-      // Rebuild the container structure
-      rebuildProtoblockContainer();
-      
-      // Send status to the chat panel instead
+      // Send status to the chat panel
       updateRecipientStatus("Block execution failed", "error");
     }
     
@@ -912,17 +906,6 @@
           wildMode = false;
         }
         
-        // Check for block execution failure message to remove protoblock display if needed
-        if (statusMessage === "❌ Block execution failed!" || 
-            statusMessage.startsWith("❌ Error:") ||
-            statusMessage.includes("Error creating protoblock:") ||
-            (statusMessage.includes("Execution attempt") && statusMessage.includes("failed"))) {
-          console.log("Removing protoblock display due to failure message");
-          // Force the canvas to be shown and protoblock to be hidden
-          document.getElementById('protoblockContainer').style.display = 'none';
-          document.querySelector('#blockPanel canvas').style.display = 'block';
-        }
-        
         // Show git operations panel after successful block execution
         if (statusMessage === "✅ Block executed successfully! Displaying final results...") {
           console.log("Block successful, showing Human Reviewer section");
@@ -979,11 +962,15 @@
       }
       else if (data.type === "remove_protoblock") {
         console.log("Received explicit remove_protoblock message");
-        document.getElementById('protoblockContainer').style.display = 'none';
-        document.querySelector('#blockPanel canvas').style.display = 'block';
         
-        document.getElementById('protoblockContainer').innerHTML = '';
-        rebuildProtoblockContainer();
+        // Only hide protoblock if this is NOT due to a failure
+        if (!data.message || !data.message.includes("fail")) {
+          document.getElementById('protoblockContainer').style.display = 'none';
+          document.querySelector('#blockPanel canvas').style.display = 'block';
+          
+          document.getElementById('protoblockContainer').innerHTML = '';
+          rebuildProtoblockContainer();
+        }
         
         // Update status in chat panel instead
         updateRecipientStatus(data.message || "Block processing complete");

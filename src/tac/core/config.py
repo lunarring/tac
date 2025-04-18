@@ -33,6 +33,7 @@ class TrustyAgentConfig:
     
     # General trusty agent settings
     default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
+    run_all_trusty_agents: bool = True  # Whether to run all selected trusty agents, even after failures
 
 
 @dataclass

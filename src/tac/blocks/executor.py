@@ -129,6 +129,11 @@ class BlockExecutor:
             - str: Error analysis
             - str: Failure type
         """
+        run_all = config.general.trusty_agents.run_all_trusty_agents
+        all_passed = True
+        first_error_analysis = ""
+        first_failure_type = ""
+        
         for agent in agents:
             agent_name = agent.__class__.__name__
             logger.info(f"Running trusty agent: {agent_name}", heading=True)
@@ -287,7 +292,16 @@ class BlockExecutor:
                 if not success:
                     logger.error(f"{agent_name} check failed: {failure_type}")
                     self.ui_manager.send_status_bar(f"❌ {agent_name} check failed: {failure_type}")
-                    return False, error_analysis, failure_type
+                    
+                    # Save the first failure details
+                    if all_passed:
+                        all_passed = False
+                        first_error_analysis = error_analysis
+                        first_failure_type = failure_type
+                    
+                    # If not run_all, return immediately on first failure
+                    if not run_all:
+                        return False, error_analysis, failure_type
                 else:
                     logger.info(f"{agent_name} check passed")
                     self.ui_manager.send_status_bar(f"✅ {agent_name} check passed")
@@ -328,11 +342,19 @@ class BlockExecutor:
                         'full_result': error_result.to_dict(),
                         **ui_friendly_result
                     }
-                    
-                return False, error_msg, f"{agent_name} execution error"
                 
-        # All trusty agents passed
-        return True, "", ""
+                # Save the first failure details
+                if all_passed:
+                    all_passed = False
+                    first_error_analysis = error_msg
+                    first_failure_type = f"{agent_name} execution error"
+                
+                # If not run_all, return immediately on first failure
+                if not run_all:
+                    return False, error_msg, f"{agent_name} execution error"
+                
+        # Return overall status after running all agents
+        return all_passed, first_error_analysis, first_failure_type
 
     def execute_block(self, protoblock: ProtoBlock, idx_attempt: int) -> Tuple[bool, Optional[str], str]:
         """
@@ -349,6 +371,10 @@ class BlockExecutor:
                 - str: Error analysis if available, empty string otherwise
         """
         self.protoblock = protoblock
+        run_all = config.general.trusty_agents.run_all_trusty_agents
+        overall_success = True
+        first_error_analysis = None
+        first_failure_type = ""
 
         try:
             # Send initial status update
@@ -392,7 +418,12 @@ class BlockExecutor:
                 self.ui_manager.send_status_bar(f"Running comparative verification: {agent_names}")
                 success, error_analysis, failure_type = self._run_trusty_agents(comparative_agents, code_diff)
                 if not success:
-                    return False, error_analysis, failure_type
+                    overall_success = False
+                    first_error_analysis = error_analysis
+                    first_failure_type = failure_type
+                    # If not run_all, return immediately after failure
+                    if not run_all:
+                        return False, error_analysis, failure_type
                 
             # Run standard trusty agents 
             if standard_agents:
@@ -400,13 +431,24 @@ class BlockExecutor:
                 self.ui_manager.send_status_bar(f"Running standard verification: {agent_names}")
                 success, error_analysis, failure_type = self._run_trusty_agents(standard_agents, code_diff)
                 if not success:
-                    return False, error_analysis, failure_type
+                    overall_success = False
+                    if not first_error_analysis:  # Only store the first error if we don't have one yet
+                        first_error_analysis = error_analysis
+                        first_failure_type = failure_type
+                    # If not run_all, return immediately after failure
+                    if not run_all:
+                        return False, error_analysis, failure_type
             
-            # If we got here, all agents passed
-            agent_list = ", ".join(self.protoblock.trusty_agents)
-            logger.info(f"All trusty agents are happy ({agent_list}). Trust is assured!", heading=True)
-            self.ui_manager.send_status_bar("✅ All verification agents approved the changes!")
-            return True, None, ""
+            # Report final status
+            if overall_success:
+                agent_list = ", ".join(self.protoblock.trusty_agents)
+                logger.info(f"All trusty agents are happy ({agent_list}). Trust is assured!", heading=True)
+                self.ui_manager.send_status_bar("✅ All verification agents approved the changes!")
+                return True, None, ""
+            else:
+                logger.info(f"Some trusty agents failed, but all have run due to run_all_trusty_agents=True", heading=True)
+                self.ui_manager.send_status_bar("❌ Some verification agents failed!")
+                return False, first_failure_type, first_error_analysis
             
         except KeyboardInterrupt:
             logger.info("\nExecution interrupted by user")
