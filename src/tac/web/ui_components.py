@@ -130,23 +130,8 @@ class StatusBar(Component):
             if len(processor_attempt_match) == 2:
                 current = processor_attempt_match[0]
                 max_attempts = processor_attempt_match[1]
-                # Update message to match the format in the processor
-                message = f"🔄 Retrying with modifications (execution cycle {current})"
-        
-        # Add emojis to common status messages if they don't already have one
-        if not any(emoji in message for emoji in ["✅", "❌", "🔄", "⚙️", "🚀", "🔍", "🧩", "👁️", "🤖"]):
-            if "error" in message.lower() or "failed" in message.lower():
-                message = f"❌ {message}"
-            elif "success" in message.lower() or "completed" in message.lower():
-                message = f"✅ {message}"
-            elif "starting" in message.lower() or "running" in message.lower():
-                message = f"🔄 {message}"
-            elif "checking" in message.lower() or "verifying" in message.lower():
-                message = f"👁️ {message}"
-            elif "preparing" in message.lower() or "initializing" in message.lower():
-                message = f"⚙️ {message}"
-            elif "analyzing" in message.lower() or "generating" in message.lower():
-                message = f"🧩 {message}"
+                # Update message to match the format in the processor - without emoji
+                message = f"Retrying with modifications (execution cycle {current})"
         
         # Send the status message to the client
         await self.send_message({

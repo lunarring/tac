@@ -1419,7 +1419,7 @@ class UIManager:
                 return
             
             # Execute the processor directly
-            await self.send_status_message("🚀 Starting block execution process...")
+            await self.send_status_message("Starting coding agent")
             
             # Create a cancellable task for the block execution instead of using an executor
             # This ensures we can interrupt execution with CTRL+C

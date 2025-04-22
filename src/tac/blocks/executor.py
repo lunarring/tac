@@ -393,11 +393,11 @@ class BlockExecutor:
                 
                 # Update status immediately after coding agent completes
                 logger.info(f"Coding agent implementation completed (attempt {idx_attempt + 1})")
-                self.ui_manager.send_status_bar("✅ Coding implementation completed")
+                self.ui_manager.send_status_bar("Coding implementation completed")
             except Exception as e:
                 error_msg = f"Error during coding agent execution: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg)
-                self.ui_manager.send_status_bar(f"❌ Coding agent error: {type(e).__name__}")
+                self.ui_manager.send_status_bar(f"Coding agent error: {type(e).__name__}")
                 return False, error_msg, "Exception during agent execution"
 
             # Get the diff for trusty agents
@@ -406,7 +406,7 @@ class BlockExecutor:
             # Run comparative agents 
             if comparative_agents:
                 # This is the third key stage - trusty agents
-                self.ui_manager.send_status_bar(f"👁️ Running verification agents...")
+                self.ui_manager.send_status_bar("Running trusty agents...")
                 success, error_analysis, failure_type = self._run_trusty_agents(comparative_agents, code_diff)
                 if not success:
                     overall_success = False
@@ -434,20 +434,20 @@ class BlockExecutor:
             if overall_success:
                 agent_list = ", ".join(self.protoblock.trusty_agents)
                 logger.info(f"All trusty agents are happy ({agent_list}). Trust is assured!", heading=True)
-                self.ui_manager.send_status_bar("✅ All verification agents passed")
+                self.ui_manager.send_status_bar("All verification agents passed")
                 return True, None, ""
             else:
                 logger.info(f"Some trusty agents failed, but all have run due to run_all_trusty_agents=True", heading=True)
-                self.ui_manager.send_status_bar("❌ Some verification agents failed")
+                self.ui_manager.send_status_bar("Some verification agents failed")
                 return False, first_failure_type, first_error_analysis
             
         except KeyboardInterrupt:
             logger.info("\nExecution interrupted by user")
-            self.ui_manager.send_status_bar("⛔ Execution interrupted by user")
+            self.ui_manager.send_status_bar("Execution interrupted")
             return False, "Execution interrupted", ""
         except Exception as e:
             logger.error(f"Unexpected error during block execution: {e}", exc_info=True)
-            self.ui_manager.send_status_bar(f"❌ Unexpected error: {type(e).__name__}")
+            self.ui_manager.send_status_bar(f"Unexpected error: {type(e).__name__}")
             return False, str(e), "Unexpected error"
 
     def run_tests(self, test_path: str = None) -> bool:

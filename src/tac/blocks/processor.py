@@ -157,7 +157,7 @@ class BlockProcessor:
             # we only need to handle subsequent attempts here
             if idx_attempt > 0:
                 # Send status update at beginning of each attempt - keep this simple
-                self.ui_manager.send_status_bar(f"🔄 Generating new protoblock...")
+                self.ui_manager.send_status_bar("Generating new protoblock...")
                     
                 # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
                 if config.general.halt_after_fail:
@@ -184,9 +184,9 @@ class BlockProcessor:
                 # Generate a protoblock for subsequent attempts
                 try:
                     # SEND STATUS MESSAGE
-                    self.ui_manager.send_status_bar(f"🧩 Generating protoblock...")
+                    self.ui_manager.send_status_bar("Generating protoblock...")
                     self.create_protoblock(idx_attempt, error_analysis)
-                    self.ui_manager.send_status_bar(f"✅ Protoblock generated")
+                    self.ui_manager.send_status_bar("Protoblock generated")
                         
                     # For web UI, send the protoblock data to display the new protoblock
                     if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket and self.protoblock:
@@ -217,13 +217,13 @@ class BlockProcessor:
                     return False
 
             # Execute the protoblock using the builder - this is one of the key stages
-            self.ui_manager.send_status_bar(f"🤖 Starting coding agent...")
+            self.ui_manager.send_status_bar("Starting coding agent...")
             
             execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
-                self.ui_manager.send_status_bar(f"❌ Implementation failed: {failure_type}")
+                self.ui_manager.send_status_bar(f"Implementation failed: {failure_type}")
                     
                 # For web UI, send an explicit message to remove the protoblock display after failure
                 if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket:
@@ -258,7 +258,7 @@ class BlockProcessor:
                     )
             else:
                 # Success case - make sure we have a clear success message
-                self.ui_manager.send_status_bar(f"✅ Block execution successful! Changes ready for review.")
+                self.ui_manager.send_status_bar("Block execution successful! Changes ready for review.")
                 
                 # Debug log to show if we have trusty agent results
                 if hasattr(self.protoblock, 'trusty_agent_results') and self.protoblock.trusty_agent_results:
