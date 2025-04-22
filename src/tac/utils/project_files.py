@@ -49,7 +49,7 @@ class ProjectFiles:
         with open(self.summary_file, 'w') as f:
             json.dump(data, f, indent=2)
     
-    def update_summaries(self, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True) -> Dict:
+    def update_summaries(self, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True, progress_callback=None) -> Dict:
         """
         Update summaries for all supported files in the project.
         Only updates files that have changed since last run.
@@ -58,6 +58,7 @@ class ProjectFiles:
         Args:
             exclusions: List of directory names to exclude
             exclude_dot_files: Whether to exclude files/dirs starting with '.'
+            progress_callback: Optional callback function to report progress (total, processed, stage)
             
         Returns:
             Dict containing stats about the update
@@ -92,10 +93,18 @@ class ProjectFiles:
 
         files_to_process = []
         
+        # Report initial discovery progress
+        if progress_callback:
+            progress_callback(len(all_files), 0, "discovery")
+        
         # Check which files need processing
-        for file_path, real_path in all_files:
+        for i, (file_path, real_path) in enumerate(all_files):
             rel_path = os.path.relpath(file_path, self.project_root)
             current_files.add(rel_path)
+            
+            # Report progress of file checking
+            if progress_callback and i % 10 == 0:  # Update progress every 10 files to avoid too many updates
+                progress_callback(len(all_files), i, "checking")
             
             # Get file info
             file_size = os.path.getsize(file_path)
@@ -111,11 +120,19 @@ class ProjectFiles:
         if files_to_process:
             logger.info(f"Processing {len(files_to_process)} files ({len(all_files) - len(files_to_process)} unchanged)")
         
+        # Report status before processing
+        if progress_callback:
+            progress_callback(len(files_to_process), 0, "processing")
+        
         # Process files that need updating with tqdm progress bar
         pbar = tqdm(files_to_process, desc="Analyzing files", unit="file")
-        for file_path, rel_path, current_hash, file_size in pbar:
+        for i, (file_path, rel_path, current_hash, file_size) in enumerate(pbar):
             pbar.set_description(f"Analyzing {rel_path}")
             last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
+            
+            # Report progress of processing
+            if progress_callback:
+                progress_callback(len(files_to_process), i+1, "processing")
             
             # Analyze file
             analysis = self.summarizer.analyze_file(file_path)
@@ -150,14 +167,26 @@ class ProjectFiles:
         # Find and remove any files that no longer exist
         removed_files = existing_files - current_files
         if removed_files:
-            for file in removed_files:
+            # Report final cleanup stage
+            if progress_callback:
+                progress_callback(len(removed_files), 0, "cleanup")
+                
+            for i, file in enumerate(removed_files):
                 del data["files"][file]
                 stats["removed"] += 1
+                
+                # Report cleanup progress
+                if progress_callback:
+                    progress_callback(len(removed_files), i+1, "cleanup")
             
             # Save final update
             data["last_updated"] = datetime.now().isoformat()
             self._save_summaries(data)
         
+        # Report completion
+        if progress_callback:
+            progress_callback(100, 100, "complete")
+            
         # Log final stats
         logger.info(f"Summary update complete: +{stats['added']}, ~{stats['updated']}, -{stats['removed']}, ={stats['unchanged']} files")
         

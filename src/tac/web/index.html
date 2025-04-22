@@ -259,6 +259,12 @@
         <div id="blockStatus">
           <span class="blockStatusDot"></span>
           <span id="blockStatusText">connecting...</span>
+          <div id="indexingProgressContainer" style="display: none;">
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width: 0%"></div>
+            </div>
+            <span class="progress-text">0%</span>
+          </div>
         </div>
         <div id="settingsButton" class="action-button">⚙️</div>
       </div>
@@ -942,6 +948,55 @@
     // Global flag for controlling the block button animation speed
     let wildMode = false;
 
+    // Function to handle indexing progress updates
+    function handleIndexingProgress(data) {
+      const progressContainer = document.getElementById('indexingProgressContainer');
+      const progressBar = document.querySelector('#indexingProgressContainer .progress-bar');
+      const progressText = document.querySelector('#indexingProgressContainer .progress-text');
+      const statusText = document.getElementById('blockStatusText');
+      
+      if (data.stage === 'hidden') {
+        // Hide progress bar
+        progressContainer.style.display = 'none';
+        statusText.style.display = 'inline';
+        return;
+      }
+      
+      // Show progress container
+      progressContainer.style.display = 'flex';
+      
+      // Hide normal status text when progress bar is visible
+      statusText.style.display = 'none';
+      
+      // Update progress percentage
+      const percentage = data.percentage;
+      progressBar.style.width = `${percentage}%`;
+      
+      // Update text
+      progressText.textContent = data.message;
+      
+      // Set color based on stage
+      if (data.stage === 'error') {
+        progressBar.style.background = 'linear-gradient(90deg, #f44336, #ff7043)';
+      } else if (data.stage === 'complete') {
+        progressBar.style.background = 'linear-gradient(90deg, #4caf50, #8bc34a)';
+      } else if (data.stage === 'processing') {
+        progressBar.style.background = 'linear-gradient(90deg, #2196f3, #03a9f4)';
+      } else {
+        progressBar.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)';
+      }
+      
+      // When indexing completes, hide progress bar after a delay and show status text again
+      if (data.stage === 'complete' && percentage === 100) {
+        setTimeout(() => {
+          progressContainer.style.display = 'none';
+          statusText.style.display = 'inline';
+          statusText.textContent = 'Ready';
+          updateRecipientStatus('Ready', 'success');
+        }, 2000);
+      }
+    }
+
     // Handle incoming messages from the WebSocket
     socket.onmessage = function(event) {
       let data;
@@ -949,6 +1004,12 @@
       // Parse JSON data if possible
       try {
         data = JSON.parse(event.data);
+        
+        // Handle indexing progress message
+        if (data.type === 'indexing_progress') {
+          handleIndexingProgress(data);
+          return;
+        }
         
         // Debug: log all settings-related messages
         if (data.type === 'settings_page' || 

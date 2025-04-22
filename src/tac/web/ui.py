@@ -540,14 +540,68 @@ class UIManager:
     async def _background_file_indexer(self):
         """Background task to index files once during UI initialization"""
         try:
-            await self.send_status_message("Starting file indexing...")
-            # Run file indexing asynchronously using an executor to avoid blocking the event loop.
+            # Initialize progress bar
+            await self.send_indexing_progress(0, 0, "Starting file indexing...", "discovery")
+            
+            # Define a progress callback that sends updates to the UI
+            def progress_callback(total, processed, stage):
+                percentage = min(100, int((processed / total) * 100)) if total > 0 else 0
+                
+                # Create appropriate message based on stage
+                if stage == "discovery":
+                    message = f"Discovering files... ({processed}/{total})"
+                elif stage == "checking":
+                    message = f"Checking files... ({processed}/{total})"
+                elif stage == "processing":
+                    message = f"Processing files... ({processed}/{total})"
+                elif stage == "cleanup":
+                    message = f"Cleaning up... ({processed}/{total})"
+                elif stage == "complete":
+                    message = f"Indexing complete! Processed {total} files"
+                else:
+                    message = f"Processing... ({processed}/{total})"
+                
+                # Use create_task to avoid waiting for the coroutine
+                asyncio.create_task(self.send_indexing_progress(percentage, total, message, stage))
+            
+            # Run file indexing asynchronously using an executor to avoid blocking the event loop
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self.project_files.refresh_index)
+            await loop.run_in_executor(None, lambda: self.project_files.refresh_index(progress_callback=progress_callback))
+            
+            # Load summaries after indexing is complete
             self.file_summaries = await self.load_high_level_summaries()
+            
+            # Send a final completion message
+            await self.send_indexing_progress(100, 100, "File indexing complete!", "complete")
+            
+            # Remove progress bar after a short delay
+            await asyncio.sleep(2)
+            await self.send_indexing_progress(100, 100, "", "hidden")
+            
         except Exception as e:
             print(f"Error in background file indexer: {e}")
+            await self.send_indexing_progress(0, 0, f"Error indexing files: {str(e)}", "error")
             raise
+            
+    async def send_indexing_progress(self, percentage, total, message, stage):
+        """Send indexing progress updates to the UI"""
+        try:
+            progress_data = {
+                "type": "indexing_progress",
+                "percentage": percentage,
+                "total": total,
+                "message": message,
+                "stage": stage
+            }
+            await self.server.broadcast_message(json.dumps(progress_data))
+        except Exception as e:
+            print(f"Error sending indexing progress: {e}")
+            # Fallback direct send if server method fails
+            if self.websocket:
+                try:
+                    await self.websocket.send(json.dumps(progress_data))
+                except Exception as direct_err:
+                    print(f"Error sending indexing progress directly: {direct_err}")
 
     async def _background_test_runner(self):
         """Background task to run tests periodically"""
