@@ -131,12 +131,44 @@ class StatusBar(Component):
                 current = processor_attempt_match[0]
                 max_attempts = processor_attempt_match[1]
                 # Update message to match the format in the processor
-                message = f"Starting attempt {current} of {max_attempts}..."
+                message = f"🔄 Retrying with modifications (execution cycle {current})"
         
+        # Add emojis to common status messages if they don't already have one
+        if not any(emoji in message for emoji in ["✅", "❌", "🔄", "⚙️", "🚀", "🔍", "🧩", "👁️", "🤖"]):
+            if "error" in message.lower() or "failed" in message.lower():
+                message = f"❌ {message}"
+            elif "success" in message.lower() or "completed" in message.lower():
+                message = f"✅ {message}"
+            elif "starting" in message.lower() or "running" in message.lower():
+                message = f"🔄 {message}"
+            elif "checking" in message.lower() or "verifying" in message.lower():
+                message = f"👁️ {message}"
+            elif "preparing" in message.lower() or "initializing" in message.lower():
+                message = f"⚙️ {message}"
+            elif "analyzing" in message.lower() or "generating" in message.lower():
+                message = f"🧩 {message}"
+        
+        # Send the status message to the client
         await self.send_message({
             "type": "status_message",
             "message": message
         })
+        
+        # Also send an update to the block status display in the right panel
+        # This helps users see the status even when focusing on the right panel
+        # Special message format for updating the block header status
+        component_id = "block_header"  # Target component in the HTML
+        try:
+            if self.websocket:
+                block_status_data = {
+                    "type": "update_block_status",
+                    "component_id": component_id,
+                    "status": message
+                }
+                await self.websocket.send(json.dumps(block_status_data))
+        except Exception as e:
+            print(f"Error sending block status update: {e}")
+        
         print(f"Status update sent: {message}")  # Log sent messages
 
 

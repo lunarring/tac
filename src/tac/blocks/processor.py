@@ -68,22 +68,27 @@ class BlockProcessor:
             # Use the directly provided protoblock
             protoblock = self.input_protoblock
             logger.info("\n✨ Using provided protoblock")
+            self.ui_manager.send_status_bar("Using existing protoblock...")
         else:
             # Create protoblock using generator
             
             if error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n You have tried to implement this before and it failed, here is the error analysis. In your next attempt, really dig into this and be explicit and do your best to AVOID the error. For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Or if there is a parameter that is undefined and throwing an error, mention it. Here is the full report: {error_analysis}"
                 logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
+                self.ui_manager.send_status_bar("Analyzing previous error and generating improved protoblock...")
             else:
                 genesis_prompt = self.task_instructions
                 logger.info(f"\n🔄 Generating protoblock from task instructions: {genesis_prompt}")
+                self.ui_manager.send_status_bar("Generating protoblock from task instructions...")
 
             # Generate complete genesis prompt
             protoblock_genesis_prompt = self.generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
+            self.ui_manager.send_status_bar("Analyzing task requirements and codebase...")
             
             # Create protoblock from genesis prompt
+            self.ui_manager.send_status_bar("Creating detailed protoblock specification...")
             protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
-
+            self.ui_manager.send_status_bar("✅ Protoblock created successfully!")
 
             # Branch name and commit from the first one!
             if idx_attempt > 0:
@@ -151,9 +156,8 @@ class BlockProcessor:
             # Since we already created the protoblock in UI.handle_block_click for first attempt,
             # we only need to handle subsequent attempts here
             if idx_attempt > 0:
-                # Send status update at beginning of each attempt
-                # Make sure the attempt number is correctly reflected
-                self.ui_manager.send_status_bar(f"Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}")
+                # Send status update at beginning of each attempt - keep this simple
+                self.ui_manager.send_status_bar(f"🔄 Generating new protoblock...")
                     
                 # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
                 if config.general.halt_after_fail:
@@ -161,7 +165,9 @@ class BlockProcessor:
                     if user_input in ['r', 'revert']:
                         if config.git.enabled:
                             logger.info("Reverting changes as per user selection...")
+                            self.ui_manager.send_status_bar("Reverting changes to clean state...")
                             self.git_manager.revert_changes()
+                            self.ui_manager.send_status_bar("Changes reverted successfully")
                         else:
                             logger.info("Git is disabled; cannot revert changes.")
                     elif user_input in ['c', 'continue']:
@@ -171,14 +177,16 @@ class BlockProcessor:
                 else:
                     if config.git.enabled:
                         logger.info("Reverting changes while staying on feature branch...")
+                        self.ui_manager.send_status_bar("Reverting changes while staying on feature branch...")
                         self.git_manager.revert_changes()
+                        self.ui_manager.send_status_bar("Changes reverted successfully")
 
                 # Generate a protoblock for subsequent attempts
                 try:
                     # SEND STATUS MESSAGE
-                    self.ui_manager.send_status_bar(f"Creating new protoblock for attempt {idx_attempt + 1}...")
+                    self.ui_manager.send_status_bar(f"🧩 Generating protoblock...")
                     self.create_protoblock(idx_attempt, error_analysis)
-                    self.ui_manager.send_status_bar(f"Protoblock created for attempt {idx_attempt + 1}!")
+                    self.ui_manager.send_status_bar(f"✅ Protoblock generated")
                         
                     # For web UI, send the protoblock data to display the new protoblock
                     if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket and self.protoblock:
@@ -203,19 +211,19 @@ class BlockProcessor:
 
             # Handle git branch setup only for first attempt
             if idx_attempt == 0:
-                self.ui_manager.send_status_bar("Setting up git branch...")
+                # Skip status update for git branch setup since it's not one of the three key stages
                 if not self.handle_git_branch_setup():
                     self.ui_manager.send_status_bar("❌ Git branch setup failed")
                     return False
 
-            # Execute the protoblock using the builder
-            self.ui_manager.send_status_bar(f"Starting coding agent execution for attempt {idx_attempt + 1}...")
+            # Execute the protoblock using the builder - this is one of the key stages
+            self.ui_manager.send_status_bar(f"🤖 Starting coding agent...")
             
             execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
-                self.ui_manager.send_status_bar(f"❌ Execution attempt {idx_attempt + 1} failed: {failure_type}")
+                self.ui_manager.send_status_bar(f"❌ Implementation failed: {failure_type}")
                     
                 # For web UI, send an explicit message to remove the protoblock display after failure
                 if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket:
@@ -248,12 +256,9 @@ class BlockProcessor:
                         self.ui_manager.send_protoblock_data(self.protoblock),
                         self.ui_manager._loop
                     )
-                
-                # If run_error_analysis is disabled, set error_analysis to empty string
-                if not config.general.trusty_agents.run_error_analysis:
-                    error_analysis = ""
             else:
-                self.ui_manager.send_status_bar(f"✅ Execution successful for attempt {idx_attempt + 1}!")
+                # Success case - make sure we have a clear success message
+                self.ui_manager.send_status_bar(f"✅ Block execution successful! Changes ready for review.")
                 
                 # Debug log to show if we have trusty agent results
                 if hasattr(self.protoblock, 'trusty_agent_results') and self.protoblock.trusty_agent_results:

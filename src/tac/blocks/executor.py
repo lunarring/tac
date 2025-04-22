@@ -134,12 +134,9 @@ class BlockExecutor:
         first_error_analysis = ""
         first_failure_type = ""
         
-        for agent in agents:
+        for i, agent in enumerate(agents, 1):
             agent_name = agent.__class__.__name__
             logger.info(f"Running trusty agent: {agent_name}", heading=True)
-            
-            # Send status update right before running the agent
-            self.ui_manager.send_status_bar(f"Running verification agent: {agent_name}...")
             
             # Get the registry name to use as the key - do this before check() to ensure
             # we have a consistent key for the agent in case of errors
@@ -291,7 +288,6 @@ class BlockExecutor:
                 # Send immediate status update after the agent completes
                 if not success:
                     logger.error(f"{agent_name} check failed: {failure_type}")
-                    self.ui_manager.send_status_bar(f"❌ {agent_name} check failed: {failure_type}")
                     
                     # Save the first failure details
                     if all_passed:
@@ -304,12 +300,10 @@ class BlockExecutor:
                         return False, error_analysis, failure_type
                 else:
                     logger.info(f"{agent_name} check passed")
-                    self.ui_manager.send_status_bar(f"✅ {agent_name} check passed")
-                    
+                
             except Exception as e:
                 error_msg = f"Error during {agent_name} check: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg, exc_info=True)
-                self.ui_manager.send_status_bar(f"❌ Error in {agent_name}: {type(e).__name__}")
                 
                 # Store the error in the protoblock
                 if hasattr(self, 'protoblock') and self.protoblock:
@@ -377,45 +371,42 @@ class BlockExecutor:
         first_failure_type = ""
 
         try:
-            # Send initial status update
-            self.ui_manager.send_status_bar(f"Preparing to execute protoblock (attempt {idx_attempt + 1})...")
-                
+            # Skip the initial status update since we already have "Starting coding agent" from processor
+            
             # Prepare and categorize trusty agents
             standard_agents, comparative_agents = self._prepare_trusty_agents()
             
+            # Skip the detailed agent summary in favor of a simpler message during verification
+
             # Capture initial states for comparative agents
             if comparative_agents:
-                self.ui_manager.send_status_bar("Capturing initial state for comparative checks...")
+                # Skip capturing state message since it's not one of the three key stages
                 self._capture_initial_states(comparative_agents)
             
             # Run the coding agent
             logger.info(f"Starting coding agent implementation (attempt {idx_attempt + 1})", heading=True)
             try:
-                # Update status right before starting coding agent
-                agent_name = config.general.coding_agent
-                self.ui_manager.send_status_bar(f"Starting coding agent ({agent_name}) implementation...")
+                # Skip duplicated status update since it's sent from the processor
                 
                 # Pass empty string as previous_analysis for first attempt
                 self.coding_agent.run(self.protoblock, previous_analysis="")
                 
                 # Update status immediately after coding agent completes
                 logger.info(f"Coding agent implementation completed (attempt {idx_attempt + 1})")
-                self.ui_manager.send_status_bar("Coding implementation completed. Starting verification...")
+                self.ui_manager.send_status_bar("✅ Coding implementation completed")
             except Exception as e:
                 error_msg = f"Error during coding agent execution: {type(e).__name__}: {str(e)}"
                 logger.error(error_msg)
                 self.ui_manager.send_status_bar(f"❌ Coding agent error: {type(e).__name__}")
                 return False, error_msg, "Exception during agent execution"
 
-            # Cycle through trusty agents, gather materials first
-            self.ui_manager.send_status_bar("Gathering code changes for verification...")
-                
+            # Get the diff for trusty agents
             code_diff = self.git_manager.get_complete_diff()
             
             # Run comparative agents 
             if comparative_agents:
-                agent_names = ", ".join([a.__class__.__name__ for a in comparative_agents])
-                self.ui_manager.send_status_bar(f"Running comparative verification: {agent_names}")
+                # This is the third key stage - trusty agents
+                self.ui_manager.send_status_bar(f"👁️ Running verification agents...")
                 success, error_analysis, failure_type = self._run_trusty_agents(comparative_agents, code_diff)
                 if not success:
                     overall_success = False
@@ -427,8 +418,8 @@ class BlockExecutor:
                 
             # Run standard trusty agents 
             if standard_agents:
-                agent_names = ", ".join([a.__class__.__name__ for a in standard_agents])
-                self.ui_manager.send_status_bar(f"Running standard verification: {agent_names}")
+                # Skip additional status update for standard agents since we already
+                # indicated we're running verification agents above
                 success, error_analysis, failure_type = self._run_trusty_agents(standard_agents, code_diff)
                 if not success:
                     overall_success = False
@@ -443,11 +434,11 @@ class BlockExecutor:
             if overall_success:
                 agent_list = ", ".join(self.protoblock.trusty_agents)
                 logger.info(f"All trusty agents are happy ({agent_list}). Trust is assured!", heading=True)
-                self.ui_manager.send_status_bar("✅ All verification agents approved the changes!")
+                self.ui_manager.send_status_bar("✅ All verification agents passed")
                 return True, None, ""
             else:
                 logger.info(f"Some trusty agents failed, but all have run due to run_all_trusty_agents=True", heading=True)
-                self.ui_manager.send_status_bar("❌ Some verification agents failed!")
+                self.ui_manager.send_status_bar("❌ Some verification agents failed")
                 return False, first_failure_type, first_error_analysis
             
         except KeyboardInterrupt:
