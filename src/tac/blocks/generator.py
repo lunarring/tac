@@ -379,7 +379,7 @@ And here a bit more detailed explanation of the output format:
                 
                 # Check for empty or whitespace-only response
                 if not response or not response.strip():
-                    self.ui_manager.send_status_bar("❌ Received empty response from LLM")
+                    self.ui_manager.send_status_bar("Received empty response from LLM")
                     raise ValueError("Received empty response from LLM")
                     
                 # Clean code fences from response if needed
@@ -391,7 +391,7 @@ And here a bit more detailed explanation of the output format:
                 if not is_valid:
                     # Include part of the response in the error message for context
                     preview = response[:200] + "..." if len(response) > 200 else response
-                    self.ui_manager.send_status_bar(f"❌ Invalid protoblock: {error_msg[:100]}...")
+                    self.ui_manager.send_status_bar(f"Invalid protoblock: {error_msg[:100]}...")
                     raise ValueError(f"Invalid protoblock: {error_msg}\nResponse preview: {preview}")
                 
                 # Ensure all paths are relative
@@ -446,8 +446,14 @@ And here a bit more detailed explanation of the output format:
                         image_url=data.get("image_url", "")
                     )
                 except Exception as e:
-                    self.ui_manager.send_status_bar(f"❌ Error creating protoblock: {type(e).__name__}")
-                    raise ValueError(f"Error creating ProtoBlock object: {str(e)}")
+                    logger.error(f"Error creating protoblock: {e}")
+                    self.ui_manager.send_status_bar(f"Error creating protoblock: {type(e).__name__}")
+                    
+                    # If this was our last attempt, return None
+                    if attempt >= max_retries - 1:
+                        logger.error("Failed to create protoblock after multiple attempts")
+                        self.ui_manager.send_status_bar("Failed to create protoblock after multiple attempts")
+                        return None
                     
             except Exception as e:
                 last_error = str(e)
@@ -459,6 +465,6 @@ And here a bit more detailed explanation of the output format:
                     messages.append(Message(role="user", content=error_guidance))
                     self.ui_manager.send_status_bar(f"Retrying protoblock creation ({attempt + 2}/{max_retries})...")
         
-        self.ui_manager.send_status_bar("❌ Failed to create protoblock after multiple attempts")
+        self.ui_manager.send_status_bar("Failed to create protoblock after multiple attempts")
         # Raise error after all retries
         raise ValueError(f"Failed to create valid protoblock after {max_retries} attempts. Last error: {last_error}") 

@@ -67,18 +67,18 @@ class BlockProcessor:
         if self.input_protoblock:
             # Use the directly provided protoblock
             protoblock = self.input_protoblock
-            logger.info("\n✨ Using provided protoblock")
+            logger.info("\nUsing provided protoblock")
             self.ui_manager.send_status_bar("Using existing protoblock...")
         else:
             # Create protoblock using generator
             
             if error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n You have tried to implement this before and it failed, here is the error analysis. In your next attempt, really dig into this and be explicit and do your best to AVOID the error. For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Or if there is a parameter that is undefined and throwing an error, mention it. Here is the full report: {error_analysis}"
-                logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
+                logger.info(f"\nGenerating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
                 self.ui_manager.send_status_bar("Analyzing previous error and generating improved protoblock...")
             else:
                 genesis_prompt = self.task_instructions
-                logger.info(f"\n🔄 Generating protoblock from task instructions: {genesis_prompt}")
+                logger.info(f"\nGenerating protoblock from task instructions: {genesis_prompt}")
                 self.ui_manager.send_status_bar("Generating protoblock from task instructions...")
 
             # Generate complete genesis prompt
@@ -88,7 +88,7 @@ class BlockProcessor:
             # Create protoblock from genesis prompt
             self.ui_manager.send_status_bar("Creating detailed protoblock specification...")
             protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
-            self.ui_manager.send_status_bar("✅ Protoblock created successfully!")
+            self.ui_manager.send_status_bar("Protoblock created successfully!")
 
             # Branch name and commit from the first one!
             if idx_attempt > 0:
@@ -151,7 +151,7 @@ class BlockProcessor:
         error_analysis = ""  # Initialize as empty string instead of None
 
         for idx_attempt in range(max_retries):
-            logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
+            logger.info(f"Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
             
             # Since we already created the protoblock in UI.handle_block_click for first attempt,
             # we only need to handle subsequent attempts here
@@ -205,7 +205,7 @@ class BlockProcessor:
                 except ValueError as exc:
                     error_analysis = str(exc)
                     logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
-                    self.ui_manager.send_status_bar(f"❌ Protoblock generation failed: {error_analysis[:100]}...")
+                    self.ui_manager.send_status_bar(f"Protoblock generation failed: {error_analysis[:100]}...")
                     self.store_previous_protoblock()
                     continue
 
@@ -213,7 +213,7 @@ class BlockProcessor:
             if idx_attempt == 0:
                 # Skip status update for git branch setup since it's not one of the three key stages
                 if not self.handle_git_branch_setup():
-                    self.ui_manager.send_status_bar("❌ Git branch setup failed")
+                    self.ui_manager.send_status_bar("Git branch setup failed")
                     return False
 
             # Execute the protoblock using the builder - this is one of the key stages
@@ -317,8 +317,8 @@ class BlockProcessor:
             base_branch = self.git_manager.base_branch if self.git_manager.base_branch else "main"
             
             # Print cleanup instructions
-            logger.error("❌ All execution attempts failed", heading=True)
-            logger.error("📋 Git Cleanup Commands:")
+            logger.error("All execution attempts failed", heading=True)
+            logger.error("Git Cleanup Commands:")
             logger.error(f"  To switch back to your main branch and clean up:")
             logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
             

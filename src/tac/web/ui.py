@@ -710,33 +710,6 @@ class UIManager:
         self.server.send_status_bar(message)
 
     async def send_status_message(self, message: str):
-        """Direct async method to send status messages with awaiting"""
-        # Check if this is an attempt update message from the processor
-        processor_attempt_match = None
-        if "Starting block creation and execution attempt" in message:
-            # Extract the attempt info from the processor log message
-            processor_attempt_match = message.split("Starting block creation and execution attempt ")[1].split(" of ")
-            if len(processor_attempt_match) == 2:
-                current = processor_attempt_match[0]
-                max_attempts = processor_attempt_match[1]
-                # Update message to match the format in the processor
-                message = f"🔄 Starting attempt {current} of {max_attempts}..."
-        
-        # Add emojis to common status messages if they don't already have one
-        if not any(emoji in message for emoji in ["✅", "❌", "🔄", "⚙️", "🚀", "🔍", "🧩", "👁️", "🤖"]):
-            if "error" in message.lower() or "failed" in message.lower():
-                message = f"❌ {message}"
-            elif "success" in message.lower() or "completed" in message.lower():
-                message = f"✅ {message}"
-            elif "starting" in message.lower() or "running" in message.lower():
-                message = f"🔄 {message}"
-            elif "checking" in message.lower() or "verifying" in message.lower():
-                message = f"👁️ {message}"
-            elif "preparing" in message.lower() or "initializing" in message.lower():
-                message = f"⚙️ {message}"
-            elif "analyzing" in message.lower() or "generating" in message.lower():
-                message = f"🧩 {message}"
-        
         # Delegate to the WebSocketServer with error handling
         try:
             # Log the message first
@@ -746,14 +719,13 @@ class UIManager:
             await self.server.send_status_message(message)
             self.latest_status = message
             
-            # Also update block status display if message doesn't match certain patterns
-            if not message.startswith("Error:") and not "❌" in message:
-                if self.websocket:
-                    try:
-                        block_status_data = {"type": "update_block_status", "status": message}
-                        await self.websocket.send(json.dumps(block_status_data))
-                    except Exception as block_status_err:
-                        print(f"Error sending block status update: {block_status_err}")
+            # Also update block status display
+            if self.websocket:
+                try:
+                    block_status_data = {"type": "update_block_status", "status": message}
+                    await self.websocket.send(json.dumps(block_status_data))
+                except Exception as block_status_err:
+                    print(f"Error sending block status update: {block_status_err}")
                 
         except Exception as e:
             print(f"Error sending status message: {e}")
@@ -1294,7 +1266,7 @@ class UIManager:
     async def handle_block_click(self, websocket, chat_agent):
         try:
             # Send status immediately
-            await self.send_status_message("🚀 Starting block creation process...")
+            await self.send_status_message("Starting coding agent")
             
             try:
                 # Get conversation history from chat agent
@@ -1303,7 +1275,7 @@ class UIManager:
                 conversation_text = "\n".join([f"{msg.role}: {msg.content}" for msg in conversation])
                 
                 # Send status about extracting task from conversation
-                await self.send_status_message("🔍 Analyzing conversation to determine task requirements...")
+                await self.send_status_message("Analyzing conversation to determine task requirements")
                 
                 # Create a protoblock generator and get the genesis prompt
                 protoblock_generator = ProtoBlockGenerator(ui_manager=self)
@@ -1313,37 +1285,37 @@ class UIManager:
                 genesis_prompt = protoblock_generator.get_protoblock_genesis_prompt(codebase="", task_instructions=task_instructions)
                 
                 if not genesis_prompt:
-                    await self.send_status_message("❌ Failed to generate protoblock prompt.")
+                    await self.send_status_message("Failed to generate protoblock prompt")
                     await self.chat_panel.send_error_message(
                         "Failed to generate protoblock prompt. Please provide more detailed information about what you want to accomplish."
                     )
                     return
             except Exception as prompt_err:
-                await self.send_status_message(f"❌ Error generating protoblock prompt: {str(prompt_err)}")
+                await self.send_status_message(f"Error generating protoblock prompt: {str(prompt_err)}")
                 await self.chat_panel.send_error_message(
                     f"Error generating protoblock prompt: {str(prompt_err)}. Please try again with more specific instructions."
                 )
                 return
 
             # Check git status before proceeding
-            await self.send_status_message("🔄 Checking Git workspace status...")
+            await self.send_status_message("Checking Git workspace status")
             git_clean = await self.check_git_status()
             if not git_clean:
-                await self.send_status_message("❌ Cannot proceed with block execution due to git status issues.")
+                await self.send_status_message("Cannot proceed with block execution due to git status issues")
                 await self.chat_panel.send_error_message(
                     "Git workspace is not clean. Please commit or stash your changes before proceeding."
                 )
                 return
-            await self.send_status_message("✅ Git workspace is clean and ready.")
+            await self.send_status_message("Git workspace is clean and ready")
 
             # Load codebase information
-            await self.send_status_message("🧩 Analyzing codebase structure...")
+            await self.send_status_message("Analyzing codebase structure")
             try:
                 project_files = ProjectFiles()
                 codebase = project_files.get_codebase_summary()
-                await self.send_status_message("✅ Codebase analysis complete.")
+                await self.send_status_message("Codebase analysis complete")
             except Exception as codebase_err:
-                await self.send_status_message(f"❌ Error analyzing codebase: {str(codebase_err)}")
+                await self.send_status_message(f"Error analyzing codebase: {str(codebase_err)}")
                 await self.chat_panel.send_error_message(
                     f"Error analyzing codebase: {str(codebase_err)}. Please check that your project structure is valid."
                 )
@@ -1369,7 +1341,7 @@ class UIManager:
                 }
             
             # Send status update before creating processor
-            await self.send_status_message("⚙️ Initializing task processor...")
+            await self.send_status_message("Initializing task processor")
 
             # Use BlockProcessor directly
             from tac.blocks.processor import BlockProcessor
@@ -1382,16 +1354,16 @@ class UIManager:
                     config_override=config_overrides,
                     ui_manager=self
                 )
-                await self.send_status_message("✅ Task processor initialized successfully.")
+                await self.send_status_message("Task processor initialized successfully")
             except Exception as processor_err:
-                await self.send_status_message(f"❌ Error initializing processor: {str(processor_err)}")
+                await self.send_status_message(f"Error initializing processor: {str(processor_err)}")
                 await self.chat_panel.send_error_message(
                     f"Error initializing task processor: {str(processor_err)}. Please try again."
                 )
                 return
             
             # Send status update right before generating protoblock
-            await self.send_status_message("🔄 Generating protoblock specification...")
+            await self.send_status_message("Generating protoblock specification")
             
             # Get the protoblock before execution for immediate display
             try:
@@ -1399,21 +1371,21 @@ class UIManager:
                 processor.create_protoblock(idx_attempt=0, error_analysis="")
                 
                 if not processor.protoblock:
-                    await self.send_status_message("❌ Failed to create protoblock.")
+                    await self.send_status_message("Failed to create protoblock")
                     await self.chat_panel.send_error_message(
                         "Failed to create a protoblock from your instructions. Please provide more specific details about what you want to accomplish."
                     )
                     return
                     
                 # Display protoblock as soon as it's created, before execution
-                await self.send_status_message("✅ Protoblock generated successfully. Preparing for execution...")
+                await self.send_status_message("Protoblock generated successfully. Preparing for execution")
                 await self.protoblock_view.send_protoblock_data(processor.protoblock)
                 # Small delay to ensure UI updates
                 await asyncio.sleep(0.5)
             except Exception as e:
                 print(f"Error creating protoblock: {e}")
                 traceback.print_exc()
-                await self.send_status_message(f"❌ Error creating protoblock: {str(e)[:100]}...")
+                await self.send_status_message(f"Error creating protoblock: {str(e)[:100]}")
                 # Ensure we remove any previous protoblock display
                 # await self.protoblock_view.remove_protoblock("Failed to create protoblock")
                 return
@@ -1445,7 +1417,7 @@ class UIManager:
 
                 # Check if execution was successful and we have a protoblock
                 if success and processor.protoblock:
-                    await self.send_status_message("✅ Block executed successfully! Displaying final results...")
+                    await self.send_status_message("Block executed successfully! Displaying final results")
                     # Send updated protoblock data after execution with the final attempt number
                     await self.protoblock_view.send_protoblock_data(processor.protoblock)
                     
@@ -1455,7 +1427,7 @@ class UIManager:
                     )
                 else:
                     # If block execution failed, send explicit failure message
-                    await self.send_status_message("❌ Block execution failed!")
+                    await self.send_status_message("Block execution failed")
                     
                     # We want to keep the protoblock visible on failure so users can see the reports
                     # await self.protoblock_view.remove_protoblock("Block execution failed")
@@ -1467,14 +1439,14 @@ class UIManager:
                     
             except asyncio.CancelledError:
                 # Task was cancelled (e.g., by CTRL+C)
-                await self.send_status_message("❌ Block execution cancelled by user.")
+                await self.send_status_message("Block execution cancelled by user")
                 # Re-raise the exception to propagate the cancellation
                 raise
                 
             except Exception as exec_err:
                 print(f"Error during block execution: {exec_err}")
                 traceback.print_exc()
-                await self.send_status_message(f"❌ Block execution failed: {str(exec_err)}")
+                await self.send_status_message(f"Block execution failed: {str(exec_err)}")
                 
                 # Send updated protoblock data even on error, to ensure trusty agent results are visible
                 if processor.protoblock and hasattr(processor.protoblock, 'trusty_agent_results'):
@@ -1489,7 +1461,7 @@ class UIManager:
         except asyncio.CancelledError:
             # Propagate cancellation
             print("Block execution cancelled by user (CTRL+C)")
-            await self.send_status_message("Block execution cancelled by user (CTRL+C)")
+            await self.send_status_message("Block execution cancelled by user")
             raise
             
         except Exception as e:
