@@ -276,14 +276,17 @@ class ProjectFiles:
         
         return "\n\n".join(formatted_strings)
         
-    def refresh_index(self) -> Dict:
+    def refresh_index(self, progress_callback=None) -> Dict:
         """
         Wrapper for update_summaries to maintain compatibility with UI code.
         
+        Args:
+            progress_callback: Optional callback function to report progress
+            
         Returns:
             Dict: Statistics about the update
         """
-        return self.update_summaries()
+        return self.update_summaries(progress_callback=progress_callback)
         
     def get_function_location(self, function_name: str) -> Union[str, bool]:
         """
