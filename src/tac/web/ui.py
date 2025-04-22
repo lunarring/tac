@@ -543,6 +543,9 @@ class UIManager:
             # Initialize progress bar
             await self.send_indexing_progress(0, 0, "Starting file indexing...", "discovery")
             
+            # Get the event loop for later use
+            loop = asyncio.get_running_loop()
+            
             # Define a progress callback that sends updates to the UI
             def progress_callback(total, processed, stage):
                 percentage = min(100, int((processed / total) * 100)) if total > 0 else 0
@@ -561,11 +564,14 @@ class UIManager:
                 else:
                     message = f"Processing... ({processed}/{total})"
                 
-                # Use create_task to avoid waiting for the coroutine
-                asyncio.create_task(self.send_indexing_progress(percentage, total, message, stage))
+                # Use call_soon_threadsafe to safely schedule the coroutine from a different thread
+                loop.call_soon_threadsafe(
+                    lambda: asyncio.create_task(
+                        self.send_indexing_progress(percentage, total, message, stage)
+                    )
+                )
             
             # Run file indexing asynchronously using an executor to avoid blocking the event loop
-            loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, lambda: self.project_files.refresh_index(progress_callback=progress_callback))
             
             # Load summaries after indexing is complete
