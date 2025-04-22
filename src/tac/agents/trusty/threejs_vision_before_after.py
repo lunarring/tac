@@ -35,7 +35,7 @@ logger = setup_logging('tac.trusty_agents.threejs_vision_before_after')
 @trusty_agent(
     name="threejs_vision_before_after",
     description="Use this trusty agent to verify the visual output of web applications if we have a previous version and can compare to the current implementation. This is useful to see if the expected changes are implemented correctly. Always use it in case we have a previous version and can compare to the current implementation. Shows before/after screenshots side by side.",
-    protoblock_prompt="Describe the expected visual changes between left side (previous) and right side (current) that you would expect given the task instructions. Directly describe the scene and what to expect.",
+    protoblock_prompt="Describe what visual changes you would expect between the before and after state, given the code modifications and the task that was carried out. Directly describe the change in scene and what to expect.",
     prompt_target="coding_agent",
     llm="gpt-4o"
 )
