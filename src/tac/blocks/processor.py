@@ -67,28 +67,23 @@ class BlockProcessor:
         if self.input_protoblock:
             # Use the directly provided protoblock
             protoblock = self.input_protoblock
-            logger.info("\nUsing provided protoblock")
-            self.ui_manager.send_status_bar("Using existing protoblock...")
+            logger.info("\n✨ Using provided protoblock")
         else:
             # Create protoblock using generator
             
             if error_analysis:
                 genesis_prompt = f"{self.task_instructions} \n You have tried to implement this before and it failed, here is the error analysis. In your next attempt, really dig into this and be explicit and do your best to AVOID the error. For instance, if there are any files mentioned that may have been missing in our analysis, you should include them this time into the protoblock. Or if there is a parameter that is undefined and throwing an error, mention it. Here is the full report: {error_analysis}"
-                logger.info(f"\nGenerating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
-                self.ui_manager.send_status_bar("Analyzing previous error and generating improved protoblock...")
+                logger.info(f"\n🔄 Generating protoblock from task instructions INCLUDING ERROR ANALYSIS: {genesis_prompt}")
             else:
                 genesis_prompt = self.task_instructions
-                logger.info(f"\nGenerating protoblock from task instructions: {genesis_prompt}")
-                self.ui_manager.send_status_bar("Generating protoblock from task instructions...")
+                logger.info(f"\n🔄 Generating protoblock from task instructions: {genesis_prompt}")
 
             # Generate complete genesis prompt
             protoblock_genesis_prompt = self.generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
-            self.ui_manager.send_status_bar("Analyzing task requirements and codebase...")
             
             # Create protoblock from genesis prompt
-            self.ui_manager.send_status_bar("Creating detailed protoblock specification...")
             protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
-            self.ui_manager.send_status_bar("Protoblock created successfully!")
+
 
             # Branch name and commit from the first one!
             if idx_attempt > 0:
@@ -103,6 +98,29 @@ class BlockProcessor:
 
         # Set the attempt number based on idx_attempt
         protoblock.attempt_number = idx_attempt + 1
+        
+        # Process mandatory agents
+        from tac.agents.trusty.registry import TrustyAgentRegistry
+        
+        # Get list of registered mandatory agents
+        mandatory_agents = TrustyAgentRegistry.get_mandatory_agents()
+        logger.info(f"Checking mandatory agents: {mandatory_agents}")
+        
+        # For each mandatory agent not already in the protoblock
+        for agent_name in mandatory_agents:
+            if agent_name not in protoblock.trusty_agents:
+                # Get the agent class
+                agent_class = TrustyAgentRegistry.get_agent(agent_name)
+                if agent_class:
+                    # Create agent instance
+                    agent = agent_class()
+                    
+                    # Check if it should run
+                    should_run, reason = agent.should_run_mandatory(protoblock, self.codebase)
+                    if should_run:
+                        logger.info(f"Adding mandatory agent '{agent_name}': {reason}")
+                        protoblock.trusty_agents.append(agent_name)
+
         
         self.protoblock = protoblock
 

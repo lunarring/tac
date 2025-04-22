@@ -10,14 +10,20 @@ class TrustyAgentRegistry:
     _descriptions = {}
     _prompt_sections = {}
     _prompt_targets = {}
+    _mandatory_agents = set()  # Set of agent names that should be considered for automatic inclusion
     
     @classmethod
-    def register(cls, name, agent_class, protoblock_prompt=None, description=None, prompt_target=None):
+    def register(cls, name, agent_class, protoblock_prompt=None, description=None, prompt_target=None, mandatory=False):
         """Register a trusty agent with the system."""
         cls._registry[name] = agent_class
         cls._protoblock_prompts[name] = protoblock_prompt or ""
         cls._descriptions[name] = description or f"'{name}': A trusty agent for verification"
         cls._prompt_targets[name] = prompt_target or ""
+        
+        # Register as mandatory if specified
+        if mandatory:
+            cls._mandatory_agents.add(name)
+            logger.info(f"Registered '{name}' as a mandatory trusty agent")
         
         # Register any prompt sections defined by the agent
         if hasattr(agent_class, "get_prompt_sections") and callable(getattr(agent_class, "get_prompt_sections")):
@@ -47,6 +53,11 @@ class TrustyAgentRegistry:
     def get_all_agents(cls):
         """Get a list of all registered agent names."""
         return list(cls._registry.keys())
+    
+    @classmethod
+    def get_mandatory_agents(cls):
+        """Get a list of all registered mandatory agent names."""
+        return list(cls._mandatory_agents)
     
     @classmethod
     def get_trusty_agents_description(cls):

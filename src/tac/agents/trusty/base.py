@@ -9,7 +9,7 @@ from tac.agents.trusty.results import TrustyAgentResult
 
 logger = setup_logging('tac.trusty_agents.base')
 
-def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_target: str = "", llm: str = ""):
+def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_target: str = "", llm: str = "", mandatory: bool = False):
     """
     Class decorator for registering TrustyAgent subclasses.
     
@@ -23,6 +23,7 @@ def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_tar
         protoblock_prompt: Prompt content for the protoblock genesis prompt
         prompt_target: Target for the prompt (optional)
         llm: LLM model to use for the agent (optional)
+        mandatory: Whether this agent should be considered for automatic inclusion (optional)
         
     Returns:
         A decorator function that registers the agent class
@@ -33,6 +34,7 @@ def trusty_agent(name: str, description: str, protoblock_prompt: str, prompt_tar
         cls.protoblock_prompt = protoblock_prompt
         cls.prompt_target = prompt_target
         cls.llm = llm
+        cls.mandatory = mandatory
         
         # Register the agent
         cls.register()
@@ -54,6 +56,7 @@ class TrustyAgent(ABC):
         description: Description of the agent for the protoblock genesis prompt
         prompt_target: Target for the prompt
         llm: LLM model to use for the agent
+        mandatory: Whether this agent should be considered for automatic inclusion
     """
     
     # Class variables for registration
@@ -62,6 +65,7 @@ class TrustyAgent(ABC):
     description: ClassVar[str] = ""
     prompt_target: ClassVar[str] = ""
     llm: ClassVar[str] = ""
+    mandatory: ClassVar[bool] = False
     
     @classmethod
     def register(cls):
@@ -86,7 +90,8 @@ class TrustyAgent(ABC):
                 cls,
                 cls.protoblock_prompt,
                 description,
-                cls.prompt_target
+                cls.prompt_target,
+                cls.mandatory  # Pass mandatory flag to registry
             )
             
             logger.info(f"Registered trusty agent: {name}")
@@ -94,6 +99,24 @@ class TrustyAgent(ABC):
             logger.error(f"Error registering trusty agent {cls.__name__}: {e}")
             import traceback
             logger.debug(traceback.format_exc())
+    
+    def should_run_mandatory(self, protoblock: ProtoBlock, codebase: Dict[str, str]) -> Tuple[bool, str]:
+        """
+        For mandatory agents, determine if this agent actually needs to run.
+        This is used for agents that are always added but might not be needed
+        in specific contexts (e.g., pytest when no Python test files exist).
+        
+        Args:
+            protoblock: The ProtoBlock containing task specifications
+            codebase: Dictionary mapping file paths to their contents
+            
+        Returns:
+            Tuple containing:
+            - bool: True if agent should run, False if it can be skipped
+            - str: Reason for the decision (for logging)
+        """
+        # Default implementation: don't run by default
+        return False, "Mandatory agents default to not running unless explicitly implemented"
     
     def check(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """

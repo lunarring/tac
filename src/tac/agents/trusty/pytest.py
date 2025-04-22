@@ -22,7 +22,8 @@ logger = setup_logging('tac.trusty_agents.pytest')
     description="ONLY use for python code updates. Do not use for threejs or html. Use this agent to create and runs new unit tests for PYTHON code using pytest. Use it to verify isolated functionality and test of small scale functions. Do not use for visual verifications or anything related to threejs, java, html, css, etc.",
     protoblock_prompt="Given the codebase and the instructions, here you describe the test outline. We are aiming to just write ONE single test ideally, which checks if the functionality update in the code has been implemented correctly. The goal is to ensure that the task instructions have been implemented correctly via an empirical test. Critically, the test needs to be fulfillable given the changes in the files we are making. We just need a test for the new task! It should be a test that realistically can be executed, be careful for instance with tests that would spawn UI and then everything blocks! However if we don't need a test, just skip this step and leave the field empty. If we alrady have a similar test in our codebase, we definitely want to write into the same test file and append the new test. Furthermore, describe in detail the input data for the test and the expected outcome. Use the provided codebase as a reference. The more detail the better, make it as concrete as possible. However if we don't need a test, just skip this step and leave the field empty. Be sure that you include or modify tests files, and add them to the write_files section, it should be of the pattern tests/test_<filename>.py",
     prompt_target = "coding_agent",
-    llm="o3-mini"
+    llm="o3-mini",
+    mandatory=True
 )
 class PytestTestingAgent(TrustyAgent):
     """
@@ -37,6 +38,32 @@ class PytestTestingAgent(TrustyAgent):
         self._test_stats = {'passed': 0, 'failed': 0, 'error': 0, 'skipped': 0}
         self.error_analyzer = ErrorAnalyzer()  # Initialize error analyzer
         
+    def should_run_mandatory(self, protoblock: ProtoBlock, codebase: Dict[str, str]) -> Tuple[bool, str]:
+        """
+        Check if pytest agent should run based on presence of Python test files.
+        
+        Args:
+            protoblock: The ProtoBlock containing task specifications
+            codebase: Dictionary mapping file paths to their contents
+            
+        Returns:
+            Tuple containing:
+            - bool: True if agent should run, False if it can be skipped
+            - str: Reason for the decision (for logging)
+        """
+        test_path = config.general.test_path or 'tests'
+        
+        # First check if directory exists
+        if not os.path.exists(test_path):
+            return False, f"Test directory {test_path} does not exist"
+        
+        # Check for Python test files
+        for root, _, files in os.walk(test_path):
+            for file in files:
+                if file.endswith('.py') and (file.startswith('test_') or file.endswith('_test.py')):
+                    return True, f"Found Python test file: {os.path.join(root, file)}"
+        
+        return False, f"No Python test files found in {test_path}"
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
         """

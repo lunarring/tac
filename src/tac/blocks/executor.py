@@ -89,6 +89,10 @@ class BlockExecutor:
         for agent_name in sorted_agent_names:
             if agent_name in self.trusty_agents:
                 agent = self.trusty_agents[agent_name]
+                
+                # No need to check mandatory status here as that's handled in the processor
+                # All agents in protoblock.trusty_agents will run
+                
                 if isinstance(agent, ComparativeTrustyAgent):
                     comparative_agents.append(agent)
                 else:
