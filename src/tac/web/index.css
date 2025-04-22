@@ -694,6 +694,7 @@ html, body {
 
 /* Summary block style */
 .summary-block {
+  display: none; /* Hide the summary section */
   background-color: #f8f9fa;
   padding: 15px;
   border-radius: 4px;
