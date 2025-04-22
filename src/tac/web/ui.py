@@ -548,7 +548,12 @@ class UIManager:
             
             # Define a progress callback that sends updates to the UI
             def progress_callback(total, processed, stage):
-                percentage = min(100, int((processed / total) * 100)) if total > 0 else 0
+                # Cap percentage at 99% until we're explicitly complete
+                if stage == "complete":
+                    percentage = 100
+                else:
+                    # For any other stage, cap at 99%
+                    percentage = min(99, int((processed / total) * 100)) if total > 0 else 0
                 
                 # Create appropriate message based on stage
                 if stage == "discovery":
@@ -577,8 +582,8 @@ class UIManager:
             # Load summaries after indexing is complete
             self.file_summaries = await self.load_high_level_summaries()
             
-            # Send a final completion message
-            await self.send_indexing_progress(100, 100, "File indexing complete!", "complete")
+            # Only now send a final completion message with 100%
+            await self.send_indexing_progress(100, 100, "Indexing complete! All files processed.", "complete")
             
             # Remove progress bar after a short delay
             await asyncio.sleep(1.5)

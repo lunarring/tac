@@ -130,9 +130,9 @@ class ProjectFiles:
             pbar.set_description(f"Indexing {rel_path}")
             last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
             
-            # Report progress of processing
+            # Report start of processing this file (i is zero-based, so we use i)
             if progress_callback:
-                progress_callback(len(files_to_process), i+1, "processing")
+                progress_callback(len(files_to_process), i, "processing")
             
             # Analyze file
             analysis = self.summarizer.analyze_file(file_path)
@@ -163,6 +163,10 @@ class ProjectFiles:
             # Save after each file
             data["last_updated"] = datetime.now().isoformat()
             self._save_summaries(data)
+            
+            # Report completion of this file (now i+1 to show accurate progress)
+            if progress_callback:
+                progress_callback(len(files_to_process), i+1, "processing")
         
         # Find and remove any files that no longer exist
         removed_files = existing_files - current_files
