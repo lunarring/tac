@@ -268,7 +268,7 @@
         <!-- Protoblock container structure -->
         <div id="protoblockHeader">
           <h2>Protoblock</h2>
-          <p id="protoblockAttempt">Attempt 1/4</p>
+          <p id="protoblockAttempt" style="display: none;">Attempt 1/4</p>
         </div>
         <div class="section">
           <div class="section-title">Task Description</div>
@@ -492,7 +492,7 @@
       const header = document.createElement('div');
       header.id = 'protoblockHeader';
       header.innerHTML = '<h2>Protoblock</h2>' +
-                         '<p id="protoblockAttempt">Attempt 1/4</p>';
+                         '<p id="protoblockAttempt" style="display: none;">Attempt 1/4</p>';
       container.appendChild(header);
       
       // Task Description
@@ -1024,8 +1024,8 @@
           const current = attemptMatch[1];
           const max = attemptMatch[2];
           // Update the attempt number display in protoblock header
-          document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
-          console.log(`Updated attempt number to ${current}/${max}`);
+          // document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
+          // console.log(`Updated attempt number to ${current}/${max}`);
         }
         
         // If the status message indicates the block execution has finished (success, failure, or cancellation), stop fast spinning.

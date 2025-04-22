@@ -361,6 +361,7 @@ html, body {
   color: #0366d6;
   margin: 0;
   font-size: 14px;
+  display: none;
 }
 
 /* Chat bubble styles */
