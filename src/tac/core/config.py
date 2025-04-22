@@ -32,7 +32,6 @@ class TrustyAgentConfig:
     exclude_performance_tests: bool = True  # Whether to exclude performance and transient tests
     
     # General trusty agent settings
-    default_trusty_agents: List[str] = field(default_factory=lambda: ["plausibility"])  # Default trusty agents to use
     run_all_trusty_agents: bool = True  # Whether to run all selected trusty agents, even after failures
 
 
@@ -543,7 +542,7 @@ class ConfigManager:
         
         Example:
             {
-                'general': {'default_trusty_agents': ['pytest']},
+                'general': {'coding_agent': 'aider'},
                 'git': {'auto_commit_if_success': False},
                 'component_llm_mappings': {'chat': 'gemini-1.5-pro'}
             }

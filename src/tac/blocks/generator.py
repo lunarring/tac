@@ -411,11 +411,8 @@ And here a bit more detailed explanation of the output format:
                 
                 # Create ProtoBlock directly
                 try:
-                    # Ensure plausibility is always included in trusty_agents
+                    # No need to force-add any agents since they are now handled through the mandatory mechanism
                     trusty_agents = data.get("trusty_agents", [])
-                    # Only force-add plausibility, not pytest (which is handled through the mandatory mechanism)
-                    if "plausibility" not in trusty_agents:
-                        trusty_agents.append("plausibility")
                     
                     # Create block ID
                     block_id = str(uuid.uuid4())

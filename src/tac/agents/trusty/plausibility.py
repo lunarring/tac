@@ -14,7 +14,8 @@ logger = setup_logging('tac.trusty_agents.plausibility')
     name="plausibility",
     description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility.",
     protoblock_prompt="Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description.",
-    llm="o3-mini"
+    llm="o3-mini",
+    mandatory=True
 )
 class PlausibilityTestingAgent(TrustyAgent):
     """
@@ -260,3 +261,18 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             result.summary = "Plausibility check failed with error"
             result.add_error(str(e), "Plausibility check error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
             return result 
+
+    def should_run_mandatory(self, protoblock: ProtoBlock, codebase: Dict[str, str]) -> Tuple[bool, str]:
+        """
+        Plausibility agent should always run as a mandatory agent.
+        
+        Args:
+            protoblock: The ProtoBlock containing task specifications
+            codebase: Dictionary mapping file paths to their contents
+            
+        Returns:
+            Tuple containing:
+            - bool: Always True for plausibility agent
+            - str: Reason for the decision
+        """
+        return True, "Plausibility agent always runs to ensure code changes match task description" 

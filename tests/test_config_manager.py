@@ -15,7 +15,7 @@ def test_config_manager():
     # Verify 'general' configuration
     general = cm.general
     assert general.coding_agent in ["aider", "native"]
-    assert "pytest" in general.trusty_agents.default_trusty_agents
+    # default_trusty_agents has been completely removed
     assert general.use_file_summaries is True
     assert general.summarizer_timeout == 45
     assert general.max_retries_block_creation == 4
