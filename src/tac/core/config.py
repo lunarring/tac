@@ -32,7 +32,7 @@ class TrustyAgentConfig:
     exclude_performance_tests: bool = True  # Whether to exclude performance and transient tests
     
     # General trusty agent settings
-    default_trusty_agents: List[str] = field(default_factory=lambda: ["pytest", "plausibility"])  # Default trusty agents to use
+    default_trusty_agents: List[str] = field(default_factory=lambda: ["plausibility"])  # Default trusty agents to use
     run_all_trusty_agents: bool = True  # Whether to run all selected trusty agents, even after failures
 
 

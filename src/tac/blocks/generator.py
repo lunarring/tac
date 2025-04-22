@@ -411,10 +411,9 @@ And here a bit more detailed explanation of the output format:
                 
                 # Create ProtoBlock directly
                 try:
-                    # Ensure pytest and plausibility are always included in trusty_agents
+                    # Ensure plausibility is always included in trusty_agents
                     trusty_agents = data.get("trusty_agents", [])
-                    if "pytest" not in trusty_agents:
-                        trusty_agents.append("pytest")
+                    # Only force-add plausibility, not pytest (which is handled through the mandatory mechanism)
                     if "plausibility" not in trusty_agents:
                         trusty_agents.append("plausibility")
                     
