@@ -581,14 +581,21 @@ class UIManager:
             await self.send_indexing_progress(100, 100, "File indexing complete!", "complete")
             
             # Remove progress bar after a short delay
-            await asyncio.sleep(2)
+            await asyncio.sleep(1.5)
             await self.send_indexing_progress(100, 100, "", "hidden")
+            
+            # Update status message to indicate system is ready
+            await self.send_status_message("Ready")
             
         except Exception as e:
             print(f"Error in background file indexer: {e}")
             await self.send_indexing_progress(0, 0, f"Error indexing files: {str(e)}", "error")
+            # Hide the progress bar after showing error for a moment
+            await asyncio.sleep(3)
+            await self.send_indexing_progress(0, 0, "", "hidden")
+            await self.send_status_message(f"Error indexing files: {str(e)}")
             raise
-            
+
     async def send_indexing_progress(self, percentage, total, message, stage):
         """Send indexing progress updates to the UI"""
         try:

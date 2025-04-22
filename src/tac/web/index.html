@@ -956,8 +956,9 @@
       const statusText = document.getElementById('blockStatusText');
       
       if (data.stage === 'hidden') {
-        // Hide progress bar
+        // Hide progress bar completely
         progressContainer.style.display = 'none';
+        // Make sure status text is visible
         statusText.style.display = 'inline';
         return;
       }
@@ -986,15 +987,8 @@
         progressBar.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)';
       }
       
-      // When indexing completes, hide progress bar after a delay and show status text again
-      if (data.stage === 'complete' && percentage === 100) {
-        setTimeout(() => {
-          progressContainer.style.display = 'none';
-          statusText.style.display = 'inline';
-          statusText.textContent = 'Ready';
-          updateRecipientStatus('Ready', 'success');
-        }, 2000);
-      }
+      // When indexing completes, let the backend handle hiding
+      // We removed the setTimeout here because it could conflict with the backend's timing
     }
 
     // Handle incoming messages from the WebSocket
