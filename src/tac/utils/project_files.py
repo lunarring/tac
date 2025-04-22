@@ -118,16 +118,16 @@ class ProjectFiles:
                 stats["unchanged"] += 1
                 
         if files_to_process:
-            logger.info(f"Processing {len(files_to_process)} files ({len(all_files) - len(files_to_process)} unchanged)")
+            logger.info(f"Indexing {len(files_to_process)} files ({len(all_files) - len(files_to_process)} unchanged)")
         
         # Report status before processing
         if progress_callback:
             progress_callback(len(files_to_process), 0, "processing")
         
         # Process files that need updating with tqdm progress bar
-        pbar = tqdm(files_to_process, desc="Analyzing files", unit="file")
+        pbar = tqdm(files_to_process, desc="Indexing files", unit="file")
         for i, (file_path, rel_path, current_hash, file_size) in enumerate(pbar):
-            pbar.set_description(f"Analyzing {rel_path}")
+            pbar.set_description(f"Indexing {rel_path}")
             last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
             
             # Report progress of processing

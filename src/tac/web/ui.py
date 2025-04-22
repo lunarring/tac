@@ -556,13 +556,13 @@ class UIManager:
                 elif stage == "checking":
                     message = f"Checking files... ({processed}/{total})"
                 elif stage == "processing":
-                    message = f"Processing files... ({processed}/{total})"
+                    message = f"Indexing files... ({processed}/{total})"
                 elif stage == "cleanup":
                     message = f"Cleaning up... ({processed}/{total})"
                 elif stage == "complete":
                     message = f"Indexing complete! Processed {total} files"
                 else:
-                    message = f"Processing... ({processed}/{total})"
+                    message = f"Indexing... ({processed}/{total})"
                 
                 # Use call_soon_threadsafe to safely schedule the coroutine from a different thread
                 loop.call_soon_threadsafe(
