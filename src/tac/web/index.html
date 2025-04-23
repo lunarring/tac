@@ -1189,6 +1189,24 @@
         
         displayProtoblockData(data);
         
+        // Show human reviewer section when protoblock data is received
+        // This was missing and caused the accept/reject buttons to not appear
+        if (data.trusty_agent_results && Object.keys(data.trusty_agent_results).length > 0) {
+          console.log("Trusty agent results found, showing Human Reviewer section");
+          setTimeout(() => {
+            // Check if any agents failed
+            let hasFailedAgents = false;
+            for (const agentName in data.trusty_agent_results) {
+              const result = data.trusty_agent_results[agentName];
+              if (result && result.status && (result.status === 'failed' || result.status === 'error')) {
+                hasFailedAgents = true;
+                break;
+              }
+            }
+            showHumanReviewerSection(true, hasFailedAgents ? 'failure' : 'success');
+          }, 300);
+        }
+        
         console.log("Protoblock is now visible");
         return;
       }
