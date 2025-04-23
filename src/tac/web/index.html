@@ -945,8 +945,9 @@
       // Don't start reconnect logic here - the close event will handle it
     });
 
-    // Global flag for controlling the block button animation speed
-    let wildMode = false;
+    // Global flag for wild animation mode is controlled by "wildMode"
+    let wildMode = false;  // Start with normal animation
+    let pauseAnimation = false;  // New flag to completely pause animation
 
     // Function to handle indexing progress updates
     function handleIndexingProgress(data) {
@@ -1396,13 +1397,20 @@
     // Global flag for wild animation mode is controlled by "wildMode"
     function animateBtnCube() {
       requestAnimationFrame(animateBtnCube);
-      if(wildMode){
-         btnCube.rotation.x += 0.2;
-         btnCube.rotation.y += 0.2;
-         btnCube.rotation.z += 0.15;
+      
+      if (pauseAnimation) {
+        // Don't update rotation when paused
+        btnRenderer.render(btnScene, btnCamera);
+        return;
+      }
+      
+      if (wildMode) {
+        btnCube.rotation.x += 0.2;
+        btnCube.rotation.y += 0.2;
+        btnCube.rotation.z += 0.15;
       } else {
-         btnCube.rotation.x += 0.02;
-         btnCube.rotation.y += 0.02;
+        btnCube.rotation.x += 0.02;
+        btnCube.rotation.y += 0.02;
       }
       btnRenderer.render(btnScene, btnCamera);
     }
@@ -1530,6 +1538,20 @@
             rejectBtn.disabled = true;
           }
           
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
           const payload = {
             type: "git_commit_request",
             message: commitMessage
@@ -1557,6 +1579,20 @@
             acceptBtn.classList.add('disabled');
             acceptBtn.disabled = true;
           }
+          
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
           
           const payload = {
             type: "git_discard_request"
@@ -1626,6 +1662,20 @@
             rejectBtn.disabled = true;
           }
           
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
           const payload = {
             type: "git_commit_request",
             message: commitMessage
@@ -1650,6 +1700,20 @@
             acceptBtn.disabled = true;
           }
           
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
           const payload = {
             type: "git_discard_request"
           };
@@ -1662,6 +1726,8 @@
     // Call setup function after block display is shown
     function showHumanReviewerSection(show = true, status = "default") {
       const humanReviewerSection = document.getElementById('humanReviewerSection');
+      const blockButton = document.getElementById('blockButton');
+      
       if (humanReviewerSection) {
         console.log(`${show ? 'Showing' : 'Hiding'} Human Reviewer section with status: ${status}`);
         humanReviewerSection.style.display = show ? 'block' : 'none';
@@ -1674,9 +1740,30 @@
           humanReviewerSection.classList.add(status);
         }
         
+        // Disable block button and freeze animation when showing Human Reviewer section
         if (show) {
+          // Disable block button
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'none';
+            blockButton.style.opacity = '0.5';
+          }
+          
+          // Completely freeze animation
+          pauseAnimation = true;
+          wildMode = false;
+          
           // Make sure the buttons are set up correctly when shown
           setTimeout(setupHumanReviewerButtons, 100);
+        } else {
+          // Re-enable block button when hiding
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Resume normal animation (not wild mode)
+          pauseAnimation = false;
+          wildMode = false;
         }
       } else {
         console.error('Human Reviewer section not found');
