@@ -55,8 +55,7 @@ except Exception as e:
 
 from tac.agents.trusty.base import TrustyAgent, ComparativeTrustyAgent
 from tac.agents.trusty.registry import TrustyAgentRegistry
-from tac.agents.trusty.results import TrustyAgentResult
-from tac.agents.trusty.ui import ConsoleResultRenderer, HTMLResultRenderer
+from tac.agents.trusty.results import TrustyAgentResult, ConsoleResultRenderer, HTMLResultRenderer
 
 # Import all agents to ensure they register
 import tac.agents.trusty.pytest
