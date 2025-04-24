@@ -60,11 +60,11 @@ from tac.agents.trusty.ui import ConsoleResultRenderer, HTMLResultRenderer
 
 # Import all agents to ensure they register
 import tac.agents.trusty.pytest
-import tac.agents.trusty.threejs_vision
-import tac.agents.trusty.threejs_vision_before_after
-import tac.agents.trusty.threejs_vision_reference
+import tac.agents.trusty.web_simple
+import tac.agents.trusty.web_compare
+import tac.agents.trusty.web_reference
 import tac.agents.trusty.pexpect_agent
-import tac.agents.trusty.plausibility
+import tac.agents.trusty.code_reviewer
 
 # Import performance agent (optional)
 try:

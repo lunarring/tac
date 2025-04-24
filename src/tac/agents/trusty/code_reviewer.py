@@ -27,7 +27,7 @@ class CodeReviewerTestingAgent(TrustyAgent):
         logger.info("Initializing CodeReviewerChecker")
         self.llm_client = LLMClient(component="code_reviewer")
         self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
-        self._min_score = config.general.trusty_agents.minimum_code_review_score
+        self._min_score = config.general.trusty_agents.minimum_plausibility_score
 
         logger.info("Initializing CodeReviewerTestingAgent")
 
@@ -42,7 +42,7 @@ class CodeReviewerTestingAgent(TrustyAgent):
             bool: True if the score meets or exceeds the minimum passing score
         """
         score_value = self._score_values.get(score.upper(), -1)
-        min_score_value = self._score_values.get(config.general.trusty_agents.minimum_code_review_score.upper(), 1)  # Default to D if invalid
+        min_score_value = self._score_values.get(config.general.trusty_agents.minimum_plausibility_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
