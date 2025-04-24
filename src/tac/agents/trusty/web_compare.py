@@ -223,10 +223,14 @@ class WebCompareAgent(ComparativeTrustyAgent):
             dummy_image_path = dummy_temp.name
             
             # Create comparison image path
-            self.comparison_path = os.path.join(
-                os.path.dirname(self.before_screenshot_path),
-                f"comparison_{uuid.uuid4()}.png"
-            )
+            comparison_dir = os.path.dirname(self.before_screenshot_path)
+            
+            # Ensure the directory exists
+            os.makedirs(comparison_dir, exist_ok=True)
+            
+            # Generate a unique filename without special characters
+            comparison_filename = f"comparison_{str(uuid.uuid4()).replace('-', '')}.png"
+            self.comparison_path = os.path.join(comparison_dir, comparison_filename)
             
             # Stitch images together: before, dummy, and after.
             comparison_img = stitch_images(
@@ -236,8 +240,18 @@ class WebCompareAgent(ComparativeTrustyAgent):
                 border=10,
                 border_color="black"
             )
+            
+            # Save the comparison image
             comparison_img.save(self.comparison_path)
-            logger.info(f"Comparison image saved: {self.comparison_path}")
+            
+            # Verify the file was saved successfully
+            if not os.path.exists(self.comparison_path) or os.path.getsize(self.comparison_path) == 0:
+                error_msg = f"Failed to save comparison image to {self.comparison_path}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Image save failed")
+                return result
+                
+            logger.info(f"Comparison image saved: {self.comparison_path} ({os.path.getsize(self.comparison_path)} bytes)")
             
             # Add comparison to result
             result.add_comparison(
@@ -356,6 +370,9 @@ class WebCompareAgent(ComparativeTrustyAgent):
         (Brief explanation of grade)
         """
         
+        # Sleep 1s to ensure the file is fully written to disk
+        time.sleep(1)
+        
         # Verify the image file exists and has content
         if not os.path.exists(comparison_path):
             error_msg = f"Comparison image file not found: {comparison_path}"
@@ -371,10 +388,19 @@ class WebCompareAgent(ComparativeTrustyAgent):
         logger.info(f"Analyzing comparison image with vision model. Image size: {file_size} bytes")
         
         try:
+            # Read the image file and convert to base64
+            import base64
+            with open(comparison_path, "rb") as image_file:
+                image_data = image_file.read()
+                base64_encoded = base64.b64encode(image_data).decode('utf-8')
+            
+            logger.info(f"Successfully encoded image to base64. Encoded size: {len(base64_encoded)} characters")
+            
+            # Use base64 encoding for the image instead of file URL
             messages = [
                 Message(role="user", content=[
                     {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"file://{comparison_path}"}}
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_encoded}"}}
                 ])
             ]
             
