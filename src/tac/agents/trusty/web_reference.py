@@ -30,16 +30,16 @@ from tac.core.config import config
 from tac.agents.trusty.results import TrustyAgentResult
 from PIL import Image
 
-logger = setup_logging('tac.trusty_agents.threejs_vision_reference')
+logger = setup_logging('tac.trusty_agents.web_reference')
 
 @trusty_agent(
-    name="threejs_vision_reference",
-    description="Use this trusty agent in case we have a reference image input and are developing something with javascript, html, threejs. Compares the current visual state of a Three.js application against a provided reference image. Captures before and after screenshots, stitches them with the reference image, and uses a vision LLM for analysis.",
+    name="web_reference",
+    description="Use this trusty agent in case we have a reference image input and are developing something with javascript, html, threejs. Compares the current visual state of a web application against a provided reference image. Captures before and after screenshots, stitches them with the reference image, and uses a vision LLM for analysis.",
     protoblock_prompt="On the left side you see the previous implementation, in the middle is the updated implementation and on the right side you see the provided reference image. Describe the expected changes between the previous implementation and the updated implementation given the reference image.",
     prompt_target="coding_agent",
     llm="gpt-4o"
 )
-class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
+class WebReferenceAgent(ComparativeTrustyAgent):
     """
     A trusty agent that captures screenshots before and after code changes,
     stitches them together with a reference image (provided via CLI or protoblock) side by side,
@@ -48,7 +48,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
     """
 
     def __init__(self):
-        logger.info("Initializing ThreeJSVisionReferenceAgent")
+        logger.info("Initializing WebReferenceAgent")
         self.llm_client = LLMClient(component="vision")
         self.before_screenshot_path = None
         self.after_screenshot_path = None
@@ -215,7 +215,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
         # Create a result object for this agent
         result = TrustyAgentResult(
             success=False,  # Default to False, will set to True if successful
-            agent_type="threejs_vision_reference",
+            agent_type="web_reference",
             summary="Checking visual output against reference image"
         )
         
@@ -250,6 +250,7 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
                 path=self.before_screenshot_path,
                 description="Before state screenshot"
             )
+            logger.info(f"Added before screenshot to result: {self.before_screenshot_path}")
             
             # Capture after state
             try:
@@ -260,110 +261,138 @@ class ThreeJSVisionReferenceAgent(ComparativeTrustyAgent):
                     path=self.after_screenshot_path,
                     description="After state screenshot"
                 )
+                logger.info(f"Added after screenshot to result: {self.after_screenshot_path}")
             except Exception as e:
                 error_msg = f"Failed to capture after state: {str(e)}"
                 result.summary = error_msg
                 result.add_error(error_msg, "Screenshot failed")
                 return result
             
-            # Create comparison image by stitching before, after, and reference images side by side.
-            self.comparison_path = os.path.join(
-                os.path.dirname(self.before_screenshot_path),
-                f"comparison_{uuid.uuid4()}.png"
-            )
+            # Create a comparison image with all three images side by side
+            # Order: before, after, reference
+            try:
+                self.comparison_path = os.path.join(
+                    os.path.dirname(self.before_screenshot_path),
+                    f"comparison_with_reference_{uuid.uuid4()}.png"
+                )
+                
+                comparison_img = stitch_images(
+                    self.before_screenshot_path,
+                    self.after_screenshot_path,
+                    self.reference_image_path,
+                    border=10,
+                    border_color="black"
+                )
+                comparison_img.save(self.comparison_path)
+                logger.info(f"Comparison with reference image saved: {self.comparison_path}")
+                
+                # Add comparison to result
+                result.add_comparison(
+                    before_path=self.before_screenshot_path,
+                    after_path=self.after_screenshot_path,
+                    description="Before/After/Reference comparison"
+                )
+                result.details["comparison_path"] = self.comparison_path
+            except Exception as e:
+                error_msg = f"Failed to create comparison image: {str(e)}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Comparison failed")
+                return result
             
-            comparison_img = stitch_images(
-                self.before_screenshot_path,
-                self.after_screenshot_path,
-                self.reference_image_path,
-                border=10,
-                border_color="black"
-            )
-            comparison_img.save(self.comparison_path)
-            logger.info(f"Comparison image saved: {self.comparison_path}")
-            
-            # Add comparison to result
-            result.add_comparison(
-                before_path=self.before_screenshot_path,
-                after_path=self.after_screenshot_path,
-                reference_path=self.reference_image_path,
-                description="Before, after, and reference comparison"
-            )
-            result.details["comparison_path"] = self.comparison_path
-            
-            # Get expected changes from protoblock; if not provided use a default prompt.
-            expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_reference", "")
+            # Get the expected changes description from the protoblock
+            expected_changes = protoblock.trusty_agent_prompts.get("web_reference", "")
             if not expected_changes:
-                expected_changes = "Compare the current implementation against the provided reference image."
+                expected_changes = "Analyze the differences between the before state, after state, and reference image. Assess how closely the after state matches the reference."
             
-            # Add expected changes to result details
             result.details["expected_changes"] = expected_changes
             
-            # Create a detailed prompt for analysis using a grading system.
-            prompt = f"""Analyze this side-by-side comparison of a Three.js application:
-- Left pane shows the before state.
-- Middle pane shows the after state (current implementation).
-- Right pane shows the provided reference image.
-Expected changes: {expected_changes}
-
-Please provide your analysis in the following format:
-
-GRADE: [A-F]
-"A" is the best possible score, if it really looks the same
-"B" is good, going the right direction but not quite the same
-"C" means some things are in place but some are missing or wrong
-"D" is not really right, not close to the reference image
-"F" is failed, because the implementation is far away from the reference image 
-
-ANALYSIS:
-(Detailed explanation)
-
-ISSUES:
-(list of visual issues. what is different? what is missing? what is wrong?)
-
-RECOMMENDATIONS:
-(suggestions for improvement. can potentially be radical and drastic. the goal is to make the implementation match the reference image as closely as possible, and the programmers are blind and you are their eyes)"""
+            # Analyze the comparison image
+            try:
+                # Create detailed prompt for analysis
+                prompt = f"""
+                This image shows three visualizations side by side:
+                1. LEFT: The BEFORE state (prior to code changes)
+                2. MIDDLE: The AFTER state (current implementation)
+                3. RIGHT: The REFERENCE image (target visualization)
+                
+                Task description: {protoblock.task_description}
+                Expected changes: {expected_changes}
+                
+                Please analyze:
+                1. How well does the AFTER state (middle) match the REFERENCE image (right)?
+                2. What differences exist between the AFTER state and the REFERENCE image?
+                3. What improvements were made from the BEFORE state to the AFTER state?
+                4. What still needs to be improved to make the AFTER state match the REFERENCE?
+                
+                Conclude with a letter grade (A-F):
+                A: Perfect match, the After state matches the Reference exactly
+                B: Very close match with minor differences
+                C: Moderate match with noticeable differences
+                D: Poor match with significant differences
+                F: Failed, minimal similarity to reference
+                
+                Format your response like this:
+                
+                ## COMPARISON ANALYSIS
+                (Detailed analysis comparing the three images)
+                
+                ## IMPROVEMENTS IMPLEMENTED
+                (What was successfully improved from Before to After)
+                
+                ## MISSING ELEMENTS
+                (What still needs to be implemented/fixed in After to match Reference)
+                
+                ## GRADE: [A/B/C/D/F]
+                (Brief explanation of the grade)
+                """
+                
+                messages = [
+                    Message(role="user", content=[
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"file://{self.comparison_path}"}}
+                    ])
+                ]
+                
+                self.analysis_result = self.llm_client.chat_completion(messages)
+                result.add_report(self.analysis_result, "Reference Comparison Analysis")
+            except Exception as e:
+                error_msg = f"Failed to analyze comparison: {str(e)}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Analysis failed")
+                return result
             
-            messages = [
-                Message(role="system", content="You are a visual analysis assistant."),
-                Message(role="user", content=prompt)
-            ]
-            
-            logger.info(f"Analyzing comparison with prompt: {prompt}")
-            self.analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
-            logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
-            
-            # Add analysis to result
-            result.add_report(self.analysis_result, "Visual Analysis")
-            
-            # Extract grade from analysis if available
+            # Extract grade if present
             grade = None
-            grade_scale = "A-F"
             if "GRADE:" in self.analysis_result:
                 grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
                 if grade_line:
                     grade = grade_line[0].upper()  # Take first character as grade
-                    result.add_grade(grade, grade_scale, "Comparison grade (only A is considered passing)")
+                    result.add_grade(grade, "A-F", "Graded on visual matching from A (perfect) to F (failed)")
+                    
+                    # For reference comparisons, only an A is a passing grade
+                    is_passing = grade == "A"
+                    
+                    # Update result success status and summary based on grade
+                    if is_passing:
+                        result.success = True
+                        result.summary = f"Reference comparison passed with grade {grade}"
+                    else:
+                        result.success = False
+                        result.summary = f"Reference comparison failed with grade {grade} (only A grade passes)"
+                    
+                    return result
             
-            success = self._determine_success(self.analysis_result)
-            if success:
-                result.success = True
-                result.summary = "Visual comparison successful - matches reference"
-                if grade:
-                    result.summary += f" with grade {grade}"
-                return result
-            else:
-                result.success = False
-                result.summary = "Visual comparison failed - does not match reference"
-                if grade:
-                    result.summary += f" with grade {grade}"
-                return result
+            # If no grade, default to failure
+            result.success = False
+            result.summary = "Reference comparison failed - no grade provided by analysis"
+            
+            return result
             
         except Exception as e:
-            logger.exception(f"Error in visual comparison: {str(e)}")
+            logger.exception(f"Error in reference comparison: {str(e)}")
             result.success = False
-            result.summary = "Visual comparison error"
-            result.add_error(str(e), "Visual comparison error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            result.summary = "Reference comparison exception"
+            result.add_error(str(e), "Exception", logger.format_exc() if hasattr(logger, 'format_exc') else None)
             return result
             
         finally:
@@ -399,4 +428,5 @@ RECOMMENDATIONS:
             if file_path.endswith('.html'):
                 return file_path
         
+        # If all else fails, return None
         return None 

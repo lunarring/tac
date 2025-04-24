@@ -8,28 +8,28 @@ from tac.agents.trusty.base import TrustyAgent, trusty_agent
 from tac.agents.trusty.results import TrustyAgentResult
 from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
-logger = setup_logging('tac.trusty_agents.plausibility')
+logger = setup_logging('tac.trusty_agents.code_reviewer')
 
 @trusty_agent(
-    name="plausibility",
-    description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on plausibility.",
+    name="code_reviewer",
+    description="A trusty agent that evaluates if the implemented changes match the promised functionality by analyzing the code diff against the task description. Assigns a letter grade (A-F) based on code review.",
     protoblock_prompt="Describe what would convince you that the changes implemented match the promised functionality, assuming you are just looking at the code diff and the task description.",
     llm="o3-mini",
     mandatory=True
 )
-class PlausibilityTestingAgent(TrustyAgent):
+class CodeReviewerTestingAgent(TrustyAgent):
     """
     Checks if the implemented changes match the promised functionality by analyzing
     git diff and protoblock specifications using LLM.
     """
 
     def __init__(self):
-        logger.info("Initializing PlausibilityChecker")
-        self.llm_client = LLMClient(component="plausibility")
+        logger.info("Initializing CodeReviewerChecker")
+        self.llm_client = LLMClient(component="code_reviewer")
         self._score_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
-        self._min_score = config.general.trusty_agents.minimum_plausibility_score
+        self._min_score = config.general.trusty_agents.minimum_code_review_score
 
-        logger.info("Initializing PlausibilityTestingAgent")
+        logger.info("Initializing CodeReviewerTestingAgent")
 
     def _is_score_passing(self, score: str) -> bool:
         """
@@ -42,7 +42,7 @@ class PlausibilityTestingAgent(TrustyAgent):
             bool: True if the score meets or exceeds the minimum passing score
         """
         score_value = self._score_values.get(score.upper(), -1)
-        min_score_value = self._score_values.get(config.general.trusty_agents.minimum_plausibility_score.upper(), 1)  # Default to D if invalid
+        min_score_value = self._score_values.get(config.general.trusty_agents.minimum_code_review_score.upper(), 1)  # Default to D if invalid
         return score_value >= min_score_value
 
     def _check_impl(self, protoblock: ProtoBlock, codebase: Dict[str, str], code_diff: str) -> Union[Tuple[bool, str, str], TrustyAgentResult]:
@@ -55,16 +55,16 @@ class PlausibilityTestingAgent(TrustyAgent):
             code_diff: The git diff showing implemented changes
             
         Returns:
-            TrustyAgentResult: Result object with plausibility analysis and grade
+            TrustyAgentResult: Result object with code review analysis and grade
         """
         # Create a result object for this agent
         result = TrustyAgentResult(
             success=False,  # Default to False, will set to True if passing
-            agent_type="plausibility",
-            summary="Checking plausibility of implementation"
+            agent_type="code_reviewer",
+            summary="Checking code review of implementation"
         )
         
-        logger.info("Starting LLM-based plausibility check")
+        logger.info("Starting LLM-based code review check")
         logger.debug(f"ProtoBlock ID: {protoblock.block_id}")
         logger.debug(f"Git diff length: {len(code_diff) if code_diff else 'None'}")
         
@@ -100,7 +100,7 @@ For context, here are the full files that the junior developer had access to.
 5. Look for any missing requirements or incomplete implementations
 6. Look if there are any external dependencies that may have been hallucinated by the junior developer.
 7. Find out whether existing functionality is broken by the changes.
-8. Finally, come up with a PLAUSIBILITY SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
+8. Finally, come up with a CODE REVIEW SCORE RATING based on the analysis, where "A" is the best and "F" is failed. Passmark is "D". Thus the valid responses are "A", "B", "C", "D", "F".
 </analysis_rules>
 
 For the output, please follow the following format. Please use markdown formatting, at least for the headings.
@@ -134,18 +134,18 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
 (List all files that you think should have been available to implement the desired changes, but were not present in the <modified_files> section)
 </output_format>"""
 
-            logger.debug(f"Prompt for plausibility check: {analysis_prompt}")
+            logger.debug(f"Prompt for code review check: {analysis_prompt}")
             
             messages = [
                 Message(role="user", content=analysis_prompt)
             ]
             
-            logger.info("Plausibility check starting, sending request to LLM")
+            logger.info("Code review check starting, sending request to LLM")
             analysis = self.llm_client.chat_completion(messages)
             
             if not analysis or not analysis.strip():
                 logger.error("Received empty response from LLM")
-                result.summary = "Error: Unable to generate plausibility analysis"
+                result.summary = "Error: Unable to generate code review analysis"
                 result.add_error("Received empty response from LLM", "Analysis failed")
                 return result
             
@@ -205,21 +205,21 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                     # Add missing files to result details
                     result.details["missing_files"] = missing_files
 
-            # Extract plausibility score
-            final_plausibility_score = ""
+            # Extract code review score
+            final_code_review_score = ""
             if "## RATING" in analysis:
                 score_section = analysis.split("## RATING")[1].strip()
                 # Extract just the letter grade, ignoring any additional text
                 for char in score_section:
                     if char in "ABCDF":
-                        final_plausibility_score = char
+                        final_code_review_score = char
                         break
             
             # Strip any whitespace and ensure uppercase
-            final_plausibility_score = final_plausibility_score.strip().upper()
+            final_code_review_score = final_code_review_score.strip().upper()
             
             # Add grade to result
-            if final_plausibility_score in ["A", "B", "C", "D", "F"]:
+            if final_code_review_score in ["A", "B", "C", "D", "F"]:
                 grade_descriptions = {
                     "A": "Excellent - Perfect match with requirements",
                     "B": "Good - Minor issues but overall solid implementation",
@@ -229,13 +229,13 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                 }
                 
                 result.add_grade(
-                    final_plausibility_score, 
+                    final_code_review_score, 
                     "A-F", 
-                    grade_descriptions.get(final_plausibility_score, "")
+                    grade_descriptions.get(final_code_review_score, "")
                 )
                 
                 # Store grade in details for backward compatibility
-                result.details["grade"] = final_plausibility_score
+                result.details["grade"] = final_code_review_score
                 result.details["grade_info"] = grade_descriptions
             else:
                 logger.warning("Invalid grade extracted, no letter grade found")
@@ -243,28 +243,28 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
                 return result
             
             # Check if the score passes the minimum requirement
-            is_passing = self._is_score_passing(final_plausibility_score)
+            is_passing = self._is_score_passing(final_code_review_score)
             
             # Update result success status and summary
             if is_passing:
                 result.success = True
-                result.summary = f"Plausibility check passed with grade {final_plausibility_score}"
+                result.summary = f"Code review check passed with grade {final_code_review_score}"
             else:
                 result.success = False
-                result.summary = f"Plausibility check failed with grade {final_plausibility_score} (minimum: {self._min_score})"
+                result.summary = f"Code review check failed with grade {final_code_review_score} (minimum: {self._min_score})"
             
             return result
             
         except Exception as e:
-            logger.exception(f"Error in plausibility check: {str(e)}")
+            logger.exception(f"Error in code review check: {str(e)}")
             result.success = False
-            result.summary = "Plausibility check failed with error"
-            result.add_error(str(e), "Plausibility check error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            result.summary = "Code review check failed with error"
+            result.add_error(str(e), "Code review check error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
             return result 
 
     def should_run_mandatory(self, protoblock: ProtoBlock, codebase: Dict[str, str]) -> Tuple[bool, str]:
         """
-        Plausibility agent should always run as a mandatory agent.
+        Code reviewer agent should always run as a mandatory agent.
         
         Args:
             protoblock: The ProtoBlock containing task specifications
@@ -272,7 +272,7 @@ Provide me here briefly how I can run the code myself to verify the changes. Thi
             
         Returns:
             Tuple containing:
-            - bool: Always True for plausibility agent
+            - bool: Always True for code reviewer agent
             - str: Reason for the decision
         """
-        return True, "Plausibility agent always runs to ensure code changes match task description" 
+        return True, "Code reviewer agent always runs to ensure code changes match task description" 

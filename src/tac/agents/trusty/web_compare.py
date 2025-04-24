@@ -30,23 +30,23 @@ from tac.utils.web_utils import (
 from tac.utils.image_stitcher import stitch_images
 from PIL import Image
 
-logger = setup_logging('tac.trusty_agents.threejs_vision_before_after')
+logger = setup_logging('tac.trusty_agents.web_compare')
 
 @trusty_agent(
-    name="threejs_vision_before_after",
+    name="web_compare",
     description="Use this trusty agent to verify the visual output of web applications if we have a previous version and can compare to the current implementation. This is useful to see if the expected changes are implemented correctly. Always use it in case we have a previous version and can compare to the current implementation. Shows before/after screenshots side by side.",
     protoblock_prompt="Describe what visual changes you would expect between the before and after state, given the code modifications and the task that was carried out. Directly describe the change in scene and what to expect.",
     prompt_target="coding_agent",
     llm="gpt-4o"
 )
-class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
+class WebCompareAgent(ComparativeTrustyAgent):
     """
     A trusty agent that captures screenshots before and after code changes,
     stitches them together side by side, and analyzes the differences.
     """
 
     def __init__(self):
-        logger.info("Initializing ThreeJSVisionBeforeAfterAgent")
+        logger.info("Initializing WebCompareAgent")
         self.llm_client = LLMClient(component="vision")
         self.before_screenshot_path = None
         self.after_screenshot_path = None
@@ -157,7 +157,7 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
         # Create a result object for this agent
         result = TrustyAgentResult(
             success=False,  # Default to False, will set to True if successful
-            agent_type="threejs_vision_before_after",
+            agent_type="web_compare",
             summary="Checking visual changes between before and after states"
         )
         
@@ -248,78 +248,62 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             result.details["comparison_path"] = self.comparison_path
             logger.info(f"Added comparison path to result details: {self.comparison_path}")
             
-            # Verify the comparison image was created properly
-            if not os.path.exists(self.comparison_path):
-                error_msg = "Failed to create comparison image"
-                result.summary = error_msg
-                result.add_error(error_msg, "Image stitching failed")
-                return result
-                
-            comparison_file_size = os.path.getsize(self.comparison_path)
-            if comparison_file_size == 0:
-                error_msg = "Comparison image file is empty"
-                result.summary = error_msg 
-                result.add_error(error_msg, "Empty comparison image")
-                return result
-                
-            logger.info(f"Comparison image verified: {self.comparison_path} ({comparison_file_size} bytes)")
-            
-            # Clean up the temporary dummy image file.
-            os.unlink(dummy_image_path)
-            
-            # Get expected changes from protoblock
-            expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_before_after", "")
+            # Get the expected changes description from the protoblock
+            expected_changes = protoblock.trusty_agent_prompts.get("web_compare", "")
             if not expected_changes:
-                expected_changes = "Analyze the visual differences between the before and after states."
+                expected_changes = "Analyze the differences between the before and after states and describe what has changed in the visualization."
             
-            # Add expected changes to result details
             result.details["expected_changes"] = expected_changes
             
-
-            self.analysis_result = self.analyze_comparison(self.comparison_path, expected_changes)
+            # Analyze the comparison image
+            try:
+                # Analyze the comparison using a vision model
+                self.analysis_result = self.analyze_comparison(self.comparison_path, expected_changes)
+                result.add_report(self.analysis_result, "Visual Comparison Analysis")
+            except Exception as e:
+                error_msg = f"Failed to analyze comparison: {str(e)}"
+                result.summary = error_msg
+                result.add_error(error_msg, "Analysis failed")
+                return result
             
-            # Add analysis to result
-            result.add_report(self.analysis_result, "Visual Analysis")
-            
-            # Extract grade from analysis if available
+            # Extract grade if present
             grade = None
-            grade_scale = "A-F"
-            if "## GRADE" in self.analysis_result:
-                # Extract grade section
-                score_section = self.analysis_result.split("## GRADE")[1].strip()
-                # Extract just the letter grade, ignoring any additional text
-                for char in score_section:
-                    if char in "ABCDF":
-                        grade = char
-                        break
-                if grade:
-                    result.add_grade(grade, grade_scale, f"Graded on scale from A (best) to F (worst)")
+            if "GRADE:" in self.analysis_result:
+                grade_line = self.analysis_result.split("GRADE:")[1].split("\n")[0].strip()
+                if grade_line:
+                    grade = grade_line[0].upper()  # Take first character as grade
+                    result.add_grade(grade, "A-F", "Graded on visual matching from A (best) to F (worst)")
+                    
+                    # Check if the grade passes the minimum requirement
+                    is_passing = grade in ["A", "B", "C"] 
+                    
+                    # Update result success status and summary based on grade
+                    if is_passing:
+                        result.success = True
+                        result.summary = f"Visual comparison check passed with grade {grade}"
+                    else:
+                        result.success = False
+                        result.summary = f"Visual comparison check failed with grade {grade}"
+                    
+                    return result
             
-            # Log the detailed analysis
-            logger.info(f"Visual comparison analysis:\n{self.analysis_result}")
-            
-            # Determine success based on grade or content analysis
-            minimum_grade = config.general.trusty_agents.minimum_vision_score.upper()
-            success = determine_vision_success(self.analysis_result, minimum_grade) 
+            # If no grade, determine success using other methods
+            success = determine_vision_success(self.analysis_result, config.general.trusty_agents.minimum_vision_score.upper())
             
             if success:
                 result.success = True
                 result.summary = "Visual comparison successful"
-                if grade:
-                    result.summary += f" with grade {grade}"
-                return result
             else:
                 result.success = False
                 result.summary = "Visual comparison failed"
-                if grade:
-                    result.summary += f" with grade {grade}"
-                return result
+            
+            return result
             
         except Exception as e:
             logger.exception(f"Error in visual comparison: {str(e)}")
             result.success = False
-            result.summary = "Visual comparison error"
-            result.add_error(str(e), "Visual comparison error", logger.format_exc() if hasattr(logger, 'format_exc') else None)
+            result.summary = "Visual comparison exception"
+            result.add_error(str(e), "Exception", logger.format_exc() if hasattr(logger, 'format_exc') else None)
             return result
             
         finally:
@@ -327,50 +311,84 @@ class ThreeJSVisionBeforeAfterAgent(ComparativeTrustyAgent):
             self._cleanup_browser()
 
     def analyze_comparison(self, comparison_path: str, expected_changes: str) -> str:
-                    # Create a detailed prompt for analysis
-            prompt = f"""You are a visual expert analyzes comparative screenshots of a threejs application. The before state of the application is on the left and the after state is on the right. You will need to compare the left (before) to the right (after) and provide a detailed analysis of the changes you see. 
-We expect the following changes, here are the expected changes: {expected_changes}
+        """
+        Analyze the comparison image with a vision model.
+        
+        Args:
+            comparison_path: Path to the comparison image
+            expected_changes: Description of the expected changes
             
-For the output, please follow the following format. Please use markdown formatting, at least for the headings.
-## DIFFERENCES BEFORE VS AFTER
-(Extensive list the differences you see between the before and after screenshots)
+        Returns:
+            str: Analysis result from the vision model
+        """
+        # Create a detailed prompt for analysis
+        prompt = f"""
+        This image shows a before (left) and after (right) comparison of a web application.
 
-## ACCURACY OF EXPECTED CHANGES
-(How accurately are the expected changes reflected in the after screenshot, as compared to the before screenshot?)
+        Expected changes: {expected_changes}
 
-## UNEXPECTED CHANGES
-(Are there any further changes in the after screenshot that were not expected? If so, list them. Cross-check the differences you listed in the DIFFERENCES BEFORE VS AFTER section. with the expected changes.)
-
-## GRADE
-(How appropriate would you rate the TOTAL changes, on a scale of A to F? A is the best, F is the worst. 
-Your responsibility is to FAIL the test (D or F) if one of two conditions is met: 
--the changes are not accurate with regards to the expected changes
--there are ANY unexpected changes that we did not expect
-ONLY RETURN HERE A SINGLE LETTER, A, B, C, D, F)
-
-## OUT OF SCOPE REPORT
-(Report here if the expected changes are out of scope of what you can do to judge, given two screenshots)
-
-## RECOMMENDATIONS
-(Suggest how the expected changes from the left before image could be implemented better in the right after image)."""
+        Please analyze the differences between the before and after states. 
+        Focus on the visual changes and how they align with the expected changes.
+        Be specific about what has changed from left to right:
+        - What visual elements have been added, removed, or modified?
+        - Do the changes match the expected changes?
+        - Are there any unexpected differences?
+        
+        Conclude with a grade (A-F) based on how well the changes align with expectations:
+        A: Perfect match, all expected changes implemented correctly
+        B: Good match, most expected changes implemented correctly with minor issues
+        C: Acceptable match, some expected changes implemented correctly but with issues
+        D: Poor match, most expected changes not implemented correctly
+        F: Failed, no expected changes or completely wrong implementation
+        
+        Format your response like this:
+        
+        ## VISUAL DIFFERENCES
+        (Detailed description of visual differences)
+        
+        ## ALIGNMENT WITH EXPECTED CHANGES
+        (Analysis of how changes align with expectations)
+        
+        ## UNEXPECTED CHANGES
+        (Any changes not aligned with expectations)
+        
+        ## GRADE: [A/B/C/D/F]
+        (Brief explanation of grade)
+        """
+        
+        # Verify the image file exists and has content
+        if not os.path.exists(comparison_path):
+            error_msg = f"Comparison image file not found: {comparison_path}"
+            logger.error(error_msg)
+            return f"Analysis failed: {error_msg}"
             
-            logger.info(f"Analyzing comparison with prompt: {prompt}")
-            
-            # Sleep to ensure the image is fully written to disk
-            time.sleep(0.5)
-            
-            # Direct call to LLM client for vision analysis to ensure image is passed correctly
+        file_size = os.path.getsize(comparison_path)
+        if file_size == 0:
+            error_msg = f"Comparison image file is empty: {comparison_path}"
+            logger.error(error_msg)
+            return f"Analysis failed: {error_msg}"
+        
+        logger.info(f"Analyzing comparison image with vision model. Image size: {file_size} bytes")
+        
+        try:
             messages = [
-                Message(role="user", content=prompt),
+                Message(role="user", content=[
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"file://{comparison_path}"}}
+                ])
             ]
             
-            # Use vision_chat_completion with the comparison image path
-            logger.info(f"Sending comparison image to vision model: {self.comparison_path}")
+            response = self.llm_client.chat_completion(messages)
+            if not response:
+                return "Vision model returned an empty response."
             
-
-            analysis_result = self.llm_client.vision_chat_completion(messages, self.comparison_path)
-
-            return analysis_result
+            logger.info(f"Comparison analysis complete. Response length: {len(response)}")
+            return response
+            
+        except Exception as e:
+            error_msg = f"Error calling vision model: {str(e)}"
+            logger.exception(error_msg)
+            return f"Analysis failed: {error_msg}"
 
     def _get_app_file_path(self, protoblock: ProtoBlock) -> Optional[str]:
         """
@@ -401,45 +419,5 @@ ONLY RETURN HERE A SINGLE LETTER, A, B, C, D, F)
             if file_path.endswith('.html'):
                 return file_path
         
+        # If all else fails, return None
         return None 
-
-if __name__ == "__main__":
-    # Example of using the ThreeJSVisionBeforeAfterAgent with an existing image
-    agent = ThreeJSVisionBeforeAfterAgent()
-    
-    # Existing comparison image to analyze
-    comparison_image = "/Users/jjj/Downloads/comparison_bb59c33a-f596-4b66-9c37-7dd137582b7e.png"
-    
-    # Create a simple ProtoBlock with the expected changes
-    from tac.blocks import ProtoBlock
-    
-    # Fix ProtoBlock initialization to match the class definition
-    protoblock = ProtoBlock(
-        task_description="Analyze starfield visualization",
-        write_files=[],
-        context_files=[],
-        block_id="example_test",
-        trusty_agent_prompts={
-            "threejs_vision_before_after": "Assert that the star field covers the full screen in the after image."
-        }
-    )
-
-    expected_changes = protoblock.trusty_agent_prompts.get("threejs_vision_before_after")
-    # Set the comparison path and protoblock
-    agent.comparison_path = comparison_image
-    agent.set_protoblock(protoblock)
-    
-    # Directly use the _check_impl method with the existing image
-    # Provide empty codebase and code_diff since we're just analyzing an image
-    result = agent.analyze_comparison(comparison_image, expected_changes)
-    
-    # Print the result
-    print(result)
-
-
-"""
-BACK TO OLD RULE:
-how accurate is change there?
-is there something else that got changed?
-outof scope things mention explicitly.
-"""
