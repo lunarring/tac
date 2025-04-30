@@ -28,7 +28,11 @@ class ProjectFiles:
             '.ts', '.tsx',       # TypeScript files
             '.json',             # JSON files for models/configurations
             '.html',             # HTML files for web pages
-            '.glsl', '.vert', '.frag', '.shader'  # GLSL shader files
+            '.glsl', '.vert', '.frag', '.shader',  # GLSL shader files
+            # C and C++ files
+            '.c', '.cc', '.cpp', '.cxx',           # C/C++ source files
+            '.h', '.hh', '.hpp', '.hxx',           # C/C++ header files
+            '.inl', '.tpp', '.ipp'                 # C++ inline/template implementation files
         ]
         
     def _compute_file_hash(self, file_path: str) -> str:
