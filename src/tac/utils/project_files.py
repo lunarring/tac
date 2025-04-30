@@ -9,6 +9,8 @@ from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tqdm import tqdm
 import ast
+import concurrent.futures
+import threading
 
 logger = setup_logging('tac.utils.project_files')
 
@@ -125,48 +127,42 @@ class ProjectFiles:
             progress_callback(len(files_to_process), 0, "processing")
         
         # Process files that need updating with tqdm progress bar
-        pbar = tqdm(files_to_process, desc="Indexing files", unit="file")
-        for i, (file_path, rel_path, current_hash, file_size) in enumerate(pbar):
-            pbar.set_description(f"Indexing {rel_path}")
+        lock = threading.Lock()
+        def process_file(args):
+            file_path, rel_path, current_hash, file_size = args
             last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
-            
-            # Report start of processing this file (i is zero-based, so we use i)
-            if progress_callback:
-                progress_callback(len(files_to_process), i, "processing")
-            
-            # Analyze file
             analysis = self.summarizer.analyze_file(file_path)
-            if not analysis["error"]:
-                # Store the summary directly since it's now a string
-                data["files"][rel_path] = {
-                    "hash": current_hash,
-                    "size": file_size,
-                    "last_modified": last_modified,
-                    "summary_high_level": analysis["summary_high_level"],
-                    "summary_detailed": analysis["summary_detailed"]
-                }
-                
-                if rel_path in existing_files:
-                    stats["updated"] += 1
+            with lock:
+                if not analysis["error"]:
+                    data["files"][rel_path] = {
+                        "hash": current_hash,
+                        "size": file_size,
+                        "last_modified": last_modified,
+                        "summary_high_level": analysis["summary_high_level"],
+                        "summary_detailed": analysis["summary_detailed"]
+                    }
+                    if rel_path in existing_files:
+                        stats["updated"] += 1
+                    else:
+                        stats["added"] += 1
                 else:
-                    stats["added"] += 1
-            else:
-                # Keep track of files we couldn't analyze
-                data["files"][rel_path] = {
-                    "hash": current_hash,
-                    "size": file_size,
-                    "last_modified": last_modified,
-                    "error": analysis["error"]
-                }
-                logger.warning(f"Error analyzing {rel_path}: {analysis['error']}")
-            
-            # Save after each file
-            data["last_updated"] = datetime.now().isoformat()
-            self._save_summaries(data)
-            
-            # Report completion of this file (now i+1 to show accurate progress)
-            if progress_callback:
-                progress_callback(len(files_to_process), i+1, "processing")
+                    data["files"][rel_path] = {
+                        "hash": current_hash,
+                        "size": file_size,
+                        "last_modified": last_modified,
+                        "error": analysis["error"]
+                    }
+                    logger.warning(f"Error analyzing {rel_path}: {analysis['error']}")
+                data["last_updated"] = datetime.now().isoformat()
+                self._save_summaries(data)
+            return rel_path
+        if files_to_process:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                pbar = tqdm(executor.map(process_file, files_to_process), total=len(files_to_process), desc="Indexing files", unit="file")
+                for i, rel_path in enumerate(pbar):
+                    pbar.set_description(f"Indexing {rel_path}")
+                    if progress_callback:
+                        progress_callback(len(files_to_process), i+1, "processing")
         
         # Find and remove any files that no longer exist
         removed_files = existing_files - current_files
