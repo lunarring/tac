@@ -14,6 +14,7 @@ from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.agents.trusty.base import TrustyAgent, trusty_agent
 from tac.agents.trusty.results import TrustyAgentResult
+import glob
 
 logger = setup_logging('tac.trusty_agents.pytest')
 
@@ -159,6 +160,46 @@ class PytestTestingAgent(TrustyAgent):
         """Get the current test statistics"""
         return self._test_stats.copy()
 
+    def _full_cache_bust(self):
+        """
+        Remove all .pyc files and __pycache__ directories from the project root and subdirectories.
+        Aggressively clear sys.modules of any user code (all modules corresponding to .py files in the project, except stdlib and site-packages).
+        """
+        import site
+        import importlib.util
+        project_root = os.path.abspath(os.getcwd())
+        # Remove all .pyc files
+        for pyc in glob.glob(f'{project_root}/**/*.pyc', recursive=True):
+            try:
+                os.remove(pyc)
+                logger.debug(f"Removed pyc: {pyc}")
+            except Exception as e:
+                logger.debug(f"Failed to remove pyc {pyc}: {e}")
+        # Remove all __pycache__ dirs
+        for pycache in glob.glob(f'{project_root}/**/__pycache__', recursive=True):
+            try:
+                shutil.rmtree(pycache)
+                logger.debug(f"Removed __pycache__: {pycache}")
+            except Exception as e:
+                logger.debug(f"Failed to remove __pycache__ {pycache}: {e}")
+        # Remove user modules from sys.modules
+        stdlib_paths = set(site.getsitepackages() + [os.path.dirname(os.__file__)])
+        to_delete = []
+        for name, mod in list(sys.modules.items()):
+            if not hasattr(mod, '__file__') or mod.__file__ is None:
+                continue
+            mod_path = os.path.abspath(mod.__file__)
+            if any(mod_path.startswith(std) for std in stdlib_paths):
+                continue
+            if mod_path.startswith(project_root):
+                to_delete.append(name)
+        for name in to_delete:
+            try:
+                del sys.modules[name]
+                logger.debug(f"Deleted user module from sys.modules: {name}")
+            except Exception as e:
+                logger.debug(f"Failed to delete user module {name}: {e}")
+
     def run_tests(self, test_path: str = None) -> bool:
         """
         Runs the tests using pytest framework.
@@ -170,32 +211,20 @@ class PytestTestingAgent(TrustyAgent):
         try:
             test_target = test_path or 'tests'
             full_path = test_target
-            
+            # Full cache bust before running tests
+            self._full_cache_bust()
             # Clear pytest cache to ensure fresh test discovery
             self._clear_pytest_cache()
-            
             # Reload modules to ensure we're using the latest code
             self._reload_modules()
-
             if not os.path.exists(full_path):
-                # Create the test directory instead of reporting an error
                 logger.info(f"Test path not found: {full_path}. Creating directory.")
                 os.makedirs(full_path, exist_ok=True)
-                # No longer setting execution error flag or returning False
-                # Continue with test execution
-
             reporter = CustomReporter()
             plugins = [reporter]
-            
-            # Add current directory to Python path
             if os.getcwd() not in sys.path:
                 sys.path.insert(0, os.getcwd())
-            
-            # Run pytest with captured output and force test discovery
-            args = ['-v', '--disable-warnings', '--cache-clear']  # Added --cache-clear
-            
-            # If test_path is a file, use it directly
-            # If it's a directory, use a pattern to find all test files
+            args = ['-v', '--disable-warnings', '--cache-clear']
             if os.path.isfile(test_target):
                 args.append(test_target)
             else:
@@ -204,42 +233,22 @@ class PytestTestingAgent(TrustyAgent):
                     args.extend(['-m', 'not performance and not transient', test_target])
                 else:
                     args.append(test_target)
-            
-            # Log the pytest command we're about to run
             logger.info(f"Running pytest with args: {' '.join(args)}")
-            
-            # Run the tests
             exit_code = pytest.main(args, plugins=plugins)
-            
-            # Aggregate results from the custom reporter
             self.test_functions = reporter.test_functions
             self._test_stats = reporter.results
             self._print_test_summary(self._test_stats)
-            
-            # Store full output
             self.test_results = "\n".join(reporter.output_lines)
             if self.test_results:
                 self.test_results += "\n\n"
-            
             summary = self._generate_summary(self._test_stats, exit_code)
             self.test_results += summary
-            
-            # Log all test results to logger.debug
             logger.debug(f"Test Results:\n{self.test_results}")
-            
-            # Determine test success:
-            # - exit_code 0: all tests passed
-            # - exit_code 5: no tests found (considered ok)
-            # - failed_tests == 0: no test failures
             execution_ok = exit_code in [0, 5]
             no_test_failures = self._test_stats['failed'] == 0 and self._test_stats['error'] == 0
             test_success = execution_ok and no_test_failures
-            
-            # Update execution error state for other parts of the system
             self.had_execution_error = not execution_ok
-            
             return test_success
-            
         except Exception as e:
             error_msg = f"Error running tests: {type(e).__name__}: {str(e)}"
             logger.exception(error_msg)
@@ -327,26 +336,24 @@ class PytestTestingAgent(TrustyAgent):
 
     def _reload_modules(self):
         """
-        Reload Python modules to ensure we're using the latest code.
+        Aggressively remove all relevant modules from sys.modules to ensure pytest does not use any cached code.
         This includes both test modules and TAC modules when modifying the TAC repository itself.
         """
         try:
             loaded_modules = list(sys.modules.keys())
             modules_to_remove = [
                 m for m in loaded_modules if 
-                'test_' in m or 
-                m.endswith('_test') or 
-                m.startswith('tac.')
+                ('test_' in m or m.endswith('_test') or m.startswith('tac.')) and m in sys.modules
             ]
-            
             for module_name in modules_to_remove:
-                if module_name in sys.modules:
-                    logger.debug(f"Removing module from sys.modules: {module_name}")
+                try:
                     del sys.modules[module_name]
-                    
-            logger.debug(f"Removed {len(modules_to_remove)} modules from sys.modules")
+                    logger.debug(f"Deleted module from sys.modules: {module_name}")
+                except Exception as e:
+                    logger.debug(f"Failed to delete module {module_name}: {e}")
+            logger.debug(f"Deleted {len(modules_to_remove)} modules from sys.modules for cache busting")
         except Exception as e:
-            logger.debug(f"Error during module reload: {e}")
+            logger.debug(f"Error during module cache busting: {e}")
 
     def _clear_pytest_cache(self):
         """
