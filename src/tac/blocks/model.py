@@ -28,24 +28,25 @@ class ProtoBlock:
     block_id: str
     trusty_agents: List[str] = None
     trusty_agent_prompts: Dict[str, str] = None
+    trusty_agent_results: Dict[str, Dict[str, Any]] = None
     branch_name: str = None
     commit_message: str = None
     image_url: Optional[str] = None
+    visual_description: Optional[str] = None
+    attempt_number: int = 1
 
     def __post_init__(self):
-        # Set default value for trusty_agents from config if None
+        # Initialize trusty_agents with an empty list if None
         if self.trusty_agents is None:
-            self.trusty_agents = config.general.trusty_agents.default_trusty_agents
+            self.trusty_agents = []
         
         # Set default empty dict for trusty_agent_prompts if None
         if self.trusty_agent_prompts is None:
             self.trusty_agent_prompts = {}
-        
-        # Preserve image_url if provided via CLI or elsewhere.
-        # Only set image_url to None if it is not already set.
-        # (This line was removed to avoid overwriting an existing image_url.)
-        # if self.image_url is None:
-        #     self.image_url = None
+            
+        # Set default empty dict for trusty_agent_results if None
+        if self.trusty_agent_results is None:
+            self.trusty_agent_results = {}
 
     @classmethod
     def load(cls, json_path: str) -> 'ProtoBlock':
@@ -83,9 +84,12 @@ class ProtoBlock:
         context_files = version_data.get('context_files', [])
         commit_message = version_data.get('commit_message', '')
         branch_name = version_data.get('branch_name', '')
-        trusty_agents = version_data.get('trusty_agents', config.general.trusty_agents.default_trusty_agents)
+        trusty_agents = version_data.get('trusty_agents', [])  # Default to empty list
         trusty_agent_prompts = version_data.get('trusty_agent_prompts', {})
+        trusty_agent_results = version_data.get('trusty_agent_results', {})
         image_url = version_data.get('image_url', None)
+        visual_description = version_data.get('visual_description', None)
+        attempt_number = version_data.get('attempt_number', 1)
         
         # Create and return the ProtoBlock
         return cls(
@@ -97,7 +101,10 @@ class ProtoBlock:
             branch_name=branch_name,
             trusty_agents=trusty_agents,
             trusty_agent_prompts=trusty_agent_prompts,
-            image_url=image_url
+            trusty_agent_results=trusty_agent_results,
+            image_url=image_url,
+            visual_description=visual_description,
+            attempt_number=attempt_number
         )
 
     def save(self, filename: Optional[str] = None) -> str:
@@ -124,8 +131,11 @@ class ProtoBlock:
             "branch_name": self.branch_name,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
+            "trusty_agent_results": self.trusty_agent_results,
             "timestamp": datetime.now().isoformat(),
-            "image_url": self.image_url
+            "image_url": self.image_url,
+            "visual_description": self.visual_description,
+            "attempt_number": self.attempt_number
         }
         
         # Use provided filename or generate default one
@@ -174,5 +184,8 @@ class ProtoBlock:
             "block_id": self.block_id,
             "trusty_agents": self.trusty_agents,
             "trusty_agent_prompts": self.trusty_agent_prompts,
-            "image_url": self.image_url
+            "trusty_agent_results": self.trusty_agent_results,
+            "image_url": self.image_url,
+            "visual_description": self.visual_description,
+            "attempt_number": self.attempt_number
         }

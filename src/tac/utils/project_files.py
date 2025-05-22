@@ -9,6 +9,8 @@ from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tqdm import tqdm
 import ast
+import concurrent.futures
+import threading
 
 logger = setup_logging('tac.utils.project_files')
 
@@ -26,7 +28,11 @@ class ProjectFiles:
             '.ts', '.tsx',       # TypeScript files
             '.json',             # JSON files for models/configurations
             '.html',             # HTML files for web pages
-            '.glsl', '.vert', '.frag', '.shader'  # GLSL shader files
+            '.glsl', '.vert', '.frag', '.shader',  # GLSL shader files
+            # C and C++ files
+            '.c', '.cc', '.cpp', '.cxx',           # C/C++ source files
+            '.h', '.hh', '.hpp', '.hxx',           # C/C++ header files
+            '.inl', '.tpp', '.ipp'                 # C++ inline/template implementation files
         ]
         
     def _compute_file_hash(self, file_path: str) -> str:
@@ -49,7 +55,7 @@ class ProjectFiles:
         with open(self.summary_file, 'w') as f:
             json.dump(data, f, indent=2)
     
-    def update_summaries(self, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True) -> Dict:
+    def update_summaries(self, exclusions: Optional[List[str]] = None, exclude_dot_files: bool = True, progress_callback=None) -> Dict:
         """
         Update summaries for all supported files in the project.
         Only updates files that have changed since last run.
@@ -58,6 +64,7 @@ class ProjectFiles:
         Args:
             exclusions: List of directory names to exclude
             exclude_dot_files: Whether to exclude files/dirs starting with '.'
+            progress_callback: Optional callback function to report progress (total, processed, stage)
             
         Returns:
             Dict containing stats about the update
@@ -92,10 +99,18 @@ class ProjectFiles:
 
         files_to_process = []
         
+        # Report initial discovery progress
+        if progress_callback:
+            progress_callback(len(all_files), 0, "discovery")
+        
         # Check which files need processing
-        for file_path, real_path in all_files:
+        for i, (file_path, real_path) in enumerate(all_files):
             rel_path = os.path.relpath(file_path, self.project_root)
             current_files.add(rel_path)
+            
+            # Report progress of file checking
+            if progress_callback and i % 10 == 0:  # Update progress every 10 files to avoid too many updates
+                progress_callback(len(all_files), i, "checking")
             
             # Get file info
             file_size = os.path.getsize(file_path)
@@ -109,54 +124,73 @@ class ProjectFiles:
                 stats["unchanged"] += 1
                 
         if files_to_process:
-            logger.info(f"Processing {len(files_to_process)} files ({len(all_files) - len(files_to_process)} unchanged)")
+            logger.info(f"Indexing {len(files_to_process)} files ({len(all_files) - len(files_to_process)} unchanged)")
+        
+        # Report status before processing
+        if progress_callback:
+            progress_callback(len(files_to_process), 0, "processing")
         
         # Process files that need updating with tqdm progress bar
-        pbar = tqdm(files_to_process, desc="Analyzing files", unit="file")
-        for file_path, rel_path, current_hash, file_size in pbar:
-            pbar.set_description(f"Analyzing {rel_path}")
+        lock = threading.Lock()
+        def process_file(args):
+            file_path, rel_path, current_hash, file_size = args
             last_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
-            
-            # Analyze file
             analysis = self.summarizer.analyze_file(file_path)
-            if not analysis["error"]:
-                # Store the summary directly since it's now a string
-                data["files"][rel_path] = {
-                    "hash": current_hash,
-                    "size": file_size,
-                    "last_modified": last_modified,
-                    "summary": analysis["content"]
-                }
-                
-                if rel_path in existing_files:
-                    stats["updated"] += 1
+            with lock:
+                if not analysis["error"]:
+                    data["files"][rel_path] = {
+                        "hash": current_hash,
+                        "size": file_size,
+                        "last_modified": last_modified,
+                        "summary_high_level": analysis["summary_high_level"],
+                        "summary_detailed": analysis["summary_detailed"]
+                    }
+                    if rel_path in existing_files:
+                        stats["updated"] += 1
+                    else:
+                        stats["added"] += 1
                 else:
-                    stats["added"] += 1
-            else:
-                # Keep track of files we couldn't analyze
-                data["files"][rel_path] = {
-                    "hash": current_hash,
-                    "size": file_size,
-                    "last_modified": last_modified,
-                    "error": analysis["error"]
-                }
-                logger.warning(f"Error analyzing {rel_path}: {analysis['error']}")
-            
-            # Save after each file
-            data["last_updated"] = datetime.now().isoformat()
-            self._save_summaries(data)
+                    data["files"][rel_path] = {
+                        "hash": current_hash,
+                        "size": file_size,
+                        "last_modified": last_modified,
+                        "error": analysis["error"]
+                    }
+                    logger.warning(f"Error analyzing {rel_path}: {analysis['error']}")
+                data["last_updated"] = datetime.now().isoformat()
+                self._save_summaries(data)
+            return rel_path
+        if files_to_process:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                pbar = tqdm(executor.map(process_file, files_to_process), total=len(files_to_process), desc="Indexing files", unit="file")
+                for i, rel_path in enumerate(pbar):
+                    pbar.set_description(f"Indexing {rel_path}")
+                    if progress_callback:
+                        progress_callback(len(files_to_process), i+1, "processing")
         
         # Find and remove any files that no longer exist
         removed_files = existing_files - current_files
         if removed_files:
-            for file in removed_files:
+            # Report final cleanup stage
+            if progress_callback:
+                progress_callback(len(removed_files), 0, "cleanup")
+                
+            for i, file in enumerate(removed_files):
                 del data["files"][file]
                 stats["removed"] += 1
+                
+                # Report cleanup progress
+                if progress_callback:
+                    progress_callback(len(removed_files), i+1, "cleanup")
             
             # Save final update
             data["last_updated"] = datetime.now().isoformat()
             self._save_summaries(data)
         
+        # Report completion
+        if progress_callback:
+            progress_callback(100, 100, "complete")
+            
         # Log final stats
         logger.info(f"Summary update complete: +{stats['added']}, ~{stats['updated']}, -{stats['removed']}, ={stats['unchanged']} files")
         
@@ -195,7 +229,18 @@ class ProjectFiles:
         if summary:
             if "error" in summary:
                 return f"Error analyzing file: {summary['error']}"
-            return summary.get("summary", "No summary available")
+            
+            high_level = summary.get("summary_high_level", "")
+            detailed = summary.get("summary_detailed", "")
+            
+            if high_level and detailed:
+                return f"High-level summary: {high_level}\n\n{detailed}"
+            elif high_level:
+                return high_level
+            elif "summary" in summary:  # Backward compatibility
+                return summary.get("summary", "No summary available")
+            
+            return "No summary available"
         
         return f"No summary available for {file_path}" 
 
@@ -214,15 +259,38 @@ class ProjectFiles:
         formatted_strings = []
         
         for rel_path, file_info in data["files"].items():
-            summary = file_info.get("summary", "No summary available")
             if "error" in file_info:
                 summary = f"Error analyzing file: {file_info['error']}"
+            else:
+                high_level = file_info.get("summary_high_level", "")
+                detailed = file_info.get("summary_detailed", "")
+                
+                if high_level and detailed:
+                    summary = f"High-level summary: {high_level}\n\n{detailed}"
+                elif high_level:
+                    summary = high_level
+                elif "summary" in file_info:  # Backward compatibility
+                    summary = file_info.get("summary", "No summary available")
+                else:
+                    summary = "No summary available"
                 
             formatted_strings.append(
                 f"###FILE: {rel_path}\n{summary}\n###END_FILE"
             )
         
         return "\n\n".join(formatted_strings)
+        
+    def refresh_index(self, progress_callback=None) -> Dict:
+        """
+        Wrapper for update_summaries to maintain compatibility with UI code.
+        
+        Args:
+            progress_callback: Optional callback function to report progress
+            
+        Returns:
+            Dict: Statistics about the update
+        """
+        return self.update_summaries(progress_callback=progress_callback)
         
     def get_function_location(self, function_name: str) -> Union[str, bool]:
         """

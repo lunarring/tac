@@ -5,6 +5,9 @@ from tac.core.llm import LLMClient, Message
 from tac.core.config import config
 from tac.core.log_config import setup_logging
 from tac.utils.project_files import ProjectFiles
+from tac.blocks.model import ProtoBlock
+from tac.utils.git_manager import create_git_manager
+from tac.utils.ui import NullUIManager
 
 logger = setup_logging('tac.blocks.orchestrator')
 
@@ -218,9 +221,10 @@ class MultiBlockOrchestrator:
     of each block in the correct order.
     """
     
-    def __init__(self):
+    def __init__(self, ui_manager=NullUIManager()):
         logger.info("Initializing MultiBlockOrchestrator")
-        self.llm_client = LLMClient(llm_type="strong")
+        self.llm_client = LLMClient(component="native_agent")
+        self.ui_manager = ui_manager
     
     def execute(self, task_instructions: str, codebase: str, args=None, voice_ui=None, git_manager=None):
         """
@@ -244,12 +248,14 @@ class MultiBlockOrchestrator:
             
         # Chunk the task instructions
         logger.info("Using orchestrator to chunk instructions into multiple protoblocks")
+        self.ui_manager.send_status_bar("Chunking task instructions...")
         recipe_result = self.chunk(task_instructions, codebase)
         
         # Get the recipes from the result
         recipes = recipe_result.recipes
         
         logger.info(f"Instructions chunked into {len(recipes)} potential protoblocks (recipes)")
+        self.ui_manager.send_status_bar(f"Task divided into {len(recipes)} blocks")
         
         # Get branch name directly from the result
         branch_name = recipe_result.branch_name
@@ -316,6 +322,7 @@ class MultiBlockOrchestrator:
         
         for i, recipe in enumerate(recipes):
             logger.info(f"🚀 Executing Protoblock Chain {i+1}/{len(recipes)}...", heading=True)
+            self.ui_manager.send_status_bar(f"Executing block {i+1}/{len(recipes)}: {recipe.title}")
 
             # Update codebase if it's not the first recipe
             if i > 0:
@@ -328,24 +335,26 @@ class MultiBlockOrchestrator:
             # Execute the recipe
             protoblock = None
             if args and hasattr(args, 'json') and args.json:
-                from tac.blocks.model import ProtoBlock
                 protoblock = ProtoBlock.load(args.json)
                 logger.info(f"📄 Loaded protoblock from: {args.json}")
             
-            block_processor = BlockProcessor(recipe_text, codebase, protoblock=protoblock)
+            block_processor = BlockProcessor(recipe_text, codebase, protoblock=protoblock, ui_manager=self.ui_manager)
             recipe_success = block_processor.run_loop()
             
             if not recipe_success:
                 logger.error(f"❌ Protoblock {i+1}/{len(recipes)} execution failed.")
+                self.ui_manager.send_status_bar(f"❌ Block {i+1}/{len(recipes)} execution failed")
                 success = False
                 break
             else:
                 logger.info(f"✅ Protoblock {i+1}/{len(recipes)} completed successfully!")
+                self.ui_manager.send_status_bar(f"✅ Block {i+1}/{len(recipes)} completed successfully")
                 
                 # Create a commit for this recipe if git is enabled
                 if config.git.enabled and git_manager:
                     commit_message = commit_messages[i]
                     logger.info(f"📝 Creating commit: {commit_message}")
+                    self.ui_manager.send_status_bar(f"Creating commit: {commit_message}")
                     git_manager.commit(commit_message)
         
         # Don't switch back to original branch - stay on feature branch

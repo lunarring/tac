@@ -13,7 +13,7 @@ class FileSummarizer:
     """Class for summarizing code files using LLM analysis"""
     
     def __init__(self):
-        self.llm_client = LLMClient(llm_type="weak")
+        self.llm_client = LLMClient(component="file_summarizer")
         self.timeout = config.general.summarizer_timeout
 
     def _generate_detailed_summary(self, code: str, functions: list, classes: list, file_type: str = "python") -> str:
@@ -30,62 +30,112 @@ class FileSummarizer:
         
         if file_type == "python":
             prompt += """You are a senior software engineer. Provide a concise analysis of the code's functions and classes. Format your response as follows:
-In the beginning, a high-level summary of the entire file
-Then for each function/class, start a new line with the exact name of the function/class, followed by a colon and the description.
-Keep descriptions technical and focus on functionality and interactions, particularly tell which methods or functions call which other ones and how they are used together. You are using strict formatting. Here is an example of the output format:
-Here is a an example of the output format. Don't use any other formatting.
-High-level summary: (insert high level summary here, say what this file contains, e.g. if there are classes, functions, tests, etc.)
-Function/Class 1 (line begin:line end): (insert description here, with above guidelines in mind)
-Function/Class 2 (line begin:line end): (insert description here, with above guidelines in mind)
+<high_level_summary>
+Write a high-level summary of the entire file here. Describe what this file contains, e.g. if there are classes, functions, tests, etc.
+</high_level_summary>
+
+<detailed_summary>
+Each entry must follow this exact format:
+
+FunctionName (line X:Y): Description of what the function does, its parameters, return values, and any notable interactions with other functions or classes.
+
+ClassName (line X:Y): Description of the class purpose and its key characteristics.
+  - method1: What this method does
+  - method2: What this method does and how it relates to method1
+
+Example:
+extract_code_definitions (line 580:620): Parses Python code using the ast module to extract all function and class definitions along with their line numbers. Returns a list of dictionaries containing type, name, start_line, and end_line for each definition.
+
+FileSummarizer (line 12:579): Class that provides functionality to analyze and summarize code files using LLM-based analysis.
+  - analyze_file: Main method that processes a file and returns a structured summary
+  - _generate_detailed_summary: Core method that uses LLM to produce a detailed analysis of code
+</detailed_summary>
 
 IMPORTANT: Make sure to include ALL classes and functions in your analysis, not just the first few. The file may contain multiple classes and functions that all need to be described.
 """
         elif file_type in ["javascript", "typescript"]:
             prompt += """You are a senior web developer who specializes in Three.js. Provide a concise analysis of the code's functions, classes, and components. Format your response as follows:
-Start with a high-level summary of the entire file.
-Then for each function/class/component, start a new line with the exact name, followed by a colon and the description.
-Focus on Three.js-specific functionality, 3D rendering concepts, and any graphical techniques used.
-Keep descriptions technical and highlight interactions between parts of the code.
+<high_level_summary>
+Write a high-level summary of the entire file here.
+</high_level_summary>
 
-High-level summary: (insert high level summary here)
-Function/Class/Component 1 (line begin:line end): (insert description here)
-Function/Class/Component 2 (line begin:line end): (insert description here)
+<detailed_summary>
+Each entry must follow this exact format:
+
+FunctionName (line X:Y): Description focusing on Three.js functionality, parameters, return values, and rendering techniques.
+
+ClassName (line X:Y): Description of the class purpose in the Three.js context.
+  - method1: What this method does for 3D rendering
+  - method2: How this method affects the scene or rendering pipeline
+
+Example:
+createScene (line 10:25): Initializes a Three.js scene with a PerspectiveCamera and WebGLRenderer. Sets up initial lighting with an AmbientLight and DirectionalLight.
+
+Particle (line 30:100): Class representing individual particles in a particle system.
+  - update: Updates particle position and opacity based on lifespan
+  - applyForce: Adds external forces to particle velocity
+</detailed_summary>
 
 IMPORTANT: Make sure to include ALL functions, classes and components in your analysis, not just the first few. The file may contain multiple functions, classes and Three.js-specific code that all need to be described.
 """
         elif file_type == "html":
             prompt += """You are a senior web developer who specializes in Three.js web applications. Provide a concise analysis of this HTML file that likely contains or references Three.js code. Format your response as follows:
-Start with a high-level summary of the entire file.
-Then describe all the key sections and elements in the file, with a focus on Three.js canvas, scripts, and imports.
-Highlight how this file connects to any Three.js functionality.
+<high_level_summary>
+Write a high-level summary of the entire file here.
+</high_level_summary>
 
-High-level summary: (insert high level summary here)
-Element/Section 1 (line begin:line end): (insert description here)
-Element/Section 2 (line begin:line end): (insert description here)
+<detailed_summary>
+Each entry must follow this exact format:
+
+ElementName (line X:Y): Description focusing on its role in the Three.js application, including any attributes, src references, or connections to the 3D rendering.
+
+Example:
+canvas (line 15:15): Main rendering canvas with id="scene" where the Three.js application draws. Set with width and height attributes to match window dimensions.
+
+ScriptSection (line 25:100): Contains the main Three.js initialization code including scene setup, camera positioning, and render loop. Imports Three.js from CDN and sets up the OrbitControls.
+</detailed_summary>
 
 IMPORTANT: Make sure to analyze ALL important elements in the file, not just the first few, with special attention to Three.js-related components.
 """
         elif file_type == "glsl":
             prompt += """You are a senior graphics programmer who specializes in Three.js and GLSL shaders. Provide a concise analysis of this shader code. Format your response as follows:
-Start with a high-level summary of what this shader does.
-Then for each function, uniform, varying, or significant section, start a new line with the name followed by a colon and description.
-Focus on the graphical techniques, mathematical operations, and visual effects this shader creates.
+<high_level_summary>
+Write a high-level summary of what this shader does.
+</high_level_summary>
 
-High-level summary: (insert description of the shader's purpose and visual effect)
-Function/Uniform/Section 1 (line begin:line end): (insert description here)
-Function/Uniform/Section 2 (line begin:line end): (insert description here)
+<detailed_summary>
+Each entry must follow this exact format:
+
+uniform/varying/attribute Name (line X:Y): Description of its purpose, type, and how it affects the rendering.
+
+functionName (line X:Y): Mathematical operations performed, visual effect created, and any key algorithms implemented.
+
+Example:
+uniform float uTime (line 5:5): Float uniform that controls time-based animations, used to create waves and movement effects.
+
+varying vec2 vUv (line 7:7): Texture coordinates passed from vertex to fragment shader, used for texture mapping and distortion effects.
+
+main (line 20:45): Fragment shader entry point that calculates the final color based on noise patterns and lighting models. Implements a procedural pattern using simplex noise and combines it with dynamic lighting.
+</detailed_summary>
 
 IMPORTANT: Make sure to describe ALL important components of the shader, not just the first few, and explain the visual effect they create.
 """
         else:  # json or generic format
             prompt += """You are a senior developer who specializes in Three.js applications. Provide a concise analysis of this file. Format your response as follows:
-Start with a high-level summary of the entire file.
-Then for each section or key component, provide a brief description.
-Focus on how this content relates to Three.js functionality.
+<high_level_summary>
+Write a high-level summary of the entire file here.
+</high_level_summary>
 
-High-level summary: (insert high level summary here)
-Section 1 (line begin:line end): (insert description here)
-Section 2 (line begin:line end): (insert description here)
+<detailed_summary>
+Each entry must follow this exact format:
+
+KeyName (line X:Y): Description of what this section contains and how it relates to Three.js functionality.
+
+Example:
+scene (line 5:20): Contains configuration for the main Three.js scene including camera properties, renderer settings, and initial object placements.
+
+materials (line 25:50): Defines material properties used in the application, including custom shaders, textures, and lighting parameters for PBR rendering.
+</detailed_summary>
 
 IMPORTANT: Make sure to analyze ALL important components in the file, not just the first few.
 """
@@ -117,40 +167,7 @@ IMPORTANT: Make sure to analyze ALL important components in the file, not just t
                 start, end = cls["name"].split(" (lines ")[1].rstrip(")").split("-")
                 name_to_lines[name] = (start, end)
 
-        # Split response into lines
-        lines = response.strip().split("\n")
-        if not lines:
-            return response
-
-        # Keep the first line (high-level summary) as is
-        formatted_lines = [lines[0]]
-        
-        # Process remaining lines
-        for line in lines[1:]:
-            line = line.strip()
-            if not line:
-                continue
-                
-            # Find the first colon which separates name from description
-            parts = line.split(":", 1)
-            if len(parts) != 2:
-                formatted_lines.append(line)  # Keep unchanged if no colon found
-                continue
-                
-            name = parts[0].strip()
-            description = parts[1].strip()
-            
-            # Find the matching name in our definitions
-            for def_name, (start, end) in name_to_lines.items():
-                if def_name in name:  # Using 'in' to match even if LLM added some prefix
-                    formatted_line = f"{def_name} (line {start}:{end}): {description}"
-                    formatted_lines.append(formatted_line)
-                    break
-            else:
-                # If no match found, keep the line unchanged
-                formatted_lines.append(line)
-        
-        return "\n".join(formatted_lines)
+        return response
 
     def _detect_file_type(self, file_path: str) -> str:
         """Detect file type based on extension"""
@@ -437,7 +454,10 @@ IMPORTANT: Make sure to analyze ALL important components in the file, not just t
                 if not definitions:
                     return {
                         "error": None,
-                        "content": "High-level summary: Empty or non-Python file with no definitions."
+                        "high_level_summary": "Empty or non-Python file with no definitions.",
+                        "summary_high_level": "Empty or non-Python file with no definitions.",
+                        "summary_detailed": "",
+                        "content": "Empty or non-Python file with no definitions."
                     }
                 
                 # Process Python definitions
@@ -529,6 +549,9 @@ IMPORTANT: Make sure to analyze ALL important components in the file, not just t
                 else:
                     return {
                         "error": None,
+                        "high_level_summary": f"{file_type.capitalize()} file with no detectable functions or classes.",
+                        "summary_high_level": f"{file_type.capitalize()} file with no detectable functions or classes.",
+                        "summary_detailed": "",
                         "content": f"High-level summary: {file_type.capitalize()} file with no detectable functions or classes."
                     }
 
@@ -537,17 +560,55 @@ IMPORTANT: Make sure to analyze ALL important components in the file, not just t
             if summary.startswith("Error:"):
                 return {
                     "error": summary,
+                    "high_level_summary": None,
+                    "summary_high_level": None,
+                    "summary_detailed": None,
                     "content": None
                 }
+                
+            # Parse the high-level summary and detailed summary from the response
+            high_level_summary = ""
+            detailed_summary = ""
+            
+            # Extract high-level summary
+            high_level_match = re.search(r'<high_level_summary>(.*?)</high_level_summary>', summary, re.DOTALL)
+            if high_level_match:
+                high_level_summary = high_level_match.group(1).strip()
+            
+            # Extract detailed summary
+            detailed_match = re.search(r'<detailed_summary>(.*?)</detailed_summary>', summary, re.DOTALL)
+            if detailed_match:
+                detailed_summary = detailed_match.group(1).strip()
+            
+            # If the tags aren't found, use the original summary format
+            if not high_level_summary and not detailed_summary:
+                # Try to extract high level summary from the first line
+                lines = summary.strip().split('\n')
+                if lines and lines[0].startswith("High-level summary:"):
+                    high_level_summary = lines[0].replace("High-level summary:", "").strip()
+                    detailed_summary = '\n'.join(lines[1:]).strip()
+                else:
+                    high_level_summary = "Summary not properly formatted"
+                    detailed_summary = summary
+            
+            # Create combined content for backward compatibility
+            content = f"High-level summary: {high_level_summary}\n\n{detailed_summary}"
+                
             return {
                 "error": None,
-                "content": summary
+                "high_level_summary": high_level_summary,
+                "summary_high_level": high_level_summary,
+                "summary_detailed": detailed_summary,
+                "content": content
             }
             
         except Exception as e:
             logger.error(f"Error analyzing file {file_path}: {str(e)}")
             return {
                 "error": f"Unexpected error: {str(e)}",
+                "high_level_summary": None,
+                "summary_high_level": None,
+                "summary_detailed": None,
                 "content": None
             }
 

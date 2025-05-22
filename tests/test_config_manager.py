@@ -15,7 +15,7 @@ def test_config_manager():
     # Verify 'general' configuration
     general = cm.general
     assert general.coding_agent in ["aider", "native"]
-    assert "pytest" in general.trusty_agents.default_trusty_agents
+    # default_trusty_agents has been completely removed
     assert general.use_file_summaries is True
     assert general.summarizer_timeout == 45
     assert general.max_retries_block_creation == 4
@@ -28,14 +28,6 @@ def test_config_manager():
     assert git.enabled is True
     assert git.auto_commit_if_success is True
 
-    # Verify 'llm_weak' configuration
-    llm = cm.get_llm_config("weak")
-    assert llm.model == "o3-mini"
-    assert llm.provider == "openai"
-    assert llm.settings.temperature == 0.7
-    assert llm.settings.timeout == 120
-    assert llm.settings.max_tokens is None
-    assert llm.settings.verify_ssl is True
 
     # Verify default value when key is missing
     assert cm.get("nonexistent_key", "default") == "default"
@@ -49,6 +41,5 @@ def test_raw_config():
     assert 'general' in raw
     assert 'git' in raw
     assert raw['general']['coding_agent'] in ['aider', 'native']
-    assert 'llm_strong' in raw
-    assert 'llm_weak' in raw
+    # llm_strong and llm_weak keys are no longer in config
     assert 'logging' in raw

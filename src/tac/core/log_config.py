@@ -34,9 +34,9 @@ def get_log_level(name: str = None, default_level: str = 'INFO') -> str:
         from tac.core.config import config
         if hasattr(config, 'logging'):
             if name and hasattr(config.logging, name):
-                return getattr(config.logging, name).get('level', default_level)
+                return config.safe_get('logging', name).get('level', default_level)
             # Fall back to general TAC level
-            return config.logging.get_tac('level', default_level)
+            return config.safe_get('logging', 'tac', 'level') or default_level
     except (ImportError, AttributeError):
         pass
         

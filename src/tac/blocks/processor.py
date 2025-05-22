@@ -7,15 +7,15 @@ import traceback
 from typing import Optional, Dict, Any, List, Tuple, TYPE_CHECKING
 import uuid
 import json
+import asyncio
 from datetime import datetime
 import git
 
 from tac.blocks.model import ProtoBlock
-# Remove direct import to break circular dependency
-# from tac.blocks.generator import ProtoBlockGenerator
-# Remove direct import to break circular dependency
-# from tac.blocks.executor import BlockExecutor
-from tac.coding_agents.aider import AiderAgent
+from tac.blocks.executor import BlockExecutor
+from tac.blocks.generator import ProtoBlockGenerator
+from tac.utils.ui import NullUIManager
+from tac.agents.coding.aider import AiderAgent
 from tac.core.log_config import setup_logging
 from tac.utils.file_gatherer import gather_python_files
 from tac.utils.file_summarizer import FileSummarizer
@@ -23,7 +23,7 @@ from tac.core.llm import LLMClient, Message
 from tac.utils.git_manager import create_git_manager
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config
-from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
+from tac.agents.trusty.pytest import PytestTestingAgent as TestRunner
 
 # Use TYPE_CHECKING for type hints to avoid circular imports
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ class BlockProcessor:
     
     Acts as the central coordinator between the generator and executor components.
     """
-    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None):
+    def __init__(self, task_instructions=None, codebase=None, protoblock=None, config_override=None, ui_manager=NullUIManager()):
         # Input validation
         if protoblock is None and (task_instructions is None or codebase is None):
             raise ValueError("Either protoblock must be specified, or both task_instructions and codebase must be provided")
@@ -50,14 +50,15 @@ class BlockProcessor:
         self.input_protoblock = protoblock
         self.protoblock = None
         self.previous_protoblock = None
+        self.ui_manager = ui_manager
         
         # Import BlockExecutor at runtime to avoid circular imports
         from tac.blocks.executor import BlockExecutor
-        self.executor = BlockExecutor(config_override=config_override, codebase=codebase)
+        self.executor = BlockExecutor(config_override=config_override, codebase=codebase, ui_manager=ui_manager)
         
         # Import ProtoBlockGenerator at runtime to avoid circular imports
         from tac.blocks.generator import ProtoBlockGenerator
-        self.generator = ProtoBlockGenerator()
+        self.generator = ProtoBlockGenerator(ui_manager=ui_manager)
         
         # Use the appropriate git manager based on config
         self.git_manager = create_git_manager()
@@ -79,7 +80,6 @@ class BlockProcessor:
 
             # Generate complete genesis prompt
             protoblock_genesis_prompt = self.generator.get_protoblock_genesis_prompt(self.codebase, genesis_prompt)
-            logger.debug(f"Protoblock genesis prompt: {protoblock_genesis_prompt}")
             
             # Create protoblock from genesis prompt
             protoblock = self.generator.create_protoblock(protoblock_genesis_prompt)
@@ -96,6 +96,32 @@ class BlockProcessor:
             else:
                 logger.info("Protoblock saving is disabled. Use --save-protoblock to enable.")
 
+        # Set the attempt number based on idx_attempt
+        protoblock.attempt_number = idx_attempt + 1
+        
+        # Process mandatory agents
+        from tac.agents.trusty.registry import TrustyAgentRegistry
+        
+        # Get list of registered mandatory agents
+        mandatory_agents = TrustyAgentRegistry.get_mandatory_agents()
+        logger.info(f"Checking mandatory agents: {mandatory_agents}")
+        
+        # For each mandatory agent not already in the protoblock
+        for agent_name in mandatory_agents:
+            if agent_name not in protoblock.trusty_agents:
+                # Get the agent class
+                agent_class = TrustyAgentRegistry.get_agent(agent_name)
+                if agent_class:
+                    # Create agent instance
+                    agent = agent_class()
+                    
+                    # Check if it should run
+                    should_run, reason = agent.should_run_mandatory(protoblock, self.codebase)
+                    if should_run:
+                        logger.info(f"Adding mandatory agent '{agent_name}': {reason}")
+                        protoblock.trusty_agents.append(agent_name)
+
+        
         self.protoblock = protoblock
 
     def override_new_protoblock_with_previous_protoblock(self, protoblock):
@@ -134,7 +160,6 @@ class BlockProcessor:
         return True
 
     def run_loop(self):
-
         # Preliminary tests before we start.
         max_retries = config.general.max_retries_block_creation
 
@@ -144,16 +169,23 @@ class BlockProcessor:
         error_analysis = ""  # Initialize as empty string instead of None
 
         for idx_attempt in range(max_retries):
-            logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
-
-            # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
+            logger.info(f"Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
+            
+            # Since we already created the protoblock in UI.handle_block_click for first attempt,
+            # we only need to handle subsequent attempts here
             if idx_attempt > 0:
+                # Send status update at beginning of each attempt - keep this simple
+                self.ui_manager.send_status_bar("Generating new protoblock...")
+                    
+                # Halt execution? Pause and let user decide on recovery action on subsequent attempts.
                 if config.general.halt_after_fail:
                     user_input = input("Execution paused after failure. Enter 'r' to revert to last commit (clean state), or 'c' to continue with current state: ").strip().lower()
                     if user_input in ['r', 'revert']:
                         if config.git.enabled:
                             logger.info("Reverting changes as per user selection...")
+                            self.ui_manager.send_status_bar("Reverting changes to clean state...")
                             self.git_manager.revert_changes()
+                            self.ui_manager.send_status_bar("Changes reverted successfully")
                         else:
                             logger.info("Git is disabled; cannot revert changes.")
                     elif user_input in ['c', 'continue']:
@@ -163,27 +195,68 @@ class BlockProcessor:
                 else:
                     if config.git.enabled:
                         logger.info("Reverting changes while staying on feature branch...")
+                        self.ui_manager.send_status_bar("Reverting changes while staying on feature branch...")
                         self.git_manager.revert_changes()
+                        self.ui_manager.send_status_bar("Changes reverted successfully")
 
-            # Generate a protoblock
-            try:
-                self.create_protoblock(idx_attempt, error_analysis)
-            except ValueError as exc:
-                error_analysis = str(exc)
-                logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
-                self.store_previous_protoblock()
-                continue
+                # Generate a protoblock for subsequent attempts
+                try:
+                    # SEND STATUS MESSAGE
+                    self.ui_manager.send_status_bar("Generating protoblock...")
+                    self.create_protoblock(idx_attempt, error_analysis)
+                    self.ui_manager.send_status_bar("Protoblock generated")
+                        
+                    # For web UI, send the protoblock data to display the new protoblock
+                    if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket and self.protoblock:
+                        try:
+                            import json
+                            import asyncio
+                            from functools import partial
+                                
+                            # Use run_coroutine_threadsafe with a partial function to send the protoblock data
+                            asyncio.run_coroutine_threadsafe(
+                                self.ui_manager.send_protoblock_data(self.protoblock),
+                                self.ui_manager._loop
+                            )
+                        except Exception as e:
+                            logger.error(f"Failed to send protoblock data: {e}")
+                except ValueError as exc:
+                    error_analysis = str(exc)
+                    logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
+                    self.ui_manager.send_status_bar(f"Protoblock generation failed: {error_analysis[:100]}...")
+                    self.store_previous_protoblock()
+                    continue
 
-            # Handle git branch setup first if git is enabled
+            # Handle git branch setup only for first attempt
             if idx_attempt == 0:
+                # Skip status update for git branch setup since it's not one of the three key stages
                 if not self.handle_git_branch_setup():
+                    self.ui_manager.send_status_bar("Git branch setup failed")
                     return False
 
-            # Execute the protoblock using the builder
-            execution_success, error_analysis, failure_type  = self.executor.execute_block(self.protoblock, idx_attempt)
+            # Execute the protoblock using the builder - this is one of the key stages
+            self.ui_manager.send_status_bar("Starting coding agent...")
+            
+            execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
 
             if not execution_success:
                 logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
+                self.ui_manager.send_status_bar(f"Implementation failed: {failure_type}")
+                    
+                # For web UI, send an explicit message to remove the protoblock display after failure
+                if hasattr(self.ui_manager, 'websocket') and self.ui_manager.websocket:
+                    try:
+                        import json
+                        import asyncio
+                        asyncio.run_coroutine_threadsafe(
+                            self.ui_manager.websocket.send(json.dumps({
+                                "type": "remove_protoblock",
+                                "message": f"Execution attempt {idx_attempt + 1} failed"
+                            })),
+                            self.ui_manager._loop
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send remove_protoblock message: {e}")
                 
                 # Only log error analysis if run_error_analysis is enabled in config
                 if config.general.trusty_agents.run_error_analysis and error_analysis:
@@ -192,16 +265,68 @@ class BlockProcessor:
                 # Store the previous protoblock
                 self.store_previous_protoblock()
                 
-                # If run_error_analysis is disabled, set error_analysis to empty string
-                if not config.general.trusty_agents.run_error_analysis:
-                    error_analysis = ""
+                # Send updated protoblock with results even on failure
+                if hasattr(self.ui_manager, 'send_protoblock_data') and hasattr(self.protoblock, 'trusty_agent_results'):
+                    logger.info(f"Sending updated protoblock with {len(self.protoblock.trusty_agent_results)} trusty agent results after failure")
+                    # Import asyncio here to make sure it's available
+                    import asyncio
+                    asyncio.run_coroutine_threadsafe(
+                        self.ui_manager.send_protoblock_data(self.protoblock),
+                        self.ui_manager._loop
+                    )
             else:
+                # Success case - make sure we have a clear success message
+                self.ui_manager.send_status_bar("Block execution successful! Changes ready for review.")
+                
+                # Debug log to show if we have trusty agent results
+                if hasattr(self.protoblock, 'trusty_agent_results') and self.protoblock.trusty_agent_results:
+                    logger.info(f"Protoblock has {len(self.protoblock.trusty_agent_results)} trusty agent results")
+                    for agent_name, result in self.protoblock.trusty_agent_results.items():
+                        logger.info(f"Agent {agent_name} result: status={result.get('status', 'unknown')}")
+                else:
+                    logger.warning("No trusty agent results found in protoblock!")
+                
+                # Send updated protoblock with results
+                if hasattr(self.ui_manager, 'send_protoblock_data'):
+                    logger.info("Sending updated protoblock with results to UI...")
+                    if hasattr(self.protoblock, 'trusty_agent_results'):
+                        result_keys = list(self.protoblock.trusty_agent_results.keys())
+                        logger.info(f"Trusty agent result keys: {result_keys}")
+                    
+                    # Import asyncio here to make sure it's available
+                    import asyncio
+                    
+                    asyncio.run_coroutine_threadsafe(
+                        self.ui_manager.send_protoblock_data(self.protoblock),
+                        self.ui_manager._loop
+                    )
+                
                 # Handle git operations if enabled and execution was successful
                 if config.git.enabled:
-                    commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
-                    if not commit_success:
-                        logger.error("Failed to commit changes")
-                        return False
+                    if config.safe_get('general', 'halt_after_verify'):
+                        logger.info("Halt after successful verification is enabled.")
+                        while True:
+                            choice = input("Verification successful! Enter 'c' to commit changes, or 'a' to abort: ").strip().lower()
+                            if choice == 'c':
+                                commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                                if commit_success:
+                                    logger.info("Changes committed successfully.")
+                                    break
+                                else:
+                                    logger.error("Failed to commit changes")
+                                    return False
+                            elif choice == 'a':
+                                logger.info("User chose to abort. Reverting changes...")
+                                self.git_manager.revert_changes()
+                                logger.info("Exiting without committing changes.")
+                                break
+                            else:
+                                logger.info("Invalid selection. Please enter 'c' to commit or 'a' to abort.")
+                    else:
+                        commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                        if not commit_success:
+                            logger.error("Failed to commit changes")
+                            return False
                 return True
             
         # If we've reached here, all attempts failed
@@ -210,8 +335,8 @@ class BlockProcessor:
             base_branch = self.git_manager.base_branch if self.git_manager.base_branch else "main"
             
             # Print cleanup instructions
-            logger.error("❌ All execution attempts failed", heading=True)
-            logger.error("📋 Git Cleanup Commands:")
+            logger.error("All execution attempts failed", heading=True)
+            logger.error("Git Cleanup Commands:")
             logger.error(f"  To switch back to your main branch and clean up:")
             logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
             

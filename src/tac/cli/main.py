@@ -2,13 +2,10 @@
 import os
 import sys
 import logging
+import asyncio
 
 # Disable all logging at the very start before any other imports
-if len(sys.argv) > 1 and sys.argv[1] == 'view':
-    logging.getLogger().setLevel(logging.CRITICAL)
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+logging.basicConfig(level=logging.INFO)
 
 import yaml
 import argparse
@@ -23,19 +20,113 @@ if src_dir not in sys.path:
     sys.path.insert(0, src_dir)
 
 from tac.blocks import ProtoBlock, ProtoBlockGenerator, BlockExecutor, BlockProcessor, MultiBlockOrchestrator
-from tac.coding_agents.aider import AiderAgent
+from tac.agents.coding.aider import AiderAgent
 from tac.core.log_config import setup_logging, reset_execution_context, setup_console_logging, update_all_loggers
 from tac.utils.file_summarizer import FileSummarizer
 from tac.core.llm import LLMClient, Message
 from tac.utils.project_files import ProjectFiles
 from tac.core.config import config, ConfigManager
-from tac.trusty_agents.pytest import PytestTestingAgent as TestRunner
-from tac.trusty_agents.performance import PerformanceTestingAgent
+from tac.agents.trusty.pytest import PytestTestingAgent as TestRunner
+from tac.agents.trusty.performance import PerformanceTestingAgent
 from tac.blocks import MultiBlockOrchestrator
-from tac.utils.git_manager import create_git_manager
+from tac.utils.git_manager import create_git_manager, GitManager
+from tac.blocks.orchestrator import MultiBlockOrchestrator
+from tac.blocks.processor import BlockProcessor
+from tac.utils.ui import NullUIManager
 
-# Initialize logger at module level but don't use it as a global in functions
+# Simple ImageAnalyzer placeholder
+class ImageAnalyzer:
+    def __init__(self, image_path):
+        self.image_path = image_path
+    
+    def analyze(self):
+        return f"Image at {self.image_path} (placeholder analysis)"
+
 _module_logger = setup_logging('tac.cli.main')
+
+# Define InteractiveBlockProcessor subclass to override the commit logic after verification
+class InteractiveBlockProcessor(BlockProcessor):
+    def run_loop(self):
+        max_retries = config.general.max_retries_block_creation
+        _module_logger.info(f"Starting execution loop, using max_retries={max_retries} from config")
+        error_analysis = ""
+        for idx_attempt in range(max_retries):
+            _module_logger.info(f"🔄 Starting block creation and execution attempt {idx_attempt + 1} of {max_retries}", heading=True)
+            if idx_attempt > 0:
+                if config.general.halt_after_fail:
+                    user_input = input("Execution paused after failure. Enter 'r' to revert to last commit (clean state), or 'c' to continue with current state: ").strip().lower()
+                    if user_input in ['r', 'revert']:
+                        if config.git.enabled:
+                            _module_logger.info("Reverting changes as per user selection...")
+                            self.git_manager.revert_changes()
+                        else:
+                            _module_logger.info("Git is disabled; cannot revert changes.")
+                    elif user_input in ['c', 'continue']:
+                        _module_logger.info("Continuing with current state as per user selection...")
+                    else:
+                        _module_logger.info("Invalid selection, defaulting to continue without reverting.")
+                else:
+                    if config.git.enabled:
+                        _module_logger.info("Reverting changes while staying on feature branch...")
+                        self.git_manager.revert_changes()
+
+            try:
+                self.create_protoblock(idx_attempt, error_analysis)
+            except ValueError as exc:
+                error_analysis = str(exc)
+                _module_logger.error(f"Protoblock generation failed on attempt {idx_attempt + 1}: {error_analysis}", heading=True)
+                self.store_previous_protoblock()
+                continue
+
+            if idx_attempt == 0:
+                if not self.handle_git_branch_setup():
+                    return False
+
+            execution_success, error_analysis, failure_type = self.executor.execute_block(self.protoblock, idx_attempt)
+
+            if not execution_success:
+                _module_logger.error(f"Attempt {idx_attempt + 1} failed. Type: {failure_type}", heading=True)
+                if config.general.trusty_agents.run_error_analysis and error_analysis:
+                    _module_logger.error(error_analysis)
+                self.store_previous_protoblock()
+                if not config.general.trusty_agents.run_error_analysis:
+                    error_analysis = ""
+            else:
+                if config.git.enabled:
+                    if config.safe_get('general', 'halt_after_verify'):
+                        _module_logger.info("Halt after successful verification is enabled.")
+                        while True:
+                            choice = input("Verification successful! Enter 'c' to commit changes, or 'a' to abort: ").strip().lower()
+                            if choice == 'c':
+                                commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                                if commit_success:
+                                    _module_logger.info("Changes committed successfully.")
+                                    break
+                                else:
+                                    _module_logger.error("Failed to commit changes")
+                                    return False
+                            elif choice == 'a':
+                                _module_logger.info("User chose to abort. Reverting changes...")
+                                self.git_manager.revert_changes()
+                                _module_logger.info("Exiting without committing changes.")
+                                break
+                            else:
+                                _module_logger.info("Invalid selection. Please enter 'c' to commit or 'a' to abort.")
+                    else:
+                        commit_success = self.git_manager.handle_post_execution(config.raw_config, self.protoblock.commit_message)
+                        if not commit_success:
+                            _module_logger.error("Failed to commit changes")
+                            return False
+                return True
+
+        if config.git.enabled and self.protoblock:
+            current_branch = self.git_manager.get_current_branch()
+            base_branch = self.git_manager.base_branch if self.git_manager.base_branch else "main"
+            _module_logger.error("❌ All execution attempts failed", heading=True)
+            _module_logger.error("📋 Git Cleanup Commands:")
+            _module_logger.error(f"  To switch back to your main branch and clean up:")
+            _module_logger.error(f"    git switch {base_branch} && git restore . && git clean -fd && git branch -D {current_branch}")
+        return False
 
 def gather_files_command(args):
     """Handle the gather command execution"""
@@ -162,11 +253,16 @@ def list_tests_command(args):
     print(f"\nTotal tests found: {test_count}")
 
 def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
+    # Initialize logger for argument parsing
+    logger = setup_logging('tac.cli.main', log_level='DEBUG')
+    
     parser = argparse.ArgumentParser(
         description='Test Chain CLI Tool',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--ui', action='store_true', help='Launch a UI server with WebSocket and serve a Three.js Hello World page')
+    parser.add_argument('--no-ui', action='store_true', help='Do not launch the UI server (default is to launch UI if no command is specified)')
+    parser.add_argument('--port', type=int, default=8765, help='Port to use for the UI server (default: 8765)')
+    parser.add_argument('--fixed-port', action='store_true', help='Use exactly the specified port, don\'t auto-detect a free port')
     
     # Add global arguments
     parser.add_argument(
@@ -174,74 +270,77 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
         choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
         help='Set the logging level (default: from config)'
     )
-    
-    subparsers = parser.add_subparsers(dest='command', help='Available commands')
-    
-    # Block command
-    run_parser = subparsers.add_parser('make',
-        help='Execute a task with automated tests based on instructions'
-    )
-    # Also add log-level to the make subcommand to handle both positions
-    run_parser.add_argument(
-        '--log-level',
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        help='Set the logging level (default: from config)'
-    )
-    run_parser.add_argument(
-        'instructions',
-        nargs='+',
-        help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
-    )
-    run_parser.add_argument(
-        '--dir',
-        default='.',
-        help='Directory to analyze and create block from (default: current directory)'
-    )
-    run_parser.add_argument(
-        '--image',
-        type=str,
-        help='Image URL to be associated with the task'
-    )
-    
-    # Dynamically add arguments from general config
+
+    # Dynamically add arguments from general config to main parser
     general_config = config.general
+    logger.debug("Adding arguments from general config:")
     for key, value in vars(general_config).items():
-            
         arg_name = f'--{key.replace("_", "-")}'
         arg_type = type(value)
+        logger.debug(f"Adding argument: {arg_name} (type: {arg_type})")
         if arg_type == bool:
             # For boolean flags, create both positive and negative versions
             positive_name = arg_name
             negative_name = f'--no-{key.replace("_", "-")}'
+            logger.debug(f"Adding boolean arguments: {positive_name} and {negative_name}")
             # Create a mutually exclusive group
-            group = run_parser.add_mutually_exclusive_group()
+            group = parser.add_mutually_exclusive_group()
             group.add_argument(
                 positive_name,
                 action='store_true',
                 default=None,
+                dest=key,  # Use the original key as the destination
                 help=f'Enable {key.replace("_", " ").title()} (default: {value})'
             )
             group.add_argument(
                 negative_name,
                 action='store_false',
-                dest=key.replace("-", "_"),
+                dest=key,  # Use the original key as the destination
                 default=None,
                 help=f'Disable {key.replace("_", " ").title()} (default: {value})'
             )
         else:
-            run_parser.add_argument(
+            parser.add_argument(
                 arg_name,
                 type=arg_type,
                 default=value,
+                dest=key,  # Use the original key as the destination
                 help=f'{key.replace("_", " ").title()} (default: {value})'
             )
-
-    run_parser.add_argument(
+    
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Block command
+    make_parser = subparsers.add_parser('make',
+        help='Execute a task with automated tests based on instructions'
+    )
+    # Also add log-level to the make subcommand to handle both positions
+    make_parser.add_argument(
+        '--log-level',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Set the logging level (default: from config)'
+    )
+    make_parser.add_argument(
+        'instructions',
+        nargs='+',
+        help='Instructions for the task to execute. Capture all tokens, including those with special characters.'
+    )
+    make_parser.add_argument(
+        '--dir',
+        default='.',
+        help='Directory to analyze and create block from (default: current directory)'
+    )
+    make_parser.add_argument(
+        '--image',
+        type=str,
+        help='Image URL to be associated with the task'
+    )
+    make_parser.add_argument(
         '--json',
         type=str,
         help='Path to a JSON file containing a protoblock definition to execute'
     )
-    run_parser.add_argument(
+    make_parser.add_argument(
         '--no-git',
         action='store_true',
         help='Disable all git operations (branch checks, commits, etc.)'
@@ -321,8 +420,8 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     )
     run_test_parser.add_argument(
         '--directory',
-        default='tests',
-        help='Directory or file path containing tests (default: tests)'
+        default='.',
+        help='Directory or file path containing tests (default: current directory)'
     )
     
     # List tests command
@@ -417,7 +516,13 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     args = parser.parse_args()
     
-    if args.command == 'run':
+    # Set default subcommand for 'test' if none is provided
+    if args.command == 'test' and args.test_command is None:
+        args.test_command = 'run'
+        if not hasattr(args, 'directory') or args.directory is None:
+            args.directory = '.'
+    
+    if args.command == 'make':
         # Only validate that we have either instructions or a JSON file
         if not args.instructions and not args.json:
             parser.error("Must provide either instructions or --json")
@@ -426,12 +531,153 @@ def parse_args() -> tuple[argparse.ArgumentParser, argparse.Namespace]:
     
     return parser, args
 
+def execute_command(task_instructions=None, config_overrides=None, ui_manager=NullUIManager(), file_path=None, file_content=None):
+    """
+    Execute a tac command based on provided task instructions or file content.
+    
+    Args:
+        task_instructions: The natural language description of the task
+        config_overrides: Dictionary of configuration overrides
+        ui_manager: UI manager object for status updates (defaults to NullUIManager)
+        file_path: Path to a file containing task instructions or protoblock JSON
+        file_content: String content of task instructions or protoblock JSON
+    
+    Returns:
+        bool: True if execution was successful, False otherwise
+    """
+    try:
+        # Process inputs
+        if not task_instructions and not file_path and not file_content:
+            print("Error: Either task_instructions, file_path, or file_content must be provided")
+            return False
+        
+        # Load config and apply overrides
+        config.load_config()
+        if config_overrides:
+            for key, value in config_overrides.items():
+                if hasattr(config, key) and value is not None:
+                    setattr(config, key, value)
+                elif key in config.raw_config and value is not None:
+                    # For nested config attributes like raw_config["git"]["enabled"] 
+                    # that aren't exposed directly as attributes
+                    config.raw_config.set_nested(key, value)
+        
+        # Check if git operations should be enabled
+        if config.git.enabled:
+            # Check current git status and ensure clean workspace if needed
+            if not config.safe_get('general', 'allow_dirty_git', default=False):
+                git_manager = create_git_manager()
+                if not git_manager.is_clean():
+                    ui_manager.send_status_bar("❌ Git status check failed")
+                    if not config.safe_get('general', 'auto_stash', default=False):
+                        print("Git workspace is not clean. Please commit or stash your changes.")
+                        return False
+        
+        # Run automated tests before execution if enabled
+        if config.general.run_tests_first:
+            ui_manager.send_status_bar("Running initial tests...")
+            
+            test_runner = TestRunner()
+            if not test_runner.run():
+                ui_manager.send_status_bar("❌ Initial tests failed. Fix tests before proceeding.")
+                print("Initial tests failed. Please fix tests before proceeding.")
+                return False
+        
+        # Update project files summary
+        ui_manager.send_status_bar("Updating project files summary...")
+            
+        project_files = ProjectFiles()
+        project_files.analyze_all_files()
+        
+        processor = None
+        
+        # If an image is provided, process it 
+        if config.image:
+            ui_manager.send_status_bar("Processing image...")
+                
+            # Create an image analyzer and get description
+            image_analyzer = ImageAnalyzer(config.image)
+            image_description = image_analyzer.analyze()
+            
+            # If we have task instructions, augment them with the image description
+            if task_instructions:
+                combined_instructions = f"{task_instructions}\n\nImage Description: {image_description}"
+            else:
+                combined_instructions = f"Based on this image: {image_description}"
+            
+            # Set task instructions to the combined instructions
+            task_instructions = combined_instructions
+        
+        # Multi-block handling (split large tasks into multiple smaller ones)
+        if (task_instructions and len(task_instructions) > config.orchestration.chunk_threshold) or \
+           (config.safe_get('general', 'force_split', default=False)):
+            
+            ui_manager.send_status_bar("Initializing multi-block orchestrator...")
+                
+            # Create a multi-block orchestrator
+            orchestrator = MultiBlockOrchestrator(task_instructions, ui_manager=ui_manager)
+            success = orchestrator.run()
+            
+            if success:
+                ui_manager.send_status_bar("✅ Multi-block orchestrator completed successfully!")
+                return True
+            else:
+                ui_manager.send_status_bar("❌ Multi-block orchestrator execution failed.")
+                return False
+        else:
+            # Regular single-block processing
+            ui_manager.send_status_bar("Initializing block processor...")
+                
+            processor = BlockProcessor(
+                task_instructions=task_instructions,
+                config_override=config_overrides,
+                ui_manager=ui_manager,
+                file_path=file_path,
+                file_content=file_content
+            )
+            
+            success = processor.run_loop()
+            if success:
+                if processor.protoblock:
+                    # If we have the protoblock and UI manager, send the protoblock data for display
+                    attempt_number = f"{ui_manager.block_attempt_count}/{ui_manager.max_attempts}"
+                    asyncio.run_coroutine_threadsafe(
+                        ui_manager.send_protoblock_data(processor.protoblock, attempt_number),
+                        ui_manager._get_loop()
+                    )
+                
+                ui_manager.send_status_bar("✅ Task completed successfully!")
+                return True
+            else:
+                ui_manager.send_status_bar("❌ Task execution failed.")
+                return False
+                
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        ui_manager.send_status_bar(f"❌ Error during execution: {type(e).__name__}")
+        print(f"Error during execution: {e}")
+        return False
+
 def main():
     parser, args = parse_args()
 
-    if args.ui:
-        from tac.web.ui import launch_ui
-        launch_ui()
+    # If no command is specified and --no-ui is not set, start UI mode by default
+    if not args.command and not args.no_ui:
+        # Load config before initializing UI manager
+        config.load_config()
+        config.override_with_args(vars(args))
+        
+        # Debug print the current component_llm_mappings
+        print("Current component_llm_mappings:")
+        print(config._config.component_llm_mappings)
+        
+        from tac.web.ui import UIManager
+        ui_manager = UIManager(
+            port=args.port, 
+            auto_find_port=not args.fixed_port
+        )
+        ui_manager.launch_ui()
         sys.exit(0)
     
     # Initialize config before any logging
@@ -443,7 +689,7 @@ def main():
     
     # Command line args have second highest priority
     # Check both global and subcommand log-level arguments
-    cmd_log_level = args.log_level if getattr(args, "log-level", None) else None
+    cmd_log_level = args.log_level if hasattr(args, "log-level") else None
     
     # Config has lowest priority
     config_log_level = config.logging.get_tac('level', 'INFO')
@@ -461,12 +707,12 @@ def main():
     # Update all existing loggers with the new log level
     update_all_loggers(log_level)
     
-    # Add a debug message to verify logging is working
     logger.debug(f"Starting TAC with log level: {log_level}")
+    logger.debug(f"Command: {args.command}")
+    logger.debug(f"Arguments: {vars(args)}")
     
     # For the 'view' command, don't set up any logging system
     if args.command == 'view':
-        # Import and run the viewer without creating log files
         from tac.cli.viewer import TACViewer
         try:
             TACViewer().logs_menu()
@@ -475,7 +721,6 @@ def main():
             sys.exit(0)
         return
     
-    # Configure logging for all other commands
     logger.debug(f"Overriding config with args: {vars(args)}")
     logger.debug(f"Config after override: {config}")
     
@@ -493,24 +738,17 @@ def main():
         return
     
     if args.command == 'optimize':
-        # Set log level explicitly for the optimize command
         if hasattr(args, 'log_level') and args.log_level:
             log_level = args.log_level
-            # Update the logger with the new log level
             logger = setup_logging('tac.cli.main', log_level=log_level, log_color=log_color)
-            # Also update the config
             config.override_with_dict({'logging': {'tac': {'level': log_level}}})
-            # Update all existing loggers
             update_all_loggers(log_level)
             
         logger.debug(f"Optimizing function: {args.function_name}")
         optimizer = PerformanceTestingAgent(args.function_name, config)
-        # First do a pre-run, setting up the test and getting baseline performance
         optimizer.optimize(nmb_runs=5) 
-
         sys.exit(0)
 
-    voice_ui = None
     if args.command == 'voice':
         from tac.cli.voice import VoiceUI
         try:
@@ -519,116 +757,64 @@ def main():
                 voice_ui.temperature = args.temperature
             voice_ui.start()
             logger.info(f"Got voice task instructions: {voice_ui.task_instructions}")
-            voice_instructions = voice_ui.task_instructions
             
-            # Set up all necessary args that make command uses
-            make_args = argparse.Namespace()
-            make_args.dir = '.'
-            make_args.no_git = getattr(args, 'no_git', False)
-            make_args.json = None
-            make_args.instructions = None
-            
+            # Create config overrides from args
+            config_overrides = {}
             for key in vars(config.general):
-                setattr(make_args, key.replace('-', '_'), getattr(config.general, key))
+                arg_key = key.replace('_', '-')  # Convert underscore to hyphen for CLI args
+                if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
+                    config_overrides[key] = getattr(args, arg_key)
             
-            for attr in vars(make_args):
-                setattr(args, attr, getattr(make_args, attr))
+            success = execute_command(
+                task_instructions=voice_ui.task_instructions,
+                config_overrides=config_overrides,
+                file_content=args.json if args.json else None
+            )
+            if not success:
+                sys.exit(1)
             
         except KeyboardInterrupt:
             print("\nGoodbye!")
             sys.exit(0)
 
-    if args.command == 'make' or voice_ui is not None:
-        git_manager = None
+    if args.command == 'make':
+        # Extract task instructions from args
+        task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
         
-        try:
-            config_override = {}
-            for key in vars(config.general):
-                arg_key = key.replace('-', '_')
-                if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
-                    config_override[key] = getattr(args, arg_key)
-                
-            if args.no_git:
-                config_override['git'] = {'enabled': False}
-                config.override_with_dict(config_override)
-                logger.info("Git operations disabled via --no-git flag")
-
-            git_manager = create_git_manager()
-            if not git_manager.check_status()[0]:
-                sys.exit(1)
-
-            logger.info("Test Execution Details:", heading=True)
-            logger.info(f"Working directory: {os.getcwd()}")
-            logger.info(f"Python path: {sys.path}")
-            test_runner = TestRunner()
-            success = test_runner.run_tests()
-            if not success:
-                logger.error("Initial Tests failed. They need to be fixed before proceeding. Exiting.")
-                sys.exit(1)
-
-            project_files = ProjectFiles()
-            project_files.update_summaries()
-            codebase = project_files.get_codebase_summary()
-
-            if voice_ui is not None:
-                task_instructions = voice_ui.wait_until_prompt()
-            else:
-                task_instructions = " ".join(args.instructions) if isinstance(args.instructions, list) else args.instructions
-
-            # HERE WE INJECT THE UI PROMPT
-
-            protoblock = None
-            if args.json:
-                from tac.blocks.model import ProtoBlock
-                protoblock = ProtoBlock.load(args.json)
-                print(f"\n📄 Loaded protoblock from: {args.json}")
-            
-            if args.image is not None:
-                setattr(args, "image_url", args.image)
-                if protoblock is not None:
-                    protoblock.image_url = args.image
-                else:
-                    from tac.blocks.generator import ProtoBlockGenerator
-                    original_create = ProtoBlockGenerator.create_protoblock
-                    def patched_create(self, protoblock_genesis_prompt, protoblock=None):
-                        pb = original_create(self, protoblock_genesis_prompt, protoblock)
-                        pb.image_url = args.image
-                        return pb
-                    ProtoBlockGenerator.create_protoblock = patched_create
-
-            if config.general.use_orchestrator:
-                if voice_ui is not None:
-                    raise NotImplementedError("Voice UI is not supported with orchestrator")
-                
-                multi_block_orchestrator = MultiBlockOrchestrator()
-                success = multi_block_orchestrator.execute(task_instructions, codebase, args, voice_ui, git_manager)
-                
-                if success:
-                    print("\n✅ Multi-block orchestrator completed successfully!")
-                    logger.info("Multi-block orchestrator completed successfully.")
-                else:
-                    print("\n❌ Multi-block orchestrator execution failed.")
-                    logger.error("Multi-block orchestrator execution failed.")
-                    sys.exit(1)
-            else:
-                block_processor = BlockProcessor(task_instructions, codebase, protoblock=protoblock)
-                success = block_processor.run_loop()
-            
-            if success:
-                print("\n✅ Task completed successfully!")
-                logger.info("Task completed successfully.")
-            else:
-                print("\n❌ Task execution failed.")
-                logger.error("Task execution failed.")
-                sys.exit(1)
-                
-        except Exception as e:
-            logger.error(f"Error during execution: {e}")
+        # Prepare protoblock from JSON if specified
+        protoblock = None
+        if args.json:
+            from tac.blocks.model import ProtoBlock
+            protoblock = ProtoBlock.load(args.json)
+            print(f"\n📄 Loaded protoblock from: {args.json}")
+        
+        # Create config overrides from args
+        config_overrides = {}
+        for key in vars(config.general):
+            arg_key = key.replace('_', '-')  # Convert underscore to hyphen for CLI args
+            if hasattr(args, arg_key) and getattr(args, arg_key) is not None:
+                config_overrides[key] = getattr(args, arg_key)
+        
+        # Handle the no-git flag
+        if args.no_git:
+            config_overrides['git'] = {'enabled': False}
+        
+        # Set image in config if provided
+        if args.image:
+            config_overrides['image'] = args.image
+        
+        success = execute_command(
+            task_instructions=task_instructions,
+            config_overrides=config_overrides,
+            file_content=args.json if args.json else None
+        )
+        if not success:
             sys.exit(1)
-
     else:
-        parser.print_help()
-        sys.exit(1)
+        # Only show help if no command is specified and --no-ui is set
+        if not args.command and args.no_ui:
+            parser.print_help()
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()

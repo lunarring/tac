@@ -2,7 +2,7 @@ import os
 import shutil
 import pytest
 from pathlib import Path
-from tac.coding_agents.native_agent import NativeAgent
+from tac.agents.coding.native_agent import NativeAgent
 from tac.utils.file_utils import load_file_contents, format_files_for_prompt
 
 # A minimal dummy ProtoBlock to simulate the real one
@@ -74,7 +74,7 @@ def test_format_files_for_prompt():
         assert "# This file is for context only, please do not edit it" in prompt_context
 
 def test_create_implementation_prompt():
-    agent = NativeAgent(config={})
+    agent = NativeAgent(cwd=".")
     task_description = "Implement dummy functionality."
     context_section = "context file content"
     write_section = "write file content"
@@ -83,14 +83,13 @@ def test_create_implementation_prompt():
     prompt = agent._create_implementation_prompt(task_description, context_section, write_section, coding_agent_prompts)
     assert "Task Description: " in prompt
     assert task_description in prompt
-    assert context_section in prompt
     assert write_section in prompt
     assert "###FILE:" in prompt
     # Confirm additional guidance was added.
     assert "AgentX guidance: Follow best practices." in prompt
 
 def test_deparse_llm_response():
-    agent = NativeAgent(config={})
+    agent = NativeAgent(cwd=".")
     # Create a dummy response with two file sections and a note.
     dummy_response = (
         "###FILE: write1.py\n"

@@ -2,110 +2,394 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WebSocket Three.js UI</title>
+  <title>trusty agentic chains</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+  <!-- Add Marked.js for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Add DOMPurify for HTML sanitization -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.3/dist/purify.min.js"></script>
+  <script>
+    // Configure Marked.js with security options
+    marked.setOptions({
+      renderer: new marked.Renderer(),
+      gfm: true,
+      breaks: true,
+      sanitize: false, // Sanitize is deprecated, we'll use DOMPurify instead
+      smartLists: true,
+      smartypants: false,
+      xhtml: false
+    });
+    
+    // Helper function to safely render markdown
+    function renderMarkdown(text) {
+      if (!text) return '';
+      const rawHtml = marked.parse(text);
+      return DOMPurify.sanitize(rawHtml);
+    }
+  </script>
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100vh;
-      overflow: hidden;
-      background-color: #ffffff;
-      font-family: sans-serif;
-    }
-    /* Container split into two equal halves */
-    #splitContainer {
-      display: flex;
-      width: 100%;
-      height: 100%;
-    }
-    /* Left panel for chat UI */
-    #leftPane {
-      flex: 1;
-      position: relative;
-      border-right: 1px solid #ccc;
-    }
-    /* Right panel for Three.js canvas */
-    #rightPane {
-      flex: 1;
+    /* Ensure the chat header positions its children relative to it */
+    #chatHeader {
       position: relative;
     }
-    /* Message container in the left pane */
-    #messageContainer {
+    /* Position the settings button to the right side of block header instead of center */
+    #settingsButton {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      color: #000000;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      z-index: 10;
-      display: none;
-      border: 1px solid #ddd;
+      top: 0;
+      right: 0;
     }
-    /* Status indicator in the left pane */
-    #statusIndicator {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      color: #000000;
-      background: red;
-      padding: 5px 10px;
+    /* CSS for blockStatus removed as it's now in the stylesheet */
+    
+    /* Styles for clickable file items */
+    .file-list li.clickable {
+      cursor: pointer;
+      transition: background-color 0.2s;
+      padding: 4px 8px;
       border-radius: 4px;
-      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
-    /* Chat prompt box repositioned to the bottom of the left pane */
-    #userInput {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      width: calc(100% - 20px);
-      max-width: 600px;
-      height: 100px;
-      font-size: 16px;
-      padding: 5px 10px;
-      background-color: #ffffff;
-      color: #000000;
-      z-index: 10;
-      border: 1px solid #ccc;
-      resize: none;
+    
+    .file-list li.clickable:hover {
+      background-color: rgba(0, 120, 215, 0.1);
     }
-    /* Ensure Three.js canvas fills its container */
-    #rightPane canvas {
-      width: 100% !important;
-      height: 100% !important;
-      display: block;
+    
+    /* Add styling for trusty agent items based on status */
+    .file-list li.trusty-agent-item.has-results {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-left: 5px;
+      transition: background-color 0.2s;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.success {
+      border-left: 3px solid #00aa00;
+      background-color: rgba(0, 170, 0, 0.15);
+    }
+    
+    .file-list li.trusty-agent-item.has-results.failure {
+      border-left: 3px solid #cc0000;
+      background-color: rgba(204, 0, 0, 0.15);
+    }
+    
+    .file-list li.trusty-agent-item.has-results:hover.success {
+      background-color: rgba(0, 170, 0, 0.25);
+    }
+    
+    .file-list li.trusty-agent-item.has-results:hover.failure {
+      background-color: rgba(204, 0, 0, 0.25);
+    }
+    
+    /* Status indicator dots */
+    .file-list li.trusty-agent-item.has-results::after {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.success::after {
+      background-color: #00aa00;
+      box-shadow: 0 0 3px #00aa00;
+    }
+    
+    .file-list li.trusty-agent-item.has-results.failure::after {
+      background-color: #cc0000;
+      box-shadow: 0 0 3px #cc0000;
+    }
+    
+    .file-diff-icon {
+      color: #0078d7;
+      font-size: 14px;
+      margin-left: 8px;
+    }
+    
+    /* Diff content styling */
+    .diff-content {
+      font-family: monospace;
+      white-space: pre;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+    
+    .diff-line {
+      padding: 2px 4px;
+    }
+    
+    .diff-added {
+      background-color: rgba(0, 255, 0, 0.15);
+    }
+    
+    .diff-removed {
+      background-color: rgba(255, 0, 0, 0.15);
+    }
+    
+    .diff-info {
+      background-color: rgba(0, 0, 255, 0.1);
+      color: #0066cc;
+    }
+    
+    .diff-header {
+      font-weight: bold;
+      color: #666;
+    }
+    
+    .diff-empty {
+      padding: 20px;
+      text-align: center;
+      color: #666;
+    }
+    
+    /* Styles for disabled buttons */
+    .git-button.disabled {
+      background-color: #ccc;
+      color: #888;
+      cursor: not-allowed;
+      pointer-events: none;
+      opacity: 0.7;
+      border: 1px solid #aaa;
+    }
+    
+    /* Styles for Human Reviewer section - success and failure states */
+    #humanReviewerSection.success {
+      background-color: rgba(0, 170, 0, 0.05);
+      border-radius: 4px;
+      padding: 10px;
+    }
+    
+    #humanReviewerSection.failure {
+      background-color: rgba(204, 0, 0, 0.1);
+      border-radius: 4px;
+      padding: 10px;
+    }
+    
+    #humanReviewerSection.failure .section-title {
+      color: #cc0000;
+      font-weight: bold;
+    }
+    
+    /* Agent status styling in popup dialog */
+    .agent-status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    
+    .agent-status.passed {
+      background-color: rgba(0, 180, 0, 0.15);
+      color: #007700;
+      border: 1px solid #00aa00;
+    }
+    
+    .agent-status.failed {
+      background-color: rgba(180, 0, 0, 0.15);
+      color: #990000;
+      border: 1px solid #cc0000;
+    }
+    
+    .agent-status.error {
+      background-color: rgba(255, 180, 0, 0.15);
+      color: #996600;
+      border: 1px solid #cc9900;
+    }
+    
+    .git-button.accepted {
+      background-color: rgba(0, 180, 0, 0.8);
+      color: white;
+      border: 1px solid #007700;
+    }
+    
+    .git-button.rejected {
+      background-color: rgba(180, 0, 0, 0.8);
+      color: white;
+      border: 1px solid #770000;
+    }
+    
+    .git-buttons {
+      display: flex;
+      flex-direction: row !important;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 10px;
+    }
+    
+    .git-button {
+      flex: 1;
+      max-width: 200px;
+      padding: 10px 15px;
+      height: 40px;
+      border-radius: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   </style>
 </head>
 <body>
   <div id="splitContainer">
-    <div id="leftPane">
+    <div id="chatPanel">
+      <div id="chatHeader">
+        <div id="recipientName">trusty agentic chains</div>
+        <div id="typingAnimation">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
       <div id="messageContainer"></div>
-      <div id="statusIndicator">offline</div>
-      <textarea id="userInput" placeholder="Enter text here..."></textarea>
+      <div id="inputContainer">
+        <textarea id="userInput" placeholder="Type your message here..." rows="2"></textarea>
+        <div id="buttonContainer">
+          <div id="micButton" class="action-button">🎤</div>
+          <div id="blockButton" class="action-button">
+            <canvas id="cubeCanvas" width="32" height="32"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
-    <div id="rightPane"></div>
+    <div id="blockPanel">
+      <div id="blockHeader">
+        <div id="blockStatus">
+          <span class="blockStatusDot"></span>
+          <span id="blockStatusText">connecting...</span>
+          <div id="indexingProgressContainer" style="display: none;">
+            <div class="progress-bar-container">
+              <div class="progress-bar" style="width: 0%"></div>
+            </div>
+            <span class="progress-text">0%</span>
+          </div>
+        </div>
+        <div id="settingsButton" class="action-button">⚙️</div>
+      </div>
+      <div id="errorMessage"></div>
+      <div id="infoMessage" style="display: none;"></div>
+      <div id="protoblockContainer">
+        <!-- Protoblock container structure -->
+        <div id="protoblockHeader">
+          <h2>Protoblock</h2>
+          <p id="protoblockAttempt" style="display: none;">Attempt 1/4</p>
+        </div>
+        <div class="section">
+          <div class="section-title">Task Description</div>
+          <div id="taskDescription" class="code-block"></div>
+        </div>
+        <div class="section">
+          <div class="section-title">Files to Modify</div>
+          <ul id="writeFilesList" class="file-list"></ul>
+        </div>
+        <div class="section">
+          <div class="section-title">Trusty Agents</div>
+          <div id="trustyAgentsSection">
+            <ul id="trustyAgentsList" class="file-list"></ul>
+          </div>
+        </div>
+        <div class="section" id="humanReviewerSection" style="display: none;">
+          <div class="section-title">Human Reviewer</div>
+          <div id="gitStatusMessage"></div>
+          <div class="git-buttons">
+            <button id="acceptChangesBtn" class="git-button">Accept Changes</button>
+            <button id="rejectChangesBtn" class="git-button">Reject Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
-    // Initialize Three.js scene
+    // Utility functions for showing and hiding elements
+    function hideElement(element) {
+      if (typeof element === 'string') {
+        element = document.getElementById(element) || document.querySelector(element);
+      }
+      if (element) {
+        // Just set display to none for consistency with existing code
+        element.style.display = 'none';
+        
+        // Also update classes for future use
+        element.classList.add('hidden');
+        element.classList.remove('visible');
+        element.classList.remove('display-flex');
+      }
+    }
+    
+    function showElement(element, displayType = 'block') {
+      if (typeof element === 'string') {
+        element = document.getElementById(element) || document.querySelector(element);
+      }
+      if (element) {
+        // Set the display style directly for compatibility with existing code
+        element.style.display = displayType;
+        
+        // Also update classes for future use
+        element.classList.remove('hidden');
+        if (displayType === 'flex') {
+          element.classList.add('display-flex');
+        } else {
+          element.classList.add('visible');
+        }
+      }
+    }
+    
+    function toggleElement(element, displayType = 'block') {
+      if (typeof element === 'string') {
+        element = document.getElementById(element) || document.querySelector(element);
+      }
+      if (element) {
+        if (element.style.display === 'none' || getComputedStyle(element).display === 'none') {
+          showElement(element, displayType);
+        } else {
+          hideElement(element);
+        }
+      }
+    }
+
+    // Initialize Three.js scene in the block panel
+    const threeContainer = document.getElementById('blockPanel');
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, document.getElementById('rightPane').clientWidth / document.getElementById('rightPane').clientHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(document.getElementById('rightPane').clientWidth, document.getElementById('rightPane').clientHeight);
-    renderer.setClearColor(0xffffff, 1);
-    document.getElementById('rightPane').appendChild(renderer.domElement);
+    const camera = new THREE.PerspectiveCamera(75, threeContainer.clientWidth / threeContainer.clientHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(threeContainer.clientWidth, threeContainer.clientHeight);
+    renderer.setClearColor(0xe0eafc, 1);
+    threeContainer.appendChild(renderer.domElement);
 
-    // Create a simple rotating cube with black wireframe material and repositioned to the right
+    // Create a polished cube with a refined material configured with wireframe: true
     const geometry = new THREE.BoxGeometry();
-    const material = new THREE.MeshBasicMaterial({color: 0x000000, wireframe: true});
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.x = 2;
+    const cubeMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x0078d7, 
+      shininess: 100, 
+      wireframe: true, 
+      transparent: true, 
+      opacity: 0.7,
+      emissive: 0x0078d7,
+      emissiveIntensity: 0.5
+    });
+    const cube = new THREE.Mesh(geometry, cubeMaterial);
+    // Center the cube horizontally within the scene
+    cube.position.x = 0;
     scene.add(cube);
-    camera.position.z = 5;
 
-    // Expose cube for testing purposes
-    window.cube = cube;
+    // Add a wireframe overlay using EdgesGeometry and LineSegments for added style
+    const edges = new THREE.EdgesGeometry(geometry);
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 });
+    const wireframe = new THREE.LineSegments(edges, lineMaterial);
+    cube.add(wireframe);
+
+    // Position the camera and add lights for a refined look
+    camera.position.set(3, 3, 5);
+    camera.lookAt(0, 0, 0);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
 
     function animate() {
       requestAnimationFrame(animate);
@@ -115,52 +399,1854 @@
     }
     animate();
 
-    // Update renderer and camera on resize
+    // Function to toggle between 3D cube and protoblock display
+    function toggleProtoblockDisplay(show) {
+      const protoblockContainer = document.getElementById('protoblockContainer');
+      const canvas = renderer.domElement;
+      
+      if (show) {
+        // First show the protoblock container
+        showElement(protoblockContainer);
+        
+        // Use a smooth transition for the canvas
+        canvas.style.opacity = '0';
+        setTimeout(() => {
+          hideElement(canvas);
+          // Ensure the header has proper background
+          document.getElementById('blockHeader').style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+        }, 300);
+      } else {
+        // Show the canvas first
+        showElement(canvas);
+        setTimeout(() => {
+          canvas.style.opacity = '1';
+          // Hide the protoblock container
+          hideElement(protoblockContainer);
+          // Reset background for cube view
+          document.getElementById('blockHeader').style.backgroundColor = 'transparent';
+          document.getElementById('blockHeader').style.boxShadow = 'none';
+        }, 50);
+      }
+    }
+
+    // Function to update the status with appropriate styling
+    function updateRecipientStatus(message, status = "default") {
+      // Skip git-related status messages
+      if (message && (
+          message.toLowerCase().includes("git") ||
+          message.toLowerCase().includes("commit") ||
+          message.toLowerCase().includes("discard") ||
+          message.toLowerCase().includes("branch") ||
+          message.toLowerCase().includes("merge") ||
+          message.toLowerCase().includes("stash")
+      )) {
+        console.log(`Skipping git-related status message: ${message}`);
+        return;
+      }
+      
+      const statusTextElement = document.getElementById("blockStatusText");
+      const statusDotElement = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (!statusTextElement || !statusDotElement) return;
+      
+      // Update status element
+      statusTextElement.textContent = message;
+      
+      // Make status visible
+      document.getElementById("blockStatus").style.display = "flex";
+      
+      // Remove all status classes from dot and text
+      statusTextElement.classList.remove("processing", "success", "error", "default");
+      statusDotElement.classList.remove("processing", "success", "error", "default", "online", "offline");
+      
+      // Add appropriate class based on status
+      if (status === "processing") {
+        statusTextElement.classList.add("processing");
+        statusDotElement.classList.add("processing");
+      } else if (status === "success") {
+        statusTextElement.classList.add("success");
+        statusDotElement.classList.add("success");
+      } else if (status === "error") {
+        statusTextElement.classList.add("error");
+        statusDotElement.classList.add("error");
+      } else {
+        statusTextElement.classList.add("default");
+        statusDotElement.classList.add("online"); // Default to online dot
+      }
+      
+      // Log the status update to console for debugging
+      console.log(`Status updated: ${message} (${status})`);
+    }
+    
+    // Function to handle block execution failure
+    function handleBlockFailure() {
+      // No longer hide the protoblock display on failure
+      // Instead, keep it visible so users can see what failed
+      
+      // Send status to the chat panel
+      updateRecipientStatus("Block execution failed", "error");
+    }
+    
+    // Function to rebuild the empty protoblock container structure
+    function rebuildProtoblockContainer() {
+      const container = document.getElementById('protoblockContainer');
+      
+      // Clear the container first
+      container.innerHTML = '';
+      
+      // Header
+      const header = document.createElement('div');
+      header.id = 'protoblockHeader';
+      header.innerHTML = '<h2>Protoblock</h2>' +
+                         '<p id="protoblockAttempt" style="display: none;">Attempt 1/4</p>';
+      container.appendChild(header);
+      
+      // Task Description
+      const taskSection = document.createElement('div');
+      taskSection.className = 'section';
+      taskSection.innerHTML = '<div class="section-title">Task Description</div>' +
+                             '<div id="taskDescription" class="code-block"></div>';
+      container.appendChild(taskSection);
+      
+      // Files to Modify
+      const writeFilesSection = document.createElement('div');
+      writeFilesSection.className = 'section';
+      writeFilesSection.innerHTML = '<div class="section-title">Files to Modify</div>' +
+                                   '<ul id="writeFilesList" class="file-list"></ul>';
+      container.appendChild(writeFilesSection);
+      
+      // Trusty Agents
+      const trustyAgentsSection = document.createElement('div');
+      trustyAgentsSection.className = 'section';
+      trustyAgentsSection.innerHTML = '<div class="section-title">Trusty Agents</div>' +
+                                     '<div id="trustyAgentsSection">' +
+                                     '<ul id="trustyAgentsList" class="file-list"></ul>' +
+                                     '</div>';
+      container.appendChild(trustyAgentsSection);
+      
+      // Human Reviewer
+      const humanReviewerSection = document.createElement('div');
+      humanReviewerSection.className = 'section';
+      humanReviewerSection.id = 'humanReviewerSection';
+      humanReviewerSection.style.display = 'none'; // Initially hidden
+      humanReviewerSection.innerHTML = '<div class="section-title">Human Reviewer</div>' +
+                                     '<div class="git-buttons">' +
+                                     '<button id="acceptChangesBtn" class="git-button">Accept Changes</button>' +
+                                     '<button id="rejectChangesBtn" class="git-button">Reject Changes</button>' +
+                                     '</div>';
+      container.appendChild(humanReviewerSection);
+      
+      console.log("Protoblock container rebuilt with Human Reviewer section");
+    }
+
+    // Function to display protoblock data
+    function displayProtoblockData(data) {
+      console.log("Displaying protoblock data:", data);
+      
+      // Ensure protoblock display is visible
+      toggleProtoblockDisplay(true);
+      
+      // Update header
+      document.getElementById('protoblockAttempt').textContent = `Attempt ${data.attempt}`;
+      
+      // Update task description
+      document.getElementById('taskDescription').textContent = data.task_description;
+      
+      // Update files to modify
+      const writeFilesList = document.getElementById('writeFilesList');
+      writeFilesList.innerHTML = '';
+      data.write_files.forEach(file => {
+        const li = document.createElement('li');
+        // Create text node to ensure we can reference just the filename later
+        li.appendChild(document.createTextNode(file));
+        writeFilesList.appendChild(li);
+      });
+      
+      // Update trusty agents
+      const trustyAgentsList = document.getElementById('trustyAgentsList');
+      trustyAgentsList.innerHTML = '';
+      
+      // Store trusty agent prompts data globally to access when popup is opened
+      window.trustyAgentPrompts = data.trusty_agent_prompts || {};
+      
+      // Store trusty agent results data globally to access when popup is opened
+      window.trustyAgentResults = data.trusty_agent_results || {};
+      
+      // Log trusty agent results for debugging
+      console.log("Trusty agent prompts:", window.trustyAgentPrompts);
+      console.log("Trusty agent results:", window.trustyAgentResults);
+      console.log("Trusty agents:", data.trusty_agents);
+      
+      // Combined display logic for trusty agents and their prompts
+      if (data.trusty_agents && data.trusty_agents.length > 0) {
+        // Always show all agents in the list
+        trustyAgentsList.style.display = 'block';
+        data.trusty_agents.forEach(agent => {
+          const li = document.createElement('li');
+          li.textContent = agent;
+          
+          // Convert agent name to lowercase for matching with results
+          // This ensures consistency with how the backend stores keys
+          const agentKey = agent.toLowerCase().replace(/agent$/, '');
+          
+          // Log whether this agent has results
+          const hasPrompt = window.trustyAgentPrompts[agent];
+          const resultObj = window.trustyAgentResults && 
+                           (window.trustyAgentResults[agent] || window.trustyAgentResults[agentKey]);
+          const hasResults = resultObj && (resultObj.output || resultObj.image_url);
+          
+          console.log(`Agent ${agent} (key: ${agentKey}): has prompt: ${!!hasPrompt}, has results: ${!!hasResults}`, resultObj);
+          
+          // Always make agents clickable to view their prompts and any results
+          li.classList.add('trusty-agent-item');
+          li.classList.add('clickable');
+          
+          // Add grade badge if available
+          if (hasResults && (resultObj.grade || (resultObj.details && resultObj.details.grade))) {
+            const grade = resultObj.grade || (resultObj.details && resultObj.details.grade);
+            if (grade && grade.match(/^[A-F]$/)) {
+              const gradeBadge = document.createElement('span');
+              gradeBadge.className = `grade-badge ${grade}`;
+              gradeBadge.textContent = grade;
+              li.prepend(gradeBadge); // Add to the beginning of the list item
+            }
+          }
+            
+          // Add has-results class if agent has results
+          if (hasResults) {
+            li.classList.add('has-results');
+            console.log(`Adding has-results class to ${agent}`);
+            
+            // Add success/failure class based on result status
+            if (resultObj.status) {
+              if (resultObj.status === 'passed' || resultObj.status === 'success') {
+                li.classList.add('success');
+              } else if (resultObj.status === 'failed' || resultObj.status === 'error') {
+                li.classList.add('failure');
+              }
+            }
+          }
+            
+          li.addEventListener('click', () => {
+            // Get the latest protoblock data for the agent
+            const protoblock = {
+              trusty_agent_prompts: window.trustyAgentPrompts || {},
+              trusty_agent_results: window.trustyAgentResults || {}
+            };
+            displayTrustyAgentPrompt(agent, protoblock);
+          });
+          
+          trustyAgentsList.appendChild(li);
+        });
+      } else {
+        // No agents at all
+        const li = document.createElement('li');
+        li.textContent = 'No trusty agents specified';
+        trustyAgentsList.appendChild(li);
+      }
+      
+      // Make files clickable regardless of success/failure status - always allow viewing reports
+      setTimeout(makeFilesClickable, 300);
+      
+      // The Human Reviewer section is now shown only when we get a completion status message
+      // This ensures it only appears after all trusty agents have completed
+    }
+
+    // Function to make files in the protoblock clickable to view diffs
+    function makeFilesClickable() {
+      const writeFilesList = document.getElementById('writeFilesList');
+      if (!writeFilesList) return;
+      
+      const fileItems = writeFilesList.querySelectorAll('li');
+      fileItems.forEach((item, index) => {
+        // Get the filename from the text content
+        const filename = item.textContent.trim();
+        
+        // Add click functionality
+        item.classList.add('clickable');
+        item.classList.add('clickable-file');
+        item.addEventListener('click', () => {
+          showFileDiff(filename);
+        });
+        
+        // Request file status with a slight delay to ensure the DOM has updated
+        // Stagger requests to avoid overwhelming the server
+        setTimeout(() => {
+          requestFileStatus(filename);
+        }, 100 * (index + 1));
+      });
+    }
+    
+    // Function to request file status from the server
+    function requestFileStatus(filename) {
+      const payload = {
+        type: "file_status_request",
+        filename: filename
+      };
+      
+      socket.send(JSON.stringify(payload));
+    }
+    
+    // Function to update file badge with line count information
+    function updateFileBadge(filename, addedLines, removedLines) {
+      console.log(`Updating badge for ${filename}: +${addedLines} -${removedLines}`);
+      const writeFilesList = document.getElementById('writeFilesList');
+      if (!writeFilesList) {
+        console.log('writeFilesList not found');
+        return;
+      }
+      
+      const fileItems = writeFilesList.querySelectorAll('li');
+      console.log(`Found ${fileItems.length} file items`);
+      
+      let fileFound = false;
+      fileItems.forEach(item => {
+        // Get the filename - the first text node contains the filename
+        let itemFilename = '';
+        
+        // Try different approaches to get the filename
+        if (item.childNodes[0] && item.childNodes[0].nodeType === Node.TEXT_NODE) {
+          itemFilename = item.childNodes[0].nodeValue.trim();
+        } else {
+          // If not a direct text node, get the text content and remove any icon text
+          itemFilename = item.textContent.replace('🔍', '').trim();
+        }
+        
+        console.log(`Checking item with filename: "${itemFilename}" against "${filename}"`);
+        
+        if (itemFilename === filename) {
+          fileFound = true;
+          console.log(`Match found for ${filename}`);
+          
+          // Add clickable-file class if not already there
+          if (!item.classList.contains('clickable-file')) {
+            item.classList.add('clickable-file');
+          }
+          
+          // Check if badge already exists
+          let badge = item.querySelector('.line-count-badge');
+          if (!badge) {
+            console.log(`Creating new badge for ${filename}`);
+            badge = document.createElement('span');
+            badge.className = 'line-count-badge';
+            item.appendChild(badge);
+          } else {
+            console.log(`Updating existing badge for ${filename}`);
+          }
+          
+          // Update badge content
+          badge.innerHTML = '';
+          
+          if (addedLines > 0) {
+            const addedSpan = document.createElement('span');
+            addedSpan.className = 'line-count-added';
+            addedSpan.textContent = `+${addedLines}`;
+            badge.appendChild(addedSpan);
+          }
+          
+          if (removedLines > 0) {
+            const removedSpan = document.createElement('span');
+            removedSpan.className = 'line-count-removed';
+            removedSpan.textContent = `-${removedLines}`;
+            badge.appendChild(removedSpan);
+          }
+        }
+      });
+      
+      if (!fileFound) {
+        console.log(`No matching file item found for ${filename}`);
+      }
+    }
+    
+    // Function to request file diff from the server
+    function requestFileDiff(filename) {
+      const payload = {
+        type: "file_diff_request",
+        filename: filename
+      };
+      
+      socket.send(JSON.stringify(payload));
+    }
+
+    // Update renderer and camera on resize for block panel
     window.addEventListener('resize', () => {
-      const rightPane = document.getElementById('rightPane');
-      const width = rightPane.clientWidth;
-      const height = rightPane.clientHeight;
+      const width = threeContainer.clientWidth;
+      const height = threeContainer.clientHeight;
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     });
 
-    // Establish websocket connection and update LED indicator status
-    const statusIndicator = document.getElementById("statusIndicator");
-    const socket = new WebSocket("ws://localhost:8765");
-    socket.onopen = function() {
-      console.log("WebSocket connection opened");
-      statusIndicator.style.background = "green";
-      statusIndicator.innerHTML = "online";
-    };
-    socket.onmessage = function(event) {
-      // Incoming messages are logged but not displayed in the UI per new requirements
-      console.log("Received: " + event.data);
-    };
-    socket.onerror = function(error) {
-      console.error("WebSocket error:", error);
-      statusIndicator.style.background = "red";
-      statusIndicator.innerHTML = "offline";
-    };
-    socket.onclose = function() {
-      console.log("WebSocket connection closed");
-      statusIndicator.style.background = "red";
-      statusIndicator.innerHTML = "offline";
-    };
-
-    // Expose the socket for testing purposes
-    window.socket = socket;
-
-    // Add event listener for the text entry field to send message on Enter key press
+    // Chat functionality in the chat panel
+    const messageContainer = document.getElementById("messageContainer");
     const userInput = document.getElementById("userInput");
+    const typingAnimation = document.getElementById("typingAnimation");
+    const micButton = document.getElementById('micButton');
+    const chatHeader = document.getElementById('chatHeader');
+
+    function addChatMessage(sender, text) {
+      const bubble = document.createElement("div");
+      bubble.classList.add("chat-bubble");
+      if (sender === "User") {
+        bubble.classList.add("chat-user");
+      } else if (sender === "AI") {
+        bubble.classList.add("chat-ai");
+      } else {
+        // For System messages or others, no additional styling is applied.
+      }
+      bubble.textContent = text;
+      messageContainer.appendChild(bubble);
+      const clearDiv = document.createElement("div");
+      clearDiv.classList.add("chat-clear");
+      messageContainer.appendChild(clearDiv);
+      messageContainer.scrollTop = messageContainer.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+      typingAnimation.style.display = "inline-flex";
+    }
+
+    function hideTypingIndicator() {
+      typingAnimation.style.display = "none";
+    }
+
+    // Create WebSocket connection with dynamic port detection
+    function getWebSocketUrl() {
+      // Check URL params for 'ws' parameter (e.g., ?ws=8766)
+      const urlParams = new URLSearchParams(window.location.search);
+      const wsPort = urlParams.get('ws');
+      
+      // If ws param exists, use it
+      if (wsPort) {
+        return `ws://localhost:${wsPort}`;
+      }
+      
+      // Check localStorage for previously saved port from server_info message
+      const savedWsPort = localStorage.getItem('tac_ws_port');
+      if (savedWsPort) {
+        console.log(`Using saved WebSocket port from previous connection: ${savedWsPort}`);
+        return `ws://localhost:${savedWsPort}`;
+      }
+      
+      // Check localStorage for http port as well (if available)
+      const savedHttpPort = localStorage.getItem('tac_http_port');
+      if (savedHttpPort) {
+        // WebSocket port is often one less than HTTP port
+        return `ws://localhost:${parseInt(savedHttpPort)-1}`;
+      }
+      
+      // If browser URL is on localhost, extract port and calculate WS port
+      const currentLocation = window.location;
+      if (currentLocation.hostname === 'localhost' || currentLocation.hostname === '127.0.0.1') {
+        // If we're on port 8767, websocket is likely on 8766
+        const httpPort = parseInt(currentLocation.port);
+        if (!isNaN(httpPort) && httpPort > 1) {
+          // WebSocket port is typically 1 less than HTTP port
+          const wsPort = httpPort - 1;
+          return `ws://localhost:${wsPort}`;
+        }
+      }
+      
+      // Default fallback
+      return "ws://localhost:8765";
+    }
+    
+    // Connect using dynamic WebSocket URL
+    const socket = new WebSocket(getWebSocketUrl());
+    
+    // Log the connection URL
+    console.log(`Connecting to WebSocket: ${socket.url}`);
+
+    // Add automatic reconnection support
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let reconnectTimeout = null;
+    
+    // Connection opened
+    socket.addEventListener('open', (event) => {
+      console.log('Connected to WebSocket server');
+      const blockStatusText = document.getElementById("blockStatusText");
+      const statusDot = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (statusDot) {
+        statusDot.classList.remove("error", "offline");
+        statusDot.classList.add("online");
+      }
+      
+      if (blockStatusText) {
+        blockStatusText.textContent = "online";
+      }
+      
+      messageContainer.classList.remove("offline");
+      chatHeader.classList.remove("offline");
+    });
+    
+    // Handle WebSocket closure to indicate offline status (red indicator)
+    socket.addEventListener('close', (event) => {
+      console.log('WebSocket connection closed');
+      const blockStatusText = document.getElementById("blockStatusText"); 
+      const statusDot = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (statusDot) {
+        statusDot.classList.remove("online");
+        statusDot.classList.add("error", "offline");
+      }
+      
+      if (blockStatusText) {
+        blockStatusText.textContent = "offline";
+      }
+      
+      messageContainer.classList.add("offline");
+      chatHeader.classList.add("offline");
+      
+      // Try to reconnect if not a clean closure or if we've forced a reconnect
+      if (!event.wasClean && reconnectAttempts < maxReconnectAttempts) {
+        reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(1.5, reconnectAttempts), 10000);
+        
+        if (blockStatusText) {
+          blockStatusText.textContent = `reconnecting in ${Math.round(delay/1000)}s...`;
+        }
+        
+        // Clear any existing reconnect timeout
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+        }
+        
+        // Set a new reconnect timeout
+        reconnectTimeout = setTimeout(() => {
+          if (blockStatusText) {
+            blockStatusText.textContent = "reconnecting...";
+          }
+          // Reload the page to reinitialize everything
+          window.location.reload();
+        }, delay);
+      }
+    });
+    
+    // Handle WebSocket errors to indicate offline status (red indicator)
+    socket.addEventListener('error', (event) => {
+      console.log('WebSocket error');
+      const blockStatusText = document.getElementById("blockStatusText");
+      const statusDot = document.querySelector("#blockStatus .blockStatusDot");
+      
+      if (statusDot) {
+        statusDot.classList.remove("online");
+        statusDot.classList.add("error", "offline");
+      }
+      
+      if (blockStatusText) {
+        blockStatusText.textContent = "offline";
+      }
+      
+      messageContainer.classList.add("offline");
+      chatHeader.classList.add("offline");
+      
+      // Don't start reconnect logic here - the close event will handle it
+    });
+
+    // Global flag for wild animation mode is controlled by "wildMode"
+    let wildMode = false;  // Start with normal animation
+    let pauseAnimation = false;  // New flag to completely pause animation
+
+    // Function to handle indexing progress updates
+    function handleIndexingProgress(data) {
+      const progressContainer = document.getElementById('indexingProgressContainer');
+      const progressBar = document.querySelector('#indexingProgressContainer .progress-bar');
+      const progressText = document.querySelector('#indexingProgressContainer .progress-text');
+      const statusText = document.getElementById('blockStatusText');
+      
+      if (data.stage === 'hidden') {
+        // Hide progress bar completely
+        progressContainer.style.display = 'none';
+        // Make sure status text is visible
+        statusText.style.display = 'inline';
+        return;
+      }
+      
+      // Show progress container
+      progressContainer.style.display = 'flex';
+      
+      // Hide normal status text when progress bar is visible
+      statusText.style.display = 'none';
+      
+      // Update progress percentage
+      const percentage = data.percentage;
+      progressBar.style.width = `${percentage}%`;
+      
+      // Update text
+      progressText.textContent = data.message;
+      
+      // Set color based on stage
+      if (data.stage === 'error') {
+        progressBar.style.background = 'linear-gradient(90deg, #f44336, #ff7043)';
+      } else if (data.stage === 'complete') {
+        progressBar.style.background = 'linear-gradient(90deg, #4caf50, #8bc34a)';
+      } else if (data.stage === 'processing') {
+        progressBar.style.background = 'linear-gradient(90deg, #2196f3, #03a9f4)';
+      } else {
+        progressBar.style.background = 'linear-gradient(90deg, #ff9800, #ffc107)';
+      }
+      
+      // When indexing completes, let the backend handle hiding
+      // We removed the setTimeout here because it could conflict with the backend's timing
+    }
+
+    // Handle incoming messages from the WebSocket
+    socket.onmessage = function(event) {
+      let data;
+      
+      // Parse JSON data if possible
+      try {
+        data = JSON.parse(event.data);
+        
+        // Handle indexing progress message
+        if (data.type === 'indexing_progress') {
+          handleIndexingProgress(data);
+          return;
+        }
+        
+        // Debug: log all settings-related messages
+        if (data.type === 'settings_page' || 
+            data.type === 'component_mapping_update_result' || 
+            (data.type === 'error_message' && data.message && data.message.includes('settings'))) {
+          console.log("Received settings-related message:", data.type);
+        }
+        
+        // Forward component mapping updates to any iframe that might be listening
+        if (data.type === 'component_mapping_update_result') {
+          window.postMessage(data, '*');
+        }
+        
+        // Handle server port information
+        if (data.type === 'server_info') {
+          console.log(`Received server info: WS port=${data.ws_port}, HTTP port=${data.http_port}`);
+          
+          // Check if we need to reconnect with the correct port
+          const currentWsUrl = new URL(socket.url);
+          const currentPort = currentWsUrl.port;
+          
+          if (currentPort !== data.ws_port.toString()) {
+            console.log(`Port mismatch! Connected to ${currentPort} but server is on ${data.ws_port}`);
+            
+            // Store the correct port in localStorage for future connections
+            localStorage.setItem('tac_ws_port', data.ws_port);
+            localStorage.setItem('tac_http_port', data.http_port);
+          } else {
+            console.log('Connected to correct WebSocket port');
+            // Reset reconnect attempts since we're connected properly
+            reconnectAttempts = 0;
+          }
+          
+          return;
+        }
+      } catch (error) {
+        // Not JSON, assume it's a chat message
+        addChatMessage("AI", event.data);
+        hideTypingIndicator();
+        return;
+      }
+      
+      // Handle settings page content
+      if (data.type === 'settings_page') {
+        const settingsFrame = document.getElementById('settingsFrame');
+        if (settingsFrame) {
+          // Use srcdoc to set the content directly
+          settingsFrame.srcdoc = data.html;
+        }
+        return;
+      }
+      
+      // Handle status message updates
+      if (data.type === 'status_message') {
+        // Get status message for status bar display
+        const statusMessage = data.message;
+        
+        // Show different status based on message content
+        if (statusMessage.includes('❌') || statusMessage.includes('Error')) {
+          updateRecipientStatus(statusMessage, 'error');
+        } else if (statusMessage.includes('✅') || statusMessage.includes('success')) {
+          updateRecipientStatus(statusMessage, 'success');
+        } else if (statusMessage.includes('Starting') || statusMessage.includes('Processing') || 
+                   statusMessage.includes('Recording') || statusMessage.includes('Analyzing')) {
+          updateRecipientStatus(statusMessage, 'processing');
+        } else {
+          updateRecipientStatus(statusMessage);
+        }
+        
+        // Check for attempt number updates in status messages - support both formats
+        const attemptMatch = statusMessage.match(/Starting (?:block creation and execution )?attempt (\d+) of (\d+)/);
+        if (attemptMatch) {
+          const current = attemptMatch[1];
+          const max = attemptMatch[2];
+          // Update the attempt number display in protoblock header
+          // document.getElementById('protoblockAttempt').textContent = `Attempt ${current}/${max}`;
+          // console.log(`Updated attempt number to ${current}/${max}`);
+        }
+        
+        // If the status message indicates the block execution has finished (success, failure, or cancellation), stop fast spinning.
+        if (statusMessage.includes("Block executed successfully") || statusMessage.includes("Block execution failed") || statusMessage.toLowerCase().includes("cancelled")) {
+          wildMode = false;
+        }
+        
+        // Show Human Reviewer section only when we get a completion message
+        if (statusMessage === "✅ Block executed successfully! Displaying final results...") {
+          console.log("Block successful, showing Human Reviewer section");
+          // Show the Human Reviewer section for successful execution
+          setTimeout(() => {
+            if (window.trustyAgentResults && Object.keys(window.trustyAgentResults).length > 0) {
+              showHumanReviewerSection(true, 'success');
+            }
+          }, 500); // Small delay to ensure trusty agent results are processed
+        } else if (statusMessage.includes("Block execution failed") && 
+                  !statusMessage.includes("creating protoblock") && 
+                  !statusMessage.includes("cancelled")) {
+          console.log("Block failed but trusty agents ran, checking for results to show Human Reviewer section");
+          // Allow a small delay to ensure agent results are fully processed
+          setTimeout(() => {
+            if (window.trustyAgentResults && Object.keys(window.trustyAgentResults).length > 0) {
+              // Check if any agents failed
+              let hasFailedAgents = false;
+              for (const agentName in window.trustyAgentResults) {
+                const result = window.trustyAgentResults[agentName];
+                if (result && result.status && (result.status === 'failed' || result.status === 'error')) {
+                  hasFailedAgents = true;
+                  break;
+                }
+              }
+              showHumanReviewerSection(true, hasFailedAgents ? 'failure' : 'success');
+            }
+          }, 500); // Small delay to ensure trusty agent results are processed
+        }
+        
+        return;
+      }
+      
+      // Handle other message types
+      if (data.type === "error_message") {
+        // Display prominent error message at the top of the right panel
+        const errorMessage = document.getElementById("errorMessage");
+        errorMessage.textContent = data.message;
+        errorMessage.style.display = "block";
+        
+        errorMessage.classList.remove("animated");
+        void errorMessage.offsetWidth;
+        errorMessage.classList.add("animated");
+        
+        setTimeout(() => {
+          errorMessage.style.display = "none";
+        }, 30000);
+        
+        return;
+      }
+      else if (data.type === "info_message") {
+        // Check if the message is about uncommitted changes
+        if (data.message && (
+            data.message.toLowerCase().includes("not committed") || 
+            data.message.toLowerCase().includes("uncommitted") || 
+            data.message.toLowerCase().includes("changes will be lost") ||
+            data.message.toLowerCase().includes("unsaved changes") ||
+            data.message.toLowerCase().includes("changes detected") ||
+            data.message.toLowerCase().includes("stash") ||
+            data.message.toLowerCase().includes("git commit")
+        )) {
+          // Skip showing messages about uncommitted changes
+          console.log("Skipping info message about uncommitted changes:", data.message);
+          return;
+        }
+
+        // Show other info messages
+        const infoMessage = document.getElementById("infoMessage");
+        infoMessage.textContent = data.message;
+        infoMessage.style.display = "block";
+        
+        setTimeout(() => {
+          infoMessage.style.display = "none";
+        }, 15000);
+        
+        return;
+      }
+      else if (data.type === "remove_protoblock") {
+        console.log("Received explicit remove_protoblock message");
+        
+        // Only hide protoblock if this is NOT due to a failure
+        if (!data.message || !data.message.includes("fail")) {
+          document.getElementById('protoblockContainer').style.display = 'none';
+          document.querySelector('#blockPanel canvas').style.display = 'block';
+          
+          document.getElementById('protoblockContainer').innerHTML = '';
+          rebuildProtoblockContainer();
+        }
+        
+        // Update status in chat panel instead
+        updateRecipientStatus(data.message || "Block processing complete");
+        return;
+      }
+      else if (data.type === "protoblock_data") {
+        console.log("Received protoblock data:", data);
+        
+        document.getElementById('protoblockContainer').style.display = 'block';
+        document.querySelector('#blockPanel canvas').style.display = 'none';
+        
+        displayProtoblockData(data);
+        
+        // Show human reviewer section when protoblock data is received
+        // This was missing and caused the accept/reject buttons to not appear
+        if (data.trusty_agent_results && Object.keys(data.trusty_agent_results).length > 0) {
+          console.log("Trusty agent results found, showing Human Reviewer section");
+          setTimeout(() => {
+            // Check if any agents failed
+            let hasFailedAgents = false;
+            for (const agentName in data.trusty_agent_results) {
+              const result = data.trusty_agent_results[agentName];
+              if (result && result.status && (result.status === 'failed' || result.status === 'error')) {
+                hasFailedAgents = true;
+                break;
+              }
+            }
+            showHumanReviewerSection(true, hasFailedAgents ? 'failure' : 'success');
+          }, 300);
+        }
+        
+        console.log("Protoblock is now visible");
+        return;
+      }
+      else if (data.type === "transcribed_message") {
+        addChatMessage("User", data.message);
+        
+        const payload = {
+          type: "user_message",
+          message: data.message
+        };
+        socket.send(JSON.stringify(payload));
+        showTypingIndicator();
+        micButton.classList.remove('waiting');
+        micButton.classList.remove('recording');
+        micButton.classList.remove('rotating');
+        micButton.classList.remove('transcribing');
+        return;
+      }
+      else if (data.type === "file_status_response" || 
+              data.type === "file_diff_response" || 
+              data.type === "git_branch_response" || 
+              data.type === "git_operation_response") {
+        console.log(`Received ${data.type}`);
+        
+        // Handle file diff response
+        if (data.type === "file_diff_response" && data.diff) {
+          fileDiffBody.innerHTML = formatDiff(data.diff);
+        }
+        
+        // Handle file status response
+        if (data.type === "file_status_response") {
+          console.log("File status response:", data);
+          
+          // If at least one file has changes, make sure files are clickable
+          if (data.is_modified && data.filename) {
+            updateFileBadge(data.filename, data.added_lines || 0, data.removed_lines || 0);
+            
+            // Ensure files are clickable after getting status
+            const blockStatusTextContent = document.getElementById('blockStatusText')?.textContent || "";
+            const isSuccess = blockStatusTextContent.includes("✅") || 
+                             blockStatusTextContent.includes("successful") ||
+                             blockStatusTextContent.includes("Ready");
+                             
+            if (isSuccess) {
+              // Make sure this file is clickable
+              makeFilesClickable();
+            }
+          }
+        }
+        
+        // Handle git operation response
+        if (data.type === "git_operation_response") {
+          console.log("Git operation response:", data);
+          
+          // If this is a discard operation, remove line count badges
+          if (data.operation === "discard" && data.success) {
+            // Clear all line count badges from files
+            const writeFilesList = document.getElementById('writeFilesList');
+            if (writeFilesList) {
+              const fileItems = writeFilesList.querySelectorAll('li');
+              fileItems.forEach(item => {
+                const badge = item.querySelector('.line-count-badge');
+                if (badge) {
+                  badge.remove();
+                }
+              });
+              console.log("Removed line count badges after rejecting changes");
+            }
+          }
+        }
+        
+        return;
+      }
+      else if (data.type === "chat_message") {
+        const role = data.role || "AI";
+        const message = data.message || "";
+        
+        if (role === "user") {
+          addChatMessage("User", message);
+        } else if (role === "assistant") {
+          addChatMessage("AI", message);
+          hideTypingIndicator();
+        } else {
+          addChatMessage(role, message);
+        }
+        
+        return;
+      }
+      else {
+        // For unrecognized message types, just log instead of displaying in chat
+        console.log("Received unknown message type:", data.type);
+        console.warn("Unknown message data:", data);
+        
+        // Only display in chat if it explicitly has a role or appears to be a chat message
+        if (data.role || (data.component_id === "chat_panel" && data.message)) {
+          addChatMessage(data.role || "AI", data.message || JSON.stringify(data));
+          hideTypingIndicator();
+        }
+      }
+    };
+
+    // Send user message when Enter key is pressed (without Shift)
     userInput.addEventListener("keydown", function(event) {
       if (event.key === "Enter" && !event.shiftKey) {
         event.preventDefault();
-        const text = userInput.value;
-        socket.send(text);
-        userInput.value = "";
+        const text = userInput.value.trim();
+        if (text !== "") {
+          addChatMessage("User", text);
+          
+          const payload = {
+            type: "user_message",
+            message: text
+          };
+          
+          socket.send(JSON.stringify(payload));
+          showTypingIndicator();
+          userInput.value = "";
+        }
       }
     });
+
+    // Bind click event to the block button for cube-like interaction
+    const blockButton = document.getElementById('blockButton');
+    blockButton.addEventListener('click', function() {
+      // Trigger fast spinning animation on the cube until backend confirmation arrives
+      wildMode = true;
+      
+      // Do not use a set timeout; the spinning will continue until a status message stops it
+      toggleProtoblockDisplay(false);
+      document.getElementById('protoblockContainer').innerHTML = '';
+      rebuildProtoblockContainer();
+      
+      blockButton.classList.add('active');
+      setTimeout(() => {
+        blockButton.classList.remove('active');
+      }, 300);
+      
+      const text = userInput.value.trim();
+      if (text !== "") {
+        // Add user message to chat display
+        addChatMessage("User", text);
+        
+        // Don't send as a regular user_message to avoid getting a standard AI response
+        // We'll include the message with the block_click instead
+        userInput.value = "";
+      }
+      
+      // Add a "creating block..." message from AI
+      addChatMessage("AI", "creating block...");
+      // Hide typing indicator since we don't want to show it for the custom message
+      hideTypingIndicator();
+      
+      const payload = {
+        type: "block_click",
+        message: text || ""  // Include user's message if available
+      };
+      socket.send(JSON.stringify(payload));
+    });
+
+    // Bind click event to the microphone button to send the 'mic_click' event to the backend
+    let isRecording = false; // flag to track recording state
+
+    micButton.addEventListener('click', function() {
+      isRecording = !isRecording;
+      if (isRecording) {
+        micButton.classList.add('recording');
+        micButton.classList.remove('rotating');
+        micButton.classList.remove('transcribing');
+      } else {
+        micButton.classList.remove('recording');
+        micButton.classList.remove('rotating');
+        micButton.classList.add('transcribing');
+      }
+      const payload = {
+        type: "mic_click",
+        recording: isRecording
+      };
+      socket.send(JSON.stringify(payload));
+    });
+
+    // Initialize Three.js scene for the rotating cube inside the block button
+    const btnCanvas = document.getElementById('cubeCanvas');
+    const btnRenderer = new THREE.WebGLRenderer({ canvas: btnCanvas, antialias: true, alpha: true });
+    btnRenderer.setPixelRatio(window.devicePixelRatio);
+    btnRenderer.setClearColor(0x000000, 0);
+    btnRenderer.setSize(32, 32);
+
+    const btnScene = new THREE.Scene();
+    const btnCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    btnCamera.position.z = 2;
+
+    const btnGeometry = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+    const btnMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x0078d7, 
+      shininess: 100, 
+      wireframe: true, 
+      transparent: true, 
+      opacity: 0.7,
+      emissive: 0x0078d7, 
+      emissiveIntensity: 0.5
+    });
+    const btnCube = new THREE.Mesh(btnGeometry, btnMaterial);
+    btnScene.add(btnCube);
+
+    const btnAmbient = new THREE.AmbientLight(0xffffff, 0.8);
+    btnScene.add(btnAmbient);
+
+    // Global flag for wild animation mode is controlled by "wildMode"
+    function animateBtnCube() {
+      requestAnimationFrame(animateBtnCube);
+      
+      if (pauseAnimation) {
+        // Don't update rotation when paused
+        btnRenderer.render(btnScene, btnCamera);
+        return;
+      }
+      
+      if (wildMode) {
+        btnCube.rotation.x += 0.2;
+        btnCube.rotation.y += 0.2;
+        btnCube.rotation.z += 0.15;
+      } else {
+        btnCube.rotation.x += 0.02;
+        btnCube.rotation.y += 0.02;
+      }
+      btnRenderer.render(btnScene, btnCamera);
+    }
+    animateBtnCube();
+
+    // Initially hide the protoblock display
+    toggleProtoblockDisplay(false);
+    rebuildProtoblockContainer();
+
+    // Settings button click handler
+    document.getElementById('settingsButton').addEventListener('click', function () {
+      console.log("Settings button clicked");
+      
+      // Create a settings iframe
+      let settingsFrame = document.getElementById('settingsFrame');
+      if (!settingsFrame) {
+        console.log("Creating new settings frame");
+        settingsFrame = document.createElement('iframe');
+        settingsFrame.id = 'settingsFrame';
+        settingsFrame.style.width = '100%';
+        settingsFrame.style.height = '100%';
+        settingsFrame.style.border = 'none';
+        
+        // Clear the block panel and add the iframe
+        const blockPanel = document.getElementById('blockPanel');
+        console.log("Block panel found:", !!blockPanel);
+        
+        // Hide the 3D scene temporarily
+        renderer.domElement.style.display = 'none';
+        
+        // Hide the protoblock container if it exists
+        const protoblockContainer = document.getElementById('protoblockContainer');
+        if (protoblockContainer) {
+          console.log("Hiding protoblock container");
+          protoblockContainer.style.display = 'none';
+        }
+        
+        // Create a close button for the settings
+        const closeButton = document.createElement('button');
+        closeButton.id = 'settingsCloseButton';
+        closeButton.textContent = '×';
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '10px';
+        closeButton.style.right = '10px';
+        closeButton.style.fontSize = '24px';
+        closeButton.style.background = 'transparent';
+        closeButton.style.border = 'none';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.zIndex = '1000';
+        closeButton.onclick = function() {
+          console.log("Settings close button clicked");
+          // Remove the settings frame
+          blockPanel.removeChild(settingsFrame);
+          if (closeButton.parentNode) {
+            blockPanel.removeChild(closeButton);
+          }
+          
+          // Show either the protoblock container or the 3D scene
+          if (protoblockContainer && protoblockContainer.firstChild) {
+            console.log("Restoring protoblock container");
+            protoblockContainer.style.display = 'block';
+          } else {
+            console.log("Restoring 3D scene");
+            renderer.domElement.style.display = 'block';
+            renderer.domElement.style.opacity = '1';
+          }
+        };
+        
+        blockPanel.appendChild(settingsFrame);
+        blockPanel.appendChild(closeButton);
+        
+        console.log("Sending settings_click websocket message");
+        // Request settings content via websocket
+        socket.send(JSON.stringify({ type: "settings_click" }));
+      } else {
+        console.log("Settings frame already exists");
+      }
+    });
+    
+    // Listen for messages from iframes (for settings page)
+    window.addEventListener('message', function(event) {
+      // Check if this is a websocket message request from the settings iframe
+      if (event.data && event.data.type === 'settings_websocket_message' && event.data.data) {
+        console.log("Received message from iframe:", event.data.type);
+        // Forward the message data to the websocket
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          console.log("Forwarding message to websocket:", event.data.data);
+          socket.send(JSON.stringify(event.data.data));
+        } else {
+          console.error('WebSocket is not open, cannot send settings update');
+          
+          // Reply with an error message
+          event.source.postMessage({
+            type: 'component_mapping_update_result',
+            success: false,
+            error: 'WebSocket is not connected'
+          }, '*');
+        }
+      }
+    });
+
+    // Add event listeners for Human Reviewer buttons
+    document.addEventListener('DOMContentLoaded', function() {
+      // We need to use event delegation since the buttons might be created dynamically
+      document.body.addEventListener('click', function(event) {
+        // Accept Changes button
+        if (event.target.id === 'acceptChangesBtn') {
+          console.log('Accept Changes clicked');
+          // Use task description as commit message
+          const taskDescription = document.getElementById('taskDescription')?.textContent || 'Accept changes from protoblock';
+          const commitMessage = taskDescription.substring(0, 100); // Limit to 100 chars in case it's too long
+          
+          // Disable both buttons and change appearance
+          const acceptBtn = document.getElementById('acceptChangesBtn');
+          const rejectBtn = document.getElementById('rejectChangesBtn');
+          
+          if (acceptBtn) {
+            acceptBtn.classList.add('accepted');
+            acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
+          }
+          
+          if (rejectBtn) {
+            rejectBtn.classList.add('disabled');
+            rejectBtn.disabled = true;
+          }
+          
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
+          const payload = {
+            type: "git_commit_request",
+            message: commitMessage
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Committing changes...', 'processing');
+        }
+        
+        // Reject Changes button
+        if (event.target.id === 'rejectChangesBtn') {
+          console.log('Reject Changes clicked');
+          // No confirm needed - immediately discard
+          
+          // Disable both buttons and change appearance
+          const acceptBtn = document.getElementById('acceptChangesBtn');
+          const rejectBtn = document.getElementById('rejectChangesBtn');
+          
+          if (rejectBtn) {
+            rejectBtn.classList.add('rejected');
+            rejectBtn.classList.add('disabled');
+            rejectBtn.disabled = true;
+          }
+          
+          if (acceptBtn) {
+            acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
+          }
+          
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
+          const payload = {
+            type: "git_discard_request"
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Discarding changes...', 'processing');
+        }
+      });
+    });
+    
+    // Also set up the buttons directly in case DOMContentLoaded already fired
+    function setupHumanReviewerButtons() {
+      const acceptBtn = document.getElementById('acceptChangesBtn');
+      const rejectBtn = document.getElementById('rejectChangesBtn');
+      const gitStatusMessage = document.getElementById('gitStatusMessage');
+      const humanReviewerSection = document.getElementById('humanReviewerSection');
+      
+      // Check if we're in failure mode
+      const isFailureMode = humanReviewerSection && humanReviewerSection.classList.contains('failure');
+      
+      // Update button text and status message based on mode
+      if (isFailureMode) {
+        if (gitStatusMessage) {
+          gitStatusMessage.textContent = "Some verification agents failed, but you can still choose to accept or reject the changes.";
+          gitStatusMessage.style.color = "#cc0000";
+          gitStatusMessage.style.marginBottom = "10px";
+        }
+        
+        if (acceptBtn) {
+          acceptBtn.textContent = "Accept Anyway";
+        }
+        
+        if (rejectBtn) {
+          rejectBtn.textContent = "Reject Changes";
+        }
+      } else {
+        // Success mode
+        if (gitStatusMessage) {
+          gitStatusMessage.textContent = "All verification agents approved the changes.";
+          gitStatusMessage.style.color = "#007700";
+          gitStatusMessage.style.marginBottom = "10px";
+        }
+        
+        if (acceptBtn) {
+          acceptBtn.textContent = "Accept Changes";
+        }
+        
+        if (rejectBtn) {
+          rejectBtn.textContent = "Reject Changes";
+        }
+      }
+      
+      if (acceptBtn) {
+        acceptBtn.onclick = function() {
+          console.log('Accept Changes clicked (direct handler)');
+          // Use task description as commit message
+          const taskDescription = document.getElementById('taskDescription')?.textContent || 'Accept changes from protoblock';
+          const commitMessage = taskDescription.substring(0, 100); // Limit to 100 chars in case it's too long
+          
+          // Disable both buttons and change appearance
+          acceptBtn.classList.add('accepted');
+          acceptBtn.classList.add('disabled');
+          acceptBtn.disabled = true;
+          
+          if (rejectBtn) {
+            rejectBtn.classList.add('disabled');
+            rejectBtn.disabled = true;
+          }
+          
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
+          const payload = {
+            type: "git_commit_request",
+            message: commitMessage
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Committing changes...', 'processing');
+        };
+      }
+      
+      if (rejectBtn) {
+        rejectBtn.onclick = function() {
+          console.log('Reject Changes clicked (direct handler)');
+          // No confirm needed - immediately discard
+          
+          // Disable both buttons and change appearance
+          rejectBtn.classList.add('rejected');
+          rejectBtn.classList.add('disabled');
+          rejectBtn.disabled = true;
+          
+          if (acceptBtn) {
+            acceptBtn.classList.add('disabled');
+            acceptBtn.disabled = true;
+          }
+          
+          // Re-enable block button after operation is complete
+          const blockButton = document.getElementById('blockButton');
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Hide human reviewer section
+          showHumanReviewerSection(false);
+          
+          // Start normal animation to indicate processing
+          pauseAnimation = false;
+          wildMode = false;
+          
+          const payload = {
+            type: "git_discard_request"
+          };
+          socket.send(JSON.stringify(payload));
+          updateRecipientStatus('Discarding changes...', 'processing');
+        };
+      }
+    }
+    
+    // Call setup function after block display is shown
+    function showHumanReviewerSection(show = true, status = "default") {
+      const humanReviewerSection = document.getElementById('humanReviewerSection');
+      const blockButton = document.getElementById('blockButton');
+      
+      if (humanReviewerSection) {
+        console.log(`${show ? 'Showing' : 'Hiding'} Human Reviewer section with status: ${status}`);
+        humanReviewerSection.style.display = show ? 'block' : 'none';
+        
+        // Remove any existing status classes
+        humanReviewerSection.classList.remove('success', 'failure');
+        
+        // Add appropriate status class if showing
+        if (show && status !== 'default') {
+          humanReviewerSection.classList.add(status);
+        }
+        
+        // Disable block button and freeze animation when showing Human Reviewer section
+        if (show) {
+          // Disable block button
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'none';
+            blockButton.style.opacity = '0.5';
+          }
+          
+          // Completely freeze animation
+          pauseAnimation = true;
+          wildMode = false;
+          
+          // Make sure the buttons are set up correctly when shown
+          setTimeout(setupHumanReviewerButtons, 100);
+        } else {
+          // Re-enable block button when hiding
+          if (blockButton) {
+            blockButton.style.pointerEvents = 'auto';
+            blockButton.style.opacity = '1';
+          }
+          
+          // Resume normal animation (not wild mode)
+          pauseAnimation = false;
+          wildMode = false;
+        }
+      } else {
+        console.error('Human Reviewer section not found');
+      }
+    }
   </script>
+  
+  <!-- File diff overlay -->
+  <div id="fileDiffOverlay">
+    <div id="fileDiffContent">
+      <div id="fileDiffHeader">
+        <h3 id="fileDiffTitle">File Changes</h3>
+        <div>
+          <button id="fileDiffCloseBtn">×</button>
+        </div>
+      </div>
+      <div id="fileDiffBody"></div>
+    </div>
+  </div>
+  
+  <!-- Trusty Agent Prompt overlay -->
+  <div id="trustyAgentOverlay">
+    <div id="trustyAgentContent">
+      <div id="trustyAgentHeader">
+        <h3 id="trustyAgentTitle">Trusty Agent</h3>
+        <div id="trustyAgentHeaderGrade" class="header-grade" style="display: none;">
+          <span class="grade-letter">A</span>
+        </div>
+        <button id="trustyAgentCloseBtn">×</button>
+      </div>
+      <div id="trustyAgentBody">
+        <div class="trusty-agent-section">
+          <div class="trusty-agent-section-title">Prompt</div>
+          <div id="trustyAgentPromptText" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentImageSection">
+          <div class="trusty-agent-section-title">Screenshot</div>
+          <div id="trustyAgentImageContainer">
+            <div id="mainImageContainer" style="text-align: center; width: 100%;">
+              <img id="trustyAgentImage" alt="ThreeJS Before/After Comparison" class="constrained-image" style="max-width: 90%; height: auto; border: 1px solid #ccc;">
+            </div>
+            <div id="comparisonImageContainer" class="initially-hidden">
+              <img id="trustyAgentComparisonImage" alt="Comparison Screenshot" class="constrained-image">
+            </div>
+          </div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentResultSection">
+          <div class="trusty-agent-section-title">Result</div>
+          <div id="trustyAgentResultStatus" class="agent-status"></div>
+          <div id="trustyAgentAgentType" class="agent-type"></div>
+          <div id="trustyAgentResultText" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentPlausibilitySection">
+          <div class="trusty-agent-section-title">Plausibility Evaluation</div>
+          <div class="plausibility-container">
+            <div class="plausibility-grade-container">
+              <div id="trustyAgentGrade" class="grade"></div>
+              <div id="trustyAgentGradeInfo" class="grade-info"></div>
+            </div>
+            <div id="trustyAgentVerificationInfo" class="verification-info"></div>
+          </div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentTestResultsSection">
+          <div class="trusty-agent-section-title">Test Results</div>
+          <div id="trustyAgentTestResults" class="code-block"></div>
+        </div>
+        <div class="trusty-agent-section initially-hidden" id="trustyAgentSummarySection">
+          <div class="trusty-agent-section-title">Summary</div>
+          <div id="trustyAgentSummary" class="summary-block"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // File diff handling
+    const fileDiffOverlay = document.getElementById('fileDiffOverlay');
+    const fileDiffCloseBtn = document.getElementById('fileDiffCloseBtn');
+    const fileDiffBody = document.getElementById('fileDiffBody');
+    const fileDiffTitle = document.getElementById('fileDiffTitle');
+    
+    // Function to format the unified diff output with syntax highlighting
+    function formatDiff(diffText) {
+      if (!diffText || diffText.trim() === '') {
+        return '<div class="diff-empty">No changes found</div>';
+      }
+      
+      const lines = diffText.split('\n');
+      let html = '<div class="diff-content">';
+      
+      lines.forEach(line => {
+        if (line.startsWith('+')) {
+          html += `<div class="diff-line diff-added">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('-')) {
+          html += `<div class="diff-line diff-removed">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('@@')) {
+          html += `<div class="diff-line diff-info">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('diff') || line.startsWith('index')) {
+          html += `<div class="diff-line diff-header">${escapeHtml(line)}</div>`;
+        } else {
+          html += `<div class="diff-line">${escapeHtml(line)}</div>`;
+        }
+      });
+      
+      html += '</div>';
+      return html;
+    }
+
+    function escapeHtml(unsafe) {
+      return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+    }
+
+    fileDiffCloseBtn.addEventListener('click', () => {
+      fileDiffOverlay.style.display = 'none';
+    });
+
+    fileDiffOverlay.addEventListener('click', (event) => {
+      if (event.target === fileDiffOverlay) {
+        fileDiffOverlay.style.display = 'none';
+      }
+    });
+
+    async function showFileDiff(filename) {
+      fileDiffTitle.textContent = `Changes in ${filename}`;
+      fileDiffBody.innerHTML = 'Loading diff...';
+      fileDiffOverlay.style.display = 'flex';
+      
+      requestFileDiff(filename);
+    }
+  </script>
+  
+  <!-- Trusty Agent Prompt overlay functionality -->
+  <script>
+    const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
+    const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
+    const trustyAgentBody = document.getElementById('trustyAgentBody');
+    const trustyAgentTitle = document.getElementById('trustyAgentTitle');
+
+    // Function to update header grade display
+    function updateHeaderGrade(grade) {
+      if (!grade) return;
+      
+      const headerGrade = document.getElementById('trustyAgentHeaderGrade');
+      const gradeLetter = headerGrade.querySelector('.grade-letter');
+      
+      // Remove any existing grade classes
+      gradeLetter.classList.remove('A', 'B', 'C', 'D', 'F');
+      
+      // Set the grade letter text
+      gradeLetter.textContent = grade;
+      
+      // Add the appropriate class for styling
+      gradeLetter.classList.add(grade);
+      
+      // Show the grade
+      headerGrade.style.display = 'flex';
+    }
+
+    function showTrustyAgentPrompt(agentName, agentKey) {
+      console.log(`Showing prompt for agent: ${agentName} (key: ${agentKey})`);
+      
+      trustyAgentTitle.textContent = `${agentName}`;
+      
+      const prompt = window.trustyAgentPrompts[agentName] || '';
+      console.log(`Prompt for ${agentName}:`, prompt ? 'exists' : 'not found');
+      
+      const results = window.trustyAgentResults && 
+                     (window.trustyAgentResults[agentName] || window.trustyAgentResults[agentKey] || null);
+      
+      console.log(`Results for ${agentName}:`, results || 'not found');
+      
+      const promptTextElement = document.getElementById('trustyAgentPromptText');
+      promptTextElement.textContent = prompt || 'No prompt available for this agent.';
+      
+      const resultSection = document.getElementById('trustyAgentResultSection');
+      const resultTextElement = document.getElementById('trustyAgentResultText');
+      const resultStatusElement = document.getElementById('trustyAgentResultStatus');
+      const imageSection = document.getElementById('trustyAgentImageSection');
+      const imageElement = document.getElementById('trustyAgentImage');
+      
+      const blockStatusText = document.getElementById('blockStatusText');
+      const executionSuccessful = blockStatusText.textContent.includes("✅");
+      
+      if (results && (results.output || results.image_url)) {
+        console.log(`${agentName} has results to display`);
+        
+        if (results.output) {
+          console.log(`${agentName} output:`, results.output);
+          resultSection.style.display = 'block';
+          if (results.status) {
+            resultStatusElement.textContent = results.status;
+            resultStatusElement.className = 'agent-status';
+            if (results.status.toLowerCase() === 'passed') {
+              resultStatusElement.classList.add('passed');
+            } else if (results.status.toLowerCase() === 'failed') {
+              resultStatusElement.classList.add('failed');
+            } else {
+              resultStatusElement.classList.add('error');
+            }
+          } else {
+            resultStatusElement.textContent = '';
+            resultStatusElement.className = 'agent-status';
+          }
+          
+          // Apply markdown formatting to the output text
+          resultTextElement.innerHTML = renderMarkdown(results.output || "No text output available");
+          resultTextElement.classList.add('markdown-content');
+        } else {
+          resultSection.style.display = 'none';
+        }
+        
+        if (results.image_url) {
+          console.log(`${agentName} image URL:`, results.image_url);
+          imageSection.style.display = 'block';
+          imageElement.src = makePathUsable(results.image_url);
+          console.log(`Setting main image src to: ${makePathUsable(results.image_url)}`);
+        } else if (results.comparison_path) {
+          // Explicitly handle comparison_path that may not be exposed as image_url
+          console.log(`${agentName} comparison path:`, results.comparison_path);
+          imageSection.style.display = 'block';
+          imageElement.src = makePathUsable(results.comparison_path);
+          console.log(`Setting main image src from comparison_path: ${makePathUsable(results.comparison_path)}`);
+        } else {
+          imageSection.style.display = 'none';
+        }
+      } else {
+        console.log(`${agentName} has no results to display`);
+        
+        resultSection.style.display = 'block';
+        resultStatusElement.style.display = 'none';
+        resultTextElement.textContent = "No results found for this agent.";
+        console.log(`No results found for agent: ${agentKey}`);
+        imageSection.style.display = 'none';
+      }
+      
+      // If we have summary data, display it with markdown formatting
+      if (results && results.summary) {
+        const summary = results.summary;
+        if (summary) {
+          const summarySection = document.getElementById('trustyAgentSummarySection');
+          const summaryText = document.getElementById('trustyAgentSummary');
+          
+          summarySection.style.display = 'block';
+          summaryText.innerHTML = renderMarkdown(summary);
+          summaryText.classList.add('markdown-content');
+        }
+      }
+      
+      // If we have verification info or plausibility data, apply markdown
+      if (results && results.verification_info) {
+        const verificationInfo = results.verification_info;
+        if (verificationInfo) {
+          const verificationSection = document.getElementById('trustyAgentVerificationInfo');
+          verificationSection.innerHTML = renderMarkdown(verificationInfo);
+          verificationSection.classList.add('markdown-content');
+        }
+      }
+      
+      // Show grade in header if available
+      if (results && results.grade) {
+        updateHeaderGrade(results.grade);
+      } else if (results && results.details && results.details.grade) {
+        updateHeaderGrade(results.details.grade);
+      } else {
+        document.getElementById('trustyAgentHeaderGrade').style.display = 'none';
+      }
+      
+      trustyAgentOverlay.style.display = 'flex';
+    }
+
+    trustyAgentCloseBtn.addEventListener('click', () => {
+      trustyAgentOverlay.style.display = 'none';
+    });
+
+    trustyAgentOverlay.addEventListener('click', (event) => {
+      if (event.target === trustyAgentOverlay) {
+        trustyAgentOverlay.style.display = 'none';
+      }
+    });
+
+    function displayTrustyAgentPrompt(agentName, protoblock) {
+      console.log("Displaying prompt for agent:", agentName);
+      const trustyAgentOverlay = document.getElementById('trustyAgentOverlay');
+      const trustyAgentTitle = document.getElementById('trustyAgentTitle');
+      const trustyAgentPromptText = document.getElementById('trustyAgentPromptText');
+      const trustyAgentResultSection = document.getElementById('trustyAgentResultSection');
+      const trustyAgentResultText = document.getElementById('trustyAgentResultText');
+      const trustyAgentImageSection = document.getElementById('trustyAgentImageSection');
+      const trustyAgentImage = document.getElementById('trustyAgentImage');
+      const trustyAgentAgentType = document.getElementById('trustyAgentAgentType');
+      const trustyAgentResultStatus = document.getElementById('trustyAgentResultStatus');
+      const trustyAgentComparisonImage = document.getElementById('trustyAgentComparisonImage');
+      const comparisonImageContainer = document.getElementById('comparisonImageContainer');
+      const trustyAgentTestResultsSection = document.getElementById('trustyAgentTestResultsSection');
+      const trustyAgentTestResults = document.getElementById('trustyAgentTestResults');
+      const trustyAgentSummarySection = document.getElementById('trustyAgentSummarySection');
+      const trustyAgentSummary = document.getElementById('trustyAgentSummary');
+      const trustyAgentPlausibilitySection = document.getElementById('trustyAgentPlausibilitySection');
+      const trustyAgentGrade = document.getElementById('trustyAgentGrade');
+      const trustyAgentGradeInfo = document.getElementById('trustyAgentGradeInfo');
+      const trustyAgentVerificationInfo = document.getElementById('trustyAgentVerificationInfo');
+
+      trustyAgentOverlay.style.display = 'flex';
+
+      trustyAgentTitle.textContent = `Trusty Agent: ${agentName}`;
+
+      const agentKey = agentName.toLowerCase();
+      let agentPrompt = "";
+
+      let hasPrompt = false;
+      if (protoblock.trusty_agent_prompts && protoblock.trusty_agent_prompts[agentKey]) {
+        hasPrompt = true;
+        agentPrompt = protoblock.trusty_agent_prompts[agentKey];
+      }
+
+      trustyAgentPromptText.textContent = hasPrompt ? agentPrompt : "No prompt found for this agent.";
+
+      let resultObj = null;
+      let hasResults = false;
+      
+      if (protoblock.trusty_agent_results) {
+        console.log("Available trusty agent results:", Object.keys(protoblock.trusty_agent_results));
+        const possibleKeys = [agentName, agentKey, agentName.toLowerCase(), agentKey.replace('agent', '')];
+        for (const key of possibleKeys) {
+          if (protoblock.trusty_agent_results[key]) {
+            resultObj = protoblock.trusty_agent_results[key];
+            hasResults = (resultObj.output !== undefined || resultObj.image_url !== undefined);
+            console.log(`Found results for ${agentKey} using key '${key}':`, resultObj);
+            console.log(`Result object for ${agentKey} - JSON:`, JSON.stringify(resultObj, null, 2));
+            break;
+          }
+        }
+      }
+      
+      function makePathUsable(path) {
+        if (!path) return null;
+        
+        if (path.startsWith('http') || path.startsWith('data:')) {
+          return path;
+        }
+        
+        if (path.startsWith('./') || path.startsWith('../')) {
+          return path;
+        }
+        
+        if (path.startsWith('/')) {
+          console.log(`Converting absolute path to screenshot URL: ${path}`);
+          return `/screenshots${path}`;
+        }
+        
+        console.log(`Converting path to screenshot URL: ${path}`);
+        return `/screenshots/${path}`;
+      }
+
+      trustyAgentResultSection.style.display = 'none';
+      trustyAgentImageSection.style.display = 'none';
+      trustyAgentTestResultsSection.style.display = 'none';
+      trustyAgentSummarySection.style.display = 'none';
+      trustyAgentPlausibilitySection.style.display = 'none';
+
+      const blockStatusText = document.getElementById('blockStatusText');
+      const executionSuccessful = blockStatusText.textContent.includes("✅");
+
+      if (hasResults && resultObj) {
+        if (resultObj.output) {
+          trustyAgentResultSection.style.display = 'block';
+          if (resultObj.status) {
+            trustyAgentResultStatus.textContent = resultObj.status;
+            trustyAgentResultStatus.className = 'agent-status';
+            if (resultObj.status.toLowerCase() === 'passed') {
+              trustyAgentResultStatus.classList.add('passed');
+            } else if (resultObj.status.toLowerCase() === 'failed') {
+              trustyAgentResultStatus.classList.add('failed');
+            } else {
+              trustyAgentResultStatus.classList.add('error');
+            }
+          } else {
+            trustyAgentResultStatus.textContent = '';
+            trustyAgentResultStatus.className = 'agent-status';
+          }
+          
+          // Apply markdown formatting to the output text
+          trustyAgentResultText.innerHTML = renderMarkdown(resultObj.output || "No text output available");
+          trustyAgentResultText.classList.add('markdown-content');
+        } else {
+          trustyAgentResultSection.style.display = 'none';
+        }
+        
+        if (resultObj.image_url) {
+          trustyAgentImageSection.style.display = 'block';
+          const usablePath = makePathUsable(resultObj.image_url);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting main image src to: ${usablePath}`);
+        } else if (resultObj.comparison_path) {
+          trustyAgentImageSection.style.display = 'block';
+          const usablePath = makePathUsable(resultObj.comparison_path);
+          trustyAgentImage.src = usablePath;
+          console.log(`Setting main image src from comparison_path: ${usablePath}`);
+        } else {
+          trustyAgentImageSection.style.display = 'none';
+        }
+      } else {
+        trustyAgentResultSection.style.display = 'block';
+        trustyAgentResultStatus.style.display = 'none';
+        trustyAgentAgentType.style.display = 'none';
+        trustyAgentResultText.textContent = "No results found for this agent.";
+        console.log(`No results found for agent: ${agentKey}`);
+        trustyAgentImageSection.style.display = 'none';
+      }
+
+      // If we have summary data, display it with markdown formatting
+      if (resultObj && resultObj.summary) {
+        const summary = resultObj.summary;
+        if (summary) {
+          trustyAgentSummarySection.style.display = 'block';
+          trustyAgentSummary.innerHTML = renderMarkdown(summary);
+          trustyAgentSummary.classList.add('markdown-content');
+        }
+      }
+      
+      // If we have verification info or plausibility data, apply markdown
+      if (resultObj && resultObj.verification_info) {
+        const verificationInfo = resultObj.verification_info;
+        if (verificationInfo) {
+          trustyAgentVerificationInfo.innerHTML = renderMarkdown(verificationInfo);
+          trustyAgentVerificationInfo.classList.add('markdown-content');
+        }
+      }
+
+      // Show grade in header if available
+      if (resultObj && resultObj.grade) {
+        updateHeaderGrade(resultObj.grade);
+      } else if (resultObj && resultObj.details && resultObj.details.grade) {
+        updateHeaderGrade(resultObj.details.grade);
+      } else {
+        document.getElementById('trustyAgentHeaderGrade').style.display = 'none';
+      }
+
+      const trustyAgentCloseBtn = document.getElementById('trustyAgentCloseBtn');
+      trustyAgentCloseBtn.onclick = function() {
+        trustyAgentOverlay.style.display = 'none';
+      };
+    }
+  </script>
+  
+  <script>
+    // File diff view toggle and helper functions already defined above
+  </script>
+  
+  <!-- New settings page functionality -->
+  <script>
+    // Removed previous placeholder implementation.
+    // The settings button now sends a WebSocket message ("settings_click")
+    // which is handled by the UIManager on the backend to generate settings HTML via get_config_html.
+  </script>
+
+  <!-- File badges script -->
+  <script src="file_badges.js"></script>
 </body>
 </html>

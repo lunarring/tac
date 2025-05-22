@@ -449,11 +449,33 @@ def determine_vision_success(analysis_result: str, min_grade: str = "B") -> bool
         grade_values = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
         min_grade_value = grade_values[min_grade]
         
-        # Extract grade from the analysis
+        # Extract grade from the analysis - check for both formats
         if "GRADE:" in analysis_result:
             grade_line = analysis_result.split("GRADE:")[1].split("\n")[0].strip()
             grade = grade_line[0].upper()  # Take first character as grade
             
+            if grade not in grade_values:
+                logger.error(f"Invalid grade found in analysis: {grade}")
+                return False
+            
+            # Compare grade values
+            return grade_values[grade] >= min_grade_value
+        
+        # Check for markdown format "## GRADE"
+        elif "## GRADE" in analysis_result:
+            # Split at "## GRADE" and take the part after it
+            grade_section = analysis_result.split("## GRADE")[1].strip()
+            # Extract just the letter grade, ignoring any additional text
+            grade = None
+            for char in grade_section:
+                if char in "ABCDF":
+                    grade = char
+                    break
+            
+            if not grade:
+                logger.error("No valid grade character found in the grade section")
+                return False
+                
             if grade not in grade_values:
                 logger.error(f"Invalid grade found in analysis: {grade}")
                 return False
