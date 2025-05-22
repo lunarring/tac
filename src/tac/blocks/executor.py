@@ -14,6 +14,7 @@ import shutil
 from tac.agents.trusty.registry import TrustyAgentRegistry
 from tac.agents.trusty.base import TrustyAgent, ComparativeTrustyAgent
 from tac.utils.ui import NullUIManager
+from tac.agents.trusty.pytest import PytestTestingAgent
 logger = setup_logging('tac.blocks.executor')
 
 class BlockExecutor:
@@ -48,7 +49,10 @@ class BlockExecutor:
         
         # Use the appropriate git manager based on config
         self.git_manager = create_git_manager()
-            
+        
+        # Initialize the test runner to always use a fresh PytestTestingAgent
+        self.test_runner = PytestTestingAgent()
+        
         # Error analyzer is now initialized in PytestTestingAgent and accessed via self.test_runner.error_analyzer
 
         # Initialize trusty agents from registry
