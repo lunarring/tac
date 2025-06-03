@@ -197,15 +197,15 @@ class Config:
     # Component-to-template mappings
     component_llm_mappings: Dict[str, str] = field(default_factory=lambda: {
         # Specify which template to use for each component
-        "native_agent": "o4-mini",
-        "protoblock_generation": "o4-mini",
+        "native_agent": "o3-mini",
+        "protoblock_generation": "o3-mini",
         "chat": "gpt-4o-2024-08-06",
         "file_summarizer": "gpt-4o-2024-08-06",
         "file_peeker": "gpt-4o-2024-08-06",
         "orchestrator": "o3-mini",
         "vision": "gpt-4o",  # Vision model needs to be gpt-4o
-        "code_reviewer": "o4-mini",  # Code reviewer testing uses o4-mini
-        "default": "o4-mini"  # Default template when component not specified
+        "code_reviewer": "o3-mini",  # Code reviewer testing uses o4-mini
+        "default": "o3-mini"  # Default template when component not specified
     })
     
     logging: LoggingConfig = field(default_factory=LoggingConfig)
