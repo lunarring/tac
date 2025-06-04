@@ -39,6 +39,7 @@ class TrustyAgentConfig:
 class GeneralConfig:
     coding_agent: str = "native"
     use_file_summaries: bool = True
+    respect_gitignore: bool = True  # Whether to respect .gitignore files when indexing
     trusty_agents: TrustyAgentConfig = field(default_factory=TrustyAgentConfig)
     summarizer_timeout: int = 45  # Timeout in seconds for file summarization
     max_retries_block_creation: int = 4

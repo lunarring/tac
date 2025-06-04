@@ -2,6 +2,7 @@ import os
 import json
 import hashlib
 import re
+import fnmatch
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union
 from tac.utils.file_summarizer import FileSummarizer
@@ -34,7 +35,69 @@ class ProjectFiles:
             '.h', '.hh', '.hpp', '.hxx',           # C/C++ header files
             '.inl', '.tpp', '.ipp'                 # C++ inline/template implementation files
         ]
+        # Load gitignore patterns only if enabled in config
+        self.gitignore_patterns = self._load_gitignore_patterns() if config.general.respect_gitignore else []
         
+    def _load_gitignore_patterns(self) -> List[str]:
+        """Load and parse .gitignore patterns"""
+        gitignore_path = os.path.join(self.project_root, '.gitignore')
+        patterns = []
+        
+        if os.path.exists(gitignore_path):
+            try:
+                with open(gitignore_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        # Skip empty lines and comments
+                        if line and not line.startswith('#'):
+                            patterns.append(line)
+            except Exception as e:
+                logger.warning(f"Error reading .gitignore: {str(e)}")
+        
+        return patterns
+    
+    def _is_ignored_by_gitignore(self, path: str) -> bool:
+        """Check if a path is ignored by gitignore patterns"""
+        if not config.general.respect_gitignore or not self.gitignore_patterns:
+            return False
+            
+        # Convert to relative path from project root
+        rel_path = os.path.relpath(path, self.project_root)
+        
+        # Handle patterns
+        for pattern in self.gitignore_patterns:
+            # Handle negation patterns (starting with !)
+            if pattern.startswith('!'):
+                continue  # Skip negation for now (basic implementation)
+            
+            # Handle directory-only patterns (ending with /)
+            if pattern.endswith('/'):
+                pattern = pattern[:-1]
+                if os.path.isdir(path) and fnmatch.fnmatch(rel_path, pattern):
+                    return True
+                # Also check if any parent directory matches
+                parent_path = rel_path
+                while parent_path:
+                    if fnmatch.fnmatch(os.path.basename(parent_path), pattern):
+                        return True
+                    parent_path = os.path.dirname(parent_path)
+                    if not parent_path or parent_path == '.':
+                        break
+            else:
+                # Handle file patterns
+                if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(os.path.basename(rel_path), pattern):
+                    return True
+                # Check if any parent directory matches the pattern
+                parent_path = rel_path
+                while parent_path:
+                    if fnmatch.fnmatch(parent_path, pattern):
+                        return True
+                    parent_path = os.path.dirname(parent_path)
+                    if not parent_path or parent_path == '.':
+                        break
+        
+        return False
+    
     def _compute_file_hash(self, file_path: str) -> str:
         """Compute SHA-256 hash of file contents"""
         with open(file_path, 'rb') as f:
@@ -81,8 +144,12 @@ class ProjectFiles:
         # First pass: collect all supported files
         all_files = []
         for root, dirs, files in os.walk(self.project_root):
-            # Filter directories: exclude specified, dot-files, and ignore_paths from config
-            dirs[:] = [d for d in dirs if d not in exclusions and d not in config.general.ignore_paths and not (exclude_dot_files and d.startswith('.'))]
+            # Filter directories: exclude specified, dot-files, ignore_paths from config, and gitignore
+            dirs[:] = [d for d in dirs 
+                      if d not in exclusions 
+                      and d not in config.general.ignore_paths 
+                      and not (exclude_dot_files and d.startswith('.'))
+                      and not self._is_ignored_by_gitignore(os.path.join(root, d))]
             
             for file in files:
                 # Check if file has a supported extension
@@ -93,6 +160,10 @@ class ProjectFiles:
                     file_path = os.path.join(root, file)
                     abs_file_path = os.path.abspath(file_path)
                     real_path = os.path.realpath(abs_file_path)
+                    
+                    # Skip if ignored by gitignore
+                    if self._is_ignored_by_gitignore(file_path):
+                        continue
                     
                     if real_path.startswith(self.project_root):  # Only include files in project
                         all_files.append((file_path, real_path))
