@@ -35,7 +35,8 @@ class ProjectFiles:
             '.h', '.hh', '.hpp', '.hxx',           # C/C++ header files
             '.inl', '.tpp', '.ipp',                # C++ inline/template implementation files
             # C# files for Unity
-            '.cs'
+            '.cs',
+            '.unity'  # Unity scene files
         ]
         # Load gitignore patterns only if enabled in config
         self.gitignore_patterns = self._load_gitignore_patterns() if config.general.respect_gitignore else []
