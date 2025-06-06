@@ -33,7 +33,9 @@ class ProjectFiles:
             # C and C++ files
             '.c', '.cc', '.cpp', '.cxx',           # C/C++ source files
             '.h', '.hh', '.hpp', '.hxx',           # C/C++ header files
-            '.inl', '.tpp', '.ipp'                 # C++ inline/template implementation files
+            '.inl', '.tpp', '.ipp',                # C++ inline/template implementation files
+            # C# files for Unity
+            '.cs'
         ]
         # Load gitignore patterns only if enabled in config
         self.gitignore_patterns = self._load_gitignore_patterns() if config.general.respect_gitignore else []
@@ -133,7 +135,8 @@ class ProjectFiles:
             Dict containing stats about the update
         """
         if exclusions is None:
-            exclusions = [".git", "__pycache__", "venv", "env", "build", "node_modules", "dist"]
+            exclusions = [".git", "__pycache__", "venv", "env", "build", "node_modules", "dist",
+                          "Library", "Temp", "obj", "Build", "Builds", "Logs"]  # Unity artifact folders
             
         # Load existing data
         data = self._load_existing_summaries()
